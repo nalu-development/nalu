@@ -1,0 +1,22 @@
+##########################################
+# StyleCop
+##########################################
+
+[*]
+# SA0001: XML comment analysis is disabled due to project configuration
+# Justification: Comments turned off
+# https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/SA0001.md
+dotnet_diagnostic.SA0001.severity = none
+
+[*.cs]
+# Silence some warnings in sample projects
+dotnet_diagnostic.IDE0005.severity = none
+dotnet_diagnostic.IDE0009.severity = none
+dotnet_diagnostic.IDE0011.severity = none
+dotnet_diagnostic.IDE0021.severity = none
+dotnet_diagnostic.IDE0022.severity = none
+dotnet_diagnostic.IDE0065.severity = none
+dotnet_diagnostic.IDE0040.severity = none
+dotnet_diagnostic.IDE0058.severity = none
+dotnet_diagnostic.CA1805.severity = none
+dotnet_diagnostic.CA1711.severity = none
