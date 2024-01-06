@@ -1,0 +1,32 @@
+<Project>
+
+  <PropertyGroup Label="Build">
+    <LangVersion>latest</LangVersion>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <Authors>Alberto Aldegheri</Authors>
+    <Company />
+    <Copyright>Copyright © Alberto Aldegheri. All rights Reserved</Copyright>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/albyrock87/Nalu</PackageProjectUrl>
+    <PackageIcon>Icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/albyrock87/Nalu.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReleaseNotes>https://github.com/albyrock87/Nalu/releases</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup Label="Package References">
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" PrivateAssets="all" Version="17.8.14" />
+    <PackageReference Include="MinVer" PrivateAssets="all" Version="4.3.0" />
+    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" Version="1.2.0-beta.556" />
+  </ItemGroup>
+
+</Project>
