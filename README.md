@@ -1,8 +1,8 @@
-![Banner](Images/Banner.png)
+![Banner](https://raw.githubusercontent.com/nalu-development/nalu/main/Images/Banner.png)
 
 # Nalu [![GitHub Actions Status](https://github.com/nalu-development/nalu/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/nalu-development/nalu/actions/workflows/build.yml)
 
-## Nalu.Maui [![Nalu.Maui NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.svg)](https://www.nuget.org/packages/Nalu.Maui/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui)](https://www.nuget.org/packages/Nalu.Maui)
+## Nalu.Maui [![Nalu.Maui NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.svg)](https://www.nuget.org/packages/Nalu.Maui/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui)](https://www.nuget.org/packages/Nalu.Maui/)
 
 Nalu.Maui is a library that solves some problems like navigation between pages in a MAUI application.
 
