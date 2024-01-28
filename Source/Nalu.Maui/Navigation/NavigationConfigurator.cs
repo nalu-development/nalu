@@ -33,7 +33,9 @@ public class NavigationConfigurator : INavigationOptions
         _applicationType = applicationType;
         _services = services.AddSingleton<INavigationOptions>(this);
         MenuImage = ImageSource.FromFile("nalu_navigation_menu.png");
-        _ = OperatingSystem.IsIOS() ? WithAppleBackImage() : WithAndroidBackImage();
+
+        var isApple = OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst();
+        _ = isApple ? WithAppleBackImage() : WithAndroidBackImage();
     }
 
     /// <summary>

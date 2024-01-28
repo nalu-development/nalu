@@ -36,9 +36,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <MauiImage Include="Images\nalu_navigation_arrow_back_android.svg" TintColor="#FFFFFF" />
-    <MauiImage Include="Images\nalu_navigation_arrow_back_ios.svg" TintColor="#FFFFFF" />
-    <MauiImage Include="Images\nalu_navigation_menu.svg" TintColor="#FFFFFF" />
+    <None Include="Nalu.Maui.targets" Pack="True" PackagePath="buildTransitive\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <MauiImage Include="Images\nalu_navigation_arrow_back_android.svg" TintColor="#FFFFFF" Pack="True" PackagePath="buildTransitive\Images\" />
+    <MauiImage Include="Images\nalu_navigation_arrow_back_ios.svg" TintColor="#FFFFFF" Pack="True" PackagePath="buildTransitive\Images\" />
+    <MauiImage Include="Images\nalu_navigation_menu.svg" TintColor="#FFFFFF" Pack="True" PackagePath="buildTransitive\Images\" />
   </ItemGroup>
 
   <ItemGroup>
