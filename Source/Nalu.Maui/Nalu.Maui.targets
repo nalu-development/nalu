@@ -1,7 +1,7 @@
 <Project>
   <ItemGroup>
-    <MauiImage Include="$(MSBuildThisFileDirectory)\Images\nalu_navigation_arrow_back_android.svg" />
-    <MauiImage Include="$(MSBuildThisFileDirectory)\Images\nalu_navigation_arrow_back_ios.svg" />
-    <MauiImage Include="$(MSBuildThisFileDirectory)\Images\nalu_navigation_menu.svg" />
+    <MauiImage Include="$(MSBuildThisFileDirectory)\Images\nalu_navigation_arrow_back_android.svg" TintColor="#FFFFFF" />
+    <MauiImage Include="$(MSBuildThisFileDirectory)\Images\nalu_navigation_arrow_back_ios.svg" TintColor="#FFFFFF" />
+    <MauiImage Include="$(MSBuildThisFileDirectory)\Images\nalu_navigation_menu.svg" TintColor="#FFFFFF" />
   </ItemGroup>
 </Project>
