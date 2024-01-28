@@ -102,7 +102,11 @@ builder
 Nalu navigation is based on `Shell` navigation, so you need to define your `Shell` in `AppShell.xaml` by inheriting from `NaluShell`.
 Use `nalu:Navigation.PageModel` to specify the page model for each `ShellContent`.
 
-Important: all the root pages must be defined as `ShellContent`.
+Important:
+- all the root pages must be defined as `ShellContent`
+- to make the flyout work correctly either
+  - define at least two root pages
+  - or set the `FlyoutBehavior` to `FlyoutBehavior.Flyout`
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
