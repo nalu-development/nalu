@@ -179,18 +179,6 @@ public abstract class Navigation : BindableObject, IList<NavigationSegment>, IRe
            other.Path == Path &&
            ((Intent == null && other.Intent == null) || (Intent is TIntent intent && other.Intent is TIntent otherIntent && intentComparer(intent, otherIntent)));
 
-    /// <inheritdoc cref="object.Equals(object)"/>
-    public override bool Equals(object? obj) => obj is Navigation navigation && Equals(navigation);
-
-    /// <inheritdoc cref="object.GetHashCode"/>
-    public override int GetHashCode()
-    {
-        unchecked
-        {
-            return Path.GetHashCode() + Intent?.GetHashCode() ?? 0;
-        }
-    }
-
     private static void PageModelPropertyChanged(BindableObject bindable, object oldvalue, object newvalue)
     {
         if (bindable is not ShellContent shellContent)
