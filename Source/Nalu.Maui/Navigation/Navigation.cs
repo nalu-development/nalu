@@ -2,13 +2,14 @@ namespace Nalu;
 
 using System.Collections;
 using System.ComponentModel;
+using System.Reflection;
 
 #pragma warning disable CA1067
 
 /// <summary>
 /// Represents a navigation request.
 /// </summary>
-public abstract class Navigation : BindableObject, IList<NavigationSegment>, IReadOnlyList<NavigationSegment>, IEquatable<Navigation>
+public abstract class Navigation : BindableObject, IList<NavigationSegment>, IReadOnlyList<NavigationSegment>
 {
     /// <inheritdoc cref="Intent"/>
     public static readonly BindableProperty IntentProperty = BindableProperty.Create(
@@ -151,11 +152,32 @@ public abstract class Navigation : BindableObject, IList<NavigationSegment>, IRe
     /// <inheritdoc cref="IList{T}.RemoveAt"/>
     public void RemoveAt(int index) => _list.RemoveAt(index);
 
-    /// <inheritdoc cref="IEquatable{Navigation}.Equals(Navigation)"/>
-    public bool Equals(Navigation? other)
+    /// <summary>
+    /// Compares two <see cref="Navigation"/>s for equality.
+    /// </summary>
+    /// <param name="other">The other navigation object.</param>
+    public bool Matches(Navigation? other) => Matches(other, GetIntentComparer());
+
+    /// <summary>
+    /// Compares two <see cref="Navigation"/>s for equality.
+    /// </summary>
+    /// <param name="other">The other navigation object.</param>
+    /// <param name="intentComparer">An equality comparer for intents.</param>
+    public bool Matches(Navigation? other, IEqualityComparer? intentComparer)
         => other is not null &&
            other.Path == Path &&
-           other.Intent == Intent;
+           (Intent == other.Intent || (intentComparer ?? EqualityComparer<object>.Default).Equals(Intent, other.Intent));
+
+    /// <summary>
+    /// Compares two <see cref="Navigation"/>s for equality.
+    /// </summary>
+    /// <typeparam name="TIntent">Expected type for intents.</typeparam>
+    /// <param name="other">The other navigation object.</param>
+    /// <param name="intentComparer">An function to check intent equality.</param>
+    public bool Matches<TIntent>(Navigation? other, Func<TIntent, TIntent, bool> intentComparer)
+        => other is not null &&
+           other.Path == Path &&
+           ((Intent == null && other.Intent == null) || (Intent is TIntent intent && other.Intent is TIntent otherIntent && intentComparer(intent, otherIntent)));
 
     /// <inheritdoc cref="object.Equals(object)"/>
     public override bool Equals(object? obj) => obj is Navigation navigation && Equals(navigation);
@@ -183,5 +205,18 @@ public abstract class Navigation : BindableObject, IList<NavigationSegment>, IRe
 
         shellContent.Route = NavigationHelper.GetSegmentName(type);
         shellContent.Content = new ContentPage();
+    }
+
+    private IEqualityComparer GetIntentComparer()
+    {
+        if (Intent is null)
+        {
+            return EqualityComparer<object>.Default;
+        }
+
+        var type = Intent.GetType();
+        var equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(type);
+        var defaultProperty = equalityComparerType.GetProperty(nameof(EqualityComparer<object>.Default), BindingFlags.Public | BindingFlags.Static);
+        return (IEqualityComparer)defaultProperty?.GetValue(null)!;
     }
 }

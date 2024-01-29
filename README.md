@@ -267,6 +267,28 @@ public class PersonDetailsPageModel(INavigationServiceProvider navigationService
 }
 ```
 
+#### How to unit test navigation
+
+Here's an example of how to unit test navigation using NSubstitute:
+
+Using `record` for intents is recommended to avoid having to implement an equality comparer.
+Suppose to have defined an intent class `public record AnIntent(int Value = 0);`.
+
+```csharp
+// Arrange
+var navigationService = Substitute.For<INavigationService>();
+navigationService.GoToAsync(Arg.Any<Navigation>()).Returns(Task.FromResult(true));
+var viewModel = new MyViewModel(navigationService);
+
+// Act
+await viewModel.DoSomethingAsync(5);
+
+// Assert
+var expectedNavigation = Navigation.Relative(new AnIntent(5)).Push<TargetPageModel>();
+await navigationService.Received().GoToAsync(Arg.Is<Navigation>(n => n.Matches(expectedNavigation)));
+```
+
+
 #### Sample application
 
 This repository contains a `Nalu.Maui.Sample` project that shows how to use Nalu navigation.
