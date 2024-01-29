@@ -8,7 +8,7 @@ using Navigation = Nalu.Navigation;
 
 public class NavigationServiceTests
 {
-    public class AnIntent;
+    public record AnIntent(int Value = 0);
 
     public interface ISomeContext;
 
@@ -590,5 +590,22 @@ public class NavigationServiceTests
         var page2sp = PageNavigationContext.Get(page2).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
 
         context.Should().BeSameAs(page2sp.GetRequiredService<ISomeContext>());
+    }
+
+    [Fact(DisplayName = "NavigationService, GoToAsync, can be easily testable")]
+    public async Task NavigationServiceGoToAsyncCanBeEasilyTestable()
+    {
+        var navigationService = Substitute.For<INavigationService>();
+        navigationService.GoToAsync(Arg.Any<Navigation>()).Returns(Task.FromResult(true));
+        {
+            // Simulate what would be the code to be tested
+            var intent = new AnIntent(5);
+            await navigationService.GoToAsync(Navigation.Relative(intent).Push<IOneTestPageModel>());
+        }
+
+        // Assert that the code did what it was supposed to do
+        var expectedNavigation = Navigation.Relative(new AnIntent(5)).Push<IOneTestPageModel>();
+        await navigationService.Received().GoToAsync(
+            Arg.Is<Navigation>(n => n.Matches(expectedNavigation)));
     }
 }
