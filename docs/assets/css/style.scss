@@ -1,0 +1,38 @@
+---
+---
+
+@import "{{ site.theme }}";
+
+html {
+  background: #f6f9fe;
+}
+
+body {
+  padding-top: 130px;
+}
+
+header {
+  background: linear-gradient(#dfe5f6, #ffffff);
+}
+
+header h1 {
+  background: url(https://raw.githubusercontent.com/nalu-development/nalu/main/Images/Banner.png) left center no-repeat;
+  background-size: 264px;
+  text-indent: -99999px;
+  width: 264px;
+  height: 158px;
+  position: relative;
+  margin-top: -130px;
+}
+
+header p {
+  width: 340px;
+}
+
+section {
+  background: #fff;
+}
+
+.wrapper {
+  width: 900px;
+}
