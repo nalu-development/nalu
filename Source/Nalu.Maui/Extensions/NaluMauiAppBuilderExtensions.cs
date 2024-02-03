@@ -19,8 +19,8 @@ public static class NaluMauiAppBuilderExtensions
     {
         builder.Services.AddSingleton<INavigationServiceInternal, NavigationService>();
         builder.Services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<INavigationServiceInternal>());
-        builder.Services.AddSingleton<INavigationServiceProviderInternal, NavigationServiceProvider>();
-        builder.Services.AddSingleton<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
+        builder.Services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
+        builder.Services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
 
         var options = new NavigationConfigurator(builder.Services, typeof(TApplication));
         configure(options);

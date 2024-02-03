@@ -32,5 +32,7 @@ internal sealed class NavigationServiceProvider : INavigationServiceProviderInte
                 disposable.Dispose();
             }
         }
+
+        _parent = null;
     }
 }
