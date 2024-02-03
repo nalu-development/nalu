@@ -94,6 +94,7 @@ Global
 		{959B003B-842C-473F-99E5-E905642AFDAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{959B003B-842C-473F-99E5-E905642AFDAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{959B003B-842C-473F-99E5-E905642AFDAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{959B003B-842C-473F-99E5-E905642AFDAF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
