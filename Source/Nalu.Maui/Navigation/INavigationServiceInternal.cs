@@ -4,7 +4,7 @@ using System.ComponentModel;
 
 internal interface INavigationServiceInternal : INavigationService
 {
-    void Initialize<TPageModel>(INavigationController controller, object? intent = null)
+    Task InitializeAsync<TPageModel>(INavigationController controller, object? intent = null)
         where TPageModel : INotifyPropertyChanged;
 
     Page CreatePage(Type pageModelType);
