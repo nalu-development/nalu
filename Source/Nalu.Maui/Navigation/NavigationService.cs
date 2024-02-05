@@ -30,7 +30,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         });
     }
 
-    void INavigationServiceInternal.Initialize<TPageModel>(INavigationController controller, object? intent)
+    async Task INavigationServiceInternal.InitializeAsync<TPageModel>(INavigationController controller, object? intent)
     {
         if (_controller is not null)
         {
@@ -49,10 +49,9 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         }
 #pragma warning disable VSTHRD002
         // Rethrow eventual exceptions
-        enteringTask.GetAwaiter().GetResult();
+        await enteringTask.ConfigureAwait(true);
+        await controller.SetRootPageAsync(page).ConfigureAwait(true);
 #pragma warning restore VSTHRD002
-
-        controller.SetRootPage(page);
 
         _ = SendAppearingAndUpdateStackAsync(intent).AsTask();
     }
@@ -187,14 +186,12 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         await controller.PopAsync(popCount).ConfigureAwait(true);
 
         PageNavigationContext.Dispose(page);
-        page.BindingContext = null;
 
         if (intermediatePages is not null)
         {
             foreach (var intermediatePage in intermediatePages)
             {
                 PageNavigationContext.Dispose(intermediatePage);
-                intermediatePage.BindingContext = null;
             }
         }
 
@@ -239,9 +236,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
 
         await NavigationHelper.SendEnteringAsync(targetPage, intent).ConfigureAwait(true);
 
-        controller.SetRootPage(targetPage);
-
-        await Task.Yield(); // give it time to render
+        await controller.SetRootPageAsync(targetPage).ConfigureAwait(true);
 
         PageNavigationContext.Dispose(page);
 

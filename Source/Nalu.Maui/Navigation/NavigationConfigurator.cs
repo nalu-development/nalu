@@ -12,19 +12,13 @@ public class NavigationConfigurator : INavigationOptions
     private readonly Type _applicationType;
     private readonly Dictionary<Type, Type> _mapping;
 
-    /// <summary>
-    /// Gets the image used to display a navigation menu button on root pages.
-    /// </summary>
+    /// <inheritdoc />
     public ImageSource MenuImage { get; private set; }
 
-    /// <summary>
-    /// Gets the image used to display a navigation back button on nested pages.
-    /// </summary>
+    /// <inheritdoc />
     public ImageSource BackImage { get; private set; } = null!;
 
-    /// <summary>
-    /// Gets a dictionary which maps a page model type to corresponding page type.
-    /// </summary>
+    /// <inheritdoc />
     public IReadOnlyDictionary<Type, Type> Mapping => _mapping;
 
     internal NavigationConfigurator(IServiceCollection services, Type applicationType)
@@ -142,7 +136,7 @@ public class NavigationConfigurator : INavigationOptions
     /// `MyPage => MyPageModel` naming convention and adds them all as scoped services.
     /// </summary>
     /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
-    public IServiceCollection AddPages(params Assembly[] otherAssemblies)
+    public NavigationConfigurator AddPages(params Assembly[] otherAssemblies)
         => AddPages(pageName => $"{pageName}Model", otherAssemblies);
 
     /// <summary>
@@ -152,7 +146,7 @@ public class NavigationConfigurator : INavigationOptions
     /// <remarks>If corresponding interface is found `IMyPageModel` the view model will be registered through the interface.</remarks>
     /// <param name="pageToModelNameConvention">Given a page class name returns the corresponding page model class name.</param>
     /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
-    public IServiceCollection AddPages(Func<string, string> pageToModelNameConvention, params Assembly[] otherAssemblies)
+    public NavigationConfigurator AddPages(Func<string, string> pageToModelNameConvention, params Assembly[] otherAssemblies)
     {
         var assemblies = new[] { _applicationType.Assembly }.Concat(otherAssemblies).Distinct();
         var types = assemblies.SelectMany(a => a.GetTypes()).ToList();
@@ -193,6 +187,6 @@ public class NavigationConfigurator : INavigationOptions
             }
         }
 
-        return _services;
+        return this;
     }
 }

@@ -31,7 +31,7 @@ internal interface INavigationController
     /// Sets the root page of the navigation.
     /// </summary>
     /// <param name="page">The page to set as root.</param>
-    void SetRootPage(Page page);
+    Task SetRootPageAsync(Page page);
 
     /// <summary>
     /// Configures page for the navigation.

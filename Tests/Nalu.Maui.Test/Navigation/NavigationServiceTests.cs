@@ -53,7 +53,11 @@ public class NavigationServiceTests
         public Page CurrentPage => NavigationStack[^1];
         public Page RootPage => NavigationStack[0];
 
-        public void SetRootPage(Page page) => NavigationStack = new[] { page };
+        public Task SetRootPageAsync(Page page)
+        {
+            NavigationStack = new[] { page };
+            return Task.CompletedTask;
+        }
 
         public void ConfigurePage(Page page)
         {
@@ -103,13 +107,13 @@ public class NavigationServiceTests
 
         serviceCollection.AddScoped<IRealTestPageModel, RealTestPageModel>();
         serviceCollection.AddScoped<RealTestPage>();
-        serviceCollection.AddScoped<IOneTestPageModel>(sp => Substitute.For<IOneTestPageModel>());
+        serviceCollection.AddScoped<IOneTestPageModel>(_ => Substitute.For<IOneTestPageModel>());
         serviceCollection.AddScoped<OneTestPage>();
-        serviceCollection.AddScoped<ITwoTestPageModel>(sp => Substitute.For<ITwoTestPageModel>());
+        serviceCollection.AddScoped<ITwoTestPageModel>(_ => Substitute.For<ITwoTestPageModel>());
         serviceCollection.AddScoped<TwoTestPage>();
-        serviceCollection.AddScoped<IThreeTestPageModel>(sp => Substitute.For<IThreeTestPageModel>());
+        serviceCollection.AddScoped<IThreeTestPageModel>(_ => Substitute.For<IThreeTestPageModel>());
         serviceCollection.AddScoped<ThreeTestPage>();
-        serviceCollection.AddScoped<IGuardedTestPageModel>(sp => Substitute.For<IGuardedTestPageModel>());
+        serviceCollection.AddScoped<IGuardedTestPageModel>(_ => Substitute.For<IGuardedTestPageModel>());
         serviceCollection.AddScoped<GuardedTestPage>();
 
         _serviceProvider = serviceCollection.BuildServiceProvider();
@@ -123,7 +127,7 @@ public class NavigationServiceTests
         _navigationController.ExecuteNavigationAsync(Arg.Any<Func<Task<bool>>>())
             .Returns(callInfo => callInfo.Arg<Func<Task<bool>>>()());
         _navigationController
-            .When(m => m.SetRootPage(Arg.Any<Page>()))
+            .When(m => m.SetRootPageAsync(Arg.Any<Page>()))
             .Do(callInfo =>
             {
                 var rootPage = callInfo.Arg<Page>();
@@ -149,9 +153,9 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when initialized, should set the root page, sending entering and appearing")]
     public void NavigationServiceWhenInitializedShouldSetTheRootPageSendingEnteringAndAppearing()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
 
-        _navigationController.Received().SetRootPage(Arg.Any<OneTestPage>());
+        _navigationController.Received().SetRootPageAsync(Arg.Any<OneTestPage>());
         var page = _navigationController.RootPage;
         var model = (IOneTestPageModel)page.BindingContext;
 
@@ -168,9 +172,9 @@ public class NavigationServiceTests
     public void NavigationServiceWhenInitializedWithIntentShouldSetTheRootPageSendingEnteringAndAppearingWithIntent()
     {
         var intent = new AnIntent();
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController, intent);
+        _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController, intent);
 
-        _navigationController.Received().SetRootPage(Arg.Any<OneTestPage>());
+        _navigationController.Received().SetRootPageAsync(Arg.Any<OneTestPage>());
         var page = _navigationController.RootPage;
         var model = (IOneTestPageModel)page.BindingContext;
 
@@ -188,15 +192,15 @@ public class NavigationServiceTests
     {
         var intent = "an intent";
 
-        var initializeAction = () => _navigationService.Initialize<IOneTestPageModel>(_navigationController, intent);
+        var initializeAction = () => _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController, intent);
 
-        initializeAction.Should().Throw<InvalidOperationException>();
+        initializeAction.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact(DisplayName = "NavigationService, when pushing a page, should send disappearing on current page, then set the new page, sending entering and appearing")]
     public async Task NavigationServiceWhenPushingAPageShouldSendDisappearingOnCurrentPageThenSetTheNewPageSendingEnteringAndAppearing()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.RootPage;
         var model1 = (IOneTestPageModel)page1.BindingContext;
         model1.ClearReceivedCalls();
@@ -222,7 +226,7 @@ public class NavigationServiceTests
     public async Task NavigationServiceWhenPushingAPageWithIntentShouldSendDisappearingOnCurrentPageThenSetTheNewPageSendingEnteringAndAppearing()
     {
         var intent = new AnIntent();
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.RootPage;
         var model1 = (IOneTestPageModel)page1.BindingContext;
         model1.ClearReceivedCalls();
@@ -248,7 +252,7 @@ public class NavigationServiceTests
     public async Task NavigationServiceWhenPushingAPageWithIncorrectIntentShouldThrow()
     {
         var intent = "an intent";
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.RootPage;
         var model1 = (IOneTestPageModel)page1.BindingContext;
         model1.ClearReceivedCalls();
@@ -264,7 +268,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when popping a page, should send disappearing and leaving on current page, then pop sending appearing")]
     public async Task NavigationServiceWhenPoppingAPageShouldSendDisappearingAndLeavingOnCurrentPageThenPopSendingAppearing()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
 
         var page1 = _navigationController.NavigationStack[^2];
@@ -295,7 +299,7 @@ public class NavigationServiceTests
         var navigationController = new RealTestNavigationController();
         WeakReference<Page> weakPage;
         {
-            ((INavigationServiceInternal)navigationService).Initialize<IOneTestPageModel>(navigationController);
+            await ((INavigationServiceInternal)navigationService).InitializeAsync<IOneTestPageModel>(navigationController);
             await navigationService.GoToAsync(Navigation.Relative().Push<IRealTestPageModel>());
             weakPage = new WeakReference<Page>(navigationController.CurrentPage);
             await navigationService.GoToAsync(Navigation.Relative().Pop());
@@ -312,7 +316,7 @@ public class NavigationServiceTests
     public async Task NavigationServiceWhenPoppingAPageWithIntentShouldSendDisappearingAndLeavingOnCurrentPageThenPopSendingAppearing()
     {
         var intent = new AnIntent();
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
 
         var page1 = _navigationController.NavigationStack[^2];
@@ -341,7 +345,7 @@ public class NavigationServiceTests
     public async Task NavigationServiceWhenPoppingAPageWithIncorrectIntentShouldThrow()
     {
         const string intent = "an intent";
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
 
         var page1 = _navigationController.NavigationStack[^2];
@@ -366,7 +370,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when popping multiple pages, should send disappearing only to current page and appearing to target page")]
     public async Task NavigationServiceWhenPoppingMultiplePagesShouldSendDisappearingOnlyToCurrentPageAndAppearingToTargetPage()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
         await _navigationService.GoToAsync(Navigation.Relative().Push<IThreeTestPageModel>());
 
@@ -400,7 +404,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when popping a guarded page, evaluates guard and cancels if false")]
     public async Task NavigationServiceWhenPoppingAGuardedPageEvaluatesGuardAndCancelsIfFalse()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         await _navigationService.GoToAsync(Navigation.Relative().Push<IGuardedTestPageModel>());
 
         var page1 = _navigationController.NavigationStack[^2];
@@ -424,7 +428,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when popping a guarded page, evaluates guard and proceeds if true")]
     public async Task NavigationServiceWhenPoppingAGuardedPageEvaluatesGuardAndProceedsIfTrue()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         await _navigationService.GoToAsync(Navigation.Relative().Push<IGuardedTestPageModel>());
 
         var page1 = _navigationController.NavigationStack[^2];
@@ -452,7 +456,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when replacing root page, sends disappearing and leaving on current page, then sets the new page, sending entering and appearing")]
     public async Task NavigationServiceWhenReplacingRootPageSendsDisappearingAndLeavingOnCurrentPageThenSetsTheNewPageSendingEnteringAndAppearing()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.NavigationStack[0];
         var model1 = (IOneTestPageModel)page1.BindingContext;
         model1.ClearReceivedCalls();
@@ -474,7 +478,7 @@ public class NavigationServiceTests
     public async Task NavigationServiceWhenReplacingRootPageWithIntentSendsDisappearingAndLeavingOnCurrentPageThenSetsTheNewPageSendingEnteringAndAppearing()
     {
         var intent = new AnIntent();
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.NavigationStack[0];
         var model1 = (IOneTestPageModel)page1.BindingContext;
         model1.ClearReceivedCalls();
@@ -488,7 +492,7 @@ public class NavigationServiceTests
             _ = model1.OnDisappearingAsync();
             _ = model1.OnLeavingAsync();
             _ = model2.OnEnteringAsync(intent);
-            _navigationController.SetRootPage(page2);
+            _navigationController.SetRootPageAsync(page2);
             model1.Dispose();
             _ = model2.OnAppearingAsync(intent);
         });
@@ -497,7 +501,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when replacing a stack with another one, sends events accordingly")]
     public async Task NavigationServiceWhenReplacingAStackWithAnotherOneSendsEventsAccordingly()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.NavigationStack[0];
         var model1 = (IOneTestPageModel)page1.BindingContext;
         await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
@@ -540,7 +544,7 @@ public class NavigationServiceTests
     {
         var intent = new AnIntent();
 
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.NavigationStack[0];
         var model1 = (IOneTestPageModel)page1.BindingContext;
         await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
@@ -579,7 +583,7 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when pushing a page, initialize the nested navigation service provider")]
     public async Task NavigationServiceWhenPushingAPageInitializeTheNestedNavigationServiceProvider()
     {
-        _navigationService.Initialize<IOneTestPageModel>(_navigationController);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
         var page1 = _navigationController.RootPage;
         var page1sp = PageNavigationContext.Get(page1).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
         var context = Substitute.For<ISomeContext>();

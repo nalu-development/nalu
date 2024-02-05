@@ -13,7 +13,9 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
-            .UseNaluNavigation<App>(nav => nav.AddPages())
+            .UseNaluNavigation<App>(nav => nav
+                .AddPages()
+            )
             .UseMauiCommunityToolkit()
             .ConfigureFonts(fonts =>
             {

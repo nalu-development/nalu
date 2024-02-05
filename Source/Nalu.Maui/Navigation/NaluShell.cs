@@ -50,7 +50,9 @@ public abstract class NaluShell : Shell
     {
         HandlerChanged += OnHandlerSet;
 
-        void OnHandlerSet(object? sender, EventArgs e)
+#pragma warning disable VSTHRD100
+        async void OnHandlerSet(object? sender, EventArgs e)
+#pragma warning restore VSTHRD100
         {
             if (Handler is null)
             {
@@ -65,7 +67,7 @@ public abstract class NaluShell : Shell
             _navigationOptions = serviceProvider.GetRequiredService<INavigationOptions>();
 
             var controller = new ShellNavigationController(_navigationService, _navigationOptions, this);
-            _navigationService.Initialize<TPageModel>(controller, intent);
+            await _navigationService.InitializeAsync<TPageModel>(controller, intent).ConfigureAwait(true);
         }
     }
 }

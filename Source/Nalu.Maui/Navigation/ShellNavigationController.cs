@@ -6,7 +6,6 @@ using System.Diagnostics.CodeAnalysis;
 internal sealed class ShellNavigationController(INavigationService navigationService, INavigationOptions navigationOptions, NaluShell shell) : INavigationController, IDisposable
 {
     private readonly SemaphoreSlim _semaphore = new(1, 1);
-    private readonly INavigation _navigation = shell.Navigation;
     private readonly List<Page> _navigationStack = new(10);
 
     public Page CurrentPage => _navigationStack[^1];
@@ -16,39 +15,6 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
     public IReadOnlyList<Page> NavigationStack => _navigationStack;
 
     public void Dispose() => _semaphore.Dispose();
-
-    public void SetRootPage(Page page)
-    {
-        try
-        {
-            shell.SetIsNavigating(true);
-
-            var backButtonBehavior = Shell.GetBackButtonBehavior(page);
-
-#if ANDROID
-            // https://github.com/dotnet/maui/issues/7045
-            backButtonBehavior.Command = null;
-#else
-            backButtonBehavior.Command = new Command(() => _ = shell.FlyoutIsPresented = true);
-#endif
-            backButtonBehavior.IconOverride = navigationOptions.MenuImage;
-
-            if (backButtonBehavior.IconOverride is FontImageSource fontImageSource)
-            {
-                fontImageSource.Color = Shell.GetForegroundColor(shell);
-            }
-
-            var segmentName = NavigationHelper.GetSegmentName(page.BindingContext.GetType());
-
-            SetShellContentPage(segmentName, page);
-            _navigationStack.Clear();
-            _navigationStack.Add(page);
-        }
-        finally
-        {
-            shell.SetIsNavigating(false);
-        }
-    }
 
     public void ConfigurePage(Page page)
     {
@@ -94,17 +60,9 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
             shell.FlyoutIsPresented = false;
 
             // We can't use shell.GoToAsync because Tabs are buggy when popping multiple times
-            // var pathBuilder = new StringBuilder("../");
-            // while (--times > 0)
-            // {
-            //     pathBuilder.Append("../");
-            // }
-            //
-            // var popPath = pathBuilder.ToString();
-            // await shell.GoToAsync(popPath, true).ConfigureAwait(true);
             while (--times >= 0)
             {
-                _ = await _navigation.PopAsync(true).ConfigureAwait(true);
+                await shell.GoToAsync("../", true).ConfigureAwait(true);
                 _navigationStack.RemoveAt(_navigationStack.Count - 1);
             }
         }
@@ -132,14 +90,52 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
         }
     }
 
-    private class FixedRouteFactory(Page page) : RouteFactory
+    private class FixedRouteFactory : RouteFactory
     {
-        public override Element GetOrCreate() => page;
+        private readonly WeakReference<Page> _weakPage;
 
-        public override Element GetOrCreate(IServiceProvider services) => page;
+#pragma warning disable IDE0290
+        public FixedRouteFactory(Page page)
+#pragma warning restore IDE0290
+        {
+            _weakPage = new WeakReference<Page>(page);
+        }
+
+        public override Element GetOrCreate() => _weakPage.TryGetTarget(out var page) ? page : throw new InvalidOperationException("Page has been collected");
+
+        public override Element GetOrCreate(IServiceProvider services) => GetOrCreate();
     }
 
-    private void SetShellContentPage(string segmentName, Page page)
+    public async Task SetRootPageAsync(Page page)
+    {
+        try
+        {
+            shell.SetIsNavigating(true);
+
+            SetRootBackButtonBehavior(page);
+
+            var segmentName = NavigationHelper.GetSegmentName(page.BindingContext.GetType());
+
+            await SetShellContentPageAsync(segmentName, page).ConfigureAwait(true);
+
+            _navigationStack.Clear();
+            _navigationStack.Add(page);
+        }
+        finally
+        {
+            shell.SetIsNavigating(false);
+        }
+    }
+
+    private async Task SetShellContentPageAsync(string segmentName, Page page)
+    {
+        if (!await InternalSetShellContentPageAsync(segmentName, page).ConfigureAwait(true))
+        {
+            throw new KeyNotFoundException($"Could not find shell content for page route {segmentName}");
+        }
+    }
+
+    private async Task<bool> InternalSetShellContentPageAsync(string segmentName, Page page)
     {
         foreach (var item in shell.Items)
         {
@@ -150,24 +146,23 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
                 {
                     if (content.Route == segmentName)
                     {
+                        content.Content = page;
+
+                        // Updating shell content is not working on Tabs
+                        // https://github.com/dotnet/maui/issues/12669
+                        // Workaround: remove and insert the shell content on the same position
                         if (section is Tab)
                         {
-                            // setting Content is not enough to update the tab
-                            // we have to remove and re-add the tab in the same position
+                            await Task.Yield();
                             section.Items.RemoveAt(i);
-                            content.Content = page;
                             section.Items.Insert(i, content);
-                        }
-                        else
-                        {
-                            content.Content = page;
+                            await Task.Yield();
                         }
 
-                        section.CurrentItem = content;
-                        item.CurrentItem = section;
-                        shell.CurrentItem = item;
                         shell.FlyoutIsPresented = false;
-                        return;
+                        await shell.GoToAsync($"//{segmentName}", true).ConfigureAwait(true);
+
+                        return true;
                     }
 
                     ++i;
@@ -175,7 +170,25 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
             }
         }
 
-        throw new KeyNotFoundException($"Could not find shell content for page route {segmentName}");
+        return false;
+    }
+
+    private void SetRootBackButtonBehavior(Page page)
+    {
+        var backButtonBehavior = Shell.GetBackButtonBehavior(page);
+
+#if ANDROID
+        // https://github.com/dotnet/maui/issues/7045
+        backButtonBehavior.Command = null;
+#else
+        backButtonBehavior.Command = new Command(() => _ = shell.FlyoutIsPresented = true);
+#endif
+        backButtonBehavior.IconOverride = navigationOptions.MenuImage;
+
+        if (backButtonBehavior.IconOverride is FontImageSource fontImageSource)
+        {
+            fontImageSource.Color = Shell.GetForegroundColor(shell);
+        }
     }
 
 #if IOS
