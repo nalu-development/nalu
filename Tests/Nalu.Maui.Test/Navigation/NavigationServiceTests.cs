@@ -45,18 +45,34 @@ public class NavigationServiceTests
 #pragma warning restore CS0067
     }
 
-    private class RealTestNavigationController : INavigationController
+    private class RealTestNavigationController(INavigationServiceInternal navigationService) : IShellNavigationController
     {
+        private readonly Dictionary<string, Page> _rootPages = [];
         public IReadOnlyList<Page> NavigationStack { get; private set; } = [];
         public Task<T> ExecuteNavigationAsync<T>(Func<Task<T>> navigationFunc) => navigationFunc();
 
         public Page CurrentPage => NavigationStack[^1];
         public Page RootPage => NavigationStack[0];
 
-        public Task SetRootPageAsync(Page page)
+        public Task SetRootPageAsync(string segmentName)
         {
-            NavigationStack = new[] { page };
+            NavigationStack = new[] { _rootPages[segmentName] };
             return Task.CompletedTask;
+        }
+
+        public Page GetRootPage(string segmentName)
+        {
+            if (_rootPages.TryGetValue(segmentName, out var page))
+            {
+                return page;
+            }
+
+            var navigationServiceTestsType = typeof(NavigationServiceTests);
+            var targetModelTypeFullName = $"{navigationServiceTestsType.FullName}+{segmentName}";
+            var targetModelType = navigationServiceTestsType.Assembly.GetType(targetModelTypeFullName)!;
+            var rootPage = navigationService.CreatePage(targetModelType);
+            _rootPages[segmentName] = rootPage;
+            return rootPage;
         }
 
         public void ConfigurePage(Page page)
@@ -87,7 +103,7 @@ public class NavigationServiceTests
     private class GuardedTestPage(IGuardedTestPageModel model) : BaseTestPage(model);
 
     private readonly INavigationServiceInternal _navigationService;
-    private readonly INavigationController _navigationController;
+    private readonly IShellNavigationController _navigationController;
     private readonly ServiceProvider _serviceProvider;
     private readonly INavigationOptions _navigationOptions;
 
@@ -120,20 +136,39 @@ public class NavigationServiceTests
         _navigationService = new NavigationService(_serviceProvider, _navigationOptions);
 
         var navigationStack = new List<Page>();
-        _navigationController = Substitute.For<INavigationController>();
+        _navigationController = Substitute.For<IShellNavigationController>();
         _navigationController.NavigationStack.Returns(navigationStack);
         _navigationController.RootPage.Returns(_ => navigationStack[0]);
         _navigationController.CurrentPage.Returns(_ => navigationStack[^1]);
         _navigationController.ExecuteNavigationAsync(Arg.Any<Func<Task<bool>>>())
             .Returns(callInfo => callInfo.Arg<Func<Task<bool>>>()());
+
+        var rootPages = new Dictionary<string, Page>();
+        _navigationController.GetRootPage(Arg.Any<string>())
+            .Returns(callInfo =>
+            {
+                var segmentName = callInfo.Arg<string>();
+                if (rootPages.TryGetValue(segmentName, out var page))
+                {
+                    return page;
+                }
+
+                var navigationServiceTestsType = typeof(NavigationServiceTests);
+                var targetModelTypeFullName = $"{navigationServiceTestsType.FullName}+{segmentName}";
+                var targetModelType = navigationServiceTestsType.Assembly.GetType(targetModelTypeFullName)!;
+                var rootPage = _navigationService.CreatePage(targetModelType);
+                rootPages[segmentName] = rootPage;
+                return rootPage;
+            });
         _navigationController
-            .When(m => m.SetRootPageAsync(Arg.Any<Page>()))
+            .When(m => m.SetRootPageAsync(Arg.Any<string>()))
             .Do(callInfo =>
             {
-                var rootPage = callInfo.Arg<Page>();
+                var segmentName = callInfo.Arg<string>();
                 navigationStack.Clear();
-                navigationStack.Add(rootPage);
+                navigationStack.Add(rootPages[segmentName]);
             });
+
         _navigationController
             .When(m => m.PushAsync(Arg.Any<Page>()))
             .Do(callInfo =>
@@ -155,7 +190,7 @@ public class NavigationServiceTests
     {
         _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
 
-        _navigationController.Received().SetRootPageAsync(Arg.Any<OneTestPage>());
+        _navigationController.Received().SetRootPageAsync(nameof(IOneTestPageModel));
         var page = _navigationController.RootPage;
         var model = (IOneTestPageModel)page.BindingContext;
 
@@ -169,12 +204,12 @@ public class NavigationServiceTests
     }
 
     [Fact(DisplayName = "NavigationService, when initialized with intent, should set the root page, sending entering and appearing with intent")]
-    public void NavigationServiceWhenInitializedWithIntentShouldSetTheRootPageSendingEnteringAndAppearingWithIntent()
+    public async Task NavigationServiceWhenInitializedWithIntentShouldSetTheRootPageSendingEnteringAndAppearingWithIntent()
     {
         var intent = new AnIntent();
-        _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController, intent);
+        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController, intent);
 
-        _navigationController.Received().SetRootPageAsync(Arg.Any<OneTestPage>());
+        _ = _navigationController.Received().SetRootPageAsync(nameof(IOneTestPageModel));
         var page = _navigationController.RootPage;
         var model = (IOneTestPageModel)page.BindingContext;
 
@@ -183,8 +218,8 @@ public class NavigationServiceTests
             model.OnEnteringAsync(intent);
             model.OnAppearingAsync(intent);
         });
-        model.DidNotReceive().OnEnteringAsync();
-        model.DidNotReceive().OnAppearingAsync();
+        _ = model.DidNotReceive().OnEnteringAsync();
+        _ = model.DidNotReceive().OnAppearingAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when initialized with incorrect intent, should throw")]
@@ -296,7 +331,7 @@ public class NavigationServiceTests
         // I would like to use _navigationController here, but NSubstitute leaks, even when clearing received calls
         // See: https://github.com/nsubstitute/NSubstitute/issues/771
         var navigationService = new NavigationService(_serviceProvider, _navigationOptions);
-        var navigationController = new RealTestNavigationController();
+        var navigationController = new RealTestNavigationController(navigationService);
         WeakReference<Page> weakPage;
         {
             await ((INavigationServiceInternal)navigationService).InitializeAsync<IOneTestPageModel>(navigationController);
@@ -333,7 +368,6 @@ public class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _navigationController.PopAsync(1);
-            model2.Dispose();
             model1.OnAppearingAsync(intent);
         });
         _ = model1.DidNotReceive().OnEnteringAsync(intent);
@@ -392,8 +426,6 @@ public class NavigationServiceTests
             currentModel.OnLeavingAsync();
             midModel.OnLeavingAsync();
             _navigationController.PopAsync(2);
-            currentModel.Dispose();
-            midModel.Dispose();
             targetModel.OnAppearingAsync();
         });
         _ = targetModel.DidNotReceive().OnEnteringAsync();
@@ -492,8 +524,7 @@ public class NavigationServiceTests
             _ = model1.OnDisappearingAsync();
             _ = model1.OnLeavingAsync();
             _ = model2.OnEnteringAsync(intent);
-            _navigationController.SetRootPageAsync(page2);
-            model1.Dispose();
+            _navigationController.SetRootPageAsync(nameof(ITwoTestPageModel));
             _ = model2.OnAppearingAsync(intent);
         });
     }
@@ -526,10 +557,8 @@ public class NavigationServiceTests
         {
             _ = model2.OnDisappearingAsync();
             _ = model2.OnLeavingAsync();
-            model2.Dispose();
             _ = model1.OnLeavingAsync();
             _ = model3.OnEnteringAsync();
-            model1.Dispose();
             _ = model4.OnEnteringAsync();
             _ = model4.OnAppearingAsync();
         });

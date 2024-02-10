@@ -15,5 +15,6 @@ public partial class ThreePageModel(INavigationService navigationService, IPopup
     private Task PushFourAsync() => navigationService.GoToAsync(Navigation.Relative().Push<FourPageModel>());
 
     public async ValueTask<bool> CanLeaveAsync()
+        // this will leak: https://github.com/CommunityToolkit/Maui/issues/1676
         => (bool)(await popupService.ShowPopupAsync<CanLeavePopupModel>() ?? false);
 }

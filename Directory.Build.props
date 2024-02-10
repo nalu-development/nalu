@@ -15,7 +15,7 @@
     <Copyright>Copyright © Alberto Aldegheri. All rights Reserved</Copyright>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nalu-development/nalu</PackageProjectUrl>
+    <PackageProjectUrl>https://nalu-development.github.io/nalu/</PackageProjectUrl>
     <PackageIcon>Icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/nalu-development/nalu.git</RepositoryUrl>

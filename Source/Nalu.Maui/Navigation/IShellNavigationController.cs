@@ -3,7 +3,7 @@ namespace Nalu;
 /// <summary>
 /// Provides a navigation layer used by <see cref="NavigationService"/> to perform navigation.
 /// </summary>
-internal interface INavigationController
+internal interface IShellNavigationController
 {
     /// <summary>
     /// Gets the navigation stack.
@@ -30,8 +30,15 @@ internal interface INavigationController
     /// <summary>
     /// Sets the root page of the navigation.
     /// </summary>
-    /// <param name="page">The page to set as root.</param>
-    Task SetRootPageAsync(Page page);
+    /// <param name="segmentName">The segment name to be set as root page.</param>
+    Task SetRootPageAsync(string segmentName);
+
+    /// <summary>
+    /// Gets the root page for the specified segment name.
+    /// </summary>
+    /// <param name="segmentName">Segment name corresponding to a ShellContent.</param>
+    /// <returns>The page instance.</returns>
+    Page? GetRootPage(string segmentName);
 
     /// <summary>
     /// Configures page for the navigation.

@@ -43,7 +43,7 @@ Navigation.Relative()
     .Push<ContactDetailPageModel>()
 ```
 
-![PushTwice](assets/images/push-push.png)
+![Push twice in a row](assets/images/push-push.png)
 
 There's also a "navigation guard" feature that allows you to prevent the navigation to happen if a condition is not met.
 You can leverage that to ask the user to confirm leaving the page.
@@ -54,7 +54,14 @@ Navigation.Absolute()
     .Add<RootPageModel>()
 ```
 
-![PushTwice](assets/images/pop-pop-with-guard.png)
+![Absolute navigation to root page](assets/images/pop-pop-with-guard.png)
+
+### Leak detection
+
+`Nalu.Maui` automatically detects and reports memory leaks when the debugger is attached.
+An alert dialog will be shown when your `Page` was not collected after navigating away.
+
+In the above example the leak detection on `ContactsPageModel`, `ContactDetailPageModel` and their respective `Page`s triggers after the navigation completed (root page appears).
 
 ### Read more
 

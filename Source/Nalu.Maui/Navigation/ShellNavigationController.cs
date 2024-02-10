@@ -1,12 +1,16 @@
 namespace Nalu;
 
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 
 [ExcludeFromCodeCoverage]
-internal sealed class ShellNavigationController(INavigationService navigationService, INavigationOptions navigationOptions, NaluShell shell) : INavigationController, IDisposable
+internal sealed class ShellNavigationController(INavigationServiceInternal navigationService, INavigationOptions navigationOptions, NaluShell shell) : IShellNavigationController, IDisposable
 {
+    private static readonly PropertyInfo _shellContentCacheProperty = typeof(ShellContent).GetProperty("ContentCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly List<Page> _navigationStack = new(10);
+    private readonly List<Page> _leakDetectionPages = new(10);
 
     public Page CurrentPage => _navigationStack[^1];
 
@@ -32,19 +36,19 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
         Shell.SetBackButtonBehavior(page, backButtonBehavior);
     }
 
-    async Task<T> INavigationController.ExecuteNavigationAsync<T>(Func<Task<T>> navigationFunc)
+    async Task<T> IShellNavigationController.ExecuteNavigationAsync<T>(Func<Task<T>> navigationFunc)
     {
+        await _semaphore.WaitAsync().ConfigureAwait(true);
         try
         {
-            // We want the eventual button animation to appear before navigating
-            // on top of that we want to avoid other kind of race conditions
-            await Task.Yield();
+            var result = await navigationFunc().ConfigureAwait(true);
+            if (Debugger.IsAttached)
+            {
+                _ = new LeakDetector(_leakDetectionPages).EnsureCollectedAsync();
+                _leakDetectionPages.Clear();
+            }
 
-            await _semaphore.WaitAsync().ConfigureAwait(true);
-#if IOS
-            await WaitForModalInPresentationAsync().ConfigureAwait(true);
-#endif
-            return await navigationFunc().ConfigureAwait(true);
+            return result;
         }
         finally
         {
@@ -54,16 +58,23 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
 
     public async Task PopAsync(int times)
     {
+#if IOS
+        await WaitForModalInPresentationAsync().ConfigureAwait(true);
+#endif
         try
         {
             shell.SetIsNavigating(true);
             shell.FlyoutIsPresented = false;
 
-            // We can't use shell.GoToAsync because Tabs are buggy when popping multiple times
+            // We can't use shell.GoToAsync("../../../") because Tabs are buggy when popping multiple times in a row
             while (--times >= 0)
             {
                 await shell.GoToAsync("../", true).ConfigureAwait(true);
-                _navigationStack.RemoveAt(_navigationStack.Count - 1);
+                var removedIndex = _navigationStack.Count - 1;
+                var removedPage = _navigationStack[removedIndex];
+                _navigationStack.RemoveAt(removedIndex);
+                PageNavigationContext.Dispose(removedPage);
+                _leakDetectionPages.Add(removedPage);
             }
         }
         finally
@@ -74,6 +85,9 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
 
     public async Task PushAsync(Page page)
     {
+#if IOS
+        await WaitForModalInPresentationAsync().ConfigureAwait(true);
+#endif
         try
         {
             shell.SetIsNavigating(true);
@@ -90,36 +104,28 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
         }
     }
 
-    private class FixedRouteFactory : RouteFactory
+    public Page? GetRootPage(string segmentName)
     {
-        private readonly WeakReference<Page> _weakPage;
-
-#pragma warning disable IDE0290
-        public FixedRouteFactory(Page page)
-#pragma warning restore IDE0290
-        {
-            _weakPage = new WeakReference<Page>(page);
-        }
-
-        public override Element GetOrCreate() => _weakPage.TryGetTarget(out var page) ? page : throw new InvalidOperationException("Page has been collected");
-
-        public override Element GetOrCreate(IServiceProvider services) => GetOrCreate();
+        var shellContent = (IShellContentController?)shell.Items
+            .SelectMany(item => item.Items)
+            .SelectMany(section => section.Items)
+            .FirstOrDefault(content => content.Route == segmentName);
+        return shellContent?.GetOrCreateContent();
     }
 
-    public async Task SetRootPageAsync(Page page)
+    public async Task SetRootPageAsync(string segmentName)
     {
+#if IOS
+        await WaitForModalInPresentationAsync().ConfigureAwait(true);
+#endif
         try
         {
             shell.SetIsNavigating(true);
 
-            SetRootBackButtonBehavior(page);
-
-            var segmentName = NavigationHelper.GetSegmentName(page.BindingContext.GetType());
-
-            await SetShellContentPageAsync(segmentName, page).ConfigureAwait(true);
+            await SetShellContentPageAsync(segmentName).ConfigureAwait(true);
 
             _navigationStack.Clear();
-            _navigationStack.Add(page);
+            _navigationStack.Add(shell.CurrentPage);
         }
         finally
         {
@@ -127,67 +133,51 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
         }
     }
 
-    private async Task SetShellContentPageAsync(string segmentName, Page page)
+    private async Task SetShellContentPageAsync(string segmentName)
     {
-        if (!await InternalSetShellContentPageAsync(segmentName, page).ConfigureAwait(true))
-        {
-            throw new KeyNotFoundException($"Could not find shell content for page route {segmentName}");
-        }
-    }
+        const int shellAnimationDuration = 300;
+        var beforeNavigationSection = shell.CurrentItem.CurrentItem;
+        var beforeNavigationContent = beforeNavigationSection.CurrentItem;
 
-    private async Task<bool> InternalSetShellContentPageAsync(string segmentName, Page page)
-    {
-        foreach (var item in shell.Items)
+        await shell.GoToAsync($"//{segmentName}", true).ConfigureAwait(true);
+
+        var afterNavigationSection = shell.CurrentItem.CurrentItem;
+        var afterNavigationContent = afterNavigationSection.CurrentItem;
+
+        // We want to remove and dispose the page we navigated from
+        // This should happen only when *not* navigating between tabs (in the same section)
+        if (beforeNavigationContent != afterNavigationContent)
         {
-            foreach (var section in item.Items)
+            if (beforeNavigationSection is Tab)
             {
-                var i = 0;
-                foreach (var content in section.Items)
+                if (afterNavigationSection != beforeNavigationSection)
                 {
-                    if (content.Route == segmentName)
+                    // Shell navigation does not wait for the animation to finish
+                    await Task.Delay(shellAnimationDuration).ConfigureAwait(true);
+
+                    foreach (var shellContent in beforeNavigationSection.Items)
                     {
-                        content.Content = page;
-
-                        // Updating shell content is not working on Tabs
-                        // https://github.com/dotnet/maui/issues/12669
-                        // Workaround: remove and insert the shell content on the same position
-                        if (section is Tab)
-                        {
-                            await Task.Yield();
-                            section.Items.RemoveAt(i);
-                            section.Items.Insert(i, content);
-                            await Task.Yield();
-                        }
-
-                        shell.FlyoutIsPresented = false;
-                        await shell.GoToAsync($"//{segmentName}", true).ConfigureAwait(true);
-
-                        return true;
+                        RemoveShellContentPage(shellContent);
                     }
-
-                    ++i;
                 }
             }
+            else
+            {
+                // Shell navigation does not wait for the animation to finish
+                await Task.Delay(shellAnimationDuration).ConfigureAwait(true);
+                RemoveShellContentPage(beforeNavigationContent);
+            }
         }
-
-        return false;
     }
 
-    private void SetRootBackButtonBehavior(Page page)
+    private void RemoveShellContentPage(ShellContent shellContent)
     {
-        var backButtonBehavior = Shell.GetBackButtonBehavior(page);
-
-#if ANDROID
-        // https://github.com/dotnet/maui/issues/7045
-        backButtonBehavior.Command = null;
-#else
-        backButtonBehavior.Command = new Command(() => _ = shell.FlyoutIsPresented = true);
-#endif
-        backButtonBehavior.IconOverride = navigationOptions.MenuImage;
-
-        if (backButtonBehavior.IconOverride is FontImageSource fontImageSource)
+        var page = (Page?)_shellContentCacheProperty.GetValue(shellContent);
+        if (page is not null)
         {
-            fontImageSource.Color = Shell.GetForegroundColor(shell);
+            PageNavigationContext.Dispose(page);
+            _shellContentCacheProperty.SetValue(shellContent, null);
+            _leakDetectionPages.Add(page);
         }
     }
 
@@ -197,7 +187,12 @@ internal sealed class ShellNavigationController(INavigationService navigationSer
         // If application is in the middle of presenting a modal, wait for it to finish
         var application = Application.Current;
         var appDelegate = (MauiUIApplicationDelegate)application!.Handler!.PlatformView!;
-        var rootViewController = appDelegate.Window!.RootViewController!;
+        var rootViewController = appDelegate.Window?.RootViewController;
+
+        if (rootViewController is null)
+        {
+            return;
+        }
 
 #pragma warning disable CA1422 // Somehow the compiler is not smart enough to understand the else block is referring to iOS < 13
         var isIOS13 = OperatingSystem.IsOSPlatformVersionAtLeast("iOS", 13);

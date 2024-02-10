@@ -3,6 +3,7 @@ namespace Nalu;
 using System.Collections;
 using System.ComponentModel;
 using System.Reflection;
+using Nalu.Internals;
 
 #pragma warning disable CA1067
 
@@ -192,7 +193,16 @@ public abstract class Navigation : BindableObject, IList<NavigationSegment>, IRe
         }
 
         shellContent.Route = NavigationHelper.GetSegmentName(type);
-        shellContent.Content = new ContentPage();
+        shellContent.ContentTemplate = new DataTemplate(() =>
+        {
+            var shell = (Shell?)shellContent.Parent?.Parent?.Parent;
+            var serviceProvider = shell?.Handler?.GetServiceProvider() ?? throw new InvalidOperationException("Cannot provide shell content while detached from active Shell.");
+            var navigationService = serviceProvider.GetService<INavigationServiceInternal>() ?? throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
+            var navigationOptions = serviceProvider.GetService<INavigationOptions>() ?? throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
+            var page = navigationService.CreatePage(type);
+            ConfigureRootPage(page, shell, navigationOptions);
+            return page;
+        });
     }
 
     private IEqualityComparer GetIntentComparer()
@@ -206,5 +216,23 @@ public abstract class Navigation : BindableObject, IList<NavigationSegment>, IRe
         var equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(type);
         var defaultProperty = equalityComparerType.GetProperty(nameof(EqualityComparer<object>.Default), BindingFlags.Public | BindingFlags.Static);
         return (IEqualityComparer)defaultProperty?.GetValue(null)!;
+    }
+
+    private static void ConfigureRootPage(Page page, Shell shell, INavigationOptions navigationOptions)
+    {
+        var backButtonBehavior = Shell.GetBackButtonBehavior(page);
+
+#if ANDROID
+        // https://github.com/dotnet/maui/issues/7045
+        backButtonBehavior.Command = null;
+#else
+        backButtonBehavior.Command = new Command(() => _ = shell.FlyoutIsPresented = true);
+#endif
+        backButtonBehavior.IconOverride = navigationOptions.MenuImage;
+
+        if (backButtonBehavior.IconOverride is FontImageSource fontImageSource)
+        {
+            fontImageSource.Color = Shell.GetForegroundColor(shell);
+        }
     }
 }
