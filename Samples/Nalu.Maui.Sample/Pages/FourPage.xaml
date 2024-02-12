@@ -6,9 +6,10 @@
              xmlns:nalu="https://nalu-development.github.com/nalu"
              x:Class="Nalu.Maui.Sample.Pages.FourPage"
              x:DataType="pageModels:FourPageModel"
-             Shell.PresentationMode="Modal"
              Title="Page Four"
-             Padding="16">
+             Padding="16"
+             Shell.PresentationMode="Modal">
+    <!-- Shell.PresentationMode="Modal" apparently leaks on iOS as of MAUI 8.0.6. -->
     <ContentPage.Content>
         <VerticalStackLayout Spacing="16">
             <Label>

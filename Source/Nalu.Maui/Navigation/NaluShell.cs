@@ -15,7 +15,9 @@ public abstract class NaluShell : Shell
     internal void SetIsNavigating(bool value) => _isNavigating.Value = value;
 
     /// <inheritdoc />
-    protected override void OnNavigating(ShellNavigatingEventArgs args)
+#pragma warning disable VSTHRD100
+    protected override async void OnNavigating(ShellNavigatingEventArgs args)
+#pragma warning restore VSTHRD100
     {
         base.OnNavigating(args);
         if (!_isNavigating.Value)
@@ -36,7 +38,13 @@ public abstract class NaluShell : Shell
 
             var absoluteNavigation = Nalu.Navigation.Absolute();
             absoluteNavigation.Add(new NavigationSegment(pageModelType));
-            _ = _navigationService.GoToAsync(absoluteNavigation);
+
+            // Let the native navigation be canceled
+            await Task.Yield();
+            await Task.Yield();
+
+            // Trigger our own navigation
+            await _navigationService.GoToAsync(absoluteNavigation).ConfigureAwait(true);
         }
     }
 

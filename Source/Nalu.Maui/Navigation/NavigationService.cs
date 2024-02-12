@@ -4,13 +4,13 @@ using System.ComponentModel;
 
 internal sealed class NavigationService(IServiceProvider serviceProvider, INavigationOptions navigationOptions) : INavigationServiceInternal
 {
-    private INavigationController? _controller;
+    private IShellNavigationController? _controller;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<INotifyPropertyChanged> PageModelStack { get; private set; } = [];
 
-    private INavigationController Controller => _controller ?? throw new InvalidOperationException(
+    private IShellNavigationController Controller => _controller ?? throw new InvalidOperationException(
         "Navigation service must be initialized via UseNaluNavigation<TPageModel> on your Application or FlyoutPage");
 
     public Task<bool> GoToAsync(Navigation navigation)
@@ -30,7 +30,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         });
     }
 
-    async Task INavigationServiceInternal.InitializeAsync<TPageModel>(INavigationController controller, object? intent)
+    async Task INavigationServiceInternal.InitializeAsync<TPageModel>(IShellNavigationController controller, object? intent)
     {
         if (_controller is not null)
         {
@@ -40,7 +40,9 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         _controller = controller;
 
         NavigationHelper.AssertIntentAware(typeof(TPageModel), intent);
-        var page = CreatePage(typeof(TPageModel), null);
+        var segmentName = NavigationHelper.GetSegmentName(typeof(TPageModel));
+        var page = controller.GetRootPage(segmentName)
+            ?? throw new InvalidOperationException($"Unable to find shell content for {typeof(TPageModel).FullName}.");
 
         var enteringTask = NavigationHelper.SendEnteringAsync(page, intent).AsTask();
         if (!enteringTask.IsCompleted)
@@ -50,7 +52,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
 #pragma warning disable VSTHRD002
         // Rethrow eventual exceptions
         await enteringTask.ConfigureAwait(true);
-        await controller.SetRootPageAsync(page).ConfigureAwait(true);
+        await controller.SetRootPageAsync(segmentName).ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
         _ = SendAppearingAndUpdateStackAsync(intent).AsTask();
@@ -89,7 +91,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         return page;
     }
 
-    private async Task<bool> PerformAbsoluteNavigationAsync(INavigationController controller, AbsoluteNavigation navigation)
+    private async Task<bool> PerformAbsoluteNavigationAsync(IShellNavigationController controller, AbsoluteNavigation navigation)
     {
         var targetSegment = navigation[^1];
         var intent = navigation.Intent;
@@ -119,7 +121,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         return await PerformRelativeNavigationAsync(controller, relativeNavigation).ConfigureAwait(true);
     }
 
-    private async Task<bool> PerformRelativeNavigationAsync(INavigationController controller, RelativeNavigation navigation)
+    private async Task<bool> PerformRelativeNavigationAsync(IShellNavigationController controller, RelativeNavigation navigation)
     {
         var navigationStack = controller.NavigationStack;
 
@@ -143,7 +145,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         return true;
     }
 
-    private async Task<bool> ExecutePopActionAsync(INavigationController controller, NavigationActionDescriptor actionDescriptor)
+    private async Task<bool> ExecutePopActionAsync(IShellNavigationController controller, NavigationActionDescriptor actionDescriptor)
     {
         var page = actionDescriptor.Page!;
         var pageModel = page.BindingContext!;
@@ -185,16 +187,6 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
 
         await controller.PopAsync(popCount).ConfigureAwait(true);
 
-        PageNavigationContext.Dispose(page);
-
-        if (intermediatePages is not null)
-        {
-            foreach (var intermediatePage in intermediatePages)
-            {
-                PageNavigationContext.Dispose(intermediatePage);
-            }
-        }
-
         if (flags.HasFlag(NavigationActionFlags.SendAppearing))
         {
             await SendAppearingAndUpdateStackAsync(intent).ConfigureAwait(true);
@@ -203,7 +195,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         return true;
     }
 
-    private async Task<bool> ExecuteSetRootActionAsync(INavigationController controller, NavigationActionDescriptor actionDescriptor)
+    private async Task<bool> ExecuteSetRootActionAsync(IShellNavigationController controller, NavigationActionDescriptor actionDescriptor)
     {
         var page = actionDescriptor.Page!;
         var pageModel = page.BindingContext!;
@@ -224,6 +216,11 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
             }
         }
 
+        var pageModelType = actionDescriptor.Segment.PageModelType!;
+        var segmentName = actionDescriptor.Segment.Segment;
+        var targetPage = controller.GetRootPage(segmentName)
+                         ?? throw new InvalidOperationException($"Unable to find shell content for {pageModelType.FullName}.");
+
         if (sendDisappearing)
         {
             await NavigationHelper.SendDisappearingAsync(page).ConfigureAwait(true);
@@ -231,14 +228,11 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
 
         await NavigationHelper.SendLeavingAsync(page).ConfigureAwait(true);
 
-        var targetPage = CreatePage(actionDescriptor.Segment.PageModelType!, null);
         var intent = actionDescriptor.Intent;
 
         await NavigationHelper.SendEnteringAsync(targetPage, intent).ConfigureAwait(true);
 
-        await controller.SetRootPageAsync(targetPage).ConfigureAwait(true);
-
-        PageNavigationContext.Dispose(page);
+        await controller.SetRootPageAsync(segmentName).ConfigureAwait(true);
 
         if (flags.HasFlag(NavigationActionFlags.SendAppearing))
         {
@@ -248,7 +242,7 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         return true;
     }
 
-    private async Task<bool> ExecutePushActionAsync(INavigationController controller, NavigationActionDescriptor actionDescriptor)
+    private async Task<bool> ExecutePushActionAsync(IShellNavigationController controller, NavigationActionDescriptor actionDescriptor)
     {
         var page = actionDescriptor.Page!;
         var flags = actionDescriptor.Flags;

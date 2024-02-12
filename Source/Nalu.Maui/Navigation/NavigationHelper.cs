@@ -153,7 +153,7 @@ internal static class NavigationHelper
         throw new InvalidOperationException($"{pageModelType.FullName} must implement either {enteringWithIntentType.FullName} or {appearingWithIntentType.FullName} to receive intent.");
     }
 
-    public static IEnumerable<INotifyPropertyChanged> EnumerateStackPageModels(INavigationController controller)
+    public static IEnumerable<INotifyPropertyChanged> EnumerateStackPageModels(IShellNavigationController controller)
         => controller.NavigationStack
             .Select(page => page.BindingContext)
             .OfType<INotifyPropertyChanged>();
