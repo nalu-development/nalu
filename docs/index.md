@@ -68,3 +68,25 @@ In the above example the leak detection on `ContactsPageModel`, `ContactDetailPa
 Documentation on this website is coming soon with a lot of examples and best practices.
 
 In the meantime, you can check the [Nalu.Maui GitHub repository's README](https://github.com/nalu-development/nalu) which contains all the information you need to get started.
+
+### Call Dispose() on Page and ViewModel when the page is popped
+
+If you're here just because you want page/vm disposal on the standard `NavigationPage` or `Shell` and you don't want these awesome features, you can just use the following methods to enable calling `Dispose` on page models after page has been removed from navigation stack.
+
+#### NavigationPage
+```csharp
+var navigationPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
+```
+
+#### Shell
+
+```csharp
+public AppShell() {
+    InitializeComponent();
+    this.ConfigureForPageDisposal(disposeShellContents: true);
+}
+```
+
+With `disposeShellContents: true` `ShellContent`s with `ContentTemplate` will be disposed and recreated too.
+
+Note: Tab's content will be disposed only when leaving the tab section.
