@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="Nalu.Maui.DefaultShellSample.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
+    Title="Nalu.Maui.DefaultShellSample">
+
+    <FlyoutItem Route="main"
+                FlyoutDisplayOptions="AsMultipleItems">
+        <Tab Title="Pages"
+             Route="pages"
+             Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}">
+            <ShellContent ContentTemplate="{DataTemplate pages:OnePage}"
+                          Title="Page One"
+                          Route="One"
+                          Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"/>
+            <ShellContent ContentTemplate="{DataTemplate pages:TwoPage}"
+                          Title="Page Two"
+                          Route="Two"
+                          Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
+        </Tab>
+    </FlyoutItem>
+    <ShellContent ContentTemplate="{DataTemplate pages:FivePage}"
+                  Title="Page Five"
+                  Route="Five"
+                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}"/>
+
+</Shell>

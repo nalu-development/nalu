@@ -77,6 +77,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.Test", "Tests\Nal
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.Sample", "Samples\Nalu.Maui.Sample\Nalu.Maui.Sample.csproj", "{959B003B-842C-473F-99E5-E905642AFDAF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.DefaultShellSample", "Samples\Nalu.Maui.DefaultShellSample\Nalu.Maui.DefaultShellSample.csproj", "{D64BF572-B11E-4068-8848-70F3FF0FF2DF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -94,6 +96,9 @@ Global
 		{959B003B-842C-473F-99E5-E905642AFDAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{959B003B-842C-473F-99E5-E905642AFDAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{959B003B-842C-473F-99E5-E905642AFDAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D64BF572-B11E-4068-8848-70F3FF0FF2DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D64BF572-B11E-4068-8848-70F3FF0FF2DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D64BF572-B11E-4068-8848-70F3FF0FF2DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -106,6 +111,7 @@ Global
 		{FF63DE33-999F-4045-B594-8BE9E7495C31} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 		{5067A8EE-4496-4F5A-A5FB-4D66B89363E1} = {E1B24F25-B8A4-46EE-B7EB-7803DCFC543F}
 		{959B003B-842C-473F-99E5-E905642AFDAF} = {00000000-0000-0000-0000-000000000000}
+		{D64BF572-B11E-4068-8848-70F3FF0FF2DF} = {00000000-0000-0000-0000-000000000000}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {73F36209-F8D6-4066-8951-D97729F773CF}

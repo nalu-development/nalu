@@ -296,15 +296,22 @@ Play with it to better see how it works.
 
 #### Do you just care about disposing page view model?
 
-If you're here just because you want page/vm disposal on the standard `NavigationPage` or `Shell` and you don't want these awsome features, you can just use the following methods to enable calling `Dispose` on page models after page has been removed from navigation stack.
+If you're here just because you want page/vm disposal on the standard `NavigationPage` or `Shell` and you don't want these awesome features, you can just use the following methods to enable calling `Dispose` on page models after page has been removed from navigation stack.
 
+##### NavigationPage
 ```csharp
 var navigationPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
 ```
 
+##### Shell
+
 ```csharp
 public AppShell() {
     InitializeComponent();
-    this.ConfigureForPageDisposal();
+    this.ConfigureForPageDisposal(disposeShellContents: true);
 }
 ```
+
+With `disposeShellContents: true` `ShellContent`s with `ContentTemplate` will be disposed and recreated too.
+
+Note: Tab's content will be disposed only when leaving the tab section.
