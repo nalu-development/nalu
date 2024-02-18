@@ -18,7 +18,7 @@ public static class NaluMauiNavigationExtensions
     /// <param name="shell">The shell instance.</param>
     public static Shell ConfigureForPageDisposal(this Shell shell)
     {
-        if (shell is not NaluShell)
+        if (shell is NaluShell)
         {
             throw new InvalidOperationException("Nalu navigation already handles page disposal.");
         }
