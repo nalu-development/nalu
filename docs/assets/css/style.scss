@@ -26,13 +26,29 @@ header h1 {
 }
 
 header p {
-  width: 340px;
+  width: 100%;
 }
 
 section {
   background: #fff;
 }
 
+code.highlighter-rouge {
+  background: whitesmoke;
+  padding: 2px;
+  border-radius: 4px;
+}
+
 .wrapper {
   width: 900px;
 }
+
+@media print, screen and (max-width: 900px) {
+  .wrapper {
+    border-radius: 0;
+    box-shadow: none;
+    width: 100%;
+  }
+}
+
+
