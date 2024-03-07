@@ -1,6 +1,7 @@
-namespace Nalu.Maui.Sample.Pages;
+namespace Nalu.Maui.DefaultShellSample.Pages;
 
 using PageModels;
+using TwoPageModel = DefaultShellSample.PageModels.TwoPageModel;
 
 public partial class TwoPage : ContentPage
 {

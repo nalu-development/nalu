@@ -3,7 +3,7 @@ namespace Nalu;
 /// <summary>
 /// Provides Nalu navigation configuration.
 /// </summary>
-public interface INavigationOptions
+public interface INavigationConfiguration
 {
     /// <summary>
     /// Gets the image used to display a navigation menu button on root pages.

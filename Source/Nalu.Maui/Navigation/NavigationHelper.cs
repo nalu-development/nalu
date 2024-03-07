@@ -1,50 +1,44 @@
 namespace Nalu;
 
-using System.ComponentModel;
 using System.Reflection;
 
 internal static class NavigationHelper
 {
     private static readonly MethodInfo _sendEnteringWithIntentAsyncMethod = typeof(NavigationHelper).GetMethod(nameof(SendEnteringWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo _sendAppearingWithIntentAsyncMethod = typeof(NavigationHelper).GetMethod(nameof(SendAppearingWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
-    private static readonly Dictionary<Type, string> _typeSegmentNames = [];
-
-    public static string GetSegmentName(Type type)
-    {
-        if (!_typeSegmentNames.TryGetValue(type, out var segmentName))
-        {
-            segmentName = type.GetCustomAttribute<NavigationSegmentAttribute>()?.SegmentName ?? type.Name;
-            _typeSegmentNames.Add(type, segmentName);
-        }
-
-        return segmentName;
-    }
 
     public static ValueTask SendEnteringAsync(Page page, object? intent)
     {
+        var context = PageNavigationContext.Get(page);
+        if (context.Entered)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        context.Entered = true;
         var target = page.BindingContext;
 
-        if (intent is null)
+        if (intent is not null)
         {
-            if (target is IEnteringAware enteringAware)
+            var intentType = intent.GetType();
+            var enteringWithIntentType = typeof(IEnteringAware<>).MakeGenericType(intentType);
+            if (enteringWithIntentType.IsInstanceOfType(target))
             {
 #if DEBUG
-                Console.WriteLine($"Entering {target.GetType().FullName}");
+                Console.WriteLine($"Entering {target.GetType().FullName} with intent {intent.GetType().FullName}");
 #endif
-                return enteringAware.OnEnteringAsync();
+                return (ValueTask)_sendEnteringWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
             return ValueTask.CompletedTask;
         }
 
-        var intentType = intent.GetType();
-        var enteringWithIntentType = typeof(IEnteringAware<>).MakeGenericType(intentType);
-        if (enteringWithIntentType.IsInstanceOfType(target))
+        if (target is IEnteringAware enteringAware)
         {
 #if DEBUG
-            Console.WriteLine($"Entering {target.GetType().FullName} with intent {intent.GetType().FullName}");
+            Console.WriteLine($"Entering {target.GetType().FullName}");
 #endif
-            return (ValueTask)_sendEnteringWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, new[] { target, intent })!;
+            return enteringAware.OnEnteringAsync();
         }
 
         return ValueTask.CompletedTask;
@@ -52,6 +46,14 @@ internal static class NavigationHelper
 
     public static ValueTask SendLeavingAsync(Page page)
     {
+        var context = PageNavigationContext.Get(page);
+        if (!context.Entered)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        context.Entered = false;
+
         var target = page.BindingContext;
 
         if (target is ILeavingAware enteringAware)
@@ -67,29 +69,37 @@ internal static class NavigationHelper
 
     public static ValueTask SendAppearingAsync(Page page, object? intent)
     {
+        var context = PageNavigationContext.Get(page);
+        if (context.Appeared)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        context.Appeared = true;
+
         var target = page.BindingContext;
 
-        if (intent is null)
+        if (intent is not null)
         {
-            if (target is IAppearingAware appearingAware)
+            var intentType = intent.GetType();
+            var appearingWithIntentType = typeof(IAppearingAware<>).MakeGenericType(intentType);
+            if (appearingWithIntentType.IsInstanceOfType(target))
             {
 #if DEBUG
-                Console.WriteLine($"Appearing {target.GetType().FullName}");
+                Console.WriteLine($"Appearing {target.GetType().FullName} with intent {intent.GetType().FullName}");
 #endif
-                return appearingAware.OnAppearingAsync();
+                return (ValueTask)_sendAppearingWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
             return ValueTask.CompletedTask;
         }
 
-        var intentType = intent.GetType();
-        var appearingWithIntentType = typeof(IAppearingAware<>).MakeGenericType(intentType);
-        if (appearingWithIntentType.IsInstanceOfType(target))
+        if (target is IAppearingAware appearingAware)
         {
 #if DEBUG
-            Console.WriteLine($"Appearing {target.GetType().FullName} with intent {intent.GetType().FullName}");
+            Console.WriteLine($"Appearing {target.GetType().FullName}");
 #endif
-            return (ValueTask)_sendAppearingWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, new[] { target, intent })!;
+            return appearingAware.OnAppearingAsync();
         }
 
         return ValueTask.CompletedTask;
@@ -97,6 +107,14 @@ internal static class NavigationHelper
 
     public static ValueTask SendDisappearingAsync(Page page)
     {
+        var context = PageNavigationContext.Get(page);
+        if (!context.Appeared)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        context.Appeared = false;
+
         var target = page.BindingContext;
 
         if (target is IDisappearingAware enteringAware)
@@ -125,16 +143,17 @@ internal static class NavigationHelper
         return ValueTask.FromResult(true);
     }
 
-    public static void AssertIntentAware(Type? pageModelType, object? intent)
+    public static void AssertIntent(Page page, object? intent, Action? onFailure = null)
     {
         if (intent is null)
         {
             return;
         }
 
+        var pageModelType = page.BindingContext?.GetType();
         if (pageModelType is null)
         {
-            throw new InvalidOperationException($"Cannot navigate with intent {intent.GetType().FullName} when target page model is not set.");
+            return;
         }
 
         var intentType = intent.GetType();
@@ -150,13 +169,30 @@ internal static class NavigationHelper
             return;
         }
 
+        onFailure?.Invoke();
+
         throw new InvalidOperationException($"{pageModelType.FullName} must implement either {enteringWithIntentType.FullName} or {appearingWithIntentType.FullName} to receive intent.");
     }
 
-    public static IEnumerable<INotifyPropertyChanged> EnumerateStackPageModels(IShellNavigationController controller)
-        => controller.NavigationStack
-            .Select(page => page.BindingContext)
-            .OfType<INotifyPropertyChanged>();
+    public static string GetSegmentName(INavigationSegment segment, INavigationConfiguration configuration)
+        => segment.SegmentName ?? NavigationSegmentAttribute.GetSegmentName(GetPageType(segment.Type, configuration));
+
+    public static Type GetPageType(Type? segmentType, INavigationConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(segmentType, nameof(segmentType));
+
+        if (segmentType.IsSubclassOf(typeof(Page)))
+        {
+            return segmentType;
+        }
+
+        if (configuration.Mapping.TryGetValue(segmentType, out var pageType))
+        {
+            return pageType;
+        }
+
+        throw new InvalidOperationException($"Cannot find page type for segment type {segmentType.FullName}.");
+    }
 
     private static ValueTask SendEnteringWithIntentAsync<TIntent>(IEnteringAware<TIntent> target, TIntent intent) => target.OnEnteringAsync(intent);
     private static ValueTask SendAppearingWithIntentAsync<TIntent>(IAppearingAware<TIntent> target, TIntent intent) => target.OnAppearingAsync(intent);

@@ -1,13 +1,12 @@
 namespace Nalu.Maui.Sample;
 
-using PageModels;
+using Pages;
 
 public partial class AppShell : NaluShell
 {
-    public AppShell()
+    public AppShell(INavigationService navigationService) : base(navigationService, typeof(OnePage))
     {
         InitializeComponent();
-        ConfigureNavigation<OnePageModel>();
     }
 }
 

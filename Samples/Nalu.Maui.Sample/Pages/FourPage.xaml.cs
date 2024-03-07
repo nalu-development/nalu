@@ -1,6 +1,6 @@
 namespace Nalu.Maui.Sample.Pages;
 
-using PageModels;
+using FourPageModel = PageModels.FourPageModel;
 
 public partial class FourPage : ContentPage
 {

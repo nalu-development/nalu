@@ -1,81 +1,157 @@
 namespace Nalu;
 
-using System.ComponentModel;
-using Nalu.Internals;
+using System.Text.RegularExpressions;
+
+#pragma warning disable IDE0290
+#pragma warning disable VSTHRD100
 
 /// <summary>
 /// Nalu shell, the shell navigation you wanted.
 /// </summary>
-public abstract class NaluShell : Shell
+public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 {
-    private readonly AsyncLocal<bool> _isNavigating = new();
-    private INavigationServiceInternal? _navigationService;
-    private INavigationOptions? _navigationOptions;
+    private readonly NavigationService _navigationService;
+    private readonly object? _rootPageIntent;
+    private readonly string _rootPageRoute;
+    private readonly object _lock = new();
+    private bool _isNavigating;
+    private bool _initialized;
+    private ShellProxy? _shellProxy;
 
-    internal void SetIsNavigating(bool value) => _isNavigating.Value = value;
+    IShellProxy INaluShell.ShellProxy => _shellProxy ?? throw new InvalidOperationException("The shell info is not available yet.");
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NaluShell"/> class.
+    /// </summary>
+    /// <param name="navigationService">The navigation service.</param>
+    /// <param name="rootPageRoute">The custom route used to identify the root shell content.</param>
+    /// <param name="rootPageIntent">The optional intent to be provided to the initial root page.</param>
+    protected NaluShell(INavigationService navigationService, string rootPageRoute, object? rootPageIntent = null)
+    {
+        _navigationService = (NavigationService)navigationService;
+        _rootPageIntent = rootPageIntent;
+        _rootPageRoute = rootPageRoute;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NaluShell"/> class.
+    /// </summary>
+    /// <param name="navigationService">The navigation service.</param>
+    /// <param name="rootPageType">The initial root page to be used.</param>
+    /// <param name="rootPageIntent">The optional intent to be provided to the initial root page.</param>
+    protected NaluShell(INavigationService navigationService, Type rootPageType, object? rootPageIntent = null)
+    {
+        if (!rootPageType.IsSubclassOf(typeof(Page)))
+        {
+            throw new ArgumentException("The root page type must be a subclass of Page.", nameof(rootPageType));
+        }
+
+        _navigationService = (NavigationService)navigationService;
+        _rootPageIntent = rootPageIntent;
+        _rootPageRoute = NavigationSegmentAttribute.GetSegmentName(rootPageType);
+    }
 
     /// <inheritdoc />
-#pragma warning disable VSTHRD100
-    protected override async void OnNavigating(ShellNavigatingEventArgs args)
-#pragma warning restore VSTHRD100
+    public void Dispose()
     {
-        base.OnNavigating(args);
-        if (!_isNavigating.Value)
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    internal void SetIsNavigating(bool value)
+    {
+        lock (_lock)
         {
-            _ = args.Cancel();
-
-            if (Handler is null || _navigationService is null || _navigationOptions is null)
-            {
-                return;
-            }
-
-            var mappings = _navigationOptions.Mapping;
-            var segmentName = args.Target.Location.ToString().Split('/', StringSplitOptions.RemoveEmptyEntries).Last();
-            if (mappings.FirstOrDefault(map => NavigationHelper.GetSegmentName(map.Key) == segmentName) is not { Key: { } pageModelType })
-            {
-                throw new KeyNotFoundException($"Unable to find page model type for {args.Target.Location.OriginalString}.");
-            }
-
-            var absoluteNavigation = Nalu.Navigation.Absolute();
-            absoluteNavigation.Add(new NavigationSegment(pageModelType));
-
-            // Let the native navigation be canceled
-            await Task.Yield();
-            await Task.Yield();
-
-            // Trigger our own navigation
-            await _navigationService.GoToAsync(absoluteNavigation).ConfigureAwait(true);
+            _isNavigating = value;
         }
     }
 
     /// <summary>
-    /// Initializes with <typeparamref name="TPageModel"/> as root page.
+    /// Disposes the resources used by the <see cref="NaluShell"/>.
     /// </summary>
-    /// <param name="intent">The intent to .</param>
-    /// <typeparam name="TPageModel">Type of the page model for the root page.</typeparam>
-    protected void ConfigureNavigation<TPageModel>(object? intent = null)
-        where TPageModel : INotifyPropertyChanged
+    /// <param name="disposing">True when disposing managed resources.</param>
+    protected virtual void Dispose(bool disposing)
     {
-        HandlerChanged += OnHandlerSet;
-
-#pragma warning disable VSTHRD100
-        async void OnHandlerSet(object? sender, EventArgs e)
-#pragma warning restore VSTHRD100
+        if (disposing)
         {
+            _shellProxy?.Dispose();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+
+        if (Handler is null || _initialized)
+        {
+            return;
+        }
+
+        _initialized = true;
+        _shellProxy = new ShellProxy(this);
+        await _navigationService.InitializeAsync(_shellProxy, _rootPageRoute, _rootPageIntent).ConfigureAwait(true);
+    }
+
+    /// <inheritdoc />
+    protected override async void OnNavigating(ShellNavigatingEventArgs args)
+    {
+        base.OnNavigating(args);
+
+        if (!GetIsNavigating())
+        {
+            args.Cancel();
             if (Handler is null)
             {
                 return;
             }
 
-            HandlerChanged -= OnHandlerSet;
+            // Only reason we're here is due to shell content navigation from Shell Flyout or Tab bars
+            // Now find the ShellContent target and navigate to it via the navigation service
+            var segments = args.Target.Location.OriginalString.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var shellContentSegmentName = NormalizeSegmentRegex().Replace(segments.Length > 3 ? segments[2] : segments[^1], string.Empty);
+            var shellContent = (ShellContentProxy)_shellProxy!.GetContent(shellContentSegmentName);
+            var shellSection = shellContent.Parent;
 
-            var serviceProvider = Handler!.GetServiceProvider();
-            _navigationService = serviceProvider.GetService<INavigationServiceInternal>() ??
-                                    throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
-            _navigationOptions = serviceProvider.GetRequiredService<INavigationOptions>();
+            var ownsNavigationStack = shellSection.CurrentContent == shellContent;
+            var navigation = (Navigation)Nalu.Navigation.Absolute();
 
-            var controller = new ShellNavigationController(_navigationService, _navigationOptions, this);
-            await _navigationService.InitializeAsync<TPageModel>(controller, intent).ConfigureAwait(true);
+            navigation.Add(new NavigationSegment
+            {
+                Type = Nalu.Navigation.GetPageType(shellContent.Content),
+                SegmentName = shellContent.SegmentName,
+            });
+
+            if (ownsNavigationStack)
+            {
+                var navigationStackPages = shellSection.GetNavigationStack().ToArray();
+                var segmentsCount = segments.Length;
+                var navigationStackCount = navigationStackPages.Length;
+                for (var i = 1; i < segmentsCount && i < navigationStackCount; i++)
+                {
+                    var stackPage = navigationStackPages[i];
+                    navigation.Add(new NavigationSegment
+                    {
+                        Type = stackPage.Page.GetType(),
+                        SegmentName = stackPage.SegmentName,
+                    });
+                }
+            }
+
+            await Task.Yield();
+            await Task.Yield();
+            await _navigationService.GoToAsync(navigation).ConfigureAwait(true);
         }
     }
+
+    private bool GetIsNavigating()
+    {
+        lock (_lock)
+        {
+            return _isNavigating;
+        }
+    }
+
+    [GeneratedRegex("^(D_FAULT_|IMPL_)")]
+    private static partial Regex NormalizeSegmentRegex();
 }

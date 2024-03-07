@@ -1,6 +1,6 @@
-namespace Nalu.Maui.Sample.Pages;
+namespace Nalu.Maui.DefaultShellSample.Pages;
 
-using PageModels;
+using ThreePageModel = PageModels.ThreePageModel;
 
 public partial class ThreePage : ContentPage
 {

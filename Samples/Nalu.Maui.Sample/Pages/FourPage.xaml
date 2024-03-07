@@ -2,10 +2,9 @@
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
-             xmlns:nalu="https://nalu-development.github.com/nalu"
+             xmlns:pageModels1="clr-namespace:Nalu.Maui.Sample.PageModels"
              x:Class="Nalu.Maui.Sample.Pages.FourPage"
-             x:DataType="pageModels:FourPageModel"
+             x:DataType="pageModels1:FourPageModel"
              Title="Page Four"
              Padding="16"
              Shell.PresentationMode="Modal">
@@ -20,16 +19,10 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
-            <Button Command="{nalu:NavigateCommand}"
-                    Text="Back">
-                <Button.CommandParameter>
-                    <nalu:RelativeNavigation>
-                        <nalu:NavigationPop />
-                    </nalu:RelativeNavigation>
-                </Button.CommandParameter>
-            </Button>
             <Button Command="{Binding PopToOneCommand}"
                     Text="Go to /One" />
+            <Button Command="{Binding NavigateToSevenCommand}"
+                    Text="Go to /Seven" />
             <Button Command="{Binding NavigateToFiveCommand}"
                     Text="Go to /Five" />
             <Button Command="{Binding NavigateToTwoCommand}"

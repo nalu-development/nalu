@@ -22,7 +22,7 @@ You can also pass type-checked parameters to the page model you are navigating t
 ```csharp
 // Pop the page and pass a parameter to the previous page model
 // which should implement `IAppearingAware<MyPopIntent>`
-await _navigationService.GoToAsync(Navigation.Relative(new MyPopIntent()).Pop());
+await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(new MyPopIntent()));
 ```
 
 And you can easily unit test your navigation logic.
@@ -51,7 +51,7 @@ You can leverage that to ask the user to confirm leaving the page.
 ```csharp
 // Starting from: RootPageModel > ContactsPageModel > ContactDetailPageModel
 Navigation.Absolute()
-    .Add<RootPageModel>()
+    .ShellContent<RootPageModel>()
 ```
 
 ![Absolute navigation to root page](assets/images/pop-pop-with-guard.png)
@@ -73,20 +73,15 @@ In the meantime, you can check the [Nalu.Maui GitHub repository's README](https:
 
 If you're here just because you want page/vm disposal on the standard `NavigationPage` or `Shell` and you don't want these awesome features, you can just use the following methods to enable calling `Dispose` on page models after page has been removed from navigation stack.
 
-#### NavigationPage
+##### NavigationPage
 ```csharp
-var navigationPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
+MainPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
 ```
 
-#### Shell
+##### Shell
 
 ```csharp
-public AppShell() {
-    InitializeComponent();
-    this.ConfigureForPageDisposal(disposeShellContents: true);
-}
+MainPage = new AppShell().ConfigureForPageDisposal();
 ```
 
-With `disposeShellContents: true` `ShellContent`s with `ContentTemplate` will be disposed and recreated too.
-
-Note: Tab's content will be disposed only when leaving the tab section.
+Note: shell content pages will not be disposed.

@@ -1,6 +1,6 @@
-﻿namespace Nalu.Maui.Sample.Pages;
+﻿namespace Nalu.Maui.DefaultShellSample.Pages;
 
-using PageModels;
+using OnePageModel = PageModels.OnePageModel;
 
 public partial class OnePage
 {

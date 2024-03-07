@@ -1,7 +1,7 @@
-﻿using Android.App;
-using Android.Content.PM;
+﻿namespace Nalu.Maui.Sample;
 
-namespace Nalu.Maui.Sample;
+using Android.App;
+using Android.Content.PM;
 
 [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true,
     ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode |
