@@ -14,7 +14,7 @@ The navigation API is designed to be simple and easy to use, and it features `Re
 // Push the page registered with the DetailPageModel
 await _navigationService.GoToAsync(Navigation.Relative().Push<DetailPageModel>());
 // Navigate to the `SettingsPageModel` root page
-await _navigationService.GoToAsync(Navigation.Absolute().Add<SettingsPageModel>());
+await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<SettingsPageModel>());
 ```
 
 You can also pass type-checked parameters to the page model you are navigating to.
