@@ -3,6 +3,8 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:nalu="https://nalu-development.github.com/nalu"
+             xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
              x:Class="Nalu.Maui.Sample.Pages.TwoPage"
              x:DataType="pageModels:TwoPageModel"
              Title="Page Two"
@@ -18,6 +20,16 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
+            <Button Command="{Binding PushSixCommand}"
+                    Text="Push Six"/>
+            <Button Command="{nalu:NavigateCommand}"
+                    Text="Push Six Via XAML">
+                <Button.CommandParameter>
+                    <nalu:RelativeNavigation>
+                        <nalu:NavigationSegment Type="pages:SixPage" />
+                    </nalu:RelativeNavigation>
+                </Button.CommandParameter>
+            </Button>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

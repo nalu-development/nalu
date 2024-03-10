@@ -2,50 +2,86 @@ namespace Nalu;
 
 #pragma warning disable IDE0290 // Use primary constructor
 
-internal class LeakDetector
+internal class LeakDetector : IDisposable
 {
-    private readonly List<WeakReference<object>> _weakReferences;
-
-    // ReSharper disable once ConvertToPrimaryConstructor
-    public LeakDetector(IEnumerable<object> objects)
+    private class DisposedObject
     {
-        _weakReferences = new List<WeakReference<object>>(10);
-        foreach (var o in objects)
-        {
-            if (o is BindableObject { BindingContext: { } bindingContext })
-            {
-                _weakReferences.Add(new WeakReference<object>(bindingContext));
-            }
+        private readonly WeakReference<object> _weakRef;
 
-            _weakReferences.Add(new WeakReference<object>(o));
+        public int Checks { get; private set; }
+
+        // ReSharper disable once ConvertToPrimaryConstructor
+        public DisposedObject(object obj)
+        {
+            _weakRef = new WeakReference<object>(obj);
+        }
+
+        public bool TryGetTarget(out object? target)
+        {
+            Checks++;
+            return _weakRef.TryGetTarget(out target);
         }
     }
 
-    public async Task EnsureCollectedAsync()
-    {
-        const int maxAttempts = 10;
+    private readonly List<DisposedObject> _disposedObjects = [];
+    private CancellationTokenSource _cts = new();
 
-        var i = 0;
-        while (true)
+    public void Track(object obj)
+    {
+        lock (_disposedObjects)
         {
-            ++i;
-            await Task.Delay(i * 50).ConfigureAwait(false);
+            _disposedObjects.Add(new DisposedObject(obj));
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = new CancellationTokenSource();
+            _ = EnsureCollectedAsync(_cts.Token);
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+    private async Task EnsureCollectedAsync(CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+
+        const int maxAttempts = 5;
+        while (HasDisposedObjects())
+        {
+            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            var leakedObjects = GetLeakedObjects().ToList();
-            if (leakedObjects.Count > 0)
+            var leakedObjects = new List<object>();
+            lock (_disposedObjects)
             {
-                if (i == maxAttempts)
+                for (var i = 0; i < _disposedObjects.Count; i++)
                 {
-                    LogLeak(leakedObjects);
-                    return;
+                    var disposedObject = _disposedObjects[i];
+                    if (disposedObject.TryGetTarget(out var leakedObject) && disposedObject.Checks >= maxAttempts)
+                    {
+                        leakedObjects.Add(leakedObject!);
+                        _disposedObjects.RemoveAt(i);
+                        i--;
+                    }
                 }
             }
-            else
+
+            if (leakedObjects.Count > 0)
             {
-                return;
+                LogLeak(leakedObjects);
             }
+        }
+    }
+
+    private bool HasDisposedObjects()
+    {
+        lock (_disposedObjects)
+        {
+            return _disposedObjects.Count > 0;
         }
     }
 
@@ -58,17 +94,6 @@ internal class LeakDetector
             var objectNames = string.Join(", ", leakedObjects.Select(o => o.GetType().Name));
             page.Dispatcher.Dispatch(() =>
                 _ = page.DisplayAlert("Leak detected", $"{objectNames} {verb} still alive", "OK"));
-        }
-    }
-
-    private IEnumerable<object> GetLeakedObjects()
-    {
-        foreach (var weakReference in _weakReferences)
-        {
-            if (weakReference.TryGetTarget(out var target))
-            {
-                yield return target;
-            }
         }
     }
 }

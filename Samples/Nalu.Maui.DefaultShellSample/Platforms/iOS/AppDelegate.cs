@@ -1,6 +1,6 @@
-﻿using Foundation;
+﻿namespace Nalu.Maui.DefaultShellSample;
 
-namespace Nalu.Maui.DefaultShellSample;
+using Foundation;
 
 [Register("AppDelegate")]
 public class AppDelegate : MauiUIApplicationDelegate

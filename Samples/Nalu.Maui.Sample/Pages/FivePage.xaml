@@ -4,8 +4,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
              xmlns:nalu="https://nalu-development.github.com/nalu"
+             xmlns:pageModels1="clr-namespace:Nalu.Maui.Sample.PageModels"
              x:Class="Nalu.Maui.Sample.Pages.FivePage"
-             x:DataType="pageModels:FivePageModel"
+             x:DataType="pageModels1:FivePageModel"
              Title="Page Five"
              Padding="16">
     <ContentPage.Content>
@@ -19,16 +20,6 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
-            <Button Command="{nalu:NavigateCommand}"
-                    Text="Go to /One/Three/Four">
-                <Button.CommandParameter>
-                    <nalu:AbsoluteNavigation>
-                        <nalu:NavigationSegment x:TypeArguments="pageModels:OnePageModel" />
-                        <nalu:NavigationSegment x:TypeArguments="pageModels:ThreePageModel" />
-                        <nalu:NavigationSegment x:TypeArguments="pageModels:FourPageModel" />
-                    </nalu:AbsoluteNavigation>
-                </Button.CommandParameter>
-            </Button>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

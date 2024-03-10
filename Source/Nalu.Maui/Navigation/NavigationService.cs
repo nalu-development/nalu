@@ -1,87 +1,68 @@
 namespace Nalu;
 
-using System.ComponentModel;
+using System.Diagnostics;
 
-internal sealed class NavigationService(IServiceProvider serviceProvider, INavigationOptions navigationOptions) : INavigationServiceInternal
+#pragma warning disable IDE0290
+
+internal class NavigationService : INavigationService, IDisposable
 {
-    private IShellNavigationController? _controller;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly LeakDetector _leakDetector;
+    private IShellProxy? _shellProxy;
 
-    public event PropertyChangedEventHandler? PropertyChanged;
+    public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
+    public INavigationConfiguration Configuration { get; }
 
-    public IReadOnlyList<INotifyPropertyChanged> PageModelStack { get; private set; } = [];
-
-    private IShellNavigationController Controller => _controller ?? throw new InvalidOperationException(
-        "Navigation service must be initialized via UseNaluNavigation<TPageModel> on your Application or FlyoutPage");
-
-    public Task<bool> GoToAsync(Navigation navigation)
+    public NavigationService(INavigationConfiguration configuration, IServiceProvider serviceProvider)
     {
-        if (navigation.Count == 0)
-        {
-            throw new InvalidOperationException("Navigation must contain at least one segment.");
-        }
-
-        var controller = Controller;
-
-        return controller.ExecuteNavigationAsync(() => navigation switch
-        {
-            AbsoluteNavigation absoluteNavigation => PerformAbsoluteNavigationAsync(controller, absoluteNavigation),
-            RelativeNavigation relativeNavigation => PerformRelativeNavigationAsync(controller, relativeNavigation),
-            _ => throw new NotSupportedException($"{navigation.GetType().FullName} navigation type not supported."),
-        });
+        Configuration = configuration;
+        _serviceProvider = serviceProvider;
+        _leakDetector = new LeakDetector();
     }
 
-    async Task INavigationServiceInternal.InitializeAsync<TPageModel>(IShellNavigationController controller, object? intent)
+    public void Dispose()
     {
-        if (_controller is not null)
-        {
-            throw new InvalidOperationException("Navigation service cannot be initialized twice.");
-        }
+        _leakDetector.Dispose();
+        _semaphore.Dispose();
+    }
 
-        _controller = controller;
+    public async Task InitializeAsync(IShellProxy shellProxy, string contentSegmentName, object? intent)
+    {
+        _shellProxy = shellProxy;
 
-        NavigationHelper.AssertIntentAware(typeof(TPageModel), intent);
-        var segmentName = NavigationHelper.GetSegmentName(typeof(TPageModel));
-        var page = controller.GetRootPage(segmentName)
-            ?? throw new InvalidOperationException($"Unable to find shell content for {typeof(TPageModel).FullName}.");
+        var content = _shellProxy.GetContent(contentSegmentName);
+        var page = content.GetOrCreateContent();
+
+        NavigationHelper.AssertIntent(page, intent, content.DestroyContent);
 
         var enteringTask = NavigationHelper.SendEnteringAsync(page, intent).AsTask();
         if (!enteringTask.IsCompleted)
         {
-            throw new NotSupportedException($"OnEnteringAsync() must not be async for the initial page {page.BindingContext.GetType().FullName}.");
+            throw new NotSupportedException($"OnEnteringAsync() must not be async for the initial page {page.BindingContext!.GetType().FullName}.");
         }
+
 #pragma warning disable VSTHRD002
         // Rethrow eventual exceptions
         await enteringTask.ConfigureAwait(true);
-        await controller.SetRootPageAsync(segmentName).ConfigureAwait(true);
+        await _shellProxy.SelectContentAsync(contentSegmentName).ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
-        _ = SendAppearingAndUpdateStackAsync(intent).AsTask();
+        await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
     }
 
-    Page INavigationServiceInternal.CreatePage(Type pageModelType) => CreatePage(pageModelType, null);
-
-    private Page CreatePage(Type pageModelType, Page? parentPage)
+    public Page CreatePage(Type pageType, Page? parentPage)
     {
-        if (!navigationOptions.Mapping.TryGetValue(pageModelType, out var pageType))
-        {
-            throw new InvalidOperationException($"No pages registered for {pageModelType.FullName}");
-        }
-
-        var serviceScope = serviceProvider.CreateScope();
+        var serviceScope = _serviceProvider.CreateScope();
         var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
 
-        Controller.ConfigurePage(page);
+        ConfigureBackButtonBehavior(page);
 
         if (parentPage is not null && PageNavigationContext.Get(parentPage) is { ServiceScope: { } parentScope })
         {
             var parentNavigationServiceProvider = parentScope.ServiceProvider.GetRequiredService<INavigationServiceProviderInternal>();
             var navigationServiceProvider = serviceScope.ServiceProvider.GetRequiredService<INavigationServiceProviderInternal>();
             navigationServiceProvider.SetParent(parentNavigationServiceProvider);
-        }
-
-        if (page.BindingContext?.GetType().IsAssignableTo(pageModelType) != true)
-        {
-            throw new InvalidOperationException($"{page.GetType().FullName} must have a ${pageModelType.FullName} as BindingContext.");
         }
 
         var pageContext = new PageNavigationContext(serviceScope);
@@ -91,293 +72,374 @@ internal sealed class NavigationService(IServiceProvider serviceProvider, INavig
         return page;
     }
 
-    private async Task<bool> PerformAbsoluteNavigationAsync(IShellNavigationController controller, AbsoluteNavigation navigation)
+    public Task<bool> GoToAsync(INavigationInfo navigation)
     {
-        var targetSegment = navigation[^1];
-        var intent = navigation.Intent;
-        NavigationHelper.AssertIntentAware(targetSegment.PageModelType, intent);
-
-        var navigationStack = controller.NavigationStack
-            .Select(page => page.BindingContext?.GetType())
-            .ToList();
-
-        var matchingSegmentsCount = navigation
-            .Select(segment => segment.PageModelType)
-            .Zip(navigationStack, (segmentPageModelType, navigationStackPageModelType) => (segmentPageModelType, navigationStackPageModelType))
-            .TakeWhile(tuple => tuple.segmentPageModelType == tuple.navigationStackPageModelType)
-            .Count();
-
-        if (matchingSegmentsCount == navigation.Count && matchingSegmentsCount == navigationStack.Count)
+        if (navigation.Count == 0)
         {
-            throw new InvalidOperationException("Cannot navigate to the current page.");
+            throw new InvalidOperationException("Navigation must contain at least one segment.");
         }
 
-        var popCount = navigationStack.Count - matchingSegmentsCount;
-
-        var relativeNavigation = Navigation.Relative(navigation.Intent);
-        relativeNavigation.AddRange(Enumerable.Range(0, popCount).Select(_ => new NavigationPop()));
-        relativeNavigation.AddRange(navigation.Skip(matchingSegmentsCount));
-
-        return await PerformRelativeNavigationAsync(controller, relativeNavigation).ConfigureAwait(true);
+        return ExecuteNavigationAsync(() => navigation switch
+        {
+            { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation),
+            _ => ExecuteRelativeNavigationAsync(navigation),
+        });
     }
 
-    private async Task<bool> PerformRelativeNavigationAsync(IShellNavigationController controller, RelativeNavigation navigation)
+    private void ConfigureBackButtonBehavior(Page page)
     {
-        var navigationStack = controller.NavigationStack;
-
-        var actions = GetRelativeNavigationActions(navigationStack, navigation);
-        foreach (var action in actions)
+        var backButtonBehavior = Shell.GetBackButtonBehavior(page);
+        if (backButtonBehavior is not null)
         {
-            var result = await (action.Action switch
+            backButtonBehavior.Command ??= new Command(() => _ = GoToAsync(Navigation.Relative().Pop()));
+            backButtonBehavior.IconOverride ??= WithColor(Configuration.BackImage, ShellProxy.GetForegroundColor(page));
+        }
+        else
+        {
+            backButtonBehavior = new BackButtonBehavior
             {
-                NavigationAction.Pop => ExecutePopActionAsync(controller, action),
-                NavigationAction.Push => ExecutePushActionAsync(controller, action),
-                NavigationAction.ReplaceRoot => ExecuteSetRootActionAsync(controller, action),
-                _ => throw new NotSupportedException($"{action.Action} navigation action not supported."),
-            }).ConfigureAwait(true);
-
-            if (!result)
-            {
-                return false;
-            }
+                Command = new Command(() => _ = GoToAsync(Navigation.Relative().Pop())),
+                IconOverride = WithColor(Configuration.BackImage, ShellProxy.GetForegroundColor(page)),
+            };
+            Shell.SetBackButtonBehavior(page, backButtonBehavior);
         }
-
-        return true;
     }
 
-    private async Task<bool> ExecutePopActionAsync(IShellNavigationController controller, NavigationActionDescriptor actionDescriptor)
+    private async Task<bool> ExecuteRelativeNavigationAsync(
+        INavigationInfo navigation,
+        IShellSectionProxy? section = null,
+        List<NavigationStackPage>? stack = null,
+        bool sendAppearingToTarget = true,
+        bool ignoreGuards = false,
+        Func<Task>? onCheckingGuardAsync = null)
     {
-        var page = actionDescriptor.Page!;
-        var pageModel = page.BindingContext!;
-        var flags = actionDescriptor.Flags;
-        var sendDisappearing = flags.HasFlag(NavigationActionFlags.SendDisappearing);
-        var intent = actionDescriptor.Intent;
-
-        if (flags.HasFlag(NavigationActionFlags.Guarded))
+        if (navigation.Count == 0)
         {
-            var canLeave = await ((ILeavingGuard)pageModel).CanLeaveAsync().ConfigureAwait(true);
-            if (!canLeave)
-            {
-                if (!sendDisappearing)
-                {
-                    await SendAppearingAndUpdateStackAsync(intent).ConfigureAwait(true);
-                }
-
-                return false;
-            }
+            return true;
         }
 
-        if (sendDisappearing)
+        var shellProxy = ShellProxy;
+        section ??= shellProxy.CurrentItem.CurrentSection;
+        stack ??= section.GetNavigationStack().ToList();
+
+        var popCount = navigation.Count(segment => segment.SegmentName == NavigationPop.PopRoute);
+        if (popCount >= stack.Count)
         {
-            await NavigationHelper.SendDisappearingAsync(page).ConfigureAwait(true);
+            throw new InvalidOperationException("Cannot pop more pages than the stack contains.");
         }
 
-        var popCount = 1;
-        await NavigationHelper.SendLeavingAsync(page).ConfigureAwait(true);
-
-        var intermediatePages = actionDescriptor.IntermediatePages;
-        if (intermediatePages is not null)
-        {
-            popCount += intermediatePages.Count;
-            foreach (var intermediatePage in intermediatePages)
-            {
-                await NavigationHelper.SendLeavingAsync(intermediatePage).ConfigureAwait(true);
-            }
-        }
-
-        await controller.PopAsync(popCount).ConfigureAwait(true);
-
-        if (flags.HasFlag(NavigationActionFlags.SendAppearing))
-        {
-            await SendAppearingAndUpdateStackAsync(intent).ConfigureAwait(true);
-        }
-
-        return true;
-    }
-
-    private async Task<bool> ExecuteSetRootActionAsync(IShellNavigationController controller, NavigationActionDescriptor actionDescriptor)
-    {
-        var page = actionDescriptor.Page!;
-        var pageModel = page.BindingContext!;
-        var flags = actionDescriptor.Flags;
-        var sendDisappearing = flags.HasFlag(NavigationActionFlags.SendDisappearing);
-
-        if (flags.HasFlag(NavigationActionFlags.Guarded))
-        {
-            var canLeave = await ((ILeavingGuard)pageModel).CanLeaveAsync().ConfigureAwait(true);
-            if (!canLeave)
-            {
-                if (!sendDisappearing)
-                {
-                    await SendAppearingAndUpdateStackAsync(null).ConfigureAwait(true);
-                }
-
-                return false;
-            }
-        }
-
-        var pageModelType = actionDescriptor.Segment.PageModelType!;
-        var segmentName = actionDescriptor.Segment.Segment;
-        var targetPage = controller.GetRootPage(segmentName)
-                         ?? throw new InvalidOperationException($"Unable to find shell content for {pageModelType.FullName}.");
-
-        if (sendDisappearing)
-        {
-            await NavigationHelper.SendDisappearingAsync(page).ConfigureAwait(true);
-        }
-
-        await NavigationHelper.SendLeavingAsync(page).ConfigureAwait(true);
-
-        var intent = actionDescriptor.Intent;
-
-        await NavigationHelper.SendEnteringAsync(targetPage, intent).ConfigureAwait(true);
-
-        await controller.SetRootPageAsync(segmentName).ConfigureAwait(true);
-
-        if (flags.HasFlag(NavigationActionFlags.SendAppearing))
-        {
-            await SendAppearingAndUpdateStackAsync(intent).ConfigureAwait(true);
-        }
-
-        return true;
-    }
-
-    private async Task<bool> ExecutePushActionAsync(IShellNavigationController controller, NavigationActionDescriptor actionDescriptor)
-    {
-        var page = actionDescriptor.Page!;
-        var flags = actionDescriptor.Flags;
-
-        if (flags.HasFlag(NavigationActionFlags.SendDisappearing))
-        {
-            await NavigationHelper.SendDisappearingAsync(page).ConfigureAwait(true);
-        }
-
-        var targetPage = CreatePage(actionDescriptor.Segment.PageModelType!, controller.CurrentPage);
-        var intent = actionDescriptor.Intent;
-
-        await NavigationHelper.SendEnteringAsync(targetPage, intent).ConfigureAwait(true);
-
-        await controller.PushAsync(targetPage).ConfigureAwait(true);
-
-        if (flags.HasFlag(NavigationActionFlags.SendAppearing))
-        {
-            await SendAppearingAndUpdateStackAsync(intent).ConfigureAwait(true);
-        }
-
-        return true;
-    }
-
-    private ValueTask SendAppearingAndUpdateStackAsync(object? intent)
-    {
-        PageModelStack = NavigationHelper.EnumerateStackPageModels(Controller).ToList();
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PageModelStack)));
-        return SendAppearingAsync(intent);
-    }
-
-    private ValueTask SendAppearingAsync(object? intent)
-    {
-        var page = Controller.CurrentPage;
-        return NavigationHelper.SendAppearingAsync(page, intent);
-    }
-
-    private enum NavigationAction
-    {
-        Push,
-        Pop,
-        ReplaceRoot,
-    }
-
-    [Flags]
-    private enum NavigationActionFlags
-    {
-        None = 0,
-        SendAppearing = 1,
-        SendDisappearing = 2,
-        Guarded = 8,
-    }
-
-    private record NavigationActionDescriptor(
-        NavigationAction Action,
-        NavigationSegment Segment,
-        NavigationActionFlags Flags,
-        Page? Page,
-        object? Intent,
-        List<Page>? IntermediatePages = null);
-
-    private static List<NavigationActionDescriptor> GetRelativeNavigationActions(IEnumerable<Page> navigationStack, RelativeNavigation navigation)
-    {
-        var stack = new Stack<(Page? Page, Type ModelType)>(navigationStack.Select(page => (Page: (Page?)page, ModelType: page.BindingContext.GetType())));
-        List<NavigationActionDescriptor> actions = new(navigation.Count);
-        NavigationActionDescriptor? previousAction = null;
-
-        for (var i = 0; i < navigation.Count; i++)
+        var navigationCount = navigation.Count;
+        for (var i = 0; i < navigationCount; i++)
         {
             var segment = navigation[i];
-            var isFirstSegment = i == 0;
-            var isLastSegment = i == navigation.Count - 1;
-            var flags = NavigationActionFlags.None;
-            var currentStackCount = stack.Count;
-            object? intent = null;
-
-            if (isFirstSegment)
+            var stackPage = stack[^1];
+            var intent = i == navigationCount - 1 ? navigation.Intent : null;
+            var isPop = segment.SegmentName == NavigationPop.PopRoute;
+            if (isPop)
             {
-                flags |= NavigationActionFlags.SendDisappearing;
-            }
-
-            if (isLastSegment)
-            {
-                flags |= NavigationActionFlags.SendAppearing;
-                intent = navigation.Intent;
-            }
-
-            if (segment.Segment == NavigationPop.PopSegment)
-            {
-                if (currentStackCount == 1 && isLastSegment)
+                var isGuarded = !ignoreGuards && stackPage.Page.BindingContext is ILeavingGuard;
+                if (isGuarded)
                 {
-                    throw new InvalidOperationException("Cannot pop the root page.");
+                    if (onCheckingGuardAsync is not null)
+                    {
+                        await onCheckingGuardAsync().ConfigureAwait(true);
+                    }
+
+                    await NavigationHelper.SendAppearingAsync(stackPage.Page, null).ConfigureAwait(true);
+                    var canLeave = await NavigationHelper.CanLeaveAsync(stackPage.Page).ConfigureAwait(true);
+                    if (!canLeave)
+                    {
+                        return false;
+                    }
                 }
 
-                if (currentStackCount == 0)
+                await NavigationHelper.SendDisappearingAsync(stackPage.Page).ConfigureAwait(true);
+                await NavigationHelper.SendLeavingAsync(stackPage.Page).ConfigureAwait(true);
+
+                stack.RemoveAt(stack.Count - 1);
+                await shellProxy.PopAsync(section).ConfigureAwait(true);
+
+                PageNavigationContext.Dispose(stackPage.Page);
+                if (Debugger.IsAttached)
                 {
-                    throw new InvalidOperationException("Cannot pop more pages than are currently on the navigation stack.");
+                    _leakDetector.Track(stackPage.Page);
                 }
-
-                var stackPage = stack.Pop();
-
-                var targetPageModelType = stack.TryPeek(out var nextStackPage) ? nextStackPage.ModelType : null;
-                NavigationHelper.AssertIntentAware(targetPageModelType, intent);
-
-                if (stackPage.ModelType.IsAssignableTo(typeof(ILeavingGuard)))
-                {
-                    flags |= NavigationActionFlags.Guarded;
-                }
-                else if (currentStackCount > 1 && previousAction?.Action == NavigationAction.Pop && !previousAction.Flags.HasFlag(NavigationActionFlags.Guarded))
-                {
-                    var intermediatePages = previousAction.IntermediatePages ?? new List<Page>(3);
-                    intermediatePages.Add(stackPage.Page!);
-                    previousAction = actions[^1] = new NavigationActionDescriptor(NavigationAction.Pop, segment, previousAction.Flags | flags, previousAction.Page, intent, intermediatePages);
-                    continue;
-                }
-
-                previousAction = new NavigationActionDescriptor(NavigationAction.Pop, segment, flags, stackPage.Page, intent);
-                actions.Add(previousAction);
-                continue;
             }
-
-            NavigationHelper.AssertIntentAware(segment.PageModelType, intent);
-
-            if (currentStackCount == 0 && previousAction!.Action == NavigationAction.Pop)
+            else
             {
-                previousAction = actions[^1] = new NavigationActionDescriptor(NavigationAction.ReplaceRoot, segment, previousAction.Flags | flags, previousAction.Page, intent);
-                stack.Push((null, segment.PageModelType!));
-                continue;
-            }
+                await NavigationHelper.SendDisappearingAsync(stackPage.Page).ConfigureAwait(true);
+                var pageType = NavigationHelper.GetPageType(segment.Type, Configuration);
+                var segmentName = segment.SegmentName ?? NavigationSegmentAttribute.GetSegmentName(pageType);
 
-            previousAction = new NavigationActionDescriptor(NavigationAction.Push, segment, flags, stack.Peek().Page, intent);
-            actions.Add(previousAction);
-            stack.Push((null, segment.PageModelType!));
+                var page = CreatePage(pageType, stackPage.Page);
+
+                var isModal = Shell.GetPresentationMode(page).HasFlag(PresentationMode.Modal);
+                await NavigationHelper.SendEnteringAsync(page, intent).ConfigureAwait(true);
+                await shellProxy.PushAsync(segmentName, page).ConfigureAwait(true);
+                stack.Add(new NavigationStackPage($"{stackPage.Route}/{segmentName}", segmentName, page, isModal));
+            }
         }
 
-        return actions;
+        if (sendAppearingToTarget)
+        {
+            var page = stack[^1].Page;
+            var intent = navigation.Intent;
+            NavigationHelper.AssertIntent(page, intent);
+            await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
+        }
+
+        return true;
+    }
+
+    private async Task<bool> ExecuteAbsoluteNavigationAsync(INavigationInfo navigation)
+    {
+        var behavior = navigation.Behavior ?? NavigationBehavior.PopAllPagesOnItemChange;
+        var ignoreGuards = behavior.HasFlag(NavigationBehavior.IgnoreGuards);
+        var shellProxy = ShellProxy;
+        var rootSegment = navigation[0];
+        var rootSegmentName = NavigationHelper.GetSegmentName(rootSegment, Configuration);
+
+        // Get current navigation stack
+        var currentItem = shellProxy.CurrentItem;
+        var currentSection = currentItem.CurrentSection;
+        var currentContent = currentSection.CurrentContent;
+        var navigationStack = currentSection.GetNavigationStack().ToList();
+        var rootStackPage = navigationStack[0];
+        if (rootStackPage.SegmentName == rootSegmentName)
+        {
+            // If we're in the same ShellContent, this is just a relative navigation
+            var relativeNavigation = ToRelativeNavigation(navigation, navigationStack);
+            return await ExecuteRelativeNavigationAsync(relativeNavigation, currentSection, navigationStack, ignoreGuards: ignoreGuards).ConfigureAwait(true);
+        }
+
+        var modalPages = navigationStack.Count(page => page.IsModal);
+        if (modalPages > 0)
+        {
+            var popModalsNavigation = PopTimes(modalPages);
+            if (!await ExecuteRelativeNavigationAsync(popModalsNavigation, currentSection, navigationStack, false, ignoreGuards).ConfigureAwait(true))
+            {
+                return false;
+            }
+        }
+
+        var targetContent = shellProxy.GetContent(rootSegmentName);
+        var targetSection = targetContent.Parent;
+        var targetItem = targetSection.Parent;
+
+        IList<IShellContentProxy> contentsToLeave;
+        ContentLeaveMode leaveMode;
+
+        if (targetItem != currentItem)
+        {
+            if (behavior.HasFlag(NavigationBehavior.PopAllPagesOnItemChange))
+            {
+                leaveMode = ContentLeaveMode.Destroy;
+                contentsToLeave = [..currentItem
+                    .Sections
+                    .SelectMany(section => section.Contents)
+                    .Where(content => content.Page is not null)
+                    .OrderByDescending(content => content.Parent == currentSection)
+                    .ThenBy(content => content.Parent)
+                    .ThenByDescending(content => content == currentContent)];
+            }
+            else
+            {
+                leaveMode = ContentLeaveMode.None;
+                contentsToLeave = [currentContent];
+            }
+        }
+        else if (targetSection != currentSection)
+        {
+            if (behavior.HasFlag(NavigationBehavior.PopAllPagesOnSectionChange))
+            {
+                leaveMode = ContentLeaveMode.Destroy;
+                contentsToLeave = [..currentSection
+                    .Contents
+                    .Where(content => content.Page is not null)
+                    .OrderByDescending(content => content == currentContent)];
+            }
+            else
+            {
+                leaveMode = ContentLeaveMode.None;
+                contentsToLeave = [currentContent];
+            }
+        }
+        else
+        {
+            leaveMode = ContentLeaveMode.ClearStack;
+            contentsToLeave = [currentContent];
+        }
+
+        return await ExecuteCrossContentNavigationAsync(navigation, contentsToLeave, targetContent, leaveMode, ignoreGuards).ConfigureAwait(true);
+    }
+
+    private enum ContentLeaveMode
+    {
+        None,
+        ClearStack,
+        Destroy,
+    }
+
+    private async Task<bool> ExecuteCrossContentNavigationAsync(
+        INavigationInfo navigation,
+        IList<IShellContentProxy> contentsToLeave,
+        IShellContentProxy targetContent,
+        ContentLeaveMode leaveMode,
+        bool ignoreGuards)
+    {
+        var shellProxy = ShellProxy;
+
+        foreach (var content in contentsToLeave)
+        {
+            var navigationStack = content.Parent.GetNavigationStack().ToList();
+
+            if (leaveMode == ContentLeaveMode.None)
+            {
+                await EnsureContentIsSelectedAsync().ConfigureAwait(true);
+                await NavigationHelper.SendDisappearingAsync(navigationStack[^1].Page).ConfigureAwait(true);
+                continue;
+            }
+
+            var popCount = navigationStack.Count - 1;
+            if (popCount > 0)
+            {
+                var popNavigation = PopTimes(popCount);
+                if (!await ExecuteRelativeNavigationAsync(
+                        popNavigation,
+                        content.Parent,
+                        navigationStack,
+                        false,
+                        ignoreGuards,
+                        EnsureContentIsSelectedAsync).ConfigureAwait(true))
+                {
+                    return false;
+                }
+            }
+
+            var contentPage = content.Page!;
+            if (!ignoreGuards && content.HasGuard)
+            {
+                await EnsureContentIsSelectedAsync().ConfigureAwait(true);
+                await NavigationHelper.SendAppearingAsync(contentPage, null).ConfigureAwait(true);
+                if (!await NavigationHelper.CanLeaveAsync(contentPage).ConfigureAwait(true))
+                {
+                    return false;
+                }
+            }
+
+            await NavigationHelper.SendDisappearingAsync(contentPage).ConfigureAwait(true);
+            await NavigationHelper.SendLeavingAsync(contentPage).ConfigureAwait(true);
+
+            Task EnsureContentIsSelectedAsync()
+                => shellProxy.CurrentItem.CurrentSection.CurrentContent == content
+                    ? Task.CompletedTask
+                    : ShellProxy.SelectContentAsync(content.SegmentName);
+        }
+
+        // Send entering
+        var targetContentPage = targetContent.GetOrCreateContent();
+        var targetIsShellContent = navigation.Count == 1;
+        var intent = targetIsShellContent ? navigation.Intent : null;
+        await NavigationHelper.SendEnteringAsync(targetContentPage, intent).ConfigureAwait(true);
+        await ShellProxy.SelectContentAsync(targetContent.SegmentName).ConfigureAwait(true);
+
+        if (leaveMode == ContentLeaveMode.Destroy)
+        {
+            foreach (var content in contentsToLeave)
+            {
+                if (Debugger.IsAttached)
+                {
+                    _leakDetector.Track(content.Page!);
+                }
+
+                content.DestroyContent();
+            }
+        }
+
+        if (!targetIsShellContent)
+        {
+            var targetSection = targetContent.Parent;
+            var targetStack = targetSection.GetNavigationStack().ToList();
+            var relativeNavigation = ToRelativeNavigation(navigation, targetStack);
+            return await ExecuteRelativeNavigationAsync(relativeNavigation, targetSection, targetStack, ignoreGuards: ignoreGuards).ConfigureAwait(true);
+        }
+
+        await NavigationHelper.SendAppearingAsync(targetContentPage, intent).ConfigureAwait(true);
+        return true;
+    }
+
+    private RelativeNavigation ToRelativeNavigation(IReadOnlyList<INavigationSegment> navigation, IList<NavigationStackPage> navigationStackPages)
+    {
+        var matchingSegmentsCount = navigation
+            .Skip(1)
+            .Select(segment => NavigationHelper.GetSegmentName(segment, Configuration))
+            .Zip(navigationStackPages.Skip(1).Select(stackPage => stackPage.SegmentName), (s1, s2) => (s1, s2))
+            .TakeWhile(pair => pair.s1 == pair.s2)
+            .Count();
+
+        var relativeNavigation = new RelativeNavigation();
+
+        // Add pop segments
+        var popCount = navigationStackPages.Count - 1 - matchingSegmentsCount;
+        while (popCount-- > 0)
+        {
+            relativeNavigation.Pop();
+        }
+
+        // Add push segments
+        for (var i = 1 + matchingSegmentsCount; i < navigation.Count; i++)
+        {
+            ((IList<INavigationSegment>)relativeNavigation).Add(navigation[i]);
+        }
+
+        return relativeNavigation;
+    }
+
+    private async Task<bool> ExecuteNavigationAsync(Func<Task<bool>> navigationFunc)
+    {
+        var taken = await _semaphore.WaitAsync(0).ConfigureAwait(true);
+        if (!taken)
+        {
+            throw new InvalidOperationException("Cannot navigate while another navigation is in progress, try to use IDispatcher.DispatchDelayed.");
+        }
+
+        try
+        {
+            var result = await navigationFunc().ConfigureAwait(true);
+            return result;
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+    }
+
+    private static ImageSource WithColor(ImageSource source, Color color)
+    {
+        if (source is FontImageSource fontSource)
+        {
+            var clone = new FontImageSource
+            {
+                Glyph = fontSource.Glyph,
+                FontFamily = fontSource.FontFamily,
+                Size = fontSource.Size,
+                Color = color,
+            };
+
+            return clone;
+        }
+
+        return source;
+    }
+
+    private static INavigationInfo PopTimes(int popCount)
+    {
+        var navigation = Navigation.Relative();
+        while (popCount-- > 0)
+        {
+            navigation.Pop();
+        }
+
+        return navigation;
     }
 }

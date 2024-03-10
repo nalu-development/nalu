@@ -2,9 +2,10 @@
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
-             x:Class="Nalu.Maui.Sample.Pages.TwoPage"
-             x:DataType="pageModels:TwoPageModel"
+             xmlns:pageModels="clr-namespace:Nalu.Maui.DefaultShellSample.PageModels"
+             xmlns:pageModels1="clr-namespace:Nalu.Maui.DefaultShellSample.PageModels"
+             x:Class="Nalu.Maui.DefaultShellSample.Pages.TwoPage"
+             x:DataType="pageModels1:TwoPageModel"
              Title="Page Two"
              Padding="16">
     <ContentPage.Content>
@@ -18,6 +19,8 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
+            <Button Command="{Binding PushSixCommand}"
+                    Text="Push Six"/>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

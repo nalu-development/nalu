@@ -17,7 +17,7 @@
         <SingleProject>true</SingleProject>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <MauiVersion>8.0.6</MauiVersion>
+        <MauiVersion>8.0.7</MauiVersion>
 
         <!-- Display name -->
         <ApplicationTitle>Nalu.Maui.DefaultShellSample</ApplicationTitle>
@@ -77,6 +77,12 @@
       <MauiXaml Update="Pages\TwoPage.xaml">
         <SubType>Designer</SubType>
       </MauiXaml>
+      <MauiXaml Update="Pages\SixPage.xaml">
+        <SubType>Designer</SubType>
+      </MauiXaml>
+      <MauiXaml Update="Pages\SevenPage.xaml">
+        <SubType>Designer</SubType>
+      </MauiXaml>
     </ItemGroup>
 
     <ItemGroup>
@@ -118,6 +124,14 @@
       </Compile>
       <Compile Update="Pages\TwoPage.xaml.cs">
         <DependentUpon>TwoPage.xaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Pages\SixPage.xaml.cs">
+        <DependentUpon>SixPage.xaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Pages\SevenPage.xaml.cs">
+        <DependentUpon>SevenPage.xaml</DependentUpon>
         <SubType>Code</SubType>
       </Compile>
     </ItemGroup>

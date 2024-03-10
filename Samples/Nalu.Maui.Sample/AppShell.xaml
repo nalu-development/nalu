@@ -2,23 +2,29 @@
 
 <nalu:NaluShell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-                xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
                 xmlns:nalu="https://nalu-development.github.com/nalu"
+                xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
                 x:Class="Nalu.Maui.Sample.AppShell">
     <FlyoutItem Route="main"
-                FlyoutDisplayOptions="AsMultipleItems">
+                FlyoutDisplayOptions="AsMultipleItems"
+                Title="Tabs"
+                Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}">
         <Tab Title="Pages"
              Route="pages"
+             FlyoutDisplayOptions="AsMultipleItems"
              Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}">
-            <ShellContent nalu:Navigation.PageModel="pageModels:OnePageModel"
+            <ShellContent nalu:Navigation.PageType="pages:OnePage"
                           Title="Page One"
                           Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"/>
-            <ShellContent nalu:Navigation.PageModel="pageModels:TwoPageModel"
-                          Title="Page Two"
-                          Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
+            <ShellContent nalu:Navigation.PageType="pages:SevenPage"
+                          Title="Page Seven"
+                          Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}"/>
         </Tab>
+        <ShellContent nalu:Navigation.PageType="pages:TwoPage"
+                      Title="Page Two"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
     </FlyoutItem>
-    <ShellContent nalu:Navigation.PageModel="pageModels:FivePageModel"
+    <ShellContent nalu:Navigation.PageType="pages:FivePage"
                   Title="Page Five"
                   Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}"/>
 </nalu:NaluShell>

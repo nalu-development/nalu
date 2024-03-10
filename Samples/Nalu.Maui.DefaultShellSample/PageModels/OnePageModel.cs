@@ -1,4 +1,4 @@
-namespace Nalu.Maui.Sample.PageModels;
+namespace Nalu.Maui.DefaultShellSample.PageModels;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;

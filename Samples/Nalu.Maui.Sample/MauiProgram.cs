@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿namespace Nalu.Maui.Sample;
 
-namespace Nalu.Maui.Sample;
+using Microsoft.Extensions.Logging;
 
 using CommunityToolkit.Maui;
 using PopupModels;

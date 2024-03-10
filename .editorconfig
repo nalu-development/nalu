@@ -451,6 +451,9 @@ dotnet_diagnostic.SA1204.severity = none
 # SA1516: Elements should be separated by blank line
 dotnet_diagnostic.SA1516.severity = none
 
+# SA1512: Single-line comments should not be followed by blank line
+dotnet_diagnostic.SA1512.severity = none
+
 ##########################################
 # License
 ##########################################

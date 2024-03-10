@@ -14,15 +14,14 @@ Unfortunately MAUI navigation (NavigationPage, or Shell) do not provide automati
 This is a problem because it can lead to memory/event leaks.
 
 There are other big issues with Shell navigation:
-- Routes needs to be verified ahead of time, so you can't use dynamic routes.
-  Well, there's a way to do that via `Routing.RegisterRoute` but it's not very convenient.
 - `Shell.Current.GoToAsync` API is really hard to understand: can you easily tell what's the difference between `GoToAsync("Page1")` / `GoToAsync("/Page1")` / `GoToAsync("//Page1")` / `GoToAsync("///Page1")`?
-- Root pages (defined as `ShellContent` will never be removed from the navigation stack, even if you navigate to a different root page.
+- Root pages (defined as `ShellContent` will never be dispose, even if you navigate to a different shell item.
 - Have you ever wonder what's the difference between `Transient` and `Scoped` service lifetime in MAUI?
 - The way to pass parameters is a bit inconvenient
 - There's no way to define something and provide that value to all nested pages (like a context)
 
-On the other hand, `Shell` offers a convenient way to define root pages and have a ready-to use flyout menu.
+On the other hand, `Shell` offers a convenient way to define the app structure including tab bar and flyout menu.
+`Shell` also supports having multiple navigation stacks alive at the same time when using a global `TabBar`.
 
 Nalu navigation is based on `Shell` navigation, but it solves all the issues above.
 
@@ -43,10 +42,10 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
-            .UseNaluNavigation<App>(nav => nav.AddPages())
+            .UseNaluNavigation<App>()
 ```
 
-The `AddPages` method will scan the `<App>` assembly for pages and view models by naming convention `MainPage` => `MainPageModel`.
+This method will scan the `<App>` assembly for pages and view models by naming convention `MainPage` => `MainPageModel`.
 You can specify a custom naming convention by passing a function that returns the view model type given the page type:
 
 ```csharp
@@ -88,6 +87,19 @@ builder
 
 Note: the automatic registration by naming convention automatically considers the page model as an interface.
 
+#### Initial setup - without MVVM pattern
+
+Nalu can be used even without MVVM pattern, just add your pages as `Scoped` services:
+
+```csharp
+builder
+    .UseNaluNavigation<App>()
+    .Services
+    .AddScoped<MyPage>();
+```
+
+#### Customizing the appearance of the navigation bar
+
 Due to some issues in MAUI, we need to define `ImageSource` for the menu button and back button displayed in the navigation bar.
 Nalu navigation already provides them, but you can override them if you want:
 
@@ -102,48 +114,94 @@ builder
 #### Shell definition
 
 Nalu navigation is based on `Shell` navigation, so you need to define your `Shell` in `AppShell.xaml` by inheriting from `NaluShell`.
-Use `nalu:Navigation.PageModel` to specify the page model for each `ShellContent`.
-
-Important:
-- all the root pages must be defined as `ShellContent`
-- to make the flyout work correctly either
-  - define at least two root pages
-  - or set the `FlyoutBehavior` to `FlyoutBehavior.Flyout`
+Use `nalu:Navigation.PageType` to specify the page type for each `ShellContent`.
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 
 <nalu:NaluShell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-                xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+                xmlns:pages="clr-namespace:Nalu.Maui.Sample.PageModels"
                 xmlns:nalu="https://nalu-development.github.com/nalu"
                 x:Class="Nalu.Maui.Sample.AppShell">
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems">
         <Tab Title="Pages"
              Route="pages">
-            <ShellContent nalu:Navigation.PageModel="pageModels:OnePageModel"
+            <ShellContent nalu:Navigation.PageType="pages:OnePage"
                           Title="Page One"/>
-            <ShellContent nalu:Navigation.PageModel="pageModels:TwoPageModel"
+            <ShellContent nalu:Navigation.PageType="pages:TwoPage"
                           Title="Page Two"/>
         </Tab>
     </FlyoutItem>
-    <ShellContent nalu:Navigation.PageModel="pageModels:FivePageModel"
+    <ShellContent nalu:Navigation.PageType="pages:FivePage"
                   Title="Page Five"/>
 </nalu:NaluShell>
 ```
 
-In the code behind you need to set the initial shell page using the `ConfigureNavigation` method:
+In the code behind you need to set the initial shell page passing the navigation service and the initial page type to the base constructor:
 
 ```csharp
-public partial class AppShell : NaluShell
+public partial class App : Application
 {
-    public AppShell()
+    public App(INavigationService navigationService)
     {
         InitializeComponent();
-        ConfigureNavigation<OnePageModel>();
+        MainPage = new AppShell(navigationService);
     }
 }
+
+public partial class AppShell : NaluShell
+{
+    public AppShell(INavigationService navigationService) : base(navigationService, typeof(OnePage))
+    {
+        InitializeComponent();
+    }
+}
+```
+
+#### Navigation concepts
+
+`Shell` structure is based on `Item` > `Section` > `Content` hierarchy.
+Even when you don't specify an `Item` or a `Section` in the `Shell` definition, it is automatically created for you.
+
+For example, the following `Shell` definition
+
+```xml
+<nalu:NaluShell>
+    <ShellContent nalu:Navigation.PageType="pages:OnePage"/>
+    <ShellContent nalu:Navigation.PageType="pages:TwoPage"/>
+</nalu:NaluShell>
+```
+
+is equivalent to
+
+```xml
+<nalu:NaluShell>
+    <ShellItem>
+        <ShellSection>
+            <ShellContent nalu:Navigation.PageType="pages:OnePage"/>
+        </ShellSection>
+    </ShellItem>
+    <ShellItem>
+        <ShellSection>
+            <ShellContent nalu:Navigation.PageType="pages:TwoPage"/>
+        </ShellSection>
+    </ShellItem>
+</nalu:NaluShell>
+```
+
+That said, `Nalu` navigation provides the following navigation behavior when switching between `ShellContent`s:
+- if the content is in the same `ShellSection`, navigation stack will be popped
+- if the content is in a different `ShellSection` but in the same `ShellItem`, the current navigation stack will be persisted
+- if the content is in a different `ShellItem`, all of the current item's navigation stacks will be popped and the `ShellContent` pages will be destroyed
+
+You can customize this behavior by providing a custom `NavigationBehavior` to the `Navigation` object.
+
+For example you can also use the `IgnoreGuards` behavior to ignore the `ILeavingGuard` when popping a page:
+
+```csharp
+await _navigationService.GoToAsync(Navigation.Relative(NavigationBehavior.IgnoreGuards).Pop());
 ```
 
 #### Navigation events
@@ -165,7 +223,7 @@ Obviously you can call them manually from the intent-aware one if you need to.
 Sometimes you want to protect a page from being popped from the navigation stack, for example when the user is editing a form.
 You can do that by implementing the `ILeavingGuard` interface which defines a `ValueTask<bool> CanLeaveAsync()` method from which you can eventually display a prompt to ask the user if they want to leave the page.
 
-Note: a page "appears" only when it is the target of the navigation, intermediate pages models will trigger `OnAppearingAsync` unless the `ILeavingGuard` stops the navigation on that page.
+Note: a page "appears" only when it is the target of the navigation, intermediate pages models will trigger `OnAppearingAsync` unless the `ILeavingGuard` needs to be evaluated.
 
 #### Navigation using C#
 
@@ -190,19 +248,23 @@ Then you can use the `GoToAsync` method to navigate to a page using relative or 
 await _navigationService.GoToAsync(Navigation.Relative().Push<TwoPageModel>());
 // Add a page to the navigation stack providing an intent
 var myIntent = new MyIntent(/* ... */);
-await _navigationService.GoToAsync(Navigation.Relative(myIntent).Push<TwoPageModel>());
+await _navigationService.GoToAsync(Navigation.Relative().Push<TwoPageModel>().WithIntent(myIntent));
 // Remove the current page from the navigation stack
 await _navigationService.GoToAsync(Navigation.Relative().Pop());
 // Remove the current page from the navigation stack providing an intent to the previous page
 var myIntent = new MyResult(/* ... */);
-await _navigationService.GoToAsync(Navigation.Relative(myIntent).Pop())
+await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(myIntent))
 // Pop two pages than push a new one
 await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop().Push<ThreePageModel>());
 // Pop to the root page using absolute navigation
-await _navigationService.GoToAsync(Navigation.Absolute().Add<MainPageModel>());
+await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<MainPageModel>());
+// Switch to a different shell content and push a page there
+await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<OtherPageModel>().Push<OtherChildPageModel>());
 ```
 
-Note, non-sense navigations will throw an exception, for example: pop -> push -> pop.
+Note:
+- if you don't want to use MVVM pattern just use page types instead of page model types (i.e. `Navigation.Relative().Push<TwoPage>()`).
+- non-sense navigations will throw an exception, for example: pop -> push -> pop.
 
 #### Navigation using XAML
 
@@ -224,7 +286,7 @@ Nalu provides a `Navigation` markup extension that can be used to navigate to a 
 <Button Command="{nalu:NavigateCommand}" Text="Push some page">
     <Button.CommandParameter>
         <nalu:RelativeNavigation Intent="{Binding MyIntentValue}">
-             <nalu:NavigationSegment x:TypeArguments="pageModels:SomePageModel" />
+            <nalu:NavigationSegment Type="pages:SixPage" />
         </nalu:RelativeNavigation>
     </Button.CommandParameter>
 </Button>
@@ -235,7 +297,7 @@ Nalu provides a `Navigation` markup extension that can be used to navigate to a 
 <Button Command="{nalu:NavigateCommand}" Text="Go to main page">
     <Button.CommandParameter>
         <nalu:AbsoluteNavigation>
-            <nalu:NavigationSegment x:TypeArguments="pageModels:MainPageModel" />
+            <nalu:NavigationSegment x:TypeArguments="pages:MainPage" />
         </nalu:AbsoluteNavigation>
     </Button.CommandParameter>
 </Button>
@@ -271,7 +333,7 @@ public class PersonDetailsPageModel(INavigationServiceProvider navigationService
 
 #### How to unit test navigation
 
-Here's an example of how to unit test navigation using NSubstitute:
+Here's an example of how to unit test navigation using `NSubstitute`:
 
 Using `record` for intents is recommended to avoid having to implement an equality comparer.
 Suppose to have defined an intent class `public record AnIntent(int Value = 0);`.
@@ -286,7 +348,7 @@ var viewModel = new MyViewModel(navigationService);
 await viewModel.DoSomethingAsync(5);
 
 // Assert
-var expectedNavigation = Navigation.Relative(new AnIntent(5)).Push<TargetPageModel>();
+var expectedNavigation = Navigation.Relative().Push<TargetPageModel>().WithIntent(new AnIntent(5));
 await navigationService.Received().GoToAsync(Arg.Is<Navigation>(n => n.Matches(expectedNavigation)));
 ```
 
@@ -302,18 +364,13 @@ If you're here just because you want page/vm disposal on the standard `Navigatio
 
 ##### NavigationPage
 ```csharp
-var navigationPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
+MainPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
 ```
 
 ##### Shell
 
 ```csharp
-public AppShell() {
-    InitializeComponent();
-    this.ConfigureForPageDisposal(disposeShellContents: true);
-}
+MainPage = new AppShell().ConfigureForPageDisposal();
 ```
 
-With `disposeShellContents: true` `ShellContent`s with `ContentTemplate` will be disposed and recreated too.
-
-Note: Tab's content will be disposed only when leaving the tab section.
+Note: shell content pages will not be disposed.

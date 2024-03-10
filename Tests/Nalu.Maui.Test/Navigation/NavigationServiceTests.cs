@@ -1,198 +1,28 @@
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
 namespace Nalu.Maui.Test.Navigation;
 
-using System.ComponentModel;
 using Navigation = Nalu.Navigation;
 
 #pragma warning disable CA2012
 #pragma warning disable VSTHRD110
 
-public class NavigationServiceTests
+public partial class NavigationServiceTests
 {
-    public record AnIntent(int Value = 0);
-
-    public interface ISomeContext;
-
-    public interface INavigationAwareTest<in T> :
-        INotifyPropertyChanged,
-        IEnteringAware, IEnteringAware<T>,
-        IAppearingAware, IAppearingAware<T>,
-        IDisappearingAware,
-        ILeavingAware,
-        IDisposable;
-
-    public interface IOneTestPageModel : INavigationAwareTest<AnIntent>;
-
-    public interface ITwoTestPageModel : INavigationAwareTest<AnIntent>;
-
-    public interface IThreeTestPageModel : INavigationAwareTest<string>;
-
-    public interface IGuardedTestPageModel : INavigationAwareTest<AnIntent>, ILeavingGuard;
-
-    public interface IRealTestPageModel : INotifyPropertyChanged;
-
-    private class BaseTestPage : ContentPage
-    {
-        protected BaseTestPage(object model)
-        {
-            BindingContext = model;
-        }
-    }
-
-    private class RealTestPageModel : IRealTestPageModel
-    {
-#pragma warning disable CS0067
-        public event PropertyChangedEventHandler? PropertyChanged;
-#pragma warning restore CS0067
-    }
-
-    private class RealTestNavigationController(INavigationServiceInternal navigationService) : IShellNavigationController
-    {
-        private readonly Dictionary<string, Page> _rootPages = [];
-        public IReadOnlyList<Page> NavigationStack { get; private set; } = [];
-        public Task<T> ExecuteNavigationAsync<T>(Func<Task<T>> navigationFunc) => navigationFunc();
-
-        public Page CurrentPage => NavigationStack[^1];
-        public Page RootPage => NavigationStack[0];
-
-        public Task SetRootPageAsync(string segmentName)
-        {
-            NavigationStack = new[] { _rootPages[segmentName] };
-            return Task.CompletedTask;
-        }
-
-        public Page GetRootPage(string segmentName)
-        {
-            if (_rootPages.TryGetValue(segmentName, out var page))
-            {
-                return page;
-            }
-
-            var navigationServiceTestsType = typeof(NavigationServiceTests);
-            var targetModelTypeFullName = $"{navigationServiceTestsType.FullName}+{segmentName}";
-            var targetModelType = navigationServiceTestsType.Assembly.GetType(targetModelTypeFullName)!;
-            var rootPage = navigationService.CreatePage(targetModelType);
-            _rootPages[segmentName] = rootPage;
-            return rootPage;
-        }
-
-        public void ConfigurePage(Page page)
-        {
-        }
-
-        public Task PopAsync(int times = 1)
-        {
-            NavigationStack = NavigationStack.Take(NavigationStack.Count - times).ToList();
-            return Task.CompletedTask;
-        }
-
-        public Task PushAsync(Page page)
-        {
-            NavigationStack = NavigationStack.Concat(new[] { page }).ToList();
-            return Task.CompletedTask;
-        }
-    }
-
-    private class RealTestPage(IRealTestPageModel model) : BaseTestPage(model);
-
-    private class OneTestPage(IOneTestPageModel model) : BaseTestPage(model);
-
-    private class TwoTestPage(ITwoTestPageModel model) : BaseTestPage(model);
-
-    private class ThreeTestPage(IThreeTestPageModel model) : BaseTestPage(model);
-
-    private class GuardedTestPage(IGuardedTestPageModel model) : BaseTestPage(model);
-
-    private readonly INavigationServiceInternal _navigationService;
-    private readonly IShellNavigationController _navigationController;
-    private readonly ServiceProvider _serviceProvider;
-    private readonly INavigationOptions _navigationOptions;
-
-    public NavigationServiceTests()
-    {
-        var serviceCollection = new ServiceCollection();
-        serviceCollection.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
-        serviceCollection.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
-        _navigationOptions = new NavigationConfigurator(serviceCollection, typeof(NavigationServiceTests));
-        var mapping = (IDictionary<Type, Type>)_navigationOptions.Mapping;
-
-        mapping.Add(typeof(IRealTestPageModel), typeof(RealTestPage));
-        mapping.Add(typeof(IOneTestPageModel), typeof(OneTestPage));
-        mapping.Add(typeof(ITwoTestPageModel), typeof(TwoTestPage));
-        mapping.Add(typeof(IThreeTestPageModel), typeof(ThreeTestPage));
-        mapping.Add(typeof(IGuardedTestPageModel), typeof(GuardedTestPage));
-
-        serviceCollection.AddScoped<IRealTestPageModel, RealTestPageModel>();
-        serviceCollection.AddScoped<RealTestPage>();
-        serviceCollection.AddScoped<IOneTestPageModel>(_ => Substitute.For<IOneTestPageModel>());
-        serviceCollection.AddScoped<OneTestPage>();
-        serviceCollection.AddScoped<ITwoTestPageModel>(_ => Substitute.For<ITwoTestPageModel>());
-        serviceCollection.AddScoped<TwoTestPage>();
-        serviceCollection.AddScoped<IThreeTestPageModel>(_ => Substitute.For<IThreeTestPageModel>());
-        serviceCollection.AddScoped<ThreeTestPage>();
-        serviceCollection.AddScoped<IGuardedTestPageModel>(_ => Substitute.For<IGuardedTestPageModel>());
-        serviceCollection.AddScoped<GuardedTestPage>();
-
-        _serviceProvider = serviceCollection.BuildServiceProvider();
-        _navigationService = new NavigationService(_serviceProvider, _navigationOptions);
-
-        var navigationStack = new List<Page>();
-        _navigationController = Substitute.For<IShellNavigationController>();
-        _navigationController.NavigationStack.Returns(navigationStack);
-        _navigationController.RootPage.Returns(_ => navigationStack[0]);
-        _navigationController.CurrentPage.Returns(_ => navigationStack[^1]);
-        _navigationController.ExecuteNavigationAsync(Arg.Any<Func<Task<bool>>>())
-            .Returns(callInfo => callInfo.Arg<Func<Task<bool>>>()());
-
-        var rootPages = new Dictionary<string, Page>();
-        _navigationController.GetRootPage(Arg.Any<string>())
-            .Returns(callInfo =>
-            {
-                var segmentName = callInfo.Arg<string>();
-                if (rootPages.TryGetValue(segmentName, out var page))
-                {
-                    return page;
-                }
-
-                var navigationServiceTestsType = typeof(NavigationServiceTests);
-                var targetModelTypeFullName = $"{navigationServiceTestsType.FullName}+{segmentName}";
-                var targetModelType = navigationServiceTestsType.Assembly.GetType(targetModelTypeFullName)!;
-                var rootPage = _navigationService.CreatePage(targetModelType);
-                rootPages[segmentName] = rootPage;
-                return rootPage;
-            });
-        _navigationController
-            .When(m => m.SetRootPageAsync(Arg.Any<string>()))
-            .Do(callInfo =>
-            {
-                var segmentName = callInfo.Arg<string>();
-                navigationStack.Clear();
-                navigationStack.Add(rootPages[segmentName]);
-            });
-
-        _navigationController
-            .When(m => m.PushAsync(Arg.Any<Page>()))
-            .Do(callInfo =>
-            {
-                var page = callInfo.Arg<Page>();
-                navigationStack.Add(page);
-            });
-        _navigationController
-            .When(m => m.PopAsync(Arg.Any<int>()))
-            .Do(callInfo =>
-            {
-                var times = callInfo.Arg<int>();
-                navigationStack.RemoveRange(navigationStack.Count - times, times);
-            });
-    }
+    private NavigationService _navigationService = null!;
+    private IShellProxy _shellProxy = null!;
+    private ServiceProvider _serviceProvider = null!;
+    private INavigationConfiguration _navigationConfiguration = null!;
 
     [Fact(DisplayName = "NavigationService, when initialized, should set the root page, sending entering and appearing")]
-    public void NavigationServiceWhenInitializedShouldSetTheRootPageSendingEnteringAndAppearing()
+    public async Task NavigationServiceWhenInitializedShouldSetTheRootPageSendingEnteringAndAppearing()
     {
-        _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
+        const string segmentName = nameof(Page1);
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, segmentName, null);
 
-        _navigationController.Received().SetRootPageAsync(nameof(IOneTestPageModel));
-        var page = _navigationController.RootPage;
-        var model = (IOneTestPageModel)page.BindingContext;
+        _ = _shellProxy.Received().SelectContentAsync(segmentName);
+        var page = _shellProxy.GetContent(segmentName).Page!;
+        var model = (IPage1Model)page.BindingContext;
 
         Received.InOrder(() =>
         {
@@ -206,28 +36,31 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when initialized with intent, should set the root page, sending entering and appearing with intent")]
     public async Task NavigationServiceWhenInitializedWithIntentShouldSetTheRootPageSendingEnteringAndAppearingWithIntent()
     {
-        var intent = new AnIntent();
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController, intent);
+        const string segmentName = nameof(Page1);
+        var intent = new OddIntent();
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, segmentName, intent);
 
-        _ = _navigationController.Received().SetRootPageAsync(nameof(IOneTestPageModel));
-        var page = _navigationController.RootPage;
-        var model = (IOneTestPageModel)page.BindingContext;
+        _ = _shellProxy.Received().SelectContentAsync(segmentName);
+        var page = _shellProxy.GetContent(segmentName).Page!;
+        var model = (IPage1Model)page.BindingContext;
 
         Received.InOrder(() =>
         {
             model.OnEnteringAsync(intent);
             model.OnAppearingAsync(intent);
         });
-        _ = model.DidNotReceive().OnEnteringAsync();
-        _ = model.DidNotReceive().OnAppearingAsync();
+        model.DidNotReceive().OnEnteringAsync();
+        model.DidNotReceive().OnAppearingAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when initialized with incorrect intent, should throw")]
     public void NavigationServiceWhenInitializedWithIncorrectIntentShouldThrow()
     {
-        var intent = "an intent";
+        const string segmentName = nameof(Page1);
+        ConfigureTestAsync("c1");
 
-        var initializeAction = () => _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController, intent);
+        var initializeAction = () => _navigationService.InitializeAsync(_shellProxy, segmentName, "an unexpected intent");
 
         initializeAction.Should().ThrowAsync<InvalidOperationException>();
     }
@@ -235,81 +68,113 @@ public class NavigationServiceTests
     [Fact(DisplayName = "NavigationService, when pushing a page, should send disappearing on current page, then set the new page, sending entering and appearing")]
     public async Task NavigationServiceWhenPushingAPageShouldSendDisappearingOnCurrentPageThenSetTheNewPageSendingEnteringAndAppearing()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.RootPage;
-        var model1 = (IOneTestPageModel)page1.BindingContext;
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+
+        var content1 = _shellProxy.GetContent(nameof(Page1));
+        var page1 = content1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
         model1.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
+        var model2 = (IPage2Model)page2.BindingContext;
 
         Received.InOrder(() =>
         {
             model1.OnDisappearingAsync();
             model2.OnEnteringAsync();
-            _navigationController.PushAsync(page2);
+            _shellProxy.PushAsync(nameof(Page2), page2);
             model2.OnAppearingAsync();
         });
-        _ = model1.DidNotReceive().OnLeavingAsync();
-        _ = model2.DidNotReceive().OnEnteringAsync(null!);
-        _ = model2.DidNotReceive().OnAppearingAsync(null!);
+        model1.DidNotReceive().OnLeavingAsync();
+        model2.DidNotReceive().OnEnteringAsync(null!);
+        model2.DidNotReceive().OnAppearingAsync(null!);
     }
 
     [Fact(DisplayName = "NavigationService, when pushing a page with intent, should send disappearing on current page, then set the new page, sending entering and appearing")]
     public async Task NavigationServiceWhenPushingAPageWithIntentShouldSendDisappearingOnCurrentPageThenSetTheNewPageSendingEnteringAndAppearing()
     {
-        var intent = new AnIntent();
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.RootPage;
-        var model1 = (IOneTestPageModel)page1.BindingContext;
+        var intent = new EvenIntent();
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+
+        var content1 = _shellProxy.GetContent(nameof(Page1));
+        var page1 = content1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
         model1.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Relative(intent).Push<ITwoTestPageModel>());
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>().WithIntent(intent));
 
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
+        var model2 = (IPage2Model)page2.BindingContext;
 
         Received.InOrder(() =>
         {
             model1.OnDisappearingAsync();
             model2.OnEnteringAsync(intent);
-            _navigationController.PushAsync(page2);
+            _shellProxy.PushAsync(nameof(Page2), page2);
             model2.OnAppearingAsync(intent);
         });
-        _ = model1.DidNotReceive().OnLeavingAsync();
-        _ = model2.DidNotReceive().OnEnteringAsync();
-        _ = model2.DidNotReceive().OnAppearingAsync();
+        model1.DidNotReceive().OnLeavingAsync();
+        model2.DidNotReceive().OnEnteringAsync();
+        model2.DidNotReceive().OnAppearingAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when pushing a page with incorrect intent, should throw")]
     public async Task NavigationServiceWhenPushingAPageWithIncorrectIntentShouldThrow()
     {
-        var intent = "an intent";
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.RootPage;
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        model1.ClearReceivedCalls();
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
 
-        var pushAction = () => _navigationService.GoToAsync(Navigation.Relative(intent).Push<ITwoTestPageModel>());
+        var pushAction = () => _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>().WithIntent("unexpected intent"));
 
         await pushAction.Should().ThrowAsync<InvalidOperationException>();
+    }
 
-        _ = model1.DidNotReceive().OnDisappearingAsync();
-        _ = model1.DidNotReceive().OnLeavingAsync();
+    [Fact(DisplayName = "NavigationService, when popping a page, should not leak the popped page")]
+    public async Task NavigationServiceWhenPoppingAPageShouldNotLeakThePoppedPage()
+    {
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+
+        WeakReference<Page> weakPage;
+        {
+            var shellContent = _shellProxy.GetContent(nameof(Page1));
+            var shellSection = shellContent.Parent;
+            var navigationStackPages = shellSection.GetNavigationStack().ToList();
+            var page2 = navigationStackPages[1].Page;
+            var model2 = (IPage2Model)page2.BindingContext;
+            model2.ClearReceivedCalls();
+            weakPage = new WeakReference<Page>(page2);
+        }
+
+        await _navigationService.GoToAsync(Navigation.Relative().Pop());
+        _shellProxy.ClearReceivedCalls();
+
+        await Task.Yield();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+
+        weakPage.TryGetTarget(out _).Should().BeFalse();
     }
 
     [Fact(DisplayName = "NavigationService, when popping a page, should send disappearing and leaving on current page, then pop sending appearing")]
     public async Task NavigationServiceWhenPoppingAPageShouldSendDisappearingAndLeavingOnCurrentPageThenPopSendingAppearing()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
-        var page1 = _navigationController.NavigationStack[^2];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
@@ -319,130 +184,122 @@ public class NavigationServiceTests
         {
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
-            _navigationController.PopAsync(1);
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
             model1.OnAppearingAsync();
         });
-        _ = model1.DidNotReceive().OnEnteringAsync();
-    }
-
-    [Fact(DisplayName = "NavigationService, when popping a page, should not leak the popped page")]
-    public async Task NavigationServiceWhenPoppingAPageShouldNotLeakThePoppedPage()
-    {
-        // I would like to use _navigationController here, but NSubstitute leaks, even when clearing received calls
-        // See: https://github.com/nsubstitute/NSubstitute/issues/771
-        var navigationService = new NavigationService(_serviceProvider, _navigationOptions);
-        var navigationController = new RealTestNavigationController(navigationService);
-        WeakReference<Page> weakPage;
-        {
-            await ((INavigationServiceInternal)navigationService).InitializeAsync<IOneTestPageModel>(navigationController);
-            await navigationService.GoToAsync(Navigation.Relative().Push<IRealTestPageModel>());
-            weakPage = new WeakReference<Page>(navigationController.CurrentPage);
-            await navigationService.GoToAsync(Navigation.Relative().Pop());
-        }
-
-        await Task.Yield();
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-
-        weakPage.TryGetTarget(out _).Should().BeFalse();
+        model1.DidNotReceive().OnEnteringAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when popping a page with intent, should send disappearing and leaving on current page, then pop sending appearing")]
     public async Task NavigationServiceWhenPoppingAPageWithIntentShouldSendDisappearingAndLeavingOnCurrentPageThenPopSendingAppearing()
     {
-        var intent = new AnIntent();
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
-        var page1 = _navigationController.NavigationStack[^2];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Relative(intent).Pop());
+        var intent = new OddIntent();
+        await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(intent));
 
         Received.InOrder(() =>
         {
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
-            _navigationController.PopAsync(1);
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
             model1.OnAppearingAsync(intent);
         });
-        _ = model1.DidNotReceive().OnEnteringAsync(intent);
-        _ = model1.DidNotReceive().OnEnteringAsync();
-        _ = model1.DidNotReceive().OnAppearingAsync();
+        model1.DidNotReceive().OnEnteringAsync(intent);
+        model1.DidNotReceive().OnEnteringAsync();
+        model1.DidNotReceive().OnAppearingAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when popping a page with incorrect intent, should throw")]
     public async Task NavigationServiceWhenPoppingAPageWithIncorrectIntentShouldThrow()
     {
-        const string intent = "an intent";
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
-        var page1 = _navigationController.NavigationStack[^2];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
-        var popAction = () => _navigationService.GoToAsync(Navigation.Relative(intent).Pop());
+        var popAction = () => _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent("Unexpected intent"));
 
         await popAction.Should().ThrowAsync<InvalidOperationException>();
 
-        _ = model2.DidNotReceive().OnDisappearingAsync();
-        _ = model2.DidNotReceive().OnLeavingAsync();
-        _ = model1.DidNotReceive().OnEnteringAsync();
-        _ = model1.DidNotReceive().OnAppearingAsync();
-        _ = model1.DidNotReceive().OnEnteringAsync();
-        _ = model1.DidNotReceive().OnAppearingAsync();
+        model1.DidNotReceive().OnAppearingAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when popping multiple pages, should send disappearing only to current page and appearing to target page")]
     public async Task NavigationServiceWhenPoppingMultiplePagesShouldSendDisappearingOnlyToCurrentPageAndAppearingToTargetPage()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
-        await _navigationService.GoToAsync(Navigation.Relative().Push<IThreeTestPageModel>());
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>().Push<IPage3Model>());
 
-        var currentPage = _navigationController.NavigationStack[^1];
-        var currentModel = (IThreeTestPageModel)currentPage.BindingContext;
-        var midPage = _navigationController.NavigationStack[^2];
-        var midModel = (ITwoTestPageModel)midPage.BindingContext;
-        var targetPage = _navigationController.NavigationStack[^3];
-        var targetModel = (IOneTestPageModel)targetPage.BindingContext;
-        currentModel.ClearReceivedCalls();
-        targetModel.ClearReceivedCalls();
-        midModel.ClearReceivedCalls();
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
+        var page3 = navigationStackPages[2].Page;
+        var model3 = (IPage3Model)page3.BindingContext;
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        model3.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop());
 
         Received.InOrder(() =>
         {
-            currentModel.OnDisappearingAsync();
-            currentModel.OnLeavingAsync();
-            midModel.OnLeavingAsync();
-            _navigationController.PopAsync(2);
-            targetModel.OnAppearingAsync();
+            model3.OnDisappearingAsync();
+            model3.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model3.Dispose();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnAppearingAsync();
         });
-        _ = targetModel.DidNotReceive().OnEnteringAsync();
-        _ = midModel.DidNotReceive().OnAppearingAsync();
-        _ = midModel.DidNotReceive().OnDisappearingAsync();
+        model1.DidNotReceive().OnEnteringAsync();
+        model2.DidNotReceive().OnAppearingAsync();
+        model2.DidNotReceive().OnDisappearingAsync();
     }
 
     [Fact(DisplayName = "NavigationService, when popping a guarded page, evaluates guard and cancels if false")]
     public async Task NavigationServiceWhenPoppingAGuardedPageEvaluatesGuardAndCancelsIfFalse()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        await _navigationService.GoToAsync(Navigation.Relative().Push<IGuardedTestPageModel>());
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>());
 
-        var page1 = _navigationController.NavigationStack[^2];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (IGuardedTestPageModel)page2.BindingContext;
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage9Model)page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
@@ -452,21 +309,26 @@ public class NavigationServiceTests
 
         navigatedToTarget.Should().BeFalse();
 
-        _ = model2.Received().CanLeaveAsync();
-        _ = model2.DidNotReceive().OnDisappearingAsync();
-        _ = model2.DidNotReceive().OnLeavingAsync();
+        model2.Received().CanLeaveAsync();
+        model2.DidNotReceive().OnDisappearingAsync();
+        model2.DidNotReceive().OnLeavingAsync();
+        _shellProxy.DidNotReceive().PopAsync(shellSection);
     }
 
     [Fact(DisplayName = "NavigationService, when popping a guarded page, evaluates guard and proceeds if true")]
     public async Task NavigationServiceWhenPoppingAGuardedPageEvaluatesGuardAndProceedsIfTrue()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        await _navigationService.GoToAsync(Navigation.Relative().Push<IGuardedTestPageModel>());
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>());
 
-        var page1 = _navigationController.NavigationStack[^2];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        var page2 = _navigationController.NavigationStack[^1];
-        var model2 = (IGuardedTestPageModel)page2.BindingContext;
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage9Model)page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
@@ -478,151 +340,467 @@ public class NavigationServiceTests
 
         Received.InOrder(() =>
         {
-            _ = model2.CanLeaveAsync();
-            _ = model2.OnDisappearingAsync();
-            _ = model2.OnLeavingAsync();
-            _ = model1.OnAppearingAsync();
+            model2.CanLeaveAsync();
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnAppearingAsync();
         });
     }
 
-    [Fact(DisplayName = "NavigationService, when replacing root page, sends disappearing and leaving on current page, then sets the new page, sending entering and appearing")]
-    public async Task NavigationServiceWhenReplacingRootPageSendsDisappearingAndLeavingOnCurrentPageThenSetsTheNewPageSendingEnteringAndAppearing()
+    [Fact(DisplayName = "NavigationService, when popping a non-current guarded page, appears and evaluates guard")]
+    public async Task NavigationServiceWhenPoppingANonCurrentGuardedPageAppearsAndEvaluatesGuard()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.NavigationStack[0];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        model1.ClearReceivedCalls();
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>().Push<IPage2Model>());
 
-        await _navigationService.GoToAsync(Navigation.Relative().Pop().Push<ITwoTestPageModel>());
-        var page2 = _navigationController.NavigationStack[0];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
-
-        Received.InOrder(() =>
-        {
-            _ = model1.OnDisappearingAsync();
-            _ = model1.OnLeavingAsync();
-            _ = model2.OnEnteringAsync();
-            _ = model2.OnAppearingAsync();
-        });
-    }
-
-    [Fact(DisplayName = "NavigationService, when replacing root page with intent, sends disappearing and leaving on current page, then sets the new page, sending entering and appearing")]
-    public async Task NavigationServiceWhenReplacingRootPageWithIntentSendsDisappearingAndLeavingOnCurrentPageThenSetsTheNewPageSendingEnteringAndAppearing()
-    {
-        var intent = new AnIntent();
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.NavigationStack[0];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        model1.ClearReceivedCalls();
-
-        await _navigationService.GoToAsync(Navigation.Relative(intent).Pop().Push<ITwoTestPageModel>());
-        var page2 = _navigationController.NavigationStack[0];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
-
-        Received.InOrder(() =>
-        {
-            _ = model1.OnDisappearingAsync();
-            _ = model1.OnLeavingAsync();
-            _ = model2.OnEnteringAsync(intent);
-            _navigationController.SetRootPageAsync(nameof(ITwoTestPageModel));
-            _ = model2.OnAppearingAsync(intent);
-        });
-    }
-
-    [Fact(DisplayName = "NavigationService, when replacing a stack with another one, sends events accordingly")]
-    public async Task NavigationServiceWhenReplacingAStackWithAnotherOneSendsEventsAccordingly()
-    {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.NavigationStack[0];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
-        var page2 = _navigationController.NavigationStack[1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage9Model)page2.BindingContext;
+        var page3 = navigationStackPages[2].Page;
+        var model3 = (IPage2Model)page3.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
+        model3.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(
-            Navigation.Relative()
-                .Pop()
-                .Pop()
-                .Push<IThreeTestPageModel>()
-                .Push<IGuardedTestPageModel>());
+        model2.CanLeaveAsync().Returns(ValueTask.FromResult(true));
 
-        var page3 = _navigationController.NavigationStack[0];
-        var model3 = (IThreeTestPageModel)page3.BindingContext;
-        var page4 = _navigationController.NavigationStack[1];
-        var model4 = (IGuardedTestPageModel)page4.BindingContext;
+        var navigatedToTarget = await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop());
+
+        navigatedToTarget.Should().BeTrue();
 
         Received.InOrder(() =>
         {
-            _ = model2.OnDisappearingAsync();
-            _ = model2.OnLeavingAsync();
-            _ = model1.OnLeavingAsync();
-            _ = model3.OnEnteringAsync();
-            _ = model4.OnEnteringAsync();
-            _ = model4.OnAppearingAsync();
+            model3.OnDisappearingAsync();
+            model3.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model3.Dispose();
+            model2.OnAppearingAsync();
+            model2.CanLeaveAsync();
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnAppearingAsync();
         });
-
-        _ = model1.DidNotReceive().OnAppearingAsync();
-        _ = model1.DidNotReceive().OnDisappearingAsync();
-        _ = model3.DidNotReceive().OnAppearingAsync();
     }
 
-    [Fact(DisplayName = "NavigationService, when replacing a stack with another one with intent, sends events accordingly")]
-    public async Task NavigationServiceWhenReplacingAStackWithAnotherOneWithIntentSendsEventsAccordingly()
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on same content, should act as relative navigation")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnSameContentShouldActAsRelativeNavigation()
     {
-        var intent = new AnIntent();
-
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.NavigationStack[0];
-        var model1 = (IOneTestPageModel)page1.BindingContext;
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
-        var page2 = _navigationController.NavigationStack[1];
-        var model2 = (ITwoTestPageModel)page2.BindingContext;
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var page1 = shellContent.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
         model1.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>().Add<IPage9Model>().Add<IPage2Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage9Model)page2.BindingContext;
+        var page3 = navigationStackPages[2].Page;
+        var model3 = (IPage2Model)page3.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>().Add<IPage9Model>());
+
+        Received.InOrder(() =>
+        {
+            model2.OnEnteringAsync();
+            _shellProxy.PushAsync(nameof(Page9), page2);
+            model3.OnEnteringAsync();
+            _shellProxy.PushAsync(nameof(Page2), page3);
+            model3.OnAppearingAsync();
+            model3.OnDisappearingAsync();
+            model3.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model3.Dispose();
+            model2.OnAppearingAsync();
+        });
+        _shellProxy.DidNotReceive().SelectContentAsync(Arg.Any<string>());
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on same section, should pop pages and change shell content")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnSameSectionShouldPopPagesAndChangeShellContent()
+    {
+        ConfigureTestAsync("s1[c1,c5]");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        model1.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
         model2.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(
-            Navigation.Relative(intent)
-                .Pop()
-                .Pop()
-                .Push<IThreeTestPageModel>()
-                .Push<IGuardedTestPageModel>());
+        _shellProxy.ClearReceivedCalls();
 
-        var page3 = _navigationController.NavigationStack[0];
-        var model3 = (IThreeTestPageModel)page3.BindingContext;
-        var page4 = _navigationController.NavigationStack[1];
-        var model4 = (IGuardedTestPageModel)page4.BindingContext;
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
 
         Received.InOrder(() =>
         {
-            _ = model2.OnDisappearingAsync();
-            _ = model2.OnLeavingAsync();
-            _ = model1.OnLeavingAsync();
-            _ = model3.OnEnteringAsync();
-            _ = model4.OnEnteringAsync(intent);
-            _ = model4.OnAppearingAsync(intent);
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model5.OnAppearingAsync();
         });
-
-        _ = model1.DidNotReceive().OnAppearingAsync();
-        _ = model1.DidNotReceive().OnDisappearingAsync();
-        _ = model3.DidNotReceive().OnAppearingAsync();
     }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation, can push on the new stack")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationCanPushOnTheNewStack()
+    {
+        ConfigureTestAsync("s1[c1,c5]");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+        model1.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+        var navigationStackPages1 = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages1[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
+        model2.ClearReceivedCalls();
+
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>().Add<IPage4Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+        var navigationStackPages5 = shellSection.GetNavigationStack().ToList();
+        var page4 = navigationStackPages5[1].Page;
+        var model4 = (IPage4Model)page4.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model4.OnEnteringAsync();
+            _shellProxy.PushAsync(nameof(Page4), page4);
+            model4.OnAppearingAsync();
+        });
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on same item but different section, should keep navigation stack")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnSameItemButDifferentSectionShouldKeepNavigationStack()
+    {
+        ConfigureTestAsync("i1[s1[c1],s2[c5]]");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model5.OnAppearingAsync();
+        });
+        model1.DidNotReceive().OnLeavingAsync();
+        model1.DidNotReceive().OnAppearingAsync();
+        model1.DidNotReceive().OnDisappearingAsync();
+        model1.DidNotReceive().Dispose();
+        model2.DidNotReceive().OnLeavingAsync();
+        model2.DidNotReceive().Dispose();
+        _shellProxy.DidNotReceive().PopAsync(shellSection);
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on same item but different section, should pop modal pages")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnSameItemButDifferentSectionShouldPopModalPages()
+    {
+        ConfigureTestAsync("i1[s1[c1],s2[c5]]");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage7Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage7Model)page2.BindingContext;
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model5.OnAppearingAsync();
+        });
+        model1.DidNotReceive().OnLeavingAsync();
+        model1.DidNotReceive().OnAppearingAsync();
+        model1.DidNotReceive().OnDisappearingAsync();
+        model1.DidNotReceive().Dispose();
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on same item but different section with PopAllPagesOnSectionChange, should pop navigation stack")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnSameItemButDifferentSectionWithPopAllPagesOnSectionChangeShouldPopNavigationStack()
+    {
+        ConfigureTestAsync("i1[s1[c1],s2[c5]]");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnSectionChange).ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnLeavingAsync();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model1.Dispose();
+            model5.OnAppearingAsync();
+        });
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on different item, should pop navigation stacks")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnDifferentItemShouldPopNavigationStacks()
+    {
+        ConfigureTestAsync("c1,c5");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnLeavingAsync();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model1.Dispose();
+            model5.OnAppearingAsync();
+        });
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation on different item without default behavior, should not pop navigation stacks")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationOnDifferentItemWithoutDefaultBehaviorShouldNotPopNavigationStacks()
+    {
+        ConfigureTestAsync("c1,c5");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage2Model)page2.BindingContext;
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.None).ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model5.OnAppearingAsync();
+        });
+        model1.DidNotReceive().OnLeavingAsync();
+        model1.DidNotReceive().OnAppearingAsync();
+        model1.DidNotReceive().OnDisappearingAsync();
+        model1.DidNotReceive().Dispose();
+        model2.DidNotReceive().OnLeavingAsync();
+        model2.DidNotReceive().Dispose();
+        _shellProxy.DidNotReceive().PopAsync(shellSection);
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation with IgnoreGuards, should ignore guards")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationWithIgnoreGuardsShouldIgnoreGuards()
+    {
+        ConfigureTestAsync("c1,c5");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage9Model)page2.BindingContext;
+        model2.CanLeaveAsync().Returns(ValueTask.FromResult(false));
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.IgnoreGuards | NavigationBehavior.PopAllPagesOnItemChange).ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnLeavingAsync();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model1.Dispose();
+            model5.OnAppearingAsync();
+        });
+        model2.DidNotReceive().CanLeaveAsync();
+    }
+
+    [Fact(DisplayName = "NavigationService, when doing absolute navigation, evaluates guards")]
+    public async Task NavigationServiceWhenDoingAbsoluteNavigationEvaluatesGuards()
+    {
+        ConfigureTestAsync("c1,c5");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+        var shellContent1 = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent1.Parent;
+        var page1 = shellContent1.Page!;
+        var model1 = (IPage1Model)page1.BindingContext;
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>());
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page2 = navigationStackPages[1].Page;
+        var model2 = (IPage9Model)page2.BindingContext;
+        model2.CanLeaveAsync().Returns(ValueTask.FromResult(true));
+
+        model1.ClearReceivedCalls();
+        model2.ClearReceivedCalls();
+        _shellProxy.ClearReceivedCalls();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        var shellContent5 = _shellProxy.GetContent(nameof(Page5));
+        var page5 = shellContent5.Page!;
+        var model5 = (IPage5Model)page5.BindingContext;
+
+        Received.InOrder(() =>
+        {
+            model2.CanLeaveAsync();
+            model2.OnDisappearingAsync();
+            model2.OnLeavingAsync();
+            _shellProxy.PopAsync(shellSection);
+            model2.Dispose();
+            model1.OnLeavingAsync();
+            model5.OnEnteringAsync();
+            _shellProxy.SelectContentAsync(nameof(Page5));
+            model1.Dispose();
+            model5.OnAppearingAsync();
+        });
+    }
+
+    public interface ISomeContext;
 
     [Fact(DisplayName = "NavigationService, when pushing a page, initialize the nested navigation service provider")]
     public async Task NavigationServiceWhenPushingAPageInitializeTheNestedNavigationServiceProvider()
     {
-        await _navigationService.InitializeAsync<IOneTestPageModel>(_navigationController);
-        var page1 = _navigationController.RootPage;
-        var page1sp = PageNavigationContext.Get(page1).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+
+        var content1 = _shellProxy.GetContent(nameof(Page1));
+        var page1 = content1.Page!;
+        var page1nsp = PageNavigationContext.Get(page1).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
         var context = Substitute.For<ISomeContext>();
-        page1sp.AddNavigationScoped(context);
+        page1nsp.AddNavigationScoped(context);
 
-        await _navigationService.GoToAsync(Navigation.Relative().Push<ITwoTestPageModel>());
-        var page2 = _navigationController.CurrentPage;
-        var page2sp = PageNavigationContext.Get(page2).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
-        context.Should().BeSameAs(page2sp.GetRequiredService<ISomeContext>());
+        var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
+        var page2nsp = PageNavigationContext.Get(page2).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
+
+        context.Should().BeSameAs(page2nsp.GetRequiredService<ISomeContext>());
     }
 
     [Fact(DisplayName = "NavigationService, GoToAsync, can be easily testable")]
@@ -632,13 +810,12 @@ public class NavigationServiceTests
         navigationService.GoToAsync(Arg.Any<Navigation>()).Returns(Task.FromResult(true));
         {
             // Simulate what would be the code to be tested
-            var intent = new AnIntent(5);
-            await navigationService.GoToAsync(Navigation.Relative(intent).Push<IOneTestPageModel>());
+            var intent = new OddIntent("hello");
+            await navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>().WithIntent(intent));
         }
 
         // Assert that the code did what it was supposed to do
-        var expectedNavigation = Navigation.Relative(new AnIntent(5)).Push<IOneTestPageModel>();
-        await navigationService.Received().GoToAsync(
-            Arg.Is<Navigation>(n => n.Matches(expectedNavigation)));
+        var expectedNavigation = Navigation.Relative().Push<IPage2Model>().WithIntent(new OddIntent("hello"));
+        await navigationService.Received().GoToAsync(Arg.Is<Navigation>(n => n.Matches(expectedNavigation)));
     }
 }

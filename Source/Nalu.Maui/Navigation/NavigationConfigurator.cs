@@ -6,7 +6,7 @@ using System.Reflection;
 /// <summary>
 /// Provides a fluent API for configuring Nalu navigation.
 /// </summary>
-public class NavigationConfigurator : INavigationOptions
+public class NavigationConfigurator : INavigationConfiguration
 {
     private readonly IServiceCollection _services;
     private readonly Type _applicationType;
@@ -25,7 +25,7 @@ public class NavigationConfigurator : INavigationOptions
     {
         _mapping = [];
         _applicationType = applicationType;
-        _services = services.AddSingleton<INavigationOptions>(this);
+        _services = services.AddSingleton<INavigationConfiguration>(this);
         MenuImage = ImageSource.FromFile("nalu_navigation_menu.png");
 
         var isApple = OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst();

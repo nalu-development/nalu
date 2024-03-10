@@ -3,6 +3,8 @@ namespace Nalu;
 internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDisposable
 {
     public IServiceScope ServiceScope => serviceScope;
+    public bool Entered { get; set; }
+    public bool Appeared { get; set; }
 
     private static readonly BindableProperty _navigationContextProperty = BindableProperty.CreateAttached("PageNavigationContext", typeof(PageNavigationContext), typeof(PageNavigationContext), null);
 

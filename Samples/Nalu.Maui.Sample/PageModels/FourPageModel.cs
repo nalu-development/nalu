@@ -2,6 +2,7 @@ namespace Nalu.Maui.Sample.PageModels;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Pages;
 
 public partial class FourPageModel(INavigationService navigationService) : ObservableObject
 {
@@ -10,11 +11,14 @@ public partial class FourPageModel(INavigationService navigationService) : Obser
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
 
     [RelayCommand(AllowConcurrentExecutions = false)]
-    private Task<bool> PopToOneAsync() => navigationService.GoToAsync(Navigation.Absolute().Add<OnePageModel>());
+    private Task PopToOneAsync() => navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.IgnoreGuards).ShellContent<OnePage>());
 
     [RelayCommand(AllowConcurrentExecutions = false)]
-    private Task<bool> NavigateToTwoAsync() => navigationService.GoToAsync(Navigation.Absolute().Add<TwoPageModel>());
+    private Task NavigateToTwoAsync() => navigationService.GoToAsync(Navigation.Relative());
 
     [RelayCommand(AllowConcurrentExecutions = false)]
-    private Task<bool> NavigateToFiveAsync() => navigationService.GoToAsync(Navigation.Absolute().Add<FivePageModel>());
+    private Task NavigateToFiveAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<FivePageModel>());
+
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private Task NavigateToSevenAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<SevenPageModel>());
 }

@@ -17,13 +17,12 @@ public static class NaluMauiAppBuilderExtensions
     public static MauiAppBuilder UseNaluNavigation<TApplication>(this MauiAppBuilder builder, Action<NavigationConfigurator> configure)
         where TApplication : IApplication
     {
-        builder.Services.AddSingleton<INavigationServiceInternal, NavigationService>();
-        builder.Services.AddSingleton<INavigationService>(sp => sp.GetRequiredService<INavigationServiceInternal>());
+        builder.Services.AddSingleton<INavigationService, NavigationService>();
         builder.Services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         builder.Services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
 
-        var options = new NavigationConfigurator(builder.Services, typeof(TApplication));
-        configure(options);
+        var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
+        configure(configurator);
         return builder;
     }
 
@@ -39,8 +38,8 @@ public static class NaluMauiAppBuilderExtensions
         where TApplication : IApplication
     {
         builder.Services.AddSingleton<INavigationService, NavigationService>();
-        var options = new NavigationConfigurator(builder.Services, typeof(TApplication));
-        options.AddPages(page => $"{page}Model");
+        var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
+        configurator.AddPages(page => $"{page}Model");
         return builder;
     }
 }
