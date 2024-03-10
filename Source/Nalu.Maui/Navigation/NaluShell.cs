@@ -79,7 +79,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     }
 
     /// <inheritdoc />
-    protected override async void OnHandlerChanged()
+    protected override void OnHandlerChanged()
     {
         base.OnHandlerChanged();
 
@@ -90,7 +90,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
         _initialized = true;
         _shellProxy = new ShellProxy(this);
-        await _navigationService.InitializeAsync(_shellProxy, _rootPageRoute, _rootPageIntent).ConfigureAwait(true);
+        _ = _navigationService.InitializeAsync(_shellProxy, _rootPageRoute, _rootPageIntent);
     }
 
     /// <inheritdoc />
