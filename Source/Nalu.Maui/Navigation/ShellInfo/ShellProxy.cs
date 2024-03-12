@@ -20,7 +20,7 @@ internal class ShellProxy : IShellProxy, IDisposable
 
     public IShellContentProxy GetContent(string segmentName) => _contentsBySegmentName[segmentName];
 
-    public Color GetForegroundColor(Page page) => Shell.GetForegroundColor(page.IsSet(Shell.ForegroundColorProperty) ? page : _shell);
+    public Color GetToolbarIconColor(Page page) => Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
 
     public async Task PushAsync(string segmentName, Page page)
     {

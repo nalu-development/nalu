@@ -101,14 +101,24 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         if (!GetIsNavigating())
         {
             args.Cancel();
-            if (Handler is null)
+
+            var uri = args.Target.Location.OriginalString;
+            if (Handler is null || string.IsNullOrEmpty(uri))
             {
+                return;
+            }
+
+            if (uri == "..")
+            {
+                await Task.Yield();
+                await Task.Yield();
+                await _navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).ConfigureAwait(true);
                 return;
             }
 
             // Only reason we're here is due to shell content navigation from Shell Flyout or Tab bars
             // Now find the ShellContent target and navigate to it via the navigation service
-            var segments = args.Target.Location.OriginalString.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var segments = uri.Split('/', StringSplitOptions.RemoveEmptyEntries);
             var shellContentSegmentName = NormalizeSegmentRegex().Replace(segments.Length > 3 ? segments[2] : segments[^1], string.Empty);
             var shellContent = (ShellContentProxy)_shellProxy!.GetContent(shellContentSegmentName);
             var shellSection = shellContent.Parent;

@@ -218,11 +218,7 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
 #else
         backButtonBehavior.Command = new Command(() => _ = shell.FlyoutIsPresented = true);
 #endif
-        backButtonBehavior.IconOverride = navigationConfiguration.MenuImage;
-
-        if (backButtonBehavior.IconOverride is FontImageSource fontImageSource)
-        {
-            fontImageSource.Color = Shell.GetForegroundColor(shell);
-        }
+        var color = Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : shell);
+        backButtonBehavior.IconOverride = NavigationService.WithColor(navigationConfiguration.MenuImage, color);
     }
 }

@@ -51,7 +51,21 @@ internal class NavigationService : INavigationService, IDisposable
         await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
     }
 
-    public Page CreatePage(Type pageType, Page? parentPage)
+    public Task<bool> GoToAsync(INavigationInfo navigation)
+    {
+        if (navigation.Count == 0)
+        {
+            throw new InvalidOperationException("Navigation must contain at least one segment.");
+        }
+
+        return ExecuteNavigationAsync(() => navigation switch
+        {
+            { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation),
+            _ => ExecuteRelativeNavigationAsync(navigation),
+        });
+    }
+
+    internal Page CreatePage(Type pageType, Page? parentPage)
     {
         var serviceScope = _serviceProvider.CreateScope();
         var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
@@ -72,18 +86,22 @@ internal class NavigationService : INavigationService, IDisposable
         return page;
     }
 
-    public Task<bool> GoToAsync(INavigationInfo navigation)
+    internal static ImageSource WithColor(ImageSource source, Color color)
     {
-        if (navigation.Count == 0)
+        if (source is FontImageSource fontSource && !fontSource.IsSet(FontImageSource.ColorProperty))
         {
-            throw new InvalidOperationException("Navigation must contain at least one segment.");
+            var clone = new FontImageSource
+            {
+                Glyph = fontSource.Glyph,
+                FontFamily = fontSource.FontFamily,
+                Size = fontSource.Size,
+                Color = color,
+            };
+
+            return clone;
         }
 
-        return ExecuteNavigationAsync(() => navigation switch
-        {
-            { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation),
-            _ => ExecuteRelativeNavigationAsync(navigation),
-        });
+        return source;
     }
 
     private void ConfigureBackButtonBehavior(Page page)
@@ -92,14 +110,14 @@ internal class NavigationService : INavigationService, IDisposable
         if (backButtonBehavior is not null)
         {
             backButtonBehavior.Command ??= new Command(() => _ = GoToAsync(Navigation.Relative().Pop()));
-            backButtonBehavior.IconOverride ??= WithColor(Configuration.BackImage, ShellProxy.GetForegroundColor(page));
+            backButtonBehavior.IconOverride ??= WithColor(Configuration.BackImage, ShellProxy.GetToolbarIconColor(page));
         }
         else
         {
             backButtonBehavior = new BackButtonBehavior
             {
                 Command = new Command(() => _ = GoToAsync(Navigation.Relative().Pop())),
-                IconOverride = WithColor(Configuration.BackImage, ShellProxy.GetForegroundColor(page)),
+                IconOverride = WithColor(Configuration.BackImage, ShellProxy.GetToolbarIconColor(page)),
             };
             Shell.SetBackButtonBehavior(page, backButtonBehavior);
         }
@@ -412,24 +430,6 @@ internal class NavigationService : INavigationService, IDisposable
         {
             _semaphore.Release();
         }
-    }
-
-    private static ImageSource WithColor(ImageSource source, Color color)
-    {
-        if (source is FontImageSource fontSource)
-        {
-            var clone = new FontImageSource
-            {
-                Glyph = fontSource.Glyph,
-                FontFamily = fontSource.FontFamily,
-                Size = fontSource.Size,
-                Color = color,
-            };
-
-            return clone;
-        }
-
-        return source;
     }
 
     private static INavigationInfo PopTimes(int popCount)
