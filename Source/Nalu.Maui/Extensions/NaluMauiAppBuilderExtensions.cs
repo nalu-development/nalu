@@ -36,10 +36,5 @@ public static class NaluMauiAppBuilderExtensions
     /// <param name="builder">Maui app builder.</param>
     public static MauiAppBuilder UseNaluNavigation<TApplication>(this MauiAppBuilder builder)
         where TApplication : IApplication
-    {
-        builder.Services.AddSingleton<INavigationService, NavigationService>();
-        var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
-        configurator.AddPages(page => $"{page}Model");
-        return builder;
-    }
+        => builder.UseNaluNavigation<TApplication>(configurator => configurator.AddPages());
 }
