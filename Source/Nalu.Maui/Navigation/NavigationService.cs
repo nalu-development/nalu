@@ -386,7 +386,7 @@ internal class NavigationService : INavigationService, IDisposable
         return true;
     }
 
-    private RelativeNavigation ToRelativeNavigation(IReadOnlyList<INavigationSegment> navigation, IList<NavigationStackPage> navigationStackPages)
+    private RelativeNavigation ToRelativeNavigation(INavigationInfo navigation, IList<NavigationStackPage> navigationStackPages)
     {
         var matchingSegmentsCount = navigation
             .Skip(1)
@@ -408,6 +408,11 @@ internal class NavigationService : INavigationService, IDisposable
         for (var i = 1 + matchingSegmentsCount; i < navigation.Count; i++)
         {
             ((IList<INavigationSegment>)relativeNavigation).Add(navigation[i]);
+        }
+
+        if (navigation.Intent is { } intent)
+        {
+            relativeNavigation.WithIntent(intent);
         }
 
         return relativeNavigation;
