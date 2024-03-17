@@ -6,6 +6,7 @@ internal interface IShellSectionProxy
     IShellContentProxy CurrentContent { get; }
     IReadOnlyList<IShellContentProxy> Contents { get; }
     IShellItemProxy Parent { get; }
-    IEnumerable<NavigationStackPage> GetNavigationStack();
+    IEnumerable<NavigationStackPage> GetNavigationStack(IShellContentProxy? content = null);
     Task PopAsync();
+    void RemoveStackPages();
 }

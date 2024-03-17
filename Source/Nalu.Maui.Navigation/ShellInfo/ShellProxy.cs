@@ -5,9 +5,13 @@ using System.ComponentModel;
 internal class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
+
     public IShellItemProxy CurrentItem { get; private set; } = null!;
     public IReadOnlyList<IShellItemProxy> Items { get; private set; } = null!;
     private Dictionary<string, IShellContentProxy> _contentsBySegmentName = null!;
+    private string? _navigationTarget;
+    private bool _contentChanged;
+    private IShellSectionProxy? _navigationCurrentSection;
 
     public ShellProxy(NaluShell shell)
     {
@@ -16,6 +20,61 @@ internal class ShellProxy : IShellProxy, IDisposable
         UpdateItems();
         shell.PropertyChanged += ShellOnPropertyChanged;
         ((IShellController)shell).StructureChanged += ShellOnStructureChanged;
+    }
+
+    public bool BeginNavigation()
+    {
+        if (_navigationTarget is not null)
+        {
+            // Already inside a batch
+            return false;
+        }
+
+        _navigationTarget = _shell.CurrentState.Location.OriginalString;
+        _navigationCurrentSection = CurrentItem.CurrentSection;
+        return true;
+    }
+
+    public async Task CommitNavigationAsync(Action? completeAction = null)
+    {
+        if (_navigationTarget is not { } targetState || targetState == _shell.CurrentState.Location.OriginalString)
+        {
+            if (completeAction is not null)
+            {
+                _shell.SetIsNavigating(true);
+                completeAction();
+                _shell.SetIsNavigating(false);
+            }
+
+            return;
+        }
+
+        try
+        {
+            _shell.SetIsNavigating(true);
+
+            var contentChanged = _contentChanged;
+            _navigationTarget = null;
+            _contentChanged = false;
+            _navigationCurrentSection = null;
+
+            await _shell.GoToAsync(targetState, true).ConfigureAwait(true);
+            await Task.Yield();
+
+            if (contentChanged)
+            {
+                // Wait for the animation to complete
+                // I know this is a hack, but I don't see any other way to do this
+                // given `shell.GoToAsync` does not wait for the animation to complete
+                await Task.Delay(600).ConfigureAwait(true);
+            }
+
+            completeAction?.Invoke();
+        }
+        finally
+        {
+            _shell.SetIsNavigating(false);
+        }
     }
 
     public IShellContentProxy GetContent(string segmentName) => _contentsBySegmentName[segmentName];
@@ -28,11 +87,19 @@ internal class ShellProxy : IShellProxy, IDisposable
         {
             _shell.SetIsNavigating(true);
 
-            var baseRoute = _shell.CurrentState.Location.OriginalString;
+            var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
             var finalRoute = $"{baseRoute}/{segmentName}";
             Routing.UnRegisterRoute(finalRoute);
             Routing.RegisterRoute(finalRoute, new FixedRouteFactory(page));
-            await _shell.GoToAsync(finalRoute).ConfigureAwait(true);
+
+            if (_navigationTarget != null)
+            {
+                _navigationTarget = finalRoute;
+            }
+            else
+            {
+                await _shell.GoToAsync(finalRoute).ConfigureAwait(true);
+            }
         }
         finally
         {
@@ -46,7 +113,16 @@ internal class ShellProxy : IShellProxy, IDisposable
         {
             _shell.SetIsNavigating(true);
             section ??= CurrentItem.CurrentSection;
-            await section.PopAsync().ConfigureAwait(true);
+
+            if (section == _navigationCurrentSection && _navigationTarget != null)
+            {
+                var previousSegmentEnd = _navigationTarget.LastIndexOf('/');
+                _navigationTarget = _navigationTarget[..previousSegmentEnd];
+            }
+            else
+            {
+                await section.PopAsync().ConfigureAwait(true);
+            }
         }
         finally
         {
@@ -60,33 +136,39 @@ internal class ShellProxy : IShellProxy, IDisposable
         {
             _shell.SetIsNavigating(true);
             var contentProxy = (ShellContentProxy)GetContent(segmentName);
+            if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
+            {
+                return;
+            }
+
+            _contentChanged = true;
             var content = contentProxy.Content;
             var section = (ShellSection)content.Parent;
             var item = (ShellItem)section.Parent;
-            var navigated = false;
+
+            if (_navigationTarget is not null)
+            {
+                _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
+                                    ?? $"//{item.Route}/{section.Route}/{content.Route}";
+                return;
+            }
 
             if (section.CurrentItem != content)
             {
                 section.CurrentItem = content;
-                navigated = true;
             }
 
             if (item.CurrentItem != section)
             {
                 item.CurrentItem = section;
-                navigated = true;
             }
 
             if (_shell.CurrentItem != item)
             {
                 _shell.CurrentItem = item;
-                navigated = true;
             }
 
-            if (navigated)
-            {
-                await Task.Delay(200).ConfigureAwait(true);
-            }
+            await Task.Delay(250).ConfigureAwait(true);
         }
         finally
         {

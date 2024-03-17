@@ -2,6 +2,8 @@ namespace Nalu;
 
 internal interface IShellProxy
 {
+    bool BeginNavigation();
+    Task CommitNavigationAsync(Action? completeAction = null);
     IShellItemProxy CurrentItem { get; }
     IReadOnlyList<IShellItemProxy> Items { get; }
     Color GetToolbarIconColor(Page page);

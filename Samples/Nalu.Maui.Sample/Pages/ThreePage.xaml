@@ -20,6 +20,8 @@
             </Label>
             <Button Command="{Binding PushFourCommand}"
                     Text="Push Four"/>
+            <Button Command="{Binding ReplaceSixCommand}"
+                    Text="Replace with six"/>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

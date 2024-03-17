@@ -185,8 +185,8 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnAppearingAsync();
+            model2.Dispose();
         });
         model1.DidNotReceive().OnEnteringAsync();
     }
@@ -216,8 +216,8 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnAppearingAsync(intent);
+            model2.Dispose();
         });
         model1.DidNotReceive().OnEnteringAsync(intent);
         model1.DidNotReceive().OnEnteringAsync();
@@ -275,11 +275,11 @@ public partial class NavigationServiceTests
             model3.OnDisappearingAsync();
             model3.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model3.Dispose();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnAppearingAsync();
+            model3.Dispose();
+            model2.Dispose();
         });
         model1.DidNotReceive().OnEnteringAsync();
         model2.DidNotReceive().OnAppearingAsync();
@@ -344,8 +344,8 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnAppearingAsync();
+            model2.Dispose();
         });
     }
 
@@ -380,14 +380,14 @@ public partial class NavigationServiceTests
             model3.OnDisappearingAsync();
             model3.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model3.Dispose();
             model2.OnAppearingAsync();
             model2.CanLeaveAsync();
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnAppearingAsync();
+            model3.Dispose();
+            model2.Dispose();
         });
     }
 
@@ -422,8 +422,8 @@ public partial class NavigationServiceTests
             model3.OnDisappearingAsync();
             model3.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model3.Dispose();
             model2.OnAppearingAsync();
+            model3.Dispose();
         });
         _shellProxy.DidNotReceive().SelectContentAsync(Arg.Any<string>());
     }
@@ -457,10 +457,10 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
             model5.OnAppearingAsync();
+            model2.Dispose();
         });
     }
 
@@ -496,12 +496,12 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
             model4.OnEnteringAsync();
             _shellProxy.PushAsync(nameof(Page4), page4);
             model4.OnAppearingAsync();
+            model2.Dispose();
         });
     }
 
@@ -574,10 +574,10 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
             model5.OnAppearingAsync();
+            model2.Dispose();
         });
         model1.DidNotReceive().OnLeavingAsync();
         model1.DidNotReceive().OnAppearingAsync();
@@ -614,12 +614,12 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnLeavingAsync();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
-            model1.Dispose();
             model5.OnAppearingAsync();
+            model2.Dispose();
+            model1.Dispose();
         });
     }
 
@@ -652,12 +652,12 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnLeavingAsync();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
-            model1.Dispose();
             model5.OnAppearingAsync();
+            model2.Dispose();
+            model1.Dispose();
         });
     }
 
@@ -731,12 +731,12 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnLeavingAsync();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
-            model1.Dispose();
             model5.OnAppearingAsync();
+            model2.Dispose();
+            model1.Dispose();
         });
         model2.DidNotReceive().CanLeaveAsync();
     }
@@ -772,12 +772,12 @@ public partial class NavigationServiceTests
             model2.OnDisappearingAsync();
             model2.OnLeavingAsync();
             _shellProxy.PopAsync(shellSection);
-            model2.Dispose();
             model1.OnLeavingAsync();
             model5.OnEnteringAsync();
             _shellProxy.SelectContentAsync(nameof(Page5));
-            model1.Dispose();
             model5.OnAppearingAsync();
+            model2.Dispose();
+            model1.Dispose();
         });
     }
 
