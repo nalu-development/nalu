@@ -56,11 +56,11 @@ public partial class NavigationServiceTests
             }
         }
 
-        public IEnumerable<NavigationStackPage> GetNavigationStack()
+        public IEnumerable<NavigationStackPage> GetNavigationStack(IShellContentProxy? content = null)
         {
             EnsureStacks();
 
-            var content = CurrentContent;
+            content ??= CurrentContent;
             if (content.Page is null)
             {
                 yield break;
@@ -68,6 +68,11 @@ public partial class NavigationServiceTests
 
             var baseRoute = $"//{Parent.SegmentName}/{SegmentName}/{content.SegmentName}";
             yield return new NavigationStackPage(baseRoute, content.SegmentName, content.Page, false);
+
+            if (content.Parent.CurrentContent != content)
+            {
+                yield break;
+            }
 
             var currentContentIndex = CurrentContentIndex;
             var navigationStack = _navigationStacks[currentContentIndex];
@@ -87,6 +92,11 @@ public partial class NavigationServiceTests
             var navigationStack = _navigationStacks[CurrentContentIndex];
             navigationStack.RemoveAt(navigationStack.Count - 1);
             return Task.CompletedTask;
+        }
+
+        public void RemoveStackPages()
+        {
+            // Not needed for tests.
         }
 
         public void Push(Page page)
@@ -240,6 +250,11 @@ public partial class NavigationServiceTests
 
         _shellProxy.Items.Returns(items);
         _shellProxy.CurrentItem.Returns(items[0]);
+        _shellProxy.CommitNavigationAsync(Arg.Any<Action>()).Returns(callInfo =>
+        {
+            callInfo.Arg<Action>()?.Invoke();
+            return Task.CompletedTask;
+        });
         _shellProxy
             .GetContent(Arg.Any<string>())
             .Returns(callInfo =>

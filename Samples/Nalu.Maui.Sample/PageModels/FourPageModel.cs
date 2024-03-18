@@ -17,7 +17,7 @@ public partial class FourPageModel(INavigationService navigationService) : Obser
     private Task NavigateToTwoAsync() => navigationService.GoToAsync(Navigation.Relative());
 
     [RelayCommand(AllowConcurrentExecutions = false)]
-    private Task NavigateToFiveAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<FivePageModel>());
+    private Task NavigateToFiveAsync() => navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnItemChange | NavigationBehavior.IgnoreGuards).ShellContent<FivePageModel>());
 
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task NavigateToSevenAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<SevenPageModel>());

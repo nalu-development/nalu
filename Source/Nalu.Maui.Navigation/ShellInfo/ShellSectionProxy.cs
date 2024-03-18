@@ -24,9 +24,9 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
         section.PropertyChanged += SectionOnPropertyChanged;
     }
 
-    public IEnumerable<NavigationStackPage> GetNavigationStack()
+    public IEnumerable<NavigationStackPage> GetNavigationStack(IShellContentProxy? content = null)
     {
-        var content = CurrentContent;
+        content ??= CurrentContent;
         if (content.Page is null)
         {
             yield break;
@@ -34,6 +34,11 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 
         var baseRoute = $"//{Parent.SegmentName}/{SegmentName}/{content.SegmentName}";
         yield return new NavigationStackPage(baseRoute, content.SegmentName, content.Page, false);
+
+        if (content != CurrentContent)
+        {
+            yield break;
+        }
 
         var navigation = _section.Navigation;
         var route = new StringBuilder(baseRoute);
@@ -72,6 +77,15 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
         var shell = (Shell)item.Parent;
         var animated = shell.CurrentItem == item && item.CurrentItem == _section;
         return navigation.PopAsync(animated);
+    }
+
+    public void RemoveStackPages()
+    {
+        var navigation = _section.Navigation;
+        while (navigation.NavigationStack.Count > 1)
+        {
+            navigation.RemovePage(navigation.NavigationStack[^1]);
+        }
     }
 
     public void Dispose() => _section.PropertyChanged -= SectionOnPropertyChanged;

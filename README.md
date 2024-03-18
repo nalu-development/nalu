@@ -4,11 +4,24 @@
 
 <a style="float:right;text-decoration:none;margin-top:-66px;padding:8px 16px;color: #2C479D;border-radius:8px;box-shadow: 0 0 4px #2C479D;font-weight: 600;background: #f6fafe;" target="_blank" href="https://buymeacoffee.com/albyrock87">🍕&nbsp;<span class="bmc-btn-text">Buy me a pizza</span></a>
 
-## Nalu.Maui [![Nalu.Maui NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.svg)](https://www.nuget.org/packages/Nalu.Maui/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui)](https://www.nuget.org/packages/Nalu.Maui/)
+## Nalu.Maui
 
 Nalu.Maui is a library that solves some problems like navigation between pages in a MAUI application.
 
-### Navigation
+### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
+
+#### Migration from v2.x to v3.x
+
+Migration from `Nalu.Maui` v2.x to v3.x is not automatic, you need to update your code to use the new `Nalu.Maui.Navigation` package.
+```
+xmlns:nalu="https://nalu-development.github.com/nalu"
+```
+becomes
+```
+xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
+```
+
+#### Why Nalu navigation?
 
 Unfortunately MAUI navigation (NavigationPage, or Shell) do not provide automatic page/view model disposal as [widely explained in this issue](https://github.com/dotnet/maui/issues/7354).
 This is a problem because it can lead to memory/event leaks.
@@ -122,7 +135,7 @@ Use `nalu:Navigation.PageType` to specify the page type for each `ShellContent`.
 <nalu:NaluShell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 xmlns:pages="clr-namespace:Nalu.Maui.Sample.PageModels"
-                xmlns:nalu="https://nalu-development.github.com/nalu"
+                xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
                 x:Class="Nalu.Maui.Sample.AppShell">
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems">

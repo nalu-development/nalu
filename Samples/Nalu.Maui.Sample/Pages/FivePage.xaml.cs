@@ -1,6 +1,6 @@
 namespace Nalu.Maui.Sample.Pages;
 
-using Nalu.Maui.Sample.PageModels;
+using PageModels;
 
 public partial class FivePage : ContentPage
 {
