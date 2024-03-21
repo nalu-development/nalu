@@ -1,5 +1,6 @@
 namespace Nalu;
 
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 #pragma warning disable IDE0290
@@ -150,7 +151,17 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
             await Task.Yield();
             await Task.Yield();
-            await _navigationService.GoToAsync(navigation).ConfigureAwait(true);
+            try
+            {
+                await _navigationService.GoToAsync(navigation).ConfigureAwait(true);
+            }
+            catch (InvalidNavigationException ex)
+            {
+                if (Debugger.IsAttached)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+            }
         }
     }
 
