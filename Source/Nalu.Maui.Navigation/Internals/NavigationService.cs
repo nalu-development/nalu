@@ -55,7 +55,7 @@ internal class NavigationService : INavigationService, IDisposable
     {
         if (navigation.Count == 0)
         {
-            throw new InvalidOperationException("Navigation must contain at least one segment.");
+            throw new InvalidNavigationException("Navigation must contain at least one segment.");
         }
 
         var disposeBag = new HashSet<object>();
@@ -165,7 +165,7 @@ internal class NavigationService : INavigationService, IDisposable
         var popCount = navigation.Count(segment => segment.SegmentName == NavigationPop.PopRoute);
         if (popCount >= stack.Count)
         {
-            throw new InvalidOperationException("Cannot pop more pages than the stack contains.");
+            throw new InvalidNavigationException("Cannot pop more pages than the stack contains.");
         }
 
         var navigationCount = navigation.Count;
@@ -465,7 +465,7 @@ internal class NavigationService : INavigationService, IDisposable
         var taken = await _semaphore.WaitAsync(0).ConfigureAwait(true);
         if (!taken)
         {
-            throw new InvalidOperationException("Cannot navigate while another navigation is in progress, try to use IDispatcher.DispatchDelayed.");
+            throw new InvalidNavigationException("Cannot navigate while another navigation is in progress, try to use IDispatcher.DispatchDelayed.");
         }
 
         try
@@ -517,7 +517,7 @@ internal class NavigationService : INavigationService, IDisposable
 
             default:
             {
-                throw new InvalidOperationException();
+                throw new InvalidNavigationException("Trying to dispose an unknown object.");
             }
         }
     }
