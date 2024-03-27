@@ -284,7 +284,7 @@ internal class NavigationService : INavigationService, IDisposable
                     .SelectMany(section => section.Contents)
                     .Where(content => content.Page is not null)
                     .OrderByDescending(content => content.Parent == currentSection)
-                    .ThenBy(content => content.Parent)
+                    .ThenBy(content => content.Parent.SegmentName)
                     .ThenByDescending(content => content == currentContent)];
             }
             else
