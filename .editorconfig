@@ -454,6 +454,15 @@ dotnet_diagnostic.SA1516.severity = none
 # SA1512: Single-line comments should not be followed by blank line
 dotnet_diagnostic.SA1512.severity = none
 
+# SA1124: Do not use regions
+dotnet_diagnostic.SA1124.severity = none
+
+# SA1625: Element documentation should not be copied and pasted
+dotnet_diagnostic.SA1625.severity = none
+
+# SA1135: Using directives should be fully qualified
+dotnet_diagnostic.SA1135.severity = none
+
 ##########################################
 # License
 ##########################################

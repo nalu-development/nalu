@@ -3,14 +3,68 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.FivePage"
              x:DataType="pageModels:FivePageModel"
-             Title="Page Five"
-             Padding="16">
+             Title="Page Five">
+    <ContentPage.Resources>
+        <nalu:ConstraintLayoutScene x:Key="MyLayout">
+            <nalu:Guideline Id="20pct" Percentage="0.2" />
+            <nalu:Guideline Id="45pct" Percentage="0.45" Orientation="Horizontal" />
+
+            <nalu:ViewConstraint Id="hello"
+                                 LeftToLeftOf="20pct"
+                                 TopToTopOf="parent"
+                                 VerticalBias="0.15"
+                                 BottomToBottomOf="parent" />
+            <nalu:ViewConstraint Id="nav"
+                                 LeftToLeftOf="20pct"
+                                 TopToBottomOf="hello"
+                                 Margin="0,8"/>
+            <nalu:ViewConstraint Id="count"
+                                 LeftToLeftOf="parent"
+                                 RightToRightOf="parent"
+                                 BottomToBottomOf="parent"
+                                 Margin="0,24"/>
+            <nalu:ViewConstraint Id="b1"
+                                 Width="Fill"
+                                 LeftToLeftOf="parent"
+                                 RightToLeftOf="b2"
+                                 TopToTopOf="45pct"/>
+            <nalu:ViewConstraint Id="b2"
+                                 LeftToRightOf="b1"
+                                 RightToLeftOf="b3"
+                                 TopToTopOf="45pct"/>
+            <nalu:ViewConstraint Id="b3"
+                                 LeftToRightOf="b2"
+                                 RightToRightOf="parent"
+                                 TopToTopOf="45pct"/>
+            <nalu:ViewConstraint Id="bg"
+                                 Width="Fill"
+                                 Height="Fill"
+                                 Margin="16"
+                                 LeftToLeftOf="parent"
+                                 RightToRightOf="parent"
+                                 BottomToBottomOf="parent"
+                                 TopToTopOf="parent"/>
+        </nalu:ConstraintLayoutScene>
+    </ContentPage.Resources>
     <ContentPage.Content>
-        <VerticalStackLayout Spacing="16">
-            <Label Text="Page Five" FontSize="Title" Margin="0,16" />
-            <Label>
+        <nalu:ConstraintLayout Scene="{StaticResource MyLayout}">
+            <Border AutomationId="bg"
+                    BackgroundColor="DeepSkyBlue"
+                    StrokeShape="RoundRectangle 20"/>
+            <Button AutomationId="hello"
+                    Text="Hello world!" />
+            <Button AutomationId="nav" Text="Navigate to /One/Three"
+                    Command="{Binding GoToThreeCommand}" />
+            <Button AutomationId="b1"
+                    Text="Btn1" />
+            <Button AutomationId="b2"
+                    Text="Btn2" />
+            <Button AutomationId="b3"
+                    Text="Btn3" />
+            <Label AutomationId="count">
                 <Label.FormattedText>
                     <FormattedString>
                         <Span Text="Instance: "/>
@@ -18,7 +72,6 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
-            <Button Text="Navigate to /One/Three" Command="{Binding GoToThreeCommand}" />
-        </VerticalStackLayout>
+        </nalu:ConstraintLayout>
     </ContentPage.Content>
 </ContentPage>

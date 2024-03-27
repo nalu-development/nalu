@@ -1,0 +1,15 @@
+[*.cs]
+
+# Accept original code style of Cassowary library
+
+# SA1614: Element parameters should be documented
+dotnet_diagnostic.SA1614.severity = none
+
+# SA1116: Split parameters should start on line after opening parenthesis
+dotnet_diagnostic.SA1116.severity = none
+
+# SA1629: Documentation text should end with a period
+dotnet_diagnostic.SA1629.severity = none
+
+# SA1413: Use trailing comma in multi-line initializers
+dotnet_diagnostic.SA1413.severity = none

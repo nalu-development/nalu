@@ -13,12 +13,19 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .UseNaluLayouts()
             .UseNaluNavigation<App>(nav => nav
                 .AddPages()
                 .WithBackImage(new FontImageSource
                 {
                     FontFamily = "MaterialFilled",
                     Glyph = "\uE5C4",
+                    Size = 24
+                })
+                .WithMenuImage(new FontImageSource
+                {
+                    FontFamily = "MaterialFilled",
+                    Glyph = "\uE5D2",
                     Size = 24
                 })
             )

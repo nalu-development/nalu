@@ -1,6 +1,6 @@
 namespace Nalu.Maui.Test.Extensions;
 
-using Nalu.Internals;
+using Internals;
 
 /// <summary>
 /// Contains test methods for <see cref="NaluElementHandlerExtensions"/>.
