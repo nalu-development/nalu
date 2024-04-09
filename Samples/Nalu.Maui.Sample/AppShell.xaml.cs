@@ -4,7 +4,7 @@ using Pages;
 
 public partial class AppShell : NaluShell
 {
-    public AppShell(INavigationService navigationService) : base(navigationService, typeof(FivePage))
+    public AppShell(INavigationService navigationService) : base(navigationService, typeof(OnePage))
     {
         InitializeComponent();
     }
