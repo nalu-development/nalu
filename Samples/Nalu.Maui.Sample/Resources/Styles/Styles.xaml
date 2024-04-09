@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <?xaml-comp compile="true" ?>
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -399,9 +399,9 @@
     </Style>
 
     <Style TargetType="Shell" ApplyToDerivedTypes="True">
-        <Setter Property="Shell.BackgroundColor" Value="{AppThemeBinding Light={StaticResource PrimaryDark}, Dark={StaticResource OffBlack}}" />
+        <Setter Property="Shell.BackgroundColor" Value="{StaticResource PrimaryDark}" />
         <Setter Property="Shell.ForegroundColor" Value="White" />
-        <Setter Property="Shell.TitleColor" Value="Yellow" />
+        <Setter Property="Shell.TitleColor" Value="White" />
         <Setter Property="Shell.DisabledColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray950}}" />
         <Setter Property="Shell.UnselectedColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray200}}" />
         <Setter Property="Shell.NavBarHasShadow" Value="False" />
