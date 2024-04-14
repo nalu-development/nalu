@@ -1,8 +1,21 @@
-﻿<maui:MauiWinUIApplication
+<maui:MauiWinUIApplication
     x:Class="Nalu.Maui.Sample.WinUI.App"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:maui="using:Microsoft.Maui"
     xmlns:local="using:Nalu.Maui.Sample.WinUI">
-
+    <maui:MauiWinUIApplication.Resources>
+        <ResourceDictionary>
+            <DataTemplate x:Key="MauiAppTitleBarTemplate">
+                <Grid>
+                    <Border
+                        Canvas.ZIndex="1"
+                        VerticalAlignment="Stretch"
+                        Background="#2C479D">
+                    </Border>
+                </Grid>
+            </DataTemplate>
+        </ResourceDictionary>
+    </maui:MauiWinUIApplication.Resources>
+    
 </maui:MauiWinUIApplication>

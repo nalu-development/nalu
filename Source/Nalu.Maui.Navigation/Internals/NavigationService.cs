@@ -131,14 +131,17 @@ internal class NavigationService : INavigationService, IDisposable
         if (backButtonBehavior is not null)
         {
             backButtonBehavior.Command ??= new Command(() => _ = GoToAsync(Navigation.Relative().Pop()));
-            backButtonBehavior.IconOverride ??= WithColor(Configuration.BackImage, ShellProxy.GetToolbarIconColor(page));
+            if (_shellProxy is not null)
+            {
+                backButtonBehavior.IconOverride ??= WithColor(Configuration.BackImage, _shellProxy.GetToolbarIconColor(page));
+            }
         }
         else
         {
             backButtonBehavior = new BackButtonBehavior
             {
                 Command = new Command(() => _ = GoToAsync(Navigation.Relative().Pop())),
-                IconOverride = WithColor(Configuration.BackImage, ShellProxy.GetToolbarIconColor(page)),
+                IconOverride = _shellProxy is not null ? WithColor(Configuration.BackImage, _shellProxy.GetToolbarIconColor(page)) : null,
             };
             Shell.SetBackButtonBehavior(page, backButtonBehavior);
         }
@@ -284,7 +287,7 @@ internal class NavigationService : INavigationService, IDisposable
                     .SelectMany(section => section.Contents)
                     .Where(content => content.Page is not null)
                     .OrderByDescending(content => content.Parent == currentSection)
-                    .ThenBy(content => content.Parent)
+                    .ThenBy(content => content.Parent.SegmentName)
                     .ThenByDescending(content => content == currentContent)];
             }
             else

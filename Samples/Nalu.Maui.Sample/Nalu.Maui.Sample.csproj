@@ -62,6 +62,6 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
-      <ProjectReference Include="..\..\Source\Nalu.Maui\Nalu.Maui.csproj" />
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
     </ItemGroup>
 </Project>

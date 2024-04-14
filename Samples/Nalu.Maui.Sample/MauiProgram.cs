@@ -1,10 +1,16 @@
 ﻿namespace Nalu.Maui.Sample;
 
-using Microsoft.Extensions.Logging;
 
 using CommunityToolkit.Maui;
 using PopupModels;
 using Popups;
+using Microsoft.Extensions.Logging;
+using Microsoft.Maui.LifecycleEvents;
+
+#if WINDOWS
+using Microsoft.Maui.Platform;
+#endif
+
 
 public static class MauiProgram
 {
@@ -13,6 +19,27 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .ConfigureLifecycleEvents(events =>
+            {
+#if WINDOWS
+                events.AddWindows(windowsLifecycleBuilder =>
+                {
+                    // See https://github.com/dotnet/maui/issues/20976 and
+                    windowsLifecycleBuilder.OnWindowCreated(window =>
+                    {
+                        var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+                        var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
+                        var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(id);
+                        var titleBar = appWindow.TitleBar;
+                        var color = Color.FromRgba("#2C479D");
+                        titleBar.BackgroundColor = color.ToWindowsColor();
+                        titleBar.ButtonBackgroundColor = color.ToWindowsColor();
+                        titleBar.InactiveBackgroundColor = color.ToWindowsColor();
+                        titleBar.ButtonInactiveBackgroundColor = color.ToWindowsColor();
+                    });
+                });
+#endif
+            })
             .UseNaluLayouts()
             .UseNaluNavigation<App>(nav => nav
                 .AddPages()
@@ -20,12 +47,6 @@ public static class MauiProgram
                 {
                     FontFamily = "MaterialFilled",
                     Glyph = "\uE5C4",
-                    Size = 24
-                })
-                .WithMenuImage(new FontImageSource
-                {
-                    FontFamily = "MaterialFilled",
-                    Glyph = "\uE5D2",
                     Size = 24
                 })
             )

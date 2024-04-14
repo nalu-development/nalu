@@ -100,12 +100,12 @@ public class ConstraintLayoutManager(IConstraintLayout layout) : ILayoutManager
                     right = view.Right.Value;
                 }
 
-                var l = view.Left.Value;
-                var t = view.Top.Value;
+                var l = view.ViewLeft.Value;
+                var t = view.ViewTop.Value;
                 var x = dx + l;
                 var y = dy + t;
-                var width = view.Right.Value - l;
-                var height = view.Bottom.Value - t;
+                var width = view.ViewRight.Value - l;
+                var height = view.ViewBottom.Value - t;
                 targetView.Arrange(new Rect(x, y, width, height));
             }
         }
