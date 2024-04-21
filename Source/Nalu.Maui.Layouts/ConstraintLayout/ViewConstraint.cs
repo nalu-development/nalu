@@ -112,6 +112,8 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
 
     private readonly Variable _measuredWidth = new();
     private readonly Variable _measuredHeight = new();
+    private readonly Variable _chainWeightedWidth = new();
+    private readonly Variable _chainWeightedHeight = new();
     private readonly Variable _leftAnchor = new();
     private readonly Variable _rightAnchor = new();
     private readonly Variable _topAnchor = new();
@@ -311,6 +313,8 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         _rightAnchor.SetName($"{id}.RightAnchor");
         _topAnchor.SetName($"{id}.TopAnchor");
         _bottomAnchor.SetName($"{id}.BottomAnchor");
+        _chainWeightedWidth.SetName($"{id}.ChainWeightedWidth");
+        _chainWeightedHeight.SetName($"{id}.ChainWeightedHeight");
         ViewLeft.SetName($"{id}.ViewLeft");
         ViewRight.SetName($"{id}.ViewRight");
         ViewTop.SetName($"{id}.ViewTop");
@@ -318,14 +322,10 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     }
 
     private IEnumerable<Constraint> GetWidthConstraints(IConstraintLayoutScene scene)
-    {
-        yield return GetSizeConstraint(Width, _measuredWidth, Left, Right, ViewLeft, ViewRight, _leftAnchor, _rightAnchor, scene.Left, scene.Right, Bottom - Top);
-    }
+        => GetSizeConstraints(Width, _measuredWidth, Left, Right, ViewLeft, ViewRight, _chainWeightedWidth, scene.Left, scene.Right, Bottom - Top);
 
     private IEnumerable<Constraint> GetHeightConstraints(IConstraintLayoutScene scene)
-    {
-        yield return GetSizeConstraint(Height, _measuredHeight, Top, Bottom, ViewTop, ViewBottom, _topAnchor, _bottomAnchor, scene.Top, scene.Bottom, Right - Left);
-    }
+        => GetSizeConstraints(Height, _measuredHeight, Top, Bottom, ViewTop, ViewBottom, _chainWeightedHeight, scene.Top, scene.Bottom, Right - Left);
 
     private IEnumerable<Constraint> GetHorizontalConstraints(IConstraintLayoutScene scene)
     {
@@ -349,6 +349,11 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         {
             yield return leftConstraint.Value;
             yield return _leftAnchor | Eq(Required) | leftAnchor!.Value;
+            var chainWeightedWidthConstraint = GetChainWeightedSizeConstraint(scene, v => v._chainWeightedWidth, v => v.LeftToRightOf, v => v.RightToLeftOf);
+            if (chainWeightedWidthConstraint is not null)
+            {
+                yield return chainWeightedWidthConstraint.Value;
+            }
         }
 
         yield return rightMarginConstraint;
@@ -381,6 +386,11 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         {
             yield return topConstraint.Value;
             yield return _topAnchor | Eq(Required) | topAnchor!.Value;
+            var chainWeightedWidthConstraint = GetChainWeightedSizeConstraint(scene, v => v._chainWeightedHeight, v => v.TopToBottomOf, v => v.BottomToTopOf);
+            if (chainWeightedWidthConstraint is not null)
+            {
+                yield return chainWeightedWidthConstraint.Value;
+            }
         }
 
         yield return bottomMarginConstraint;
@@ -389,6 +399,31 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
             yield return bottomConstraint.Value;
             yield return _bottomAnchor | Eq(Required) | bottomAnchor!.Value;
         }
+    }
+
+    private Constraint? GetChainWeightedSizeConstraint(IConstraintLayoutScene scene, Func<ViewConstraint, Variable> chainWeightedSize, Func<ViewConstraint, string?> startToEndOf, Func<ViewConstraint, string?> endToStartOf)
+    {
+        var isChained = true;
+        var view = this;
+        while (isChained)
+        {
+            var startToEndOfId = startToEndOf(view);
+            if (startToEndOfId is null)
+            {
+                break;
+            }
+
+            var sibling = scene.GetElement(startToEndOfId) as ViewConstraint;
+            isChained = sibling is not null && endToStartOf(sibling) == Id;
+            if (!isChained)
+            {
+                break;
+            }
+
+            view = sibling!;
+        }
+
+        return view == this ? null : (chainWeightedSize(this) - chainWeightedSize(view)) | Eq(Medium) | 0;
     }
 
     private (Constraint MarginConstraint, Constraint? AnchorConstraint, Variable? Anchor) CreateBottomAnchorConstraint(IConstraintLayoutScene scene)
@@ -486,19 +521,29 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     }
 
 #pragma warning disable IDE0060
-    private static Constraint GetSizeConstraint(SizeDefinition size, Variable measured, Variable start, Variable end, Variable viewStart, Variable viewEnd, Variable startAnchor, Variable endAnchor, Variable sceneStart, Variable sceneEnd, Expression otherAxisSize)
+    private static IEnumerable<Constraint> GetSizeConstraints(SizeDefinition size, Variable measured, Variable start, Variable end, Variable viewStart, Variable viewEnd, Variable chainWeightedSize, Variable sceneStart, Variable sceneEnd, Expression otherAxisSize)
 #pragma warning restore IDE0060
     {
         var multiplier = size.Multiplier;
-        return size.Match switch
+        switch (size.Match)
         {
-            SizeUnit.Measured => viewEnd | Eq(Strong) | (viewStart + (measured * multiplier)),
-            SizeUnit.MeasuredUnconstrained => viewEnd | Eq(Strong) | (viewStart + (measured * multiplier)),
-            SizeUnit.Constraint => (end - start) | LessOrEq(Strong) | ((sceneEnd - sceneStart) * multiplier),
-            SizeUnit.Parent => (end + (sceneStart * multiplier)) | Eq(Strong) | (start + (sceneEnd * multiplier)),
-            SizeUnit.Ratio => (end - start) | Eq(Strong) | (otherAxisSize * multiplier),
-            _ => throw new NotSupportedException(),
-        };
+            case SizeUnit.Measured:
+            case SizeUnit.MeasuredUnconstrained:
+                yield return (viewEnd - viewStart) | Eq(Strong) | (measured * multiplier);
+                break;
+            case SizeUnit.Constraint:
+                yield return (end - start) | LessOrEq(Medium) | 10000000000000;
+                yield return (end - start) | Eq(Medium) | (chainWeightedSize * multiplier);
+                break;
+            case SizeUnit.Parent:
+                yield return (end - start) | Eq(Strong) | ((sceneEnd - sceneStart) * multiplier);
+                break;
+            case SizeUnit.Ratio:
+                yield return (end - start) | Eq(Strong) | (otherAxisSize * multiplier);
+                break;
+            default:
+                throw new NotSupportedException();
+        }
     }
 
     private static void HorizontalPropertyChanged(BindableObject bindable, object oldValue, object newValue)

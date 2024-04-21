@@ -27,10 +27,10 @@
                                  BottomToBottomOf="parent"
                                  Margin="0,24"/>
             <nalu:ViewConstraint Id="b1"
-                                 LeftToLeftOf="parent"
                                  Width="1C"
+                                 LeftToLeftOf="parent"
                                  HorizontalBias="0"
-                                 RightToRightOf="b2"
+                                 RightToLeftOf="b2"
                                  TopToTopOf="45pct"
                                  Margin="16,0,8,0"/>
             <nalu:ViewConstraint Id="b2"
@@ -39,6 +39,7 @@
                                  TopToTopOf="45pct"
                                  Margin="8,0"/>
             <nalu:ViewConstraint Id="b3"
+                                 Width="1C"
                                  LeftToRightOf="b2"
                                  RightToRightOf="parent"
                                  TopToTopOf="45pct"
