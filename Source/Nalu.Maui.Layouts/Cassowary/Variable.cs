@@ -22,7 +22,7 @@ public class Variable : IEquatable<Variable>
     /// Gets or sets the current value of the variable.
     /// </summary>
     /// <remarks>Don't use this value unless you know what you're doing.</remarks>
-    public double Value { get; set; }
+    public double CurrentValue { get; set; }
 
     /// <summary>
     /// Gets the variable identifier.

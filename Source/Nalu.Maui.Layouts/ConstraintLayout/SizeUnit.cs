@@ -8,18 +8,7 @@ public enum SizeUnit
     /// <summary>
     /// Size matches the measured or desired size of the content.
     /// </summary>
-    /// <remarks>
-    /// Measures are constrained by the parent size.
-    /// </remarks>
     Measured,
-
-    /// <summary>
-    /// Size matches the measured or desired size of the content.
-    /// </summary>
-    /// <remarks>
-    /// Measures are unconstrained.
-    /// </remarks>
-    MeasuredUnconstrained,
 
     /// <summary>
     /// Size matches the size of the parent.

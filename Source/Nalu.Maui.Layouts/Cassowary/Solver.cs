@@ -332,7 +332,7 @@ public class Solver
                 if (oldValue != newValue)
                 {
                     _publicChanges.Add((variable, newValue));
-                    variable.Value = newValue;
+                    variable.CurrentValue = newValue;
                     data.Item1 = newValue;
                     _varData[variable] = data;
                 }

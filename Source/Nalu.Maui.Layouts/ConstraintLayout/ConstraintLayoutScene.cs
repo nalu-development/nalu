@@ -88,15 +88,23 @@ public class ConstraintLayoutScene : IConstraintLayoutScene, IList<ISceneElement
                 element.ApplyConstraints();
             }
 
+            foreach (var (variable, value) in Solver.FetchChanges())
+            {
+                variable.CurrentValue = value;
+            }
+
             foreach (var element in _elements.Values)
             {
-                element.ApplyConstraints();
+                if (element is ISceneViewConstraint view)
+                {
+                    view.FinalizeConstraints();
+                }
             }
-        }
 
-        foreach (var (variable, value) in Solver.FetchChanges())
-        {
-            variable.Value = value;
+            foreach (var (variable, value) in Solver.FetchChanges())
+            {
+                variable.CurrentValue = value;
+            }
         }
     }
 
@@ -197,9 +205,9 @@ public class ConstraintLayoutScene : IConstraintLayoutScene, IList<ISceneElement
 
     private void ApplyCoordinate(ref Constraint? coordinateConstraint, double newValue, Variable variable, bool force = false)
     {
-        if (newValue != variable.Value || force)
+        if (newValue != variable.CurrentValue || force)
         {
-            variable.Value = newValue;
+            variable.CurrentValue = newValue;
             if (coordinateConstraint.HasValue)
             {
                 Solver.RemoveConstraint(coordinateConstraint.Value);

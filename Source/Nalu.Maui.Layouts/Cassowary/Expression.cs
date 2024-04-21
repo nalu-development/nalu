@@ -164,6 +164,15 @@ public readonly struct Expression
     public static Expression operator +(Expression expression, Expression other)
         => new(expression.Terms.AddRange(other.Terms), expression.Constant + other.Constant);
 
+    /// <summary>
+    /// Sum two <see cref="Expression"/>.
+    /// </summary>
+    /// <param name="expression">The <see cref="Expression"/>.</param>
+    /// <param name="other">The <see cref="Term"/>.</param>
+    /// <returns>New <see cref="Expression"/> instance with a joins terms and constant sum.</returns>
+    public static Expression operator +(Expression expression, Term other)
+        => new(expression.Terms.Add(other), expression.Constant);
+
     #endregion
 
     #region operator -

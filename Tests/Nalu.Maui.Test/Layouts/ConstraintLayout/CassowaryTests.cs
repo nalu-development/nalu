@@ -82,9 +82,9 @@ public class CassowaryTests
         var changes = solver.FetchChanges();
         foreach (var (variable, value) in changes)
         {
-            variable.Value = value;
+            variable.CurrentValue = value;
         }
 
-        var result = $"ax1: {ax1.Value} | ax2: {ax2.Value} | bx1: {bx1.Value} | bx2: {bx2.Value}";
+        var result = $"ax1: {ax1.CurrentValue} | ax2: {ax2.CurrentValue} | bx1: {bx1.CurrentValue} | bx2: {bx2.CurrentValue}";
     }
 }

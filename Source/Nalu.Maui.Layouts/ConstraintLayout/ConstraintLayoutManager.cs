@@ -37,14 +37,14 @@ public class ConstraintLayoutManager(IConstraintLayout layout) : ILayoutManager
         {
             if (element is ISceneViewConstraint view)
             {
-                if (bottom < view.Bottom.Value)
+                if (bottom < view.Bottom.CurrentValue)
                 {
-                    bottom = view.Bottom.Value;
+                    bottom = view.Bottom.CurrentValue;
                 }
 
-                if (right < view.Right.Value)
+                if (right < view.Right.CurrentValue)
                 {
-                    right = view.Right.Value;
+                    right = view.Right.CurrentValue;
                 }
             }
         }
@@ -90,22 +90,22 @@ public class ConstraintLayoutManager(IConstraintLayout layout) : ILayoutManager
         {
             if (element is ISceneViewConstraint view && scene.GetView(view.Id) is { } targetView)
             {
-                if (bottom > view.Bottom.Value)
+                if (bottom > view.Bottom.CurrentValue)
                 {
-                    bottom = view.Bottom.Value;
+                    bottom = view.Bottom.CurrentValue;
                 }
 
-                if (right > view.Right.Value)
+                if (right > view.Right.CurrentValue)
                 {
-                    right = view.Right.Value;
+                    right = view.Right.CurrentValue;
                 }
 
-                var l = view.ViewLeft.Value;
-                var t = view.ViewTop.Value;
+                var l = view.ViewLeft.CurrentValue;
+                var t = view.ViewTop.CurrentValue;
                 var x = dx + l;
                 var y = dy + t;
-                var width = view.ViewRight.Value - l;
-                var height = view.ViewBottom.Value - t;
+                var width = view.ViewRight.CurrentValue - l;
+                var height = view.ViewBottom.CurrentValue - t;
                 targetView.Arrange(new Rect(x, y, width, height));
             }
         }

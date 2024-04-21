@@ -10,20 +10,25 @@ public interface ISceneViewConstraint : ISceneElement
     /// <summary>
     /// Gets the left edge of the view.
     /// </summary>
-    public Variable ViewLeft { get; }
+    Variable ViewLeft { get; }
 
     /// <summary>
     /// Gets the right edge of the view.
     /// </summary>
-    public Variable ViewRight { get; }
+    Variable ViewRight { get; }
 
     /// <summary>
     /// Gets the top edge of the view.
     /// </summary>
-    public Variable ViewTop { get; }
+    Variable ViewTop { get; }
 
     /// <summary>
     /// Gets the bottom edge of the view.
     /// </summary>
-    public Variable ViewBottom { get; }
+    Variable ViewBottom { get; }
+
+    /// <summary>
+    /// Updates the measurements of the view based on applied constraints.
+    /// </summary>
+    void FinalizeConstraints();
 }
