@@ -3,7 +3,7 @@ namespace Nalu;
 using Cassowary;
 using static Cassowary.Strength;
 using static Cassowary.WeightedRelation;
-using AnchorConstraints = (Cassowary.Constraint MarginConstraint, Cassowary.Constraint? AnchorConstraint, Cassowary.Variable? Anchor);
+using AnchorConstraints = (Cassowary.Constraint AnchorConstraint, Cassowary.Expression Anchor);
 
 // ReSharper disable CompareOfFloatsByEqualityOperator
 
@@ -22,6 +22,7 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         Vertical,
         Height,
         Measure,
+        Visibility,
     }
 #pragma warning restore CS1591,SA1602
 
@@ -119,18 +120,7 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     private readonly Variable _rightAnchor = new();
     private readonly Variable _topAnchor = new();
     private readonly Variable _bottomAnchor = new();
-
-    /// <inheritdoc />
-    public Variable ViewLeft { get; } = new();
-
-    /// <inheritdoc />
-    public Variable ViewRight { get; } = new();
-
-    /// <inheritdoc />
-    public Variable ViewTop { get; } = new();
-
-    /// <inheritdoc />
-    public Variable ViewBottom { get; } = new();
+    private readonly Variable _visibilityMultiplier = new();
 
     /// <summary>
     /// Gets or sets the vertical bias of the element when both top and bottom constraints are set.
@@ -297,12 +287,12 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
 
             if (Width.Unit != SizeUnit.Measured)
             {
-                constrainedWidth = ViewRight.CurrentValue - ViewLeft.CurrentValue;
+                constrainedWidth = Right.CurrentValue - Left.CurrentValue;
             }
 
             if (Height.Unit != SizeUnit.Measured)
             {
-                constrainedHeight = ViewBottom.CurrentValue - ViewTop.CurrentValue;
+                constrainedHeight = Bottom.CurrentValue - Top.CurrentValue;
             }
 
             var measured = view.Measure(constrainedWidth, constrainedHeight);
@@ -363,149 +353,128 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         _bottomAnchor.SetName($"{id}.BottomAnchor");
         _chainWeightedWidth.SetName($"{id}.ChainWeightedWidth");
         _chainWeightedHeight.SetName($"{id}.ChainWeightedHeight");
-        ViewLeft.SetName($"{id}.ViewLeft");
-        ViewRight.SetName($"{id}.ViewRight");
-        ViewTop.SetName($"{id}.ViewTop");
-        ViewBottom.SetName($"{id}.ViewBottom");
+        _visibilityMultiplier.SetName($"{id}.VisibilityMultiplier");
     }
 
     private IEnumerable<Constraint> GetWidthConstraints(IConstraintLayoutScene scene)
-        => GetSizeConstraints(Width, _measuredWidth, Left, Right, ViewLeft, ViewRight, _chainWeightedWidth, scene.Left, scene.Right, Bottom - Top);
+        => !IsVisible
+            ? [(Right - Left) | Eq(Required) | 0]
+            : GetSizeConstraints(Width, _measuredWidth, Left, Right, _leftAnchor, _rightAnchor, _chainWeightedWidth, scene.Left, scene.Right, Bottom - Top);
 
     private IEnumerable<Constraint> GetHeightConstraints(IConstraintLayoutScene scene)
-        => GetSizeConstraints(Height, _measuredHeight, Top, Bottom, ViewTop, ViewBottom, _chainWeightedHeight, scene.Top, scene.Bottom, Right - Left);
+        => !IsVisible
+            ? [(Bottom - Top) | Eq(Required) | 0]
+            : GetSizeConstraints(Height, _measuredHeight, Top, Bottom, _topAnchor, _bottomAnchor, _chainWeightedHeight, scene.Top, scene.Bottom, Right - Left);
 
     private IEnumerable<Constraint> GetHorizontalConstraints(IConstraintLayoutScene scene)
-    {
-        var (leftMarginConstraint, leftConstraint, leftAnchor) = CreateLeftAnchorConstraint(scene);
-        var (rightMarginConstraint, rightConstraint, rightAnchor) = CreateRightAnchorConstraint(scene);
+        => GetPositionConstraints(
+            scene,
+            v => v.CreateLeftAnchorConstraint(scene),
+            v => v.CreateRightAnchorConstraint(scene),
+            v => v._chainWeightedWidth,
+            v => NormalizeAnchorId(v.LeftToRightOf),
+            v => NormalizeAnchorId(v.RightToLeftOf),
+            v => v.Left,
+            v => v.Right,
+            _leftAnchor,
+            _rightAnchor,
+            HorizontalBias);
 
+    private IEnumerable<Constraint> GetVerticalConstraints(IConstraintLayoutScene scene)
+        => GetPositionConstraints(
+            scene,
+            v => v.CreateTopAnchorConstraint(scene),
+            v => v.CreateBottomAnchorConstraint(scene),
+            v => v._chainWeightedHeight,
+            v => NormalizeAnchorId(v.TopToBottomOf),
+            v => NormalizeAnchorId(v.BottomToTopOf),
+            v => v.Top,
+            v => v.Bottom,
+            _topAnchor,
+            _bottomAnchor,
+            VerticalBias);
+
+    private IEnumerable<Constraint> GetPositionConstraints(
+        IConstraintLayoutScene scene,
+        Func<ViewConstraint, AnchorConstraints?> createStartAnchorConstraint,
+        Func<ViewConstraint, AnchorConstraints?> createEndAnchorConstraint,
+        Func<ViewConstraint, Variable> chainWeightedSize,
+        Func<ViewConstraint, string?> startToEndOf,
+        Func<ViewConstraint, string?> endToStartOf,
+        Func<ViewConstraint, Variable> startGetter,
+        Func<ViewConstraint, Variable> endGetter,
+        Variable startAnchorVariable,
+        Variable endAnchorVariable,
+        double bias)
+    {
+        var start = startGetter(this);
+        var end = endGetter(this);
+        var startAnchorConstraint = createStartAnchorConstraint(this);
+        var endAnchorConstraint = createEndAnchorConstraint(this);
         var isChainHead = false;
-        yield return leftMarginConstraint;
-        if (leftConstraint.HasValue)
+        if (startAnchorConstraint is not null)
         {
-            yield return leftConstraint.Value;
-            yield return _leftAnchor | Eq(Required) | leftAnchor!;
+            var (startConstraint, startAnchor) = startAnchorConstraint.Value;
+            yield return startConstraint;
+            yield return startAnchorVariable | Eq(Required) | startAnchor;
 
             // Chain elements (except the head) should constrain their size to the chain weighted size variable found inside the head.
-            var chainWeightedWidthConstraint = GetChainWeightedSizeConstraint(scene, v => v._chainWeightedWidth, v => NormalizeAnchorId(v.LeftToRightOf), v => NormalizeAnchorId(v.RightToLeftOf));
+            var chainWeightedWidthConstraint = GetChainWeightedSizeConstraint(scene, chainWeightedSize, startToEndOf, endToStartOf);
             if (chainWeightedWidthConstraint is not null)
             {
                 yield return chainWeightedWidthConstraint.Value;
             }
-            else if (rightAnchor is not null)
+            else if (endAnchorConstraint?.Anchor is { } rightAnchor)
             {
-                isChainHead = HasChainedEnd(scene, v => NormalizeAnchorId(v.LeftToRightOf), v => NormalizeAnchorId(v.RightToLeftOf));
+                isChainHead = HasChainedEnd(scene, startToEndOf, endToStartOf);
                 if (!isChainHead)
                 {
-                    yield return _chainWeightedWidth | Eq(Required) | (rightAnchor - leftAnchor!);
+                    yield return chainWeightedSize(this) | Eq(Required) | (rightAnchor - startAnchor);
                 }
             }
         }
 
-        var hasVariableLeftConstraint = leftConstraint is { Strength: < Required };
-        var hasVariableRightConstraint = rightConstraint is { Strength: < Required };
+        var hasVariableLeftConstraint = startAnchorConstraint?.AnchorConstraint is { Strength: < Required };
+        var hasVariableRightConstraint = endAnchorConstraint?.AnchorConstraint is { Strength: < Required };
         if (hasVariableLeftConstraint && hasVariableRightConstraint)
         {
-            var bias = HorizontalBias;
+            var startAnchor = startAnchorConstraint!.Value.Anchor;
+            var endAnchor = endAnchorConstraint!.Value.Anchor;
             yield return bias switch
             {
-                1d => Right | Eq(Required) | rightAnchor!,
-                0d => Left | Eq(Required) | leftAnchor!,
+                1d => end | Eq(Required) | endAnchor,
+                0d => start | Eq(Required) | startAnchor,
 
-                // left = leftAnchor + (rightAnchor - leftAnchor - width) * bias
-                // left = leftAnchor + (rightAnchor - leftAnchor - right + left) * bias
-                // 0 = leftAnchor + (rightAnchor - leftAnchor - right + left) * bias - left
-                // 0 = leftAnchor + bias * rightAnchor - bias * leftAnchor - bias * right + bias * left - left
-                // 0 = leftAnchor - bias * leftAnchor + bias * rightAnchor - bias * right + bias * left - left
-                // 0 = leftAnchor * (1 - bias) + bias * rightAnchor - bias * right + left * (bias - 1)
-                // bias * right = leftAnchor * (1 - bias) + bias * rightAnchor + left * (bias - 1)
-                _ => (Right * bias) | Eq(Required) | ((leftAnchor! * (1 - bias)) + (bias * rightAnchor!) + (Left * (bias - 1))),
+                // start = startAnchor + (endAnchor - startAnchor - size) * bias
+                // start = startAnchor + (endAnchor - startAnchor - end + start) * bias
+                // 0 = startAnchor + (endAnchor - startAnchor - end + start) * bias - start
+                // 0 = startAnchor + bias * endAnchor - bias * startAnchor - bias * end + bias * start - start
+                // 0 = startAnchor - bias * startAnchor + bias * endAnchor - bias * end + bias * start - start
+                // 0 = startAnchor * (1 - bias) + bias * endAnchor - bias * end + start * (bias - 1)
+                // bias * end = startAnchor * (1 - bias) + bias * endAnchor + start * (bias - 1)
+                _ => (bias * end) | Eq(Required) | ((startAnchor * (1 - bias)) + (endAnchor * bias) + (start * (bias - 1))),
             };
         }
-        else if (isChainHead && leftAnchor is not null && hasVariableLeftConstraint && !hasVariableRightConstraint)
+        else if (isChainHead && hasVariableLeftConstraint && !hasVariableRightConstraint)
         {
-            var tail = GetChainTail(scene, v => NormalizeAnchorId(v.LeftToRightOf), v => NormalizeAnchorId(v.RightToLeftOf));
-            var (_, _, tailRightAnchor) = tail.CreateRightAnchorConstraint(scene);
-            if (tailRightAnchor is not null)
+            var startAnchor = startAnchorConstraint!.Value.Anchor;
+            var tail = GetChainTail(scene, startToEndOf, endToStartOf);
+            var tailStartAnchorConstraint = createStartAnchorConstraint(tail);
+            var tailEndAnchorConstraint = createEndAnchorConstraint(tail);
+            var tailHasVariableStartConstraint = tailStartAnchorConstraint?.AnchorConstraint is { Strength: < Required };
+            var tailHasVariableEndConstraint = tailEndAnchorConstraint?.AnchorConstraint is { Strength: < Required };
+            if (tailEndAnchorConstraint is not null && tailHasVariableEndConstraint && !tailHasVariableStartConstraint)
             {
-                var bias = HorizontalBias;
-                yield return (tail.Right * bias) | Eq(Required) | ((leftAnchor * (1 - bias)) + (bias * tailRightAnchor) + (Left * (bias - 1)));
+                var tailRightAnchor = tailEndAnchorConstraint.Value.Anchor;
+                yield return (bias * endGetter(tail)) | Eq(Required) | ((startAnchor * (1 - bias)) + (tailRightAnchor * bias) + (start * (bias - 1)));
             }
         }
 
-        yield return rightMarginConstraint;
-        if (rightConstraint.HasValue)
+        if (endAnchorConstraint is not null)
         {
-            yield return rightConstraint.Value;
-            yield return _rightAnchor | Eq(Required) | rightAnchor!;
-        }
-    }
-
-    private IEnumerable<Constraint> GetVerticalConstraints(IConstraintLayoutScene scene)
-    {
-        var (topMarginConstraint, topConstraint, topAnchor) = CreateTopAnchorConstraint(scene);
-        var (bottomMarginConstraint, bottomConstraint, bottomAnchor) = CreateBottomAnchorConstraint(scene);
-
-        var isChainHead = false;
-        yield return topMarginConstraint;
-        if (topConstraint.HasValue)
-        {
-            yield return topConstraint.Value;
-            yield return _topAnchor | Eq(Required) | topAnchor!;
-
-            // Chain elements (except the head) should constrain their size to the chain weighted size variable found inside the head.
-            var chainWeightedHeightConstraint = GetChainWeightedSizeConstraint(scene, v => v._chainWeightedHeight, v => NormalizeAnchorId(v.TopToBottomOf), v => NormalizeAnchorId(v.BottomToTopOf));
-            if (chainWeightedHeightConstraint is not null)
-            {
-                yield return chainWeightedHeightConstraint.Value;
-            }
-            else if (bottomAnchor is not null)
-            {
-                isChainHead = HasChainedEnd(scene, v => NormalizeAnchorId(v.TopToBottomOf), v => NormalizeAnchorId(v.BottomToTopOf));
-                if (!isChainHead)
-                {
-                    yield return _chainWeightedHeight | Eq(Required) | (bottomAnchor - topAnchor!);
-                }
-            }
-        }
-
-        var hasVariableTopConstraint = topConstraint is { Strength: < Required };
-        var hasVariableBottomConstraint = bottomConstraint is { Strength: < Required };
-        if (hasVariableTopConstraint && hasVariableBottomConstraint)
-        {
-            var bias = VerticalBias;
-            yield return bias switch
-            {
-                1d => Bottom | Eq(Required) | bottomAnchor!,
-                0d => Top | Eq(Required) | topAnchor!,
-
-                // top = topAnchor + (bottomAnchor - topAnchor - height) * bias
-                // top = topAnchor + (bottomAnchor - topAnchor - bottom + top) * bias
-                // 0 = topAnchor + (bottomAnchor - topAnchor - bottom + top) * bias - top
-                // 0 = topAnchor + bias * bottomAnchor - bias * topAnchor - bias * bottom + bias * top - top
-                // 0 = topAnchor - bias * topAnchor + bias * bottomAnchor - bias * bottom + bias * top - top
-                // 0 = topAnchor * (1 - bias) + bias * bottomAnchor - bias * bottom + top * (bias - 1)
-                // bias * bottom = topAnchor * (1 - bias) + bias * bottomAnchor + top * (bias - 1)
-                _ => (Bottom * bias) | Eq(Required) | ((topAnchor! * (1 - bias)) + (bias * bottomAnchor!) + (Top * (bias - 1))),
-            };
-        }
-        else if (isChainHead && topAnchor is not null && hasVariableTopConstraint && !hasVariableBottomConstraint)
-        {
-            var tail = GetChainTail(scene, v => NormalizeAnchorId(v.TopToBottomOf), v => NormalizeAnchorId(v.BottomToTopOf));
-            var (_, _, tailBottomAnchor) = tail.CreateBottomAnchorConstraint(scene);
-            if (tailBottomAnchor is not null)
-            {
-                var bias = VerticalBias;
-                yield return (tail.Bottom * bias) | Eq(Required) | ((topAnchor * (1 - bias)) + (bias * tailBottomAnchor) + (Top * (bias - 1)));
-            }
-        }
-
-        yield return bottomMarginConstraint;
-        if (bottomConstraint.HasValue)
-        {
-            yield return bottomConstraint.Value;
-            yield return _bottomAnchor | Eq(Required) | bottomAnchor!;
+            var (endConstraint, endAnchor) = endAnchorConstraint.Value;
+            yield return endConstraint;
+            yield return endAnchorVariable | Eq(Required) | endAnchor;
         }
     }
 
@@ -573,82 +542,78 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
             view = sibling!;
         }
 
-        return view == this ? null : (chainWeightedSize(this) - chainWeightedSize(view)) | Eq(Medium) | 0;
+        return view == this ? null : (chainWeightedSize(this) - chainWeightedSize(view)) | Eq(Required) | 0;
     }
 
-    private AnchorConstraints CreateBottomAnchorConstraint(IConstraintLayoutScene scene)
+    private AnchorConstraints? CreateBottomAnchorConstraint(IConstraintLayoutScene scene)
     {
         var op = LessOrEq(Medium);
 
         if (BottomToBottomOf is { } bottomToBottomOf)
         {
-            return CreateAnchorConstraint(scene, op, Bottom, ViewBottom, bottomToBottomOf, e => e.Bottom, -Margin.Bottom, -GoneMargin.Bottom);
+            return CreateAnchorConstraint(scene, op, Bottom, bottomToBottomOf, e => e.Bottom, -Margin.Bottom, -GoneMargin.Bottom);
         }
 
         if (BottomToTopOf is { } bottomToTopOf)
         {
-            return CreateAnchorConstraint(scene, op, Bottom, ViewBottom, bottomToTopOf, e => e.Top, -Margin.Bottom, -GoneMargin.Bottom);
+            return CreateAnchorConstraint(scene, op, Bottom, bottomToTopOf, e => e.Top, -Margin.Bottom, -GoneMargin.Bottom);
         }
 
-        var noAnchorMarginConstraint = ViewBottom | Eq(Required) | (Bottom - Margin.Bottom);
-        return (noAnchorMarginConstraint, null, null);
+        return null;
     }
 
-    private AnchorConstraints CreateTopAnchorConstraint(IConstraintLayoutScene scene)
+    private AnchorConstraints? CreateTopAnchorConstraint(IConstraintLayoutScene scene)
     {
         var op = GreaterOrEq(Medium);
 
         if (TopToTopOf is { } topToTopOf)
         {
-            return CreateAnchorConstraint(scene, op, Top, ViewTop, topToTopOf, e => e.Top, Margin.Top, GoneMargin.Top);
+            return CreateAnchorConstraint(scene, op, Top, topToTopOf, e => e.Top, Margin.Top, GoneMargin.Top);
         }
 
         if (TopToBottomOf is { } topToBottomOf)
         {
-            return CreateAnchorConstraint(scene, op, Top, ViewTop, topToBottomOf, e => e.Bottom, Margin.Top, GoneMargin.Top);
+            return CreateAnchorConstraint(scene, op, Top, topToBottomOf, e => e.Bottom, Margin.Top, GoneMargin.Top);
         }
 
-        var noAnchorMarginConstraint = ViewTop | Eq(Required) | (Top + Margin.Top);
-        return (noAnchorMarginConstraint, null, null);
+        return null;
     }
 
-    private AnchorConstraints CreateRightAnchorConstraint(IConstraintLayoutScene scene)
+    private AnchorConstraints? CreateRightAnchorConstraint(IConstraintLayoutScene scene)
     {
         var op = LessOrEq(Medium);
 
         if (RightToRightOf is { } rightToRightOf)
         {
-            return CreateAnchorConstraint(scene, op, Right, ViewRight, rightToRightOf, e => e.Right, -Margin.Right, -GoneMargin.Right);
+            return CreateAnchorConstraint(scene, op, Right, rightToRightOf, e => e.Right, -Margin.Right, -GoneMargin.Right);
         }
 
         if (RightToLeftOf is { } rightToLeftOf)
         {
-            return CreateAnchorConstraint(scene, op, Right, ViewRight, rightToLeftOf, e => e.Left, -Margin.Right, -GoneMargin.Right);
+            return CreateAnchorConstraint(scene, op, Right, rightToLeftOf, e => e.Left, -Margin.Right, -GoneMargin.Right);
         }
 
-        var noAnchorMarginConstraint = ViewRight | Eq(Required) | (Right - Margin.Right);
-        return (noAnchorMarginConstraint, null, null);
+        return null;
     }
 
-    private AnchorConstraints CreateLeftAnchorConstraint(IConstraintLayoutScene scene)
+    private AnchorConstraints? CreateLeftAnchorConstraint(IConstraintLayoutScene scene)
     {
         var op = GreaterOrEq(Medium);
 
         if (LeftToLeftOf is { } leftToLeftOf)
         {
-            return CreateAnchorConstraint(scene, op, Left, ViewLeft, leftToLeftOf, e => e.Left, Margin.Left, GoneMargin.Left);
+            return CreateAnchorConstraint(scene, op, Left, leftToLeftOf, e => e.Left, Margin.Left, GoneMargin.Left);
         }
 
         if (LeftToRightOf is { } leftToRightOf)
         {
-            return CreateAnchorConstraint(scene, op, Left, ViewLeft, leftToRightOf, e => e.Right, Margin.Left, GoneMargin.Left);
+            return CreateAnchorConstraint(scene, op, Left, leftToRightOf, e => e.Right, Margin.Left, GoneMargin.Left);
         }
 
-        var noAnchorMarginConstraint = ViewLeft | Eq(Required) | (Left + Margin.Left);
-        return (noAnchorMarginConstraint, null, null);
+        return null;
     }
 
-    private static AnchorConstraints CreateAnchorConstraint(IConstraintLayoutScene scene, WeightedRelation op, Variable sourceVariable, Variable sourceViewVariable, string targetId, Func<ISceneElementBase, Variable> targetVariableGetter, double margin, double goneMargin)
+    private AnchorConstraints? CreateAnchorConstraint(IConstraintLayoutScene scene, WeightedRelation op, Variable sourceVariable, string targetId, Func<ISceneElementBase, Variable> targetVariableGetter, double margin, double goneMargin)
     {
         if (targetId[^1] == '!')
         {
@@ -659,29 +624,61 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         var targetElement = scene.GetElement(targetId);
         if (targetElement is null)
         {
-            var noAnchorMarginConstraint = sourceViewVariable | Eq(Required) | (sourceVariable + margin);
-            return (noAnchorMarginConstraint, null, null);
+            return null;
         }
 
-        var gone = scene.GetView(targetId)?.Visibility == Visibility.Collapsed;
         var anchor = targetVariableGetter(targetElement);
-        var anchorConstraint = sourceVariable | op | anchor;
-        var marginConstraint = sourceViewVariable | Eq(Required) | (sourceVariable + (gone ? goneMargin : margin));
-        return (marginConstraint, anchorConstraint, anchor);
+        Expression anchorExpression;
+
+        var isVisible = IsVisible;
+        if (targetElement is ViewConstraint targetViewConstraint)
+        {
+            var targetVisibilityMultiplier = targetViewConstraint._visibilityMultiplier;
+            if (isVisible && margin != 0)
+            {
+                if (goneMargin != 0)
+                {
+                    var goneMarginTerm = goneMargin * (1 - targetVisibilityMultiplier);
+                    var marginTerm = margin * targetVisibilityMultiplier;
+                    anchorExpression = anchor + goneMarginTerm + marginTerm;
+                }
+                else
+                {
+                    var marginTerm = margin * targetVisibilityMultiplier;
+                    anchorExpression = anchor + marginTerm;
+                }
+            }
+            else if (isVisible && goneMargin != 0)
+            {
+                var goneMarginTerm = goneMargin * (1 - targetVisibilityMultiplier);
+                anchorExpression = anchor + goneMarginTerm;
+            }
+            else
+            {
+                anchorExpression = anchor + 0;
+            }
+        }
+        else
+        {
+            anchorExpression = anchor + (isVisible ? margin : 0);
+        }
+
+        var anchorConstraint = sourceVariable | op | anchorExpression;
+        return (anchorConstraint, anchorExpression);
     }
 
 #pragma warning disable IDE0060
-    private static IEnumerable<Constraint> GetSizeConstraints(SizeDefinition size, Variable measured, Variable start, Variable end, Variable viewStart, Variable viewEnd, Variable chainWeightedSize, Variable sceneStart, Variable sceneEnd, Expression otherAxisSize)
+    private static IEnumerable<Constraint> GetSizeConstraints(SizeDefinition size, Variable measured, Variable start, Variable end, Variable startAnchor, Variable endAnchor, Variable chainWeightedSize, Variable sceneStart, Variable sceneEnd, Expression otherAxisSize)
 #pragma warning restore IDE0060
     {
         var multiplier = size.Multiplier;
         switch (size.Unit)
         {
             case SizeUnit.Measured:
-                yield return (viewEnd - viewStart) | Eq(Strong) | (measured * multiplier);
+                yield return (end - start) | Eq(Strong) | (measured * multiplier);
                 break;
             case SizeUnit.Constraint:
-                yield return (end - start) | LessOrEq(Strong) | (chainWeightedSize * multiplier);
+                yield return (end - start) | Eq(Strong) | (chainWeightedSize * multiplier);
                 break;
             case SizeUnit.Parent:
                 yield return (end - start) | Eq(Strong) | ((sceneEnd - sceneStart) * multiplier);
@@ -725,16 +722,11 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     private static void IsVisiblePropertyChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var viewConstraint = (ViewConstraint)bindable;
-        if (newValue is true)
-        {
-            viewConstraint.SetConstraint(ConstraintTypes.Height, viewConstraint.GetHeightConstraints);
-            viewConstraint.SetConstraint(ConstraintTypes.Width, viewConstraint.GetWidthConstraints);
-        }
-        else
-        {
-            viewConstraint.SetConstraint(ConstraintTypes.Height, _ => [viewConstraint.Right | Eq(Required) | viewConstraint.Left]);
-            viewConstraint.SetConstraint(ConstraintTypes.Width, _ => [viewConstraint.Top | Eq(Required) | viewConstraint.Bottom]);
-        }
+        viewConstraint.SetConstraint(ConstraintTypes.Visibility, _ => [viewConstraint._visibilityMultiplier | Eq(Required) | (viewConstraint.IsVisible ? 1 : 0)]);
+        viewConstraint.SetConstraint(ConstraintTypes.Height, viewConstraint.GetHeightConstraints);
+        viewConstraint.SetConstraint(ConstraintTypes.Width, viewConstraint.GetWidthConstraints);
+        viewConstraint.SetConstraint(ConstraintTypes.Horizontal, viewConstraint.GetHorizontalConstraints);
+        viewConstraint.SetConstraint(ConstraintTypes.Vertical, viewConstraint.GetVerticalConstraints);
 
         viewConstraint.Scene?.InvalidateScene();
     }

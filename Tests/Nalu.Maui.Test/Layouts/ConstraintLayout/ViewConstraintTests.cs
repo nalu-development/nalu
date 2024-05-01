@@ -81,10 +81,10 @@ public class ViewConstraintTests
 
         // Assert
         solver.ShouldHaveVariables(
-            (view.ViewLeft, expectedLeft),
-            (view.ViewRight, expectedRight),
-            (view.ViewTop, expectedTop),
-            (view.ViewBottom, expectedBottom));
+            (view.Left, expectedLeft),
+            (view.Right, expectedRight),
+            (view.Top, expectedTop),
+            (view.Bottom, expectedBottom));
     }
 
     [Fact(DisplayName = "View constraint, can be positioned side by side to another view constraint")]
@@ -132,14 +132,14 @@ public class ViewConstraintTests
 
         // Assert
         solver.ShouldHaveVariables(
-            (view1.ViewLeft, 10),
-            (view1.ViewRight, 30),
-            (view1.ViewTop, 10),
-            (view1.ViewBottom, 50),
-            (view2.ViewLeft, 40),
-            (view2.ViewRight, 80),
-            (view2.ViewTop, 40),
-            (view2.ViewBottom, 60));
+            (view1.Left, 10),
+            (view1.Right, 30),
+            (view1.Top, 10),
+            (view1.Bottom, 50),
+            (view2.Left, 30),
+            (view2.Right, 70),
+            (view2.Top, 30),
+            (view2.Bottom, 50));
     }
 
     [Fact(DisplayName = "View constraints, can generate chain")]
@@ -369,7 +369,6 @@ public class ViewConstraintTests
         var view3 = new ViewConstraint
         {
             Id = "view3",
-            HorizontalBias = 0,
             LeftToRightOf = "view2!",
             RightToRightOf = "parent",
         };
