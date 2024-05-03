@@ -30,97 +30,295 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     /// Identifies the TopToTopOf bindable property.
     /// This property is used to align the top edge of the element with the top edge of another element or the parent.
     /// </summary>
-    public static readonly BindableProperty TopToTopOfProperty = BindableProperty.Create(nameof(TopToTopOf), typeof(string), typeof(ViewConstraint), propertyChanged: VerticalPropertyChanged);
+    public static readonly BindableProperty TopToTopOfProperty = BindableProperty.Create(
+        nameof(TopToTopOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Top;
+                anchor.TargetFunc = e => e.Top;
+                anchor.Type = AnchorType.TopToTopOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._topAnchor = newValue as Anchor ?? viewConstraint.TopToBottomOf;
+            viewConstraint.NotifyVerticalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the LeftToLeftOf bindable property.
     /// This property is used to align the left edge of the element with the left edge of another element or the parent.
     /// </summary>
-    public static readonly BindableProperty LeftToLeftOfProperty = BindableProperty.Create(nameof(LeftToLeftOf), typeof(string), typeof(ViewConstraint), propertyChanged: HorizontalPropertyChanged);
+    public static readonly BindableProperty LeftToLeftOfProperty = BindableProperty.Create(
+        nameof(LeftToLeftOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Left;
+                anchor.TargetFunc = e => e.Left;
+                anchor.Type = AnchorType.LeftToLeftOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._leftAnchor = newValue as Anchor ?? viewConstraint.LeftToRightOf;
+            viewConstraint.NotifyHorizontalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the TopToBottomOf bindable property.
     /// This property is used to align the top edge of the element with the bottom edge of another element.
     /// </summary>
-    public static readonly BindableProperty TopToBottomOfProperty = BindableProperty.Create(nameof(TopToBottomOf), typeof(string), typeof(ViewConstraint), propertyChanged: VerticalPropertyChanged);
+    public static readonly BindableProperty TopToBottomOfProperty = BindableProperty.Create(
+        nameof(TopToBottomOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Top;
+                anchor.TargetFunc = e => e.Bottom;
+                anchor.Type = AnchorType.TopToBottomOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._topAnchor = newValue as Anchor ?? viewConstraint.TopToTopOf;
+            viewConstraint.NotifyVerticalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the LeftToRightOf bindable property.
     /// This property is used to align the left edge of the element with the right edge of another element.
     /// </summary>
-    public static readonly BindableProperty LeftToRightOfProperty = BindableProperty.Create(nameof(LeftToRightOf), typeof(string), typeof(ViewConstraint), propertyChanged: HorizontalPropertyChanged);
+    public static readonly BindableProperty LeftToRightOfProperty = BindableProperty.Create(
+        nameof(LeftToRightOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Left;
+                anchor.TargetFunc = e => e.Right;
+                anchor.Type = AnchorType.LeftToRightOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._leftAnchor = newValue as Anchor ?? viewConstraint.LeftToLeftOf;
+            viewConstraint.NotifyHorizontalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the RightToRightOf bindable property.
     /// This property is used to align the right edge of the element with the right edge of another element or the parent.
     /// </summary>
-    public static readonly BindableProperty RightToRightOfProperty = BindableProperty.Create(nameof(RightToRightOf), typeof(string), typeof(ViewConstraint), propertyChanged: HorizontalPropertyChanged);
+    public static readonly BindableProperty RightToRightOfProperty = BindableProperty.Create(
+        nameof(RightToRightOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Right;
+                anchor.TargetFunc = e => e.Right;
+                anchor.Type = AnchorType.RightToRightOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._rightAnchor = newValue as Anchor ?? viewConstraint.RightToLeftOf;
+            viewConstraint.NotifyHorizontalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the RightToLeftOf bindable property.
     /// This property is used to align the right edge of the element with the left edge of another element.
     /// </summary>
-    public static readonly BindableProperty RightToLeftOfProperty = BindableProperty.Create(nameof(RightToLeftOf), typeof(string), typeof(ViewConstraint), propertyChanged: HorizontalPropertyChanged);
+    public static readonly BindableProperty RightToLeftOfProperty = BindableProperty.Create(
+        nameof(RightToLeftOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Right;
+                anchor.TargetFunc = e => e.Left;
+                anchor.Type = AnchorType.RightToLeftOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._rightAnchor = newValue as Anchor ?? viewConstraint.RightToRightOf;
+            viewConstraint.NotifyHorizontalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the BottomToTopOf bindable property.
     /// This property is used to align the bottom edge of the element with the top edge of another element.
     /// </summary>
-    public static readonly BindableProperty BottomToTopOfProperty = BindableProperty.Create(nameof(BottomToTopOf), typeof(string), typeof(ViewConstraint), propertyChanged: VerticalPropertyChanged);
+    public static readonly BindableProperty BottomToTopOfProperty = BindableProperty.Create(
+        nameof(BottomToTopOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Bottom;
+                anchor.TargetFunc = e => e.Top;
+                anchor.Type = AnchorType.BottomToTopOf;
+            }
+
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._bottomAnchor = newValue as Anchor ?? viewConstraint.BottomToBottomOf;
+            viewConstraint.NotifyVerticalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the BottomToBottomOf bindable property.
     /// This property is used to align the bottom edge of the element with the bottom edge of another element or the parent.
     /// </summary>
-    public static readonly BindableProperty BottomToBottomOfProperty = BindableProperty.Create(nameof(BottomToBottomOf), typeof(string), typeof(ViewConstraint), propertyChanged: VerticalPropertyChanged);
+    public static readonly BindableProperty BottomToBottomOfProperty = BindableProperty.Create(
+        nameof(BottomToBottomOf),
+        typeof(Anchor),
+        typeof(ViewConstraint),
+        coerceValue: (_, value) =>
+        {
+            if (value is Anchor anchor)
+            {
+                anchor.SourceFunc = e => e.Bottom;
+                anchor.TargetFunc = e => e.Bottom;
+                anchor.Type = AnchorType.BottomToBottomOf;
+            }
 
-    /// <summary>
-    /// Identifies the Margin bindable property.
-    /// This property is used to set the margin of the element.
-    /// </summary>
-    public static readonly BindableProperty MarginProperty = BindableProperty.Create(nameof(Margin), typeof(Thickness), typeof(ViewConstraint), propertyChanged: MarginPropertyChanged);
-
-    /// <summary>
-    /// Identifies the GoneMargin bindable property.
-    /// This property is used to set the margin of the element when it's not visible.
-    /// </summary>
-    public static readonly BindableProperty GoneMarginProperty = BindableProperty.Create(nameof(GoneMargin), typeof(Thickness), typeof(ViewConstraint), propertyChanged: MarginPropertyChanged);
+            return value;
+        },
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint._bottomAnchor = newValue as Anchor ?? viewConstraint.BottomToTopOf;
+            viewConstraint.NotifyVerticalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the Height bindable property.
     /// </summary>
-    public static readonly BindableProperty HeightProperty = BindableProperty.Create(nameof(Height), typeof(SizeDefinition), typeof(ViewConstraint), SizeDefinition.Measured, propertyChanged: HeightPropertyChanged);
+    public static readonly BindableProperty HeightProperty = BindableProperty.Create(
+        nameof(Height),
+        typeof(SizeDefinition),
+        typeof(ViewConstraint),
+        SizeDefinition.Measured,
+        propertyChanged: (bindable, _, _) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint.NotifyHeightPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the Width bindable property.
     /// </summary>
-    public static readonly BindableProperty WidthProperty = BindableProperty.Create(nameof(Width), typeof(SizeDefinition), typeof(ViewConstraint), SizeDefinition.Measured, propertyChanged: WidthPropertyChanged);
+    public static readonly BindableProperty WidthProperty = BindableProperty.Create(
+        nameof(Width),
+        typeof(SizeDefinition),
+        typeof(ViewConstraint),
+        SizeDefinition.Measured,
+        propertyChanged: (bindable, _, _) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint.NotifyWidthPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the HorizontalBias bindable property.
     /// </summary>
-    public static readonly BindableProperty HorizontalBiasProperty = BindableProperty.Create(nameof(HorizontalBias), typeof(double), typeof(ViewConstraint), 0.5d, propertyChanged: HorizontalPropertyChanged);
+    public static readonly BindableProperty HorizontalBiasProperty = BindableProperty.Create(
+        nameof(HorizontalBias),
+        typeof(double),
+        typeof(ViewConstraint),
+        0.5d,
+        propertyChanged: (bindable, _, _) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint.NotifyHorizontalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the VerticalBias bindable property.
     /// </summary>
-    public static readonly BindableProperty VerticalBiasProperty = BindableProperty.Create(nameof(VerticalBias), typeof(double), typeof(ViewConstraint), 0.5d, propertyChanged: VerticalPropertyChanged);
+    public static readonly BindableProperty VerticalBiasProperty = BindableProperty.Create(
+        nameof(VerticalBias),
+        typeof(double),
+        typeof(ViewConstraint),
+        0.5d,
+        propertyChanged: (bindable, _, _) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint.NotifyVerticalPropertyChanged();
+        });
 
     /// <summary>
     /// Identifies the IsVisible bindable property.
     /// This property is used internally to track the visibility of the target view.
     /// </summary>
-    private static readonly BindableProperty _isVisibleProperty = BindableProperty.Create(nameof(IsVisible), typeof(bool), typeof(ViewConstraint), true, propertyChanged: IsVisiblePropertyChanged);
+    private static readonly BindableProperty _isVisibleProperty = BindableProperty.Create(
+        nameof(IsVisible),
+        typeof(bool),
+        typeof(ViewConstraint),
+        true,
+        propertyChanged: (bindable, _, _) =>
+        {
+            var viewConstraint = (ViewConstraint)bindable;
+            viewConstraint.NotifyVisibilityChanged();
+        });
 
     private readonly Variable _measuredWidth = new();
     private readonly Variable _measuredHeight = new();
     private readonly Variable _chainWeightedWidth = new();
     private readonly Variable _chainWeightedHeight = new();
-    private readonly Variable _leftAnchor = new();
-    private readonly Variable _rightAnchor = new();
-    private readonly Variable _topAnchor = new();
-    private readonly Variable _bottomAnchor = new();
+    private readonly Variable _leftAnchorVariable = new();
+    private readonly Variable _rightAnchorVariable = new();
+    private readonly Variable _topAnchorVariable = new();
+    private readonly Variable _bottomAnchorVariable = new();
     private readonly Variable _visibilityMultiplier = new();
+
+    private Anchor? _topAnchor;
+    private Anchor? _leftAnchor;
+    private Anchor? _rightAnchor;
+    private Anchor? _bottomAnchor;
 
     /// <summary>
     /// Gets or sets the vertical bias of the element when both top and bottom constraints are set.
@@ -159,92 +357,74 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     }
 
     /// <summary>
-    /// Gets or sets the margin of the element.
-    /// </summary>
-    public Thickness Margin
-    {
-        get => (Thickness)GetValue(MarginProperty);
-        set => SetValue(MarginProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the margin of the element when the target is not visible.
-    /// </summary>
-    public Thickness GoneMargin
-    {
-        get => (Thickness)GetValue(GoneMarginProperty);
-        set => SetValue(GoneMarginProperty, value);
-    }
-
-    /// <summary>
     /// Gets or sets the ID of the element to align the top edge with.
     /// </summary>
-    public string? TopToTopOf
+    public Anchor? TopToTopOf
     {
-        get => (string?)GetValue(TopToTopOfProperty);
+        get => (Anchor?)GetValue(TopToTopOfProperty);
         set => SetValue(TopToTopOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the left edge with.
     /// </summary>
-    public string? LeftToLeftOf
+    public Anchor? LeftToLeftOf
     {
-        get => (string?)GetValue(LeftToLeftOfProperty);
+        get => (Anchor?)GetValue(LeftToLeftOfProperty);
         set => SetValue(LeftToLeftOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the top edge with its bottom edge.
     /// </summary>
-    public string? TopToBottomOf
+    public Anchor? TopToBottomOf
     {
-        get => (string?)GetValue(TopToBottomOfProperty);
+        get => (Anchor?)GetValue(TopToBottomOfProperty);
         set => SetValue(TopToBottomOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the left edge with its right edge.
     /// </summary>
-    public string? LeftToRightOf
+    public Anchor? LeftToRightOf
     {
-        get => (string?)GetValue(LeftToRightOfProperty);
+        get => (Anchor?)GetValue(LeftToRightOfProperty);
         set => SetValue(LeftToRightOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the right edge with.
     /// </summary>
-    public string? RightToRightOf
+    public Anchor? RightToRightOf
     {
-        get => (string?)GetValue(RightToRightOfProperty);
+        get => (Anchor?)GetValue(RightToRightOfProperty);
         set => SetValue(RightToRightOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the right edge with its left edge.
     /// </summary>
-    public string? RightToLeftOf
+    public Anchor? RightToLeftOf
     {
-        get => (string?)GetValue(RightToLeftOfProperty);
+        get => (Anchor?)GetValue(RightToLeftOfProperty);
         set => SetValue(RightToLeftOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the bottom edge with its top edge.
     /// </summary>
-    public string? BottomToTopOf
+    public Anchor? BottomToTopOf
     {
-        get => (string?)GetValue(BottomToTopOfProperty);
+        get => (Anchor?)GetValue(BottomToTopOfProperty);
         set => SetValue(BottomToTopOfProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the ID of the element to align the bottom edge with.
     /// </summary>
-    public string? BottomToBottomOf
+    public Anchor? BottomToBottomOf
     {
-        get => (string?)GetValue(BottomToBottomOfProperty);
+        get => (Anchor?)GetValue(BottomToBottomOfProperty);
         set => SetValue(BottomToBottomOfProperty, value);
     }
 
@@ -259,7 +439,7 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     /// </summary>
     public ViewConstraint()
     {
-        IsVisiblePropertyChanged(this, false, true);
+        NotifyVisibilityChanged();
     }
 
     /// <inheritdoc />
@@ -323,7 +503,7 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         }
 
         IsVisible = view.Visibility != Visibility.Collapsed;
-        SetConstraint(ConstraintTypes.Measure, scene =>
+        SetConstraint(ConstraintTypes.Measure, _ =>
         {
             if (Width.Unit != SizeUnit.Measured && Height.Unit != SizeUnit.Measured)
             {
@@ -347,10 +527,10 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         base.SetVariablesNames(id);
         _measuredHeight.SetName($"{id}.MeasuredHeight");
         _measuredWidth.SetName($"{id}.MeasuredWidth");
-        _leftAnchor.SetName($"{id}.LeftAnchor");
-        _rightAnchor.SetName($"{id}.RightAnchor");
-        _topAnchor.SetName($"{id}.TopAnchor");
-        _bottomAnchor.SetName($"{id}.BottomAnchor");
+        _leftAnchorVariable.SetName($"{id}.LeftAnchor");
+        _rightAnchorVariable.SetName($"{id}.RightAnchor");
+        _topAnchorVariable.SetName($"{id}.TopAnchor");
+        _bottomAnchorVariable.SetName($"{id}.BottomAnchor");
         _chainWeightedWidth.SetName($"{id}.ChainWeightedWidth");
         _chainWeightedHeight.SetName($"{id}.ChainWeightedHeight");
         _visibilityMultiplier.SetName($"{id}.VisibilityMultiplier");
@@ -359,12 +539,12 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     private IEnumerable<Constraint> GetWidthConstraints(IConstraintLayoutScene scene)
         => !IsVisible
             ? [(Right - Left) | Eq(Required) | 0]
-            : GetSizeConstraints(Width, _measuredWidth, Left, Right, _leftAnchor, _rightAnchor, _chainWeightedWidth, scene.Left, scene.Right, Bottom - Top);
+            : GetSizeConstraints(Width, _measuredWidth, Left, Right, _chainWeightedWidth, scene.Left, scene.Right, Bottom - Top);
 
     private IEnumerable<Constraint> GetHeightConstraints(IConstraintLayoutScene scene)
         => !IsVisible
             ? [(Bottom - Top) | Eq(Required) | 0]
-            : GetSizeConstraints(Height, _measuredHeight, Top, Bottom, _topAnchor, _bottomAnchor, _chainWeightedHeight, scene.Top, scene.Bottom, Right - Left);
+            : GetSizeConstraints(Height, _measuredHeight, Top, Bottom, _chainWeightedHeight, scene.Top, scene.Bottom, Right - Left);
 
     private IEnumerable<Constraint> GetHorizontalConstraints(IConstraintLayoutScene scene)
         => GetPositionConstraints(
@@ -372,13 +552,14 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
             v => v.CreateLeftAnchorConstraint(scene),
             v => v.CreateRightAnchorConstraint(scene),
             v => v._chainWeightedWidth,
-            v => NormalizeAnchorId(v.LeftToRightOf),
-            v => NormalizeAnchorId(v.RightToLeftOf),
+            v => v._leftAnchor,
+            v => v._rightAnchor,
             v => v.Left,
             v => v.Right,
-            _leftAnchor,
-            _rightAnchor,
-            HorizontalBias);
+            _leftAnchorVariable,
+            _rightAnchorVariable,
+            HorizontalBias,
+            Width);
 
     private IEnumerable<Constraint> GetVerticalConstraints(IConstraintLayoutScene scene)
         => GetPositionConstraints(
@@ -386,32 +567,35 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
             v => v.CreateTopAnchorConstraint(scene),
             v => v.CreateBottomAnchorConstraint(scene),
             v => v._chainWeightedHeight,
-            v => NormalizeAnchorId(v.TopToBottomOf),
-            v => NormalizeAnchorId(v.BottomToTopOf),
+            v => v._topAnchor,
+            v => v._bottomAnchor,
             v => v.Top,
             v => v.Bottom,
-            _topAnchor,
-            _bottomAnchor,
-            VerticalBias);
+            _topAnchorVariable,
+            _bottomAnchorVariable,
+            VerticalBias,
+            Height);
 
     private IEnumerable<Constraint> GetPositionConstraints(
         IConstraintLayoutScene scene,
         Func<ViewConstraint, AnchorConstraints?> createStartAnchorConstraint,
         Func<ViewConstraint, AnchorConstraints?> createEndAnchorConstraint,
         Func<ViewConstraint, Variable> chainWeightedSize,
-        Func<ViewConstraint, string?> startToEndOf,
-        Func<ViewConstraint, string?> endToStartOf,
+        Func<ViewConstraint, Anchor?> startAnchorGetter,
+        Func<ViewConstraint, Anchor?> endAnchorGetter,
         Func<ViewConstraint, Variable> startGetter,
         Func<ViewConstraint, Variable> endGetter,
         Variable startAnchorVariable,
         Variable endAnchorVariable,
-        double bias)
+        double bias,
+        SizeDefinition size)
     {
         var start = startGetter(this);
         var end = endGetter(this);
         var startAnchorConstraint = createStartAnchorConstraint(this);
         var endAnchorConstraint = createEndAnchorConstraint(this);
         var isChainHead = false;
+        var isChain = false;
         if (startAnchorConstraint is not null)
         {
             var (startConstraint, startAnchor) = startAnchorConstraint.Value;
@@ -419,14 +603,15 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
             yield return startAnchorVariable | Eq(Required) | startAnchor;
 
             // Chain elements (except the head) should constrain their size to the chain weighted size variable found inside the head.
-            var chainWeightedWidthConstraint = GetChainWeightedSizeConstraint(scene, chainWeightedSize, startToEndOf, endToStartOf);
+            var chainWeightedWidthConstraint = GetChainWeightedSizeConstraint(scene, chainWeightedSize, startAnchorGetter, endAnchorGetter);
             if (chainWeightedWidthConstraint is not null)
             {
+                isChain = true;
                 yield return chainWeightedWidthConstraint.Value;
             }
             else if (endAnchorConstraint?.Anchor is { } rightAnchor)
             {
-                isChainHead = HasChainedEnd(scene, startToEndOf, endToStartOf);
+                isChain = isChainHead = HasChainedEnd(scene, startAnchorGetter, endAnchorGetter);
                 if (!isChainHead)
                 {
                     yield return chainWeightedSize(this) | Eq(Required) | (rightAnchor - startAnchor);
@@ -436,7 +621,7 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
 
         var hasVariableLeftConstraint = startAnchorConstraint?.AnchorConstraint is { Strength: < Required };
         var hasVariableRightConstraint = endAnchorConstraint?.AnchorConstraint is { Strength: < Required };
-        if (hasVariableLeftConstraint && hasVariableRightConstraint)
+        if (hasVariableLeftConstraint && hasVariableRightConstraint && !(isChain && size.Unit == SizeUnit.Constraint))
         {
             var startAnchor = startAnchorConstraint!.Value.Anchor;
             var endAnchor = endAnchorConstraint!.Value.Anchor;
@@ -458,12 +643,12 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         else if (isChainHead && hasVariableLeftConstraint && !hasVariableRightConstraint)
         {
             var startAnchor = startAnchorConstraint!.Value.Anchor;
-            var tail = GetChainTail(scene, startToEndOf, endToStartOf);
+            var tail = GetChainTail(scene, startAnchorGetter, endAnchorGetter);
             var tailStartAnchorConstraint = createStartAnchorConstraint(tail);
             var tailEndAnchorConstraint = createEndAnchorConstraint(tail);
             var tailHasVariableStartConstraint = tailStartAnchorConstraint?.AnchorConstraint is { Strength: < Required };
             var tailHasVariableEndConstraint = tailEndAnchorConstraint?.AnchorConstraint is { Strength: < Required };
-            if (tailEndAnchorConstraint is not null && tailHasVariableEndConstraint && !tailHasVariableStartConstraint)
+            if (tailEndAnchorConstraint is not null && tailHasVariableEndConstraint && !tailHasVariableStartConstraint && size.Unit != SizeUnit.Constraint)
             {
                 var tailRightAnchor = tailEndAnchorConstraint.Value.Anchor;
                 yield return (bias * endGetter(tail)) | Eq(Required) | ((startAnchor * (1 - bias)) + (tailRightAnchor * bias) + (start * (bias - 1)));
@@ -478,38 +663,47 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         }
     }
 
-    private bool HasChainedEnd(IConstraintLayoutScene scene, Func<ViewConstraint, string?> startToEndOf, Func<ViewConstraint, string?> endToStartOf)
+    private bool HasChainedEnd(IConstraintLayoutScene scene, Func<ViewConstraint, Anchor?> startAnchorGetter, Func<ViewConstraint, Anchor?> endAnchorGetter)
     {
-        var endToStartOfId = endToStartOf(this);
-        if (endToStartOfId is null)
+        var view = this;
+        var endAnchor = endAnchorGetter(view);
+        if (endAnchor is null || !endAnchor.Type.HasFlag(AnchorType.EndToStartOf))
         {
             return false;
         }
 
-        var sibling = scene.GetElement(endToStartOfId) as ViewConstraint;
-        return sibling is not null && startToEndOf(sibling) == Id;
+        if (scene.GetElement(endAnchor.Target) is not ViewConstraint sibling)
+        {
+            return false;
+        }
+
+        var startAnchor = startAnchorGetter(sibling);
+        if (startAnchor is null || !startAnchor.Type.HasFlag(AnchorType.StartToEndOf) || startAnchor.Target != view.Id)
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    private ViewConstraint GetChainTail(IConstraintLayoutScene scene, Func<ViewConstraint, string?> startToEndOf, Func<ViewConstraint, string?> endToStartOf)
+    private ViewConstraint GetChainTail(IConstraintLayoutScene scene, Func<ViewConstraint, Anchor?> startAnchorGetter, Func<ViewConstraint, Anchor?> endAnchorGetter)
     {
-        var isChained = true;
         var view = this;
-        while (isChained)
+        while (true)
         {
-            var endToStartOfId = endToStartOf(view);
-            if (endToStartOfId is null)
+            var endAnchor = endAnchorGetter(view);
+            if (endAnchor is null || !endAnchor.Type.HasFlag(AnchorType.EndToStartOf))
             {
                 break;
             }
 
-            if (scene.GetElement(endToStartOfId) is not ViewConstraint sibling)
+            if (scene.GetElement(endAnchor.Target) is not ViewConstraint sibling)
             {
                 break;
             }
 
-            var siblingStartToEndOf = startToEndOf(sibling);
-            isChained = siblingStartToEndOf == view.Id;
-            if (!isChained)
+            var startAnchor = startAnchorGetter(sibling);
+            if (startAnchor is null || !startAnchor.Type.HasFlag(AnchorType.StartToEndOf) || startAnchor.Target != view.Id)
             {
                 break;
             }
@@ -520,28 +714,37 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
         return view;
     }
 
-    private Constraint? GetChainWeightedSizeConstraint(IConstraintLayoutScene scene, Func<ViewConstraint, Variable> chainWeightedSize, Func<ViewConstraint, string?> startToEndOf, Func<ViewConstraint, string?> endToStartOf)
+    private ViewConstraint GetChainHead(IConstraintLayoutScene scene, Func<ViewConstraint, Anchor?> startAnchorGetter, Func<ViewConstraint, Anchor?> endAnchorGetter)
     {
-        var isChained = true;
         var view = this;
-        while (isChained)
+        while (true)
         {
-            var startToEndOfId = startToEndOf(view);
-            if (startToEndOfId is null)
+            var startAnchor = startAnchorGetter(view);
+            if (startAnchor is null || !startAnchor.Type.HasFlag(AnchorType.StartToEndOf))
             {
                 break;
             }
 
-            var sibling = scene.GetElement(startToEndOfId) as ViewConstraint;
-            isChained = sibling is not null && endToStartOf(sibling) == view.Id;
-            if (!isChained)
+            if (scene.GetElement(startAnchor.Target) is not ViewConstraint sibling)
             {
                 break;
             }
 
-            view = sibling!;
+            var endAnchor = endAnchorGetter(sibling);
+            if (endAnchor is null || !endAnchor.Type.HasFlag(AnchorType.EndToStartOf) || endAnchor.Target != view.Id)
+            {
+                break;
+            }
+
+            view = sibling;
         }
 
+        return view;
+    }
+
+    private Constraint? GetChainWeightedSizeConstraint(IConstraintLayoutScene scene, Func<ViewConstraint, Variable> chainWeightedSize, Func<ViewConstraint, Anchor?> startAnchorGetter, Func<ViewConstraint, Anchor?> endAnchorGetter)
+    {
+        var view = GetChainHead(scene, startAnchorGetter, endAnchorGetter);
         return view == this ? null : (chainWeightedSize(this) - chainWeightedSize(view)) | Eq(Required) | 0;
     }
 
@@ -549,14 +752,9 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     {
         var op = LessOrEq(Medium);
 
-        if (BottomToBottomOf is { } bottomToBottomOf)
+        if (_bottomAnchor is { } bottomAnchor)
         {
-            return CreateAnchorConstraint(scene, op, Bottom, bottomToBottomOf, e => e.Bottom, -Margin.Bottom, -GoneMargin.Bottom);
-        }
-
-        if (BottomToTopOf is { } bottomToTopOf)
-        {
-            return CreateAnchorConstraint(scene, op, Bottom, bottomToTopOf, e => e.Top, -Margin.Bottom, -GoneMargin.Bottom);
+            return CreateAnchorConstraint(scene, op, bottomAnchor, -1);
         }
 
         return null;
@@ -566,14 +764,9 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     {
         var op = GreaterOrEq(Medium);
 
-        if (TopToTopOf is { } topToTopOf)
+        if (_topAnchor is { } topAnchor)
         {
-            return CreateAnchorConstraint(scene, op, Top, topToTopOf, e => e.Top, Margin.Top, GoneMargin.Top);
-        }
-
-        if (TopToBottomOf is { } topToBottomOf)
-        {
-            return CreateAnchorConstraint(scene, op, Top, topToBottomOf, e => e.Bottom, Margin.Top, GoneMargin.Top);
+            return CreateAnchorConstraint(scene, op, topAnchor);
         }
 
         return null;
@@ -583,14 +776,9 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     {
         var op = LessOrEq(Medium);
 
-        if (RightToRightOf is { } rightToRightOf)
+        if (_rightAnchor is { } rightAnchor)
         {
-            return CreateAnchorConstraint(scene, op, Right, rightToRightOf, e => e.Right, -Margin.Right, -GoneMargin.Right);
-        }
-
-        if (RightToLeftOf is { } rightToLeftOf)
-        {
-            return CreateAnchorConstraint(scene, op, Right, rightToLeftOf, e => e.Left, -Margin.Right, -GoneMargin.Right);
+            return CreateAnchorConstraint(scene, op, rightAnchor, -1);
         }
 
         return null;
@@ -600,37 +788,34 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
     {
         var op = GreaterOrEq(Medium);
 
-        if (LeftToLeftOf is { } leftToLeftOf)
+        if (_leftAnchor is { } leftAnchor)
         {
-            return CreateAnchorConstraint(scene, op, Left, leftToLeftOf, e => e.Left, Margin.Left, GoneMargin.Left);
-        }
-
-        if (LeftToRightOf is { } leftToRightOf)
-        {
-            return CreateAnchorConstraint(scene, op, Left, leftToRightOf, e => e.Right, Margin.Left, GoneMargin.Left);
+            return CreateAnchorConstraint(scene, op, leftAnchor);
         }
 
         return null;
     }
 
-    private AnchorConstraints? CreateAnchorConstraint(IConstraintLayoutScene scene, WeightedRelation op, Variable sourceVariable, string targetId, Func<ISceneElementBase, Variable> targetVariableGetter, double margin, double goneMargin)
+    private AnchorConstraints? CreateAnchorConstraint(IConstraintLayoutScene scene, WeightedRelation op, Anchor anchor, double marginMultiplier = 1)
     {
-        if (targetId[^1] == '!')
+        if (anchor.Tight)
         {
             op = Eq(Required);
-            targetId = targetId[..^1];
         }
 
-        var targetElement = scene.GetElement(targetId);
+        var targetElement = scene.GetElement(anchor.Target);
         if (targetElement is null)
         {
             return null;
         }
 
-        var anchor = targetVariableGetter(targetElement);
+        var anchorVariable = anchor.TargetFunc(targetElement);
+        var sourceVariable = anchor.SourceFunc(this);
         Expression anchorExpression;
 
         var isVisible = IsVisible;
+        var margin = anchor.Margin * marginMultiplier;
+        var goneMargin = anchor.GoneMargin * marginMultiplier;
         if (targetElement is ViewConstraint targetViewConstraint)
         {
             var targetVisibilityMultiplier = targetViewConstraint._visibilityMultiplier;
@@ -640,35 +825,76 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
                 {
                     var goneMarginTerm = goneMargin * (1 - targetVisibilityMultiplier);
                     var marginTerm = margin * targetVisibilityMultiplier;
-                    anchorExpression = anchor + goneMarginTerm + marginTerm;
+                    anchorExpression = anchorVariable + goneMarginTerm + marginTerm;
                 }
                 else
                 {
                     var marginTerm = margin * targetVisibilityMultiplier;
-                    anchorExpression = anchor + marginTerm;
+                    anchorExpression = anchorVariable + marginTerm;
                 }
             }
             else if (isVisible && goneMargin != 0)
             {
                 var goneMarginTerm = goneMargin * (1 - targetVisibilityMultiplier);
-                anchorExpression = anchor + goneMarginTerm;
+                anchorExpression = anchorVariable + goneMarginTerm;
             }
             else
             {
-                anchorExpression = anchor + 0;
+                anchorExpression = anchorVariable + 0;
             }
         }
         else
         {
-            anchorExpression = anchor + (isVisible ? margin : 0);
+            anchorExpression = anchorVariable + (isVisible ? margin : 0);
         }
 
         var anchorConstraint = sourceVariable | op | anchorExpression;
         return (anchorConstraint, anchorExpression);
     }
 
+    private void NotifyHorizontalPropertyChanged(bool invalidateScene = true)
+    {
+        SetConstraint(ConstraintTypes.Horizontal, GetHorizontalConstraints);
+        if (invalidateScene)
+        {
+            Scene?.InvalidateScene();
+        }
+    }
+
+    private void NotifyVerticalPropertyChanged(bool invalidateScene = true)
+    {
+        SetConstraint(ConstraintTypes.Vertical, GetVerticalConstraints);
+        if (invalidateScene)
+        {
+            Scene?.InvalidateScene();
+        }
+    }
+
+    private void NotifyWidthPropertyChanged(bool invalidateScene = true)
+    {
+        SetConstraint(ConstraintTypes.Width, GetWidthConstraints);
+        NotifyHorizontalPropertyChanged(invalidateScene);
+    }
+
+    private void NotifyHeightPropertyChanged(bool invalidateScene = true)
+    {
+        SetConstraint(ConstraintTypes.Height, GetHeightConstraints);
+        NotifyVerticalPropertyChanged(invalidateScene);
+    }
+
+    private void NotifyVisibilityChanged(bool invalidateScene = true)
+    {
+        SetConstraint(ConstraintTypes.Visibility, _ => [_visibilityMultiplier | Eq(Required) | (IsVisible ? 1 : 0)]);
+        NotifyWidthPropertyChanged(false);
+        NotifyHeightPropertyChanged(false);
+        if (invalidateScene)
+        {
+            Scene?.InvalidateScene();
+        }
+    }
+
 #pragma warning disable IDE0060
-    private static IEnumerable<Constraint> GetSizeConstraints(SizeDefinition size, Variable measured, Variable start, Variable end, Variable startAnchor, Variable endAnchor, Variable chainWeightedSize, Variable sceneStart, Variable sceneEnd, Expression otherAxisSize)
+    private static IEnumerable<Constraint> GetSizeConstraints(SizeDefinition size, Variable measured, Variable start, Variable end, Variable chainWeightedSize, Variable sceneStart, Variable sceneEnd, Expression otherAxisSize)
 #pragma warning restore IDE0060
     {
         var multiplier = size.Multiplier;
@@ -689,74 +915,5 @@ public class ViewConstraint : SceneElementBase<ViewConstraint.ConstraintTypes>, 
             default:
                 throw new NotSupportedException();
         }
-    }
-
-    private static void HorizontalPropertyChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var viewConstraint = (ViewConstraint)bindable;
-        viewConstraint.SetConstraint(ConstraintTypes.Horizontal, viewConstraint.GetHorizontalConstraints);
-        viewConstraint.Scene?.InvalidateScene();
-    }
-
-    private static void WidthPropertyChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var viewConstraint = (ViewConstraint)bindable;
-        viewConstraint.SetConstraint(ConstraintTypes.Width, viewConstraint.GetWidthConstraints);
-        viewConstraint.Scene?.InvalidateScene();
-    }
-
-    private static void VerticalPropertyChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var viewConstraint = (ViewConstraint)bindable;
-        viewConstraint.SetConstraint(ConstraintTypes.Vertical, viewConstraint.GetVerticalConstraints);
-        viewConstraint.Scene?.InvalidateScene();
-    }
-
-    private static void HeightPropertyChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var viewConstraint = (ViewConstraint)bindable;
-        viewConstraint.SetConstraint(ConstraintTypes.Height, viewConstraint.GetHeightConstraints);
-        viewConstraint.Scene?.InvalidateScene();
-    }
-
-    private static void IsVisiblePropertyChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var viewConstraint = (ViewConstraint)bindable;
-        viewConstraint.SetConstraint(ConstraintTypes.Visibility, _ => [viewConstraint._visibilityMultiplier | Eq(Required) | (viewConstraint.IsVisible ? 1 : 0)]);
-        viewConstraint.SetConstraint(ConstraintTypes.Height, viewConstraint.GetHeightConstraints);
-        viewConstraint.SetConstraint(ConstraintTypes.Width, viewConstraint.GetWidthConstraints);
-        viewConstraint.SetConstraint(ConstraintTypes.Horizontal, viewConstraint.GetHorizontalConstraints);
-        viewConstraint.SetConstraint(ConstraintTypes.Vertical, viewConstraint.GetVerticalConstraints);
-
-        viewConstraint.Scene?.InvalidateScene();
-    }
-
-    private static void MarginPropertyChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var viewConstraint = (ViewConstraint)bindable;
-        var oldThickness = (Thickness)oldValue;
-        var thickness = (Thickness)newValue;
-
-        if (oldThickness.Left != thickness.Left || oldThickness.Right != thickness.Right)
-        {
-            viewConstraint.SetConstraint(ConstraintTypes.Horizontal, viewConstraint.GetHorizontalConstraints);
-        }
-
-        if (oldThickness.Top != thickness.Top || oldThickness.Bottom != thickness.Bottom)
-        {
-            viewConstraint.SetConstraint(ConstraintTypes.Vertical, viewConstraint.GetVerticalConstraints);
-        }
-
-        viewConstraint.Scene?.InvalidateScene();
-    }
-
-    private static string? NormalizeAnchorId(string? anchorId)
-    {
-        if (anchorId?.Length > 0 && anchorId[^1] == '!')
-        {
-            return anchorId[..^1];
-        }
-
-        return anchorId;
     }
 }

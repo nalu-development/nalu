@@ -1,21 +1,17 @@
 namespace Nalu.Maui.Test.Layouts;
 
-using System.Globalization;
 using Cassowary;
-using Microsoft.Maui.Converters;
 
 public class ViewConstraintTests
 {
-    private static readonly ThicknessTypeConverter _thicknessTypeConverter = new();
-
     [Theory(DisplayName = "ViewConstraint, should apply constraints")]
     [InlineData("1M", "1M", 20, 40, "t:t:parent,l:l:parent", 0, 20, 0, 40)]
     [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 40, 60, 0, 40)]
-    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 0, 20, 0, 40, "0", "0,0")]
-    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 80, 100, 0, 40, "0", "1,0")]
-    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 20, 40, 0, 40, "20,0", "0,0")]
-    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 60, 80, 0, 40, "20,0", "1,0")]
-    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 40, 60, 20, 60, "20")]
+    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 0, 20, 0, 40, "0,0")]
+    [InlineData("1M", "1M", 20, 40, "r:r:parent,l:l:parent,t:t:parent", 80, 100, 0, 40, "1,0")]
+    [InlineData("1M", "1M", 20, 40, "r:r:parent|20,l:l:parent|20,t:t:parent", 20, 40, 0, 40, "0,0")]
+    [InlineData("1M", "1M", 20, 40, "r:r:parent|20,l:l:parent|20,t:t:parent", 60, 80, 0, 40, "1,0")]
+    [InlineData("1M", "1M", 20, 40, "r:r:parent|20,l:l:parent|20,t:t:parent|20", 40, 60, 20, 60)]
     [InlineData("0.5M", "0.5M", 20, 40, "t:t:parent,r:r:parent", 90, 100, 0, 20)]
     [InlineData("1M", "1M", 20, 40, "t:t:parent,l:l:parent,r:r:parent", 40, 60, 0, 40)]
     [InlineData("0.5*", "0.5*", 20, 40, "t:t:parent,l:l:parent,r:r:parent,b:b:parent", 25, 75, 50, 150)]
@@ -30,7 +26,6 @@ public class ViewConstraintTests
         double expectedRight,
         double expectedTop,
         double expectedBottom,
-        string? margins = null,
         string? biases = null)
     {
         // Arrange
@@ -44,12 +39,6 @@ public class ViewConstraintTests
             Width = width,
             Height = height,
         };
-
-        if (margins is not null)
-        {
-            var margin = (Thickness)_thicknessTypeConverter.ConvertFrom(null!, CultureInfo.InvariantCulture, margins);
-            view.Margin = margin;
-        }
 
         if (biases is not null)
         {
@@ -98,9 +87,8 @@ public class ViewConstraintTests
         var view1 = new ViewConstraint
         {
             Id = "view1",
-            LeftToLeftOf = "parent",
-            TopToTopOf = "parent",
-            Margin = new Thickness(10),
+            LeftToLeftOf = "parent|10",
+            TopToTopOf = "parent|10",
         };
         var view2 = new ViewConstraint
         {
@@ -423,7 +411,7 @@ public class ViewConstraintTests
     {
         edge = ParseEdge(edge);
         targetEdge = ParseEdge(targetEdge);
-        view.GetType().GetProperty($"{edge}To{targetEdge}Of")!.SetValue(view, target);
+        view.GetType().GetProperty($"{edge}To{targetEdge}Of")!.SetValue(view, (Anchor)target);
     }
 
     private static string ParseEdge(string edge) =>
