@@ -12,6 +12,7 @@ internal class ShellProxy : IShellProxy, IDisposable
     private string? _navigationTarget;
     private bool _contentChanged;
     private IShellSectionProxy? _navigationCurrentSection;
+    public string State => _shell.CurrentState.Location.OriginalString;
 
     public ShellProxy(NaluShell shell)
     {
@@ -78,6 +79,22 @@ internal class ShellProxy : IShellProxy, IDisposable
     }
 
     public IShellContentProxy GetContent(string segmentName) => _contentsBySegmentName[segmentName];
+
+    public IShellContentProxy FindContent(params string[] names)
+    {
+        var namesLength = names.Length;
+        var name = names[0];
+        for (var i = 0; i < namesLength; i++)
+        {
+            name = names[i];
+            if (_contentsBySegmentName.TryGetValue(name, out var content))
+            {
+                return content;
+            }
+        }
+
+        throw new KeyNotFoundException($"Could not find content with segment name '{name}'");
+    }
 
     public Color GetToolbarIconColor(Page page) => Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
 

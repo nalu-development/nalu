@@ -1,6 +1,7 @@
 namespace Nalu;
 
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 #pragma warning disable IDE0290
 
@@ -8,6 +9,7 @@ internal class NavigationService : INavigationService, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
     private readonly LeakDetector _leakDetector;
     private IShellProxy? _shellProxy;
 
@@ -60,30 +62,30 @@ internal class NavigationService : INavigationService, IDisposable
 
         var disposeBag = new HashSet<object>();
         var shellProxy = ShellProxy;
-        shellProxy.BeginNavigation();
 
-        try
+        return await ExecuteNavigationAsync(async () =>
         {
-            return await ExecuteNavigationAsync(() =>
+            shellProxy.BeginNavigation();
+            try
             {
                 var ignoreGuards = navigation.Behavior?.HasFlag(NavigationBehavior.IgnoreGuards) ?? false;
-                return navigation switch
+                return await (navigation switch
                 {
-                    { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards),
-                    _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards),
-                };
-            }).ConfigureAwait(true);
-        }
-        finally
-        {
-            await shellProxy.CommitNavigationAsync(() =>
+                    { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards).ConfigureAwait(true),
+                    _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards).ConfigureAwait(true),
+                });
+            }
+            finally
             {
-                foreach (var toDispose in disposeBag)
+                await shellProxy.CommitNavigationAsync(() =>
                 {
-                    DisposePage(toDispose);
-                }
-            }).ConfigureAwait(true);
-        }
+                    foreach (var toDispose in disposeBag)
+                    {
+                        DisposePage(toDispose);
+                    }
+                }).ConfigureAwait(true);
+            }
+        }).ConfigureAwait(true);
     }
 
     internal Page CreatePage(Type pageType, Page? parentPage)
@@ -465,11 +467,24 @@ internal class NavigationService : INavigationService, IDisposable
 
     private async Task<bool> ExecuteNavigationAsync(Func<Task<bool>> navigationFunc)
     {
-        var taken = await _semaphore.WaitAsync(0).ConfigureAwait(true);
-        if (!taken)
+        if (_isNavigating.Value is { Value: true })
         {
-            throw new InvalidNavigationException("Cannot navigate while another navigation is in progress, try to use IDispatcher.DispatchDelayed.");
+            throw new InvalidNavigationException("Cannot trigger a navigation from within a navigation, try to use IDispatcher.DispatchDelayed.");
         }
+
+        var shellProxy = ShellProxy;
+        var initialState = shellProxy.State;
+
+        await _semaphore.WaitAsync().ConfigureAwait(true);
+
+        if (initialState != shellProxy.State)
+        {
+            // State has changed, abort the navigation
+            _semaphore.Release();
+            return false;
+        }
+
+        _isNavigating.Value = new StrongBox<bool>(true);
 
         try
         {
@@ -479,6 +494,8 @@ internal class NavigationService : INavigationService, IDisposable
         finally
         {
             _semaphore.Release();
+
+            _isNavigating.Value.Value = false;
         }
     }
 
