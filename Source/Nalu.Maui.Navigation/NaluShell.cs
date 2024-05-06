@@ -1,6 +1,7 @@
 namespace Nalu;
 
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
 #pragma warning disable IDE0290
@@ -14,8 +15,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     private readonly NavigationService _navigationService;
     private readonly object? _rootPageIntent;
     private readonly string _rootPageRoute;
-    private readonly object _lock = new();
-    private bool _isNavigating;
+    private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
     private bool _initialized;
     private ShellProxy? _shellProxy;
 
@@ -61,10 +61,13 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
     internal void SetIsNavigating(bool value)
     {
-        lock (_lock)
+        if (_isNavigating.Value is { } isNavigating)
         {
-            _isNavigating = value;
+            isNavigating.Value = value;
+            return;
         }
+
+        _isNavigating.Value ??= new StrongBox<bool>(value);
     }
 
     /// <summary>
@@ -119,9 +122,11 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
             // Only reason we're here is due to shell content navigation from Shell Flyout or Tab bars
             // Now find the ShellContent target and navigate to it via the navigation service
-            var segments = uri.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            var shellContentSegmentName = NormalizeSegmentRegex().Replace(segments.Length > 3 ? segments[2] : segments[^1], string.Empty);
-            var shellContent = (ShellContentProxy)_shellProxy!.GetContent(shellContentSegmentName);
+            var segments = uri
+                .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Select(NormalizeSegment)
+                .ToArray();
+            var shellContent = (ShellContentProxy)_shellProxy!.FindContent(segments);
             var shellSection = shellContent.Parent;
 
             var ownsNavigationStack = shellSection.CurrentContent == shellContent;
@@ -165,14 +170,11 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         }
     }
 
-    private bool GetIsNavigating()
-    {
-        lock (_lock)
-        {
-            return _isNavigating;
-        }
-    }
+    private bool GetIsNavigating() => _isNavigating.Value?.Value ?? false;
 
+    private static readonly Regex _normalizeSegmentRegex = NormalizeSegmentRegex();
     [GeneratedRegex("^(D_FAULT_|IMPL_)")]
     private static partial Regex NormalizeSegmentRegex();
+    private static string NormalizeSegment(string segment)
+        => _normalizeSegmentRegex.Replace(segment, string.Empty);
 }
