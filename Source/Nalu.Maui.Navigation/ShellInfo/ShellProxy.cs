@@ -5,6 +5,8 @@ using System.ComponentModel;
 internal class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
+    private readonly ShellRouteFactory _routeFactory = new();
+    private readonly HashSet<string> _registeredSegments = [];
 
     public IShellItemProxy CurrentItem { get; private set; } = null!;
     public IReadOnlyList<IShellItemProxy> Items { get; private set; } = null!;
@@ -107,19 +109,11 @@ internal class ShellProxy : IShellProxy, IDisposable
             var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
             var finalRoute = $"{baseRoute}/{segmentName}";
 
-            Routing.UnRegisterRoute(finalRoute);
-            Routing.RegisterRoute(finalRoute, new FixedRouteFactory(page));
-
-            // Apparently shell does not work well when the same segment is being used differently
-            // inside the same ShellContent:
-            // - //MyShellContent/MyPage
-            // - //MyShellContent/OtherPage/MyPage
-            // - //MyShellContent/MyPage/MyPage
-            // It always falls under the first one, even when we clearly specify an absolute Uri
-            // For now there's no apparent way to fix the recursive route, while on the other use cases
-            // We can just unregister the route when the page is disposed
-            var pageNavigationContext = PageNavigationContext.Get(page);
-            pageNavigationContext.OnDispose = () => Routing.UnRegisterRoute(finalRoute);
+            if (!_registeredSegments.Contains(segmentName))
+            {
+                Routing.RegisterRoute(segmentName, _routeFactory.GetRouteFactory(page));
+                _registeredSegments.Add(segmentName);
+            }
 
             if (_navigationTarget != null)
             {
