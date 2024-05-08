@@ -29,6 +29,14 @@
                     </nalu:RelativeNavigation>
                 </Button.CommandParameter>
             </Button>
+            <Button Command="{nalu:NavigateCommand}"
+                    Text="Push Five">
+                <Button.CommandParameter>
+                    <nalu:RelativeNavigation>
+                        <nalu:NavigationSegment Type="pages:FivePage" />
+                    </nalu:RelativeNavigation>
+                </Button.CommandParameter>
+            </Button>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

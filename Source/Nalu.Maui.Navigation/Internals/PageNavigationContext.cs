@@ -5,7 +5,6 @@ internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDispo
     public IServiceScope ServiceScope => serviceScope;
     public bool Entered { get; set; }
     public bool Appeared { get; set; }
-    internal Action? OnDispose { get; set; }
 
     private static readonly BindableProperty _navigationContextProperty = BindableProperty.CreateAttached("PageNavigationContext", typeof(PageNavigationContext), typeof(PageNavigationContext), null);
 
@@ -31,9 +30,5 @@ internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDispo
         page.ClearValue(_navigationContextProperty);
     }
 
-    public void Dispose()
-    {
-        OnDispose?.Invoke();
-        serviceScope.Dispose();
-    }
+    public void Dispose() => serviceScope.Dispose();
 }

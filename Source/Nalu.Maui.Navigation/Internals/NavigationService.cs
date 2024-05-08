@@ -140,9 +140,28 @@ internal class NavigationService : INavigationService, IDisposable
         }
         else
         {
+#pragma warning disable VSTHRD100
+            async void PopAction()
+#pragma warning restore VSTHRD100
+            {
+                try
+                {
+                    await GoToAsync(Navigation.Relative().Pop()).ConfigureAwait(true);
+                }
+#pragma warning disable CS0168 // Variable is declared but never used
+                catch (Exception ex)
+#pragma warning restore CS0168 // Variable is declared but never used
+                {
+                    if (Debugger.IsAttached)
+                    {
+                        Console.WriteLine(ex);
+                    }
+                }
+            }
+
             backButtonBehavior = new BackButtonBehavior
             {
-                Command = new Command(() => _ = GoToAsync(Navigation.Relative().Pop())),
+                Command = new Command(PopAction),
                 IconOverride = _shellProxy is not null ? WithColor(Configuration.BackImage, _shellProxy.GetToolbarIconColor(page)) : null,
             };
             Shell.SetBackButtonBehavior(page, backButtonBehavior);

@@ -37,6 +37,17 @@
                     </nalu:RelativeNavigation>
                 </Button.CommandParameter>
             </Button>
+
+            <Button Command="{nalu:NavigateCommand}"
+                    Text="Push Six 3 times">
+                <Button.CommandParameter>
+                    <nalu:RelativeNavigation>
+                        <nalu:NavigationSegment Type="pages:SixPage" />
+                        <nalu:NavigationSegment Type="pages:SixPage" />
+                        <nalu:NavigationSegment Type="pages:SixPage" />
+                    </nalu:RelativeNavigation>
+                </Button.CommandParameter>
+            </Button>
         </VerticalStackLayout>
     </ScrollView>
 
