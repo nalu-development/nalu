@@ -109,9 +109,12 @@ internal class ShellProxy : IShellProxy, IDisposable
             var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
             var finalRoute = $"{baseRoute}/{segmentName}";
 
+            var pageTypeRouteFactory = _routeFactory.GetRouteFactory(page.GetType());
+            pageTypeRouteFactory.Push(page);
+
             if (!_registeredSegments.Contains(segmentName))
             {
-                Routing.RegisterRoute(segmentName, _routeFactory.GetRouteFactory(page));
+                Routing.RegisterRoute(segmentName, pageTypeRouteFactory);
                 _registeredSegments.Add(segmentName);
             }
 
