@@ -91,9 +91,6 @@ internal class NavigationService : INavigationService, IDisposable
     internal Page CreatePage(Type pageType, Page? parentPage)
     {
         var serviceScope = _serviceProvider.CreateScope();
-        var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
-
-        ConfigureBackButtonBehavior(page);
 
         if (parentPage is not null && PageNavigationContext.Get(parentPage) is { ServiceScope: { } parentScope })
         {
@@ -101,6 +98,9 @@ internal class NavigationService : INavigationService, IDisposable
             var navigationServiceProvider = serviceScope.ServiceProvider.GetRequiredService<INavigationServiceProviderInternal>();
             navigationServiceProvider.SetParent(parentNavigationServiceProvider);
         }
+
+        var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
+        ConfigureBackButtonBehavior(page);
 
         var pageContext = new PageNavigationContext(serviceScope);
 
