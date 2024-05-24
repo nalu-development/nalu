@@ -10,7 +10,7 @@ internal class NavigationService : INavigationService, IDisposable
     private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
-    private readonly LeakDetector _leakDetector;
+    private readonly LeakDetector? _leakDetector;
     private IShellProxy? _shellProxy;
 
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
@@ -20,12 +20,16 @@ internal class NavigationService : INavigationService, IDisposable
     {
         Configuration = configuration;
         _serviceProvider = serviceProvider;
-        _leakDetector = new LeakDetector();
+
+        var trackLeaks
+            = (Configuration.LeakDetectorState == NavigationLeakDetectorState.EnabledWithDebugger && Debugger.IsAttached) ||
+              Configuration.LeakDetectorState == NavigationLeakDetectorState.Enabled;
+        _leakDetector = trackLeaks ? new LeakDetector() : null;
     }
 
     public void Dispose()
     {
-        _leakDetector.Dispose();
+        _leakDetector?.Dispose();
         _semaphore.Dispose();
     }
 
@@ -525,10 +529,7 @@ internal class NavigationService : INavigationService, IDisposable
             case Page page:
             {
                 PageNavigationContext.Dispose(page);
-                if (Debugger.IsAttached)
-                {
-                    _leakDetector.Track(page);
-                }
+                _leakDetector?.Track(page);
 
                 break;
             }
@@ -539,10 +540,7 @@ internal class NavigationService : INavigationService, IDisposable
                 if (contentPage is not null)
                 {
                     contentProxy.DestroyContent();
-                    if (Debugger.IsAttached)
-                    {
-                        _leakDetector.Track(contentPage);
-                    }
+                    _leakDetector?.Track(contentPage);
                 }
 
                 break;
