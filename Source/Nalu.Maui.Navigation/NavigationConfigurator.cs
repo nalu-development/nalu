@@ -21,6 +21,9 @@ public class NavigationConfigurator : INavigationConfiguration
     /// <inheritdoc />
     public IReadOnlyDictionary<Type, Type> Mapping => _mapping;
 
+    /// <inheritdoc />
+    public NavigationLeakDetectorState LeakDetectorState { get; private set; } = NavigationLeakDetectorState.EnabledWithDebugger;
+
     internal NavigationConfigurator(IServiceCollection services, Type applicationType)
     {
         _mapping = [];
@@ -30,6 +33,16 @@ public class NavigationConfigurator : INavigationConfiguration
 
         var isApple = OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst();
         _ = isApple ? WithAppleBackImage() : WithAndroidBackImage();
+    }
+
+    /// <summary>
+    /// Sets the navigation leak detector state.
+    /// </summary>
+    /// <param name="state">Whether the leak detector should be enabled or not.</param>
+    public NavigationConfigurator WithLeakDetectorState(NavigationLeakDetectorState state)
+    {
+        LeakDetectorState = state;
+        return this;
     }
 
     /// <summary>
