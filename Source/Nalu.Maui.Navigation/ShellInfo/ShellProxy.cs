@@ -52,32 +52,32 @@ internal class ShellProxy : IShellProxy, IDisposable
             return;
         }
 
+        var contentChanged = _contentChanged;
+        _navigationTarget = null;
+        _contentChanged = false;
+        _navigationCurrentSection = null;
+
         try
         {
             _shell.SetIsNavigating(true);
-
-            var contentChanged = _contentChanged;
-            _navigationTarget = null;
-            _contentChanged = false;
-            _navigationCurrentSection = null;
-
             await _shell.GoToAsync(targetState, true).ConfigureAwait(true);
-            await Task.Yield();
-
-            if (contentChanged)
-            {
-                // Wait for the animation to complete
-                // I know this is a hack, but I don't see any other way to do this
-                // given `shell.GoToAsync` does not wait for the animation to complete
-                await Task.Delay(600).ConfigureAwait(true);
-            }
-
-            completeAction?.Invoke();
         }
         finally
         {
             _shell.SetIsNavigating(false);
         }
+
+        await Task.Yield();
+
+        if (contentChanged)
+        {
+            // Wait for the animation to complete
+            // I know this is a hack, but I don't see any other way to do this
+            // given `shell.GoToAsync` does not wait for the animation to complete
+            await Task.Delay(500).ConfigureAwait(true);
+        }
+
+        completeAction?.Invoke();
     }
 
     public IShellContentProxy GetContent(string segmentName) => _contentsBySegmentName[segmentName];
@@ -98,87 +98,87 @@ internal class ShellProxy : IShellProxy, IDisposable
         throw new KeyNotFoundException($"Could not find content with segment name '{name}'");
     }
 
-    public Color GetToolbarIconColor(Page page) => Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
+    public Color GetToolbarIconColor(Page page) =>
+        Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
 
     public async Task PushAsync(string segmentName, Page page)
     {
-        try
+        var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
+        var finalRoute = $"{baseRoute}/{segmentName}";
+
+        var pageTypeRouteFactory = _routeFactory.GetRouteFactory(page.GetType());
+        pageTypeRouteFactory.Push(page);
+
+        if (!_registeredSegments.Contains(segmentName))
         {
-            _shell.SetIsNavigating(true);
+            Routing.RegisterRoute(segmentName, pageTypeRouteFactory);
+            _registeredSegments.Add(segmentName);
+        }
 
-            var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
-            var finalRoute = $"{baseRoute}/{segmentName}";
-
-            var pageTypeRouteFactory = _routeFactory.GetRouteFactory(page.GetType());
-            pageTypeRouteFactory.Push(page);
-
-            if (!_registeredSegments.Contains(segmentName))
+        if (_navigationTarget != null)
+        {
+            _navigationTarget = finalRoute;
+        }
+        else
+        {
+            try
             {
-                Routing.RegisterRoute(segmentName, pageTypeRouteFactory);
-                _registeredSegments.Add(segmentName);
-            }
-
-            if (_navigationTarget != null)
-            {
-                _navigationTarget = finalRoute;
-            }
-            else
-            {
+                _shell.SetIsNavigating(true);
                 await _shell.GoToAsync(finalRoute).ConfigureAwait(true);
             }
-        }
-        finally
-        {
-            _shell.SetIsNavigating(false);
+            finally
+            {
+                _shell.SetIsNavigating(false);
+            }
         }
     }
 
     public async Task PopAsync(IShellSectionProxy? section = null)
     {
-        try
-        {
-            _shell.SetIsNavigating(true);
-            section ??= CurrentItem.CurrentSection;
+        section ??= CurrentItem.CurrentSection;
 
-            if (section == _navigationCurrentSection && _navigationTarget != null)
+        if (section == _navigationCurrentSection && _navigationTarget != null)
+        {
+            var previousSegmentEnd = _navigationTarget.LastIndexOf('/');
+            _navigationTarget = _navigationTarget[..previousSegmentEnd];
+        }
+        else
+        {
+            try
             {
-                var previousSegmentEnd = _navigationTarget.LastIndexOf('/');
-                _navigationTarget = _navigationTarget[..previousSegmentEnd];
-            }
-            else
-            {
+                _shell.SetIsNavigating(true);
                 await section.PopAsync().ConfigureAwait(true);
             }
-        }
-        finally
-        {
-            _shell.SetIsNavigating(false);
+            finally
+            {
+                _shell.SetIsNavigating(false);
+            }
         }
     }
 
     public async Task SelectContentAsync(string segmentName)
     {
+        var contentProxy = (ShellContentProxy)GetContent(segmentName);
+        if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
+        {
+            return;
+        }
+
+        _contentChanged = true;
+        var content = contentProxy.Content;
+        var section = (ShellSection)content.Parent;
+        var item = (ShellItem)section.Parent;
+
+        if (_navigationTarget is not null)
+        {
+            _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
+                                ?? $"//{item.Route}/{section.Route}/{content.Route}";
+            return;
+        }
+
         try
         {
             _shell.SetIsNavigating(true);
-            var contentProxy = (ShellContentProxy)GetContent(segmentName);
-            if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
-            {
-                return;
-            }
-
-            _contentChanged = true;
-            var content = contentProxy.Content;
-            var section = (ShellSection)content.Parent;
-            var item = (ShellItem)section.Parent;
-
-            if (_navigationTarget is not null)
-            {
-                _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
-                                    ?? $"//{item.Route}/{section.Route}/{content.Route}";
-                return;
-            }
-
             if (section.CurrentItem != content)
             {
                 section.CurrentItem = content;
@@ -194,7 +194,7 @@ internal class ShellProxy : IShellProxy, IDisposable
                 _shell.CurrentItem = item;
             }
 
-            await Task.Delay(250).ConfigureAwait(true);
+            await Task.Delay(500).ConfigureAwait(true);
         }
         finally
         {

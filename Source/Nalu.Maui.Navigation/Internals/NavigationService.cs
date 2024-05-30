@@ -11,6 +11,7 @@ internal class NavigationService : INavigationService, IDisposable
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
     private readonly LeakDetector? _leakDetector;
+    private readonly TimeProvider _timeProvider;
     private IShellProxy? _shellProxy;
 
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
@@ -20,6 +21,7 @@ internal class NavigationService : INavigationService, IDisposable
     {
         Configuration = configuration;
         _serviceProvider = serviceProvider;
+        _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
 
         var trackLeaks
             = (Configuration.LeakDetectorState == NavigationLeakDetectorState.EnabledWithDebugger && Debugger.IsAttached) ||
@@ -69,6 +71,11 @@ internal class NavigationService : INavigationService, IDisposable
 
         return await ExecuteNavigationAsync(async () =>
         {
+            if (navigation.Behavior?.HasFlag(NavigationBehavior.Immediate) != true)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(60), _timeProvider).ConfigureAwait(true);
+            }
+
             shellProxy.BeginNavigation();
             try
             {
