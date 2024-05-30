@@ -33,4 +33,12 @@ public enum NavigationBehavior
     /// When popping a page, the <see cref="ILeavingGuard"/>s will be ignored.
     /// </summary>
     IgnoreGuards = 0x04,
+
+    /// <summary>
+    /// Immediately navigates to the target page without waiting 60 milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Default behavior is to wait 60 milliseconds before navigating to the target page to let touch be displayed.
+    /// </remarks>
+    Immediate = 0x08,
 }
