@@ -1,6 +1,7 @@
 namespace Nalu;
 
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 #pragma warning disable IDE0290
 
@@ -8,7 +9,8 @@ internal class NavigationService : INavigationService, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
-    private readonly LeakDetector _leakDetector;
+    private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
+    private readonly LeakDetector? _leakDetector;
     private IShellProxy? _shellProxy;
 
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
@@ -18,12 +20,16 @@ internal class NavigationService : INavigationService, IDisposable
     {
         Configuration = configuration;
         _serviceProvider = serviceProvider;
-        _leakDetector = new LeakDetector();
+
+        var trackLeaks
+            = (Configuration.LeakDetectorState == NavigationLeakDetectorState.EnabledWithDebugger && Debugger.IsAttached) ||
+              Configuration.LeakDetectorState == NavigationLeakDetectorState.Enabled;
+        _leakDetector = trackLeaks ? new LeakDetector() : null;
     }
 
     public void Dispose()
     {
-        _leakDetector.Dispose();
+        _leakDetector?.Dispose();
         _semaphore.Dispose();
     }
 
@@ -60,38 +66,35 @@ internal class NavigationService : INavigationService, IDisposable
 
         var disposeBag = new HashSet<object>();
         var shellProxy = ShellProxy;
-        shellProxy.BeginNavigation();
 
-        try
+        return await ExecuteNavigationAsync(async () =>
         {
-            return await ExecuteNavigationAsync(() =>
+            shellProxy.BeginNavigation();
+            try
             {
                 var ignoreGuards = navigation.Behavior?.HasFlag(NavigationBehavior.IgnoreGuards) ?? false;
-                return navigation switch
+                return await (navigation switch
                 {
-                    { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards),
-                    _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards),
-                };
-            }).ConfigureAwait(true);
-        }
-        finally
-        {
-            await shellProxy.CommitNavigationAsync(() =>
+                    { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards).ConfigureAwait(true),
+                    _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards).ConfigureAwait(true),
+                });
+            }
+            finally
             {
-                foreach (var toDispose in disposeBag)
+                await shellProxy.CommitNavigationAsync(() =>
                 {
-                    DisposePage(toDispose);
-                }
-            }).ConfigureAwait(true);
-        }
+                    foreach (var toDispose in disposeBag)
+                    {
+                        DisposePage(toDispose);
+                    }
+                }).ConfigureAwait(true);
+            }
+        }).ConfigureAwait(true);
     }
 
     internal Page CreatePage(Type pageType, Page? parentPage)
     {
         var serviceScope = _serviceProvider.CreateScope();
-        var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
-
-        ConfigureBackButtonBehavior(page);
 
         if (parentPage is not null && PageNavigationContext.Get(parentPage) is { ServiceScope: { } parentScope })
         {
@@ -99,6 +102,9 @@ internal class NavigationService : INavigationService, IDisposable
             var navigationServiceProvider = serviceScope.ServiceProvider.GetRequiredService<INavigationServiceProviderInternal>();
             navigationServiceProvider.SetParent(parentNavigationServiceProvider);
         }
+
+        var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
+        ConfigureBackButtonBehavior(page);
 
         var pageContext = new PageNavigationContext(serviceScope);
 
@@ -138,9 +144,28 @@ internal class NavigationService : INavigationService, IDisposable
         }
         else
         {
+#pragma warning disable VSTHRD100
+            async void PopAction()
+#pragma warning restore VSTHRD100
+            {
+                try
+                {
+                    await GoToAsync(Navigation.Relative().Pop()).ConfigureAwait(true);
+                }
+#pragma warning disable CS0168 // Variable is declared but never used
+                catch (Exception ex)
+#pragma warning restore CS0168 // Variable is declared but never used
+                {
+                    if (Debugger.IsAttached)
+                    {
+                        Console.WriteLine(ex);
+                    }
+                }
+            }
+
             backButtonBehavior = new BackButtonBehavior
             {
-                Command = new Command(() => _ = GoToAsync(Navigation.Relative().Pop())),
+                Command = new Command(PopAction),
                 IconOverride = _shellProxy is not null ? WithColor(Configuration.BackImage, _shellProxy.GetToolbarIconColor(page)) : null,
             };
             Shell.SetBackButtonBehavior(page, backButtonBehavior);
@@ -465,11 +490,24 @@ internal class NavigationService : INavigationService, IDisposable
 
     private async Task<bool> ExecuteNavigationAsync(Func<Task<bool>> navigationFunc)
     {
-        var taken = await _semaphore.WaitAsync(0).ConfigureAwait(true);
-        if (!taken)
+        if (_isNavigating.Value is { Value: true })
         {
-            throw new InvalidNavigationException("Cannot navigate while another navigation is in progress, try to use IDispatcher.DispatchDelayed.");
+            throw new InvalidNavigationException("Cannot trigger a navigation from within a navigation, try to use IDispatcher.DispatchDelayed.");
         }
+
+        var shellProxy = ShellProxy;
+        var initialState = shellProxy.State;
+
+        await _semaphore.WaitAsync().ConfigureAwait(true);
+
+        if (initialState != shellProxy.State)
+        {
+            // State has changed, abort the navigation
+            _semaphore.Release();
+            return false;
+        }
+
+        _isNavigating.Value = new StrongBox<bool>(true);
 
         try
         {
@@ -479,6 +517,8 @@ internal class NavigationService : INavigationService, IDisposable
         finally
         {
             _semaphore.Release();
+
+            _isNavigating.Value.Value = false;
         }
     }
 
@@ -489,10 +529,7 @@ internal class NavigationService : INavigationService, IDisposable
             case Page page:
             {
                 PageNavigationContext.Dispose(page);
-                if (Debugger.IsAttached)
-                {
-                    _leakDetector.Track(page);
-                }
+                _leakDetector?.Track(page);
 
                 break;
             }
@@ -503,10 +540,7 @@ internal class NavigationService : INavigationService, IDisposable
                 if (contentPage is not null)
                 {
                     contentProxy.DestroyContent();
-                    if (Debugger.IsAttached)
-                    {
-                        _leakDetector.Track(contentPage);
-                    }
+                    _leakDetector?.Track(contentPage);
                 }
 
                 break;

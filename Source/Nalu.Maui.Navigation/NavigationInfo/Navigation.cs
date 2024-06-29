@@ -32,7 +32,7 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     [TypeConverter(typeof(TypeTypeConverter))]
     public static void SetPageType(BindableObject bindable, Type? value)
     {
-        if (value?.GetType().IsSubclassOf(typeof(Page)) != true)
+        if (value?.IsSubclassOf(typeof(Page)) != true)
         {
             throw new InvalidOperationException("PageType must be a type that inherits from Page.");
         }

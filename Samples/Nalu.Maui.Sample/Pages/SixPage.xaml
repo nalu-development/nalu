@@ -3,6 +3,8 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
+             xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
              x:Class="Nalu.Maui.Sample.Pages.SixPage"
              x:DataType="pageModels:SixPageModel"
              Title="Page Six"
@@ -19,6 +21,22 @@
                 </Label.FormattedText>
             </Label>
             <Button Text="One" Command="{Binding GoToOneCommand}" />
+            <Button Command="{nalu:NavigateCommand}"
+                    Text="Push Six Via XAML">
+                <Button.CommandParameter>
+                    <nalu:RelativeNavigation>
+                        <nalu:NavigationSegment Type="pages:SixPage" />
+                    </nalu:RelativeNavigation>
+                </Button.CommandParameter>
+            </Button>
+            <Button Command="{nalu:NavigateCommand}"
+                    Text="Push Five">
+                <Button.CommandParameter>
+                    <nalu:RelativeNavigation>
+                        <nalu:NavigationSegment Type="pages:FivePage" />
+                    </nalu:RelativeNavigation>
+                </Button.CommandParameter>
+            </Button>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

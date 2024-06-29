@@ -25,10 +25,25 @@ public class NavigationSegmentAttribute(string segmentName) : Attribute
     {
         if (!_typeSegmentNames.TryGetValue(type, out var segmentName))
         {
-            segmentName = type.GetCustomAttribute<NavigationSegmentAttribute>()?.SegmentName ?? type.Name;
+            segmentName = type.GetCustomAttribute<NavigationSegmentAttribute>()?.SegmentName ?? GetTypeName(type);
             _typeSegmentNames.Add(type, segmentName);
         }
 
         return segmentName;
+    }
+
+    private static string GetTypeName(Type type)
+    {
+        var name = type.Name;
+        if (!type.IsGenericType)
+        {
+            return name;
+        }
+
+        var index = name.IndexOf('`');
+        name = name[..index];
+        var genericArguments = type.GetGenericArguments();
+        var genericArgumentsNames = genericArguments.Select(GetTypeName);
+        return $"{name}-{string.Join("-", genericArgumentsNames)}";
     }
 }

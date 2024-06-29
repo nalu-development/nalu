@@ -5,6 +5,8 @@ using System.ComponentModel;
 internal class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
+    private readonly ShellRouteFactory _routeFactory = new();
+    private readonly HashSet<string> _registeredSegments = [];
 
     public IShellItemProxy CurrentItem { get; private set; } = null!;
     public IReadOnlyList<IShellItemProxy> Items { get; private set; } = null!;
@@ -12,6 +14,7 @@ internal class ShellProxy : IShellProxy, IDisposable
     private string? _navigationTarget;
     private bool _contentChanged;
     private IShellSectionProxy? _navigationCurrentSection;
+    public string State => _shell.CurrentState.Location.OriginalString;
 
     public ShellProxy(NaluShell shell)
     {
@@ -79,6 +82,22 @@ internal class ShellProxy : IShellProxy, IDisposable
 
     public IShellContentProxy GetContent(string segmentName) => _contentsBySegmentName[segmentName];
 
+    public IShellContentProxy FindContent(params string[] names)
+    {
+        var namesLength = names.Length;
+        var name = names[0];
+        for (var i = 0; i < namesLength; i++)
+        {
+            name = names[i];
+            if (_contentsBySegmentName.TryGetValue(name, out var content))
+            {
+                return content;
+            }
+        }
+
+        throw new KeyNotFoundException($"Could not find content with segment name '{name}'");
+    }
+
     public Color GetToolbarIconColor(Page page) => Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
 
     public async Task PushAsync(string segmentName, Page page)
@@ -89,8 +108,15 @@ internal class ShellProxy : IShellProxy, IDisposable
 
             var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
             var finalRoute = $"{baseRoute}/{segmentName}";
-            Routing.UnRegisterRoute(finalRoute);
-            Routing.RegisterRoute(finalRoute, new FixedRouteFactory(page));
+
+            var pageTypeRouteFactory = _routeFactory.GetRouteFactory(page.GetType());
+            pageTypeRouteFactory.Push(page);
+
+            if (!_registeredSegments.Contains(segmentName))
+            {
+                Routing.RegisterRoute(segmentName, pageTypeRouteFactory);
+                _registeredSegments.Add(segmentName);
+            }
 
             if (_navigationTarget != null)
             {

@@ -1,5 +1,6 @@
 namespace Nalu;
 
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
 using Nalu.Internals;
@@ -61,9 +62,12 @@ public class NavigateCommand : IMarkupExtension<ICommand>
             {
                 await navigationService.GoToAsync(navigation).ConfigureAwait(true);
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore
+                if (Debugger.IsAttached)
+                {
+                    Console.WriteLine(ex);
+                }
             }
 
             Interlocked.Exchange(ref _canExecute, 1);

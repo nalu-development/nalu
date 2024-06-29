@@ -19,4 +19,9 @@ public interface INavigationConfiguration
     /// Gets a dictionary which maps a page model type to corresponding page type.
     /// </summary>
     IReadOnlyDictionary<Type, Type> Mapping { get; }
+
+    /// <summary>
+    /// Gets the navigation leak detector state.
+    /// </summary>
+    NavigationLeakDetectorState LeakDetectorState { get; }
 }

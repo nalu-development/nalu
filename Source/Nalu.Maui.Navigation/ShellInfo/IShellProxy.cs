@@ -2,6 +2,7 @@ namespace Nalu;
 
 internal interface IShellProxy
 {
+    string State { get; }
     bool BeginNavigation();
     Task CommitNavigationAsync(Action? completeAction = null);
     IShellItemProxy CurrentItem { get; }
