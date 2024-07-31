@@ -8,7 +8,11 @@
 
 Nalu.Maui is a library that solves some problems like navigation between pages in a MAUI application.
 
-### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
+### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
+
+Shell-based navigation abstraction which handles `IDisposable`, provides navigation guards, and simplifies passing parameters.
+
+Make sure to install `Nalu.Maui.Navigation` (and not just `Nalu.Maui`) package into the main MAUI project in order to avoid default menu and back icons loading issues.
 
 #### Migration from v2.x to v3.x
 
