@@ -64,4 +64,6 @@
     <ItemGroup>
       <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
     </ItemGroup>
+
+    <Import Project="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.targets" />
 </Project>

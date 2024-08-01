@@ -24,7 +24,7 @@ public static class MauiProgram
 #if WINDOWS
                 events.AddWindows(windowsLifecycleBuilder =>
                 {
-                    // See https://github.com/dotnet/maui/issues/20976 and 
+                    // See https://github.com/dotnet/maui/issues/20976 and
                     windowsLifecycleBuilder.OnWindowCreated(window =>
                     {
                         var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
@@ -42,12 +42,6 @@ public static class MauiProgram
             })
             .UseNaluNavigation<App>(nav => nav
                 .AddPages()
-                .WithBackImage(new FontImageSource
-                {
-                    FontFamily = "MaterialFilled",
-                    Glyph = "\uE5C4",
-                    Size = 24
-                })
             )
             .UseMauiCommunityToolkit()
             .ConfigureMauiHandlers(handlers =>
