@@ -240,6 +240,16 @@ Obviously you can call them manually from the intent-aware one if you need to.
 Sometimes you want to protect a page from being popped from the navigation stack, for example when the user is editing a form.
 You can do that by implementing the `ILeavingGuard` interface which defines a `ValueTask<bool> CanLeaveAsync()` method from which you can eventually display a prompt to ask the user if they want to leave the page.
 
+```csharp
+public class ViewModel :  ILeavingGuard
+{
+    public async ValueTask<bool> CanLeaveAsync()
+    {
+        return await ConfirmUserLeaveAsync("Are you sure you want to leave without saving?") // a method to verify the leave action
+    }
+}
+```
+
 Note: a page "appears" only when it is the target of the navigation, intermediate pages models will trigger `OnAppearingAsync` unless the `ILeavingGuard` needs to be evaluated.
 
 #### Navigation using C#
