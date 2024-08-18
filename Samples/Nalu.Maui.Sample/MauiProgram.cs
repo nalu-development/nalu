@@ -24,7 +24,7 @@ public static class MauiProgram
 #if WINDOWS
                 events.AddWindows(windowsLifecycleBuilder =>
                 {
-                    // See https://github.com/dotnet/maui/issues/20976 and 
+                    // See https://github.com/dotnet/maui/issues/20976 and
                     windowsLifecycleBuilder.OnWindowCreated(window =>
                     {
                         var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
@@ -49,6 +49,7 @@ public static class MauiProgram
                     Size = 24
                 })
             )
+            .UseNaluLayouts()
             .UseMauiCommunityToolkit()
             .ConfigureMauiHandlers(handlers =>
             {

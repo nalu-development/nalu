@@ -8,6 +8,55 @@
 
 Nalu.Maui is a library that solves some problems like navigation between pages in a MAUI application.
 
+### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
+
+Cross-platform layouts for MAUI applications to simplify dealing with templates and `BindinginContext` in XAML.
+
+Can be added to your project using `.UseNaluLayouts()` on your app builder.
+
+#### ContentLayout
+
+`ContentLayout` is a lightweight replacement for `ContentView` based on new MAUI `Layout` class.
+You can also simply use `ContentLayout` as base class of your custom views instead of using `ContentView`.
+
+This class also provides a `ContentBindingContext` property that allows you to bind the content to a property of the `ContentLayout`'s binding context.
+This helps to fulfill interface segregation principle.
+
+```xml
+<layouts:ContentLayout ContentBindingContext="{Binding CurrentAnimal}">
+    <views:AnimalView x:DataType="models:Animal" />
+</layouts:ContentLayout>
+```
+
+### TemplateLayout
+
+A `ContentLayout` that generates a content view based on `DataTemplate` or `DataTemplateSelector`.
+
+```xml
+<layouts:TemplateLayout ContentTemplate="{StaticResource AnimalTemplate}" ContentBindingContext="{Binding CurrentAnimal}" />
+<!-- or -->
+<layouts:TemplateLayout ContentTemplate="{StaticResource AnimalTemplateSelector}" ContentBindingContext="{Binding CurrentAnimal}" />
+```
+
+### ConditionalTemplateLayout
+
+Usually to switch between views we use `IsVisible` property, but this is not always the best solution.
+Using `IsVisible` still creates the view in the visual tree applying all of the bindings.
+`ConditionalTemplateLayout` is a `ContentLayout` that generates a content view based on a boolean value and corresponding template(s).
+
+```xml
+<layouts:ConditionalTemplateLayout TrueTemplate="{StaticResource AnimalExpensiveTemplate}"
+                                   FalseTemplate="{StaticResource PersonExpensiveTemplate}"
+                                   Value="{Binding IsAnimal}"
+                                   ContentBindingContext="{Binding BestFriend}" />
+```
+
+This can also be used with one single expensive template:
+```xml
+<layouts:ConditionalTemplateLayout TrueTemplate="{StaticResource ExpensiveTemplate}"
+                                   Value="{Binding ShowExpensiveTemplate}" />
+```
+
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 
 Shell-based navigation abstraction which handles `IDisposable`, provides navigation guards, and simplifies passing parameters.
