@@ -1,9 +1,9 @@
 namespace Nalu;
 
 /// <summary>
-/// A <see cref="ContentLayout"/> base class that uses a <see cref="DataTemplate"/> to render content.
+/// A <see cref="Component"/> base class that uses a <see cref="DataTemplate"/> to render content.
 /// </summary>
-public abstract class TemplateLayoutBase : ContentLayout
+public abstract class TemplatedComponentBase : ComponentBase
 {
     private bool _changingTemplate;
 
@@ -32,7 +32,7 @@ public abstract class TemplateLayoutBase : ContentLayout
             if (dataTemplate == null)
             {
                 ActualTemplate = null;
-                Content = null;
+                SetContent(null);
                 return;
             }
 
@@ -43,7 +43,7 @@ public abstract class TemplateLayoutBase : ContentLayout
             if (bindingContext is null && dataTemplateSelector != null)
             {
                 ActualTemplate = null;
-                Content = null;
+                SetContent(null);
                 return;
             }
 
@@ -51,7 +51,7 @@ public abstract class TemplateLayoutBase : ContentLayout
 
             if (actualTemplate == ActualTemplate)
             {
-                if (Content is View currentContent && currentContent.BindingContext != bindingContext)
+                if (GetContent() is BindableObject currentContent && currentContent.BindingContext != bindingContext)
                 {
                     currentContent.BindingContext = bindingContext;
                 }
@@ -67,7 +67,7 @@ public abstract class TemplateLayoutBase : ContentLayout
                 bindableContent.BindingContext = bindingContext;
             }
 
-            Content = content;
+            SetContent(content);
         }
         finally
         {
@@ -93,19 +93,21 @@ public abstract class TemplateLayoutBase : ContentLayout
             throw new InvalidOperationException($"The content of {GetType().Name} should not be set directly.");
         }
 
-        if (oldView != null)
+        if (oldView is BindableObject bindableObject)
         {
-            if (oldView is BindableObject bindableObject)
+            if (oldView is Element oldElement)
             {
-                bindableObject.BindingContext = null;
+                RemoveLogicalChild(oldElement);
             }
 
-            Remove(oldView);
+            bindableObject.BindingContext = null;
         }
 
-        if (newView != null)
+        if (newView is Element newElement)
         {
-            Add(newView);
+            AddLogicalChild(newElement);
         }
+
+        Handler?.UpdateValue(nameof(IContentView.Content));
     }
 }

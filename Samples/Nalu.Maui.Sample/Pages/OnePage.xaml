@@ -26,9 +26,9 @@
                 </Label.FormattedText>
             </Label>
 
-            <layouts:ContentLayout ContentBindingContext="{Binding Animal}">
+            <layouts:Component ContentBindingContext="{Binding Animal}">
                 <Label Text="{Binding Name}" x:DataType="pageModels:AnimalModel" />
-            </layouts:ContentLayout>
+            </layouts:Component>
 
             <Button Command="{Binding PushThreeCommand}"
                     Text="Push Three"

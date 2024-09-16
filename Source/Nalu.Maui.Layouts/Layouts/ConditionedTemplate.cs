@@ -1,26 +1,26 @@
 namespace Nalu;
 
 /// <summary>
-/// A <see cref="ContentLayout"/> that uses a <see cref="DataTemplate"/> to render content based on a boolean value.
+/// A <see cref="Component"/> that uses a <see cref="DataTemplate"/> to render content based on a boolean value.
 /// </summary>
-public class ConditionalTemplateLayout : TemplateLayoutBase
+public class ConditionedTemplate : TemplatedComponentBase
 {
     /// <summary>
     /// Bindable property for <see cref="TrueTemplate"/> property.
     /// </summary>
     public static readonly BindableProperty TrueTemplateProperty =
-        BindableProperty.Create(nameof(TrueTemplate), typeof(DataTemplate), typeof(ConditionalTemplateLayout), propertyChanged: ConditionChanged);
+        BindableProperty.Create(nameof(TrueTemplate), typeof(DataTemplate), typeof(ConditionedTemplate), propertyChanged: ConditionChanged);
 
     /// <summary>
     /// Bindable property for <see cref="FalseTemplate"/> property.
     /// </summary>
     public static readonly BindableProperty FalseTemplateProperty =
-        BindableProperty.Create(nameof(FalseTemplate), typeof(DataTemplate), typeof(ConditionalTemplateLayout), propertyChanged: ConditionChanged);
+        BindableProperty.Create(nameof(FalseTemplate), typeof(DataTemplate), typeof(ConditionedTemplate), propertyChanged: ConditionChanged);
 
     /// <summary>
     /// Bindable property for <see cref="Value"/> property.
     /// </summary>
-    public static readonly BindableProperty ValueProperty = BindableProperty.Create(nameof(Value), typeof(bool?), typeof(ConditionalTemplateLayout), propertyChanged: ConditionChanged);
+    public static readonly BindableProperty ValueProperty = BindableProperty.Create(nameof(Value), typeof(bool?), typeof(ConditionedTemplate), propertyChanged: ConditionChanged);
 
     /// <summary>
     /// Gets or sets the <see cref="DataTemplate"/> to use when the value is false.
@@ -63,7 +63,7 @@ public class ConditionalTemplateLayout : TemplateLayoutBase
 
     private static void ConditionChanged(BindableObject bindable, object oldvalue, object newvalue)
     {
-        if (bindable is ConditionalTemplateLayout chooseTemplate)
+        if (bindable is ConditionedTemplate chooseTemplate)
         {
             chooseTemplate.SetTemplateFromValue();
         }

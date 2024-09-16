@@ -42,19 +42,19 @@ A `ContentLayout` that generates a content view based on `DataTemplate` or `Data
 
 Usually to switch between views we use `IsVisible` property, but this is not always the best solution.
 Using `IsVisible` still creates the view in the visual tree applying all of the bindings.
-`ConditionalTemplateLayout` is a `ContentLayout` that generates a content view based on a boolean value and corresponding template(s).
+`ConditionalLayout` is a `ContentLayout` that generates a content view based on a boolean value and corresponding template(s).
 
 ```xml
-<layouts:ConditionalTemplateLayout TrueTemplate="{StaticResource AnimalExpensiveTemplate}"
-                                   FalseTemplate="{StaticResource PersonExpensiveTemplate}"
-                                   Value="{Binding IsAnimal}"
-                                   ContentBindingContext="{Binding BestFriend}" />
+<layouts:ConditionalLayout TrueTemplate="{StaticResource AnimalExpensiveTemplate}"
+                           FalseTemplate="{StaticResource PersonExpensiveTemplate}"
+                           Value="{Binding IsAnimal}"
+                           ContentBindingContext="{Binding BestFriend}" />
 ```
 
 This can also be used with one single expensive template:
 ```xml
-<layouts:ConditionalTemplateLayout TrueTemplate="{StaticResource ExpensiveTemplate}"
-                                   Value="{Binding ShowExpensiveTemplate}" />
+<layouts:ConditionalLayout TrueTemplate="{StaticResource ExpensiveTemplate}"
+                           Value="{Binding ShowExpensiveTemplate}" />
 ```
 
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)

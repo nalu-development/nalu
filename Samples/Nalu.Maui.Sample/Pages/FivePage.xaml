@@ -3,6 +3,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.FivePage"
              x:DataType="pageModels:FivePageModel"
              Title="Page Five"
@@ -19,6 +20,25 @@
                 </Label.FormattedText>
             </Label>
             <Button Text="Navigate to /One/Three" Command="{Binding GoToThreeCommand}" />
+            <nalu:ConditionedTemplate Value="True" ContentBindingContext="A true statement">
+                <nalu:ConditionedTemplate.TrueTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <Label Text="{Binding .}" />
+                    </DataTemplate>
+                </nalu:ConditionedTemplate.TrueTemplate>
+                <nalu:ConditionedTemplate.FalseTemplate>
+                    <DataTemplate>
+                        <Label Text="This is false" />
+                    </DataTemplate>
+                </nalu:ConditionedTemplate.FalseTemplate>
+            </nalu:ConditionedTemplate>
+            <Border BindingContext="{x:String 'Hello world'}"
+                    BackgroundColor="LightBlue"
+                    StrokeShape="RoundRectangle 24">
+                <nalu:Component Padding="16,8" x:DataType="x:String">
+                    <Label Text="{Binding .}"/>
+                </nalu:Component>
+            </Border>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>
