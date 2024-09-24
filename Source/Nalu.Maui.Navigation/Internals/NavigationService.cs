@@ -44,7 +44,7 @@ internal class NavigationService : INavigationService, IDisposable
 
         NavigationHelper.AssertIntent(page, intent, content.DestroyContent);
 
-        var enteringTask = NavigationHelper.SendEnteringAsync(page, intent).AsTask();
+        var enteringTask = NavigationHelper.SendEnteringAsync(page, intent, Configuration).AsTask();
         if (!enteringTask.IsCompleted)
         {
             throw new NotSupportedException($"OnEnteringAsync() must not be async for the initial page {page.BindingContext!.GetType().FullName}.");
@@ -56,7 +56,7 @@ internal class NavigationService : INavigationService, IDisposable
         await _shellProxy.SelectContentAsync(contentSegmentName).ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
-        await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
+        await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);
     }
 
     public async Task<bool> GoToAsync(INavigationInfo navigation)
@@ -186,7 +186,7 @@ internal class NavigationService : INavigationService, IDisposable
                     await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
                     shellProxy.BeginNavigation();
 
-                    await NavigationHelper.SendAppearingAsync(stackPage.Page, null).ConfigureAwait(true);
+                    await NavigationHelper.SendAppearingAsync(stackPage.Page, null, Configuration).ConfigureAwait(true);
                     var canLeave = await NavigationHelper.CanLeaveAsync(stackPage.Page).ConfigureAwait(true);
                     if (!canLeave)
                     {
@@ -211,7 +211,7 @@ internal class NavigationService : INavigationService, IDisposable
                 var page = CreatePage(pageType, stackPage.Page, Configuration.BackImage);
 
                 var isModal = Shell.GetPresentationMode(page).HasFlag(PresentationMode.Modal);
-                await NavigationHelper.SendEnteringAsync(page, intent).ConfigureAwait(true);
+                await NavigationHelper.SendEnteringAsync(page, intent, Configuration).ConfigureAwait(true);
                 await shellProxy.PushAsync(segmentName, page).ConfigureAwait(true);
                 stack.Add(new NavigationStackPage($"{stackPage.Route}/{segmentName}", segmentName, page, isModal));
             }
@@ -226,7 +226,7 @@ internal class NavigationService : INavigationService, IDisposable
             shellProxy.BeginNavigation();
 
             NavigationHelper.AssertIntent(page, intent);
-            await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
+            await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);
         }
 
         return true;
@@ -373,7 +373,7 @@ internal class NavigationService : INavigationService, IDisposable
                     await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
                     shellProxy.BeginNavigation();
 
-                    await NavigationHelper.SendAppearingAsync(contentPage, null).ConfigureAwait(true);
+                    await NavigationHelper.SendAppearingAsync(contentPage, null, Configuration).ConfigureAwait(true);
                     if (!await NavigationHelper.CanLeaveAsync(contentPage).ConfigureAwait(true))
                     {
                         return false;
@@ -408,7 +408,7 @@ internal class NavigationService : INavigationService, IDisposable
         var targetContentPage = targetContent.GetOrCreateContent();
         var targetIsShellContent = navigation.Count == 1;
         var intent = targetIsShellContent ? navigation.Intent : null;
-        await NavigationHelper.SendEnteringAsync(targetContentPage, intent).ConfigureAwait(true);
+        await NavigationHelper.SendEnteringAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
         await ShellProxy.SelectContentAsync(targetContent.SegmentName).ConfigureAwait(true);
 
         if (!targetIsShellContent)
@@ -422,7 +422,7 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
-        await NavigationHelper.SendAppearingAsync(targetContentPage, intent).ConfigureAwait(true);
+        await NavigationHelper.SendAppearingAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
         return true;
     }
 

@@ -19,6 +19,9 @@ public class NavigationConfigurator : INavigationConfiguration
     public ImageSource? BackImage { get; private set; }
 
     /// <inheritdoc />
+    public NavigationIntentBehavior NavigationIntentBehavior { get; private set; }
+
+    /// <inheritdoc />
     public IReadOnlyDictionary<Type, Type> Mapping => _mapping;
 
     /// <inheritdoc />
@@ -58,6 +61,16 @@ public class NavigationConfigurator : INavigationConfiguration
     public NavigationConfigurator WithMenuImage(ImageSource imageSource)
     {
         MenuImage = imageSource;
+        return this;
+    }
+
+    /// <summary>
+    /// Defines how lifecycle events should be handled when an intent is detected.
+    /// </summary>
+    /// <param name="behavior">The behavior to use.</param>
+    public NavigationConfigurator WithNavigationIntentBehavior(NavigationIntentBehavior behavior)
+    {
+        NavigationIntentBehavior = behavior;
         return this;
     }
 

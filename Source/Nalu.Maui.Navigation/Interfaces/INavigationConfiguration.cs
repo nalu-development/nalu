@@ -16,6 +16,11 @@ public interface INavigationConfiguration
     ImageSource? BackImage { get; }
 
     /// <summary>
+    /// Gets the navigation intent behavior.
+    /// </summary>
+    NavigationIntentBehavior NavigationIntentBehavior { get; }
+
+    /// <summary>
     /// Gets a dictionary which maps a page model type to corresponding page type.
     /// </summary>
     IReadOnlyDictionary<Type, Type> Mapping { get; }
