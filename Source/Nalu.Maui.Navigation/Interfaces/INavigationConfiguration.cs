@@ -8,12 +8,12 @@ public interface INavigationConfiguration
     /// <summary>
     /// Gets the image used to display a navigation menu button on root pages.
     /// </summary>
-    ImageSource MenuImage { get; }
+    ImageSource? MenuImage { get; }
 
     /// <summary>
     /// Gets the image used to display a navigation back button on nested pages.
     /// </summary>
-    ImageSource BackImage { get; }
+    ImageSource? BackImage { get; }
 
     /// <summary>
     /// Gets a dictionary which maps a page model type to corresponding page type.

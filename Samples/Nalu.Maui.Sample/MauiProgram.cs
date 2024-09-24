@@ -42,12 +42,7 @@ public static class MauiProgram
             })
             .UseNaluNavigation<App>(nav => nav
                 .AddPages()
-                .WithBackImage(new FontImageSource
-                {
-                    FontFamily = "MaterialFilled",
-                    Glyph = "\uE5C4",
-                    Size = 24
-                })
+                .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseNaluLayouts()
             .UseMauiCommunityToolkit()

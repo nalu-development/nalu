@@ -200,25 +200,8 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
             var navigationService = (NavigationService)(serviceProvider.GetService<INavigationService>() ?? throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation()."));
             var navigationConfiguration = serviceProvider.GetService<INavigationConfiguration>() ?? throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
             var pageType = NavigationHelper.GetPageType(type, navigationConfiguration);
-            var page = navigationService.CreatePage(pageType, null);
-            ConfigureRootPage(page, shell, navigationConfiguration);
+            var page = navigationService.CreatePage(pageType, null, navigationConfiguration.MenuImage);
             return page;
         });
-    }
-
-#pragma warning disable IDE0051
-    private static void ConfigureRootPage(Page page, Shell shell, INavigationConfiguration navigationConfiguration)
-#pragma warning restore IDE0051
-    {
-        var backButtonBehavior = Shell.GetBackButtonBehavior(page);
-
-#if ANDROID
-        // https://github.com/dotnet/maui/issues/7045
-        backButtonBehavior.Command = null;
-#else
-        backButtonBehavior.Command = new Command(() => _ = shell.FlyoutIsPresented = true);
-#endif
-        var color = Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : shell);
-        backButtonBehavior.IconOverride = NavigationService.WithColor(navigationConfiguration.MenuImage, color);
     }
 }

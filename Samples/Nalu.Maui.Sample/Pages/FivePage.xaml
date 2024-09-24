@@ -32,7 +32,7 @@
                     </DataTemplate>
                 </nalu:ConditionedTemplate.FalseTemplate>
             </nalu:ConditionedTemplate>
-            <Border BindingContext="{x:String 'Hello world'}"
+            <Border BindingContext="Hello world"
                     BackgroundColor="LightBlue"
                     StrokeShape="RoundRectangle 24">
                 <nalu:Component Padding="16,8" x:DataType="x:String">
