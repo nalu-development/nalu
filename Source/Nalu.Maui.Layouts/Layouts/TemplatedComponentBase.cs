@@ -3,9 +3,27 @@ namespace Nalu;
 /// <summary>
 /// A <see cref="Component"/> base class that uses a <see cref="DataTemplate"/> to render content.
 /// </summary>
+[ContentProperty(nameof(ProjectedContent))]
 public abstract class TemplatedComponentBase : ComponentBase
 {
+    /// <summary>
+    /// Bindable property for <see cref="ProjectedContent"/> property.
+    /// </summary>
+    public static readonly BindableProperty ProjectedContentProperty = BindableProperty.Create(
+        nameof(ProjectedContent),
+        typeof(IView),
+        typeof(TemplatedComponent));
+
     private bool _changingTemplate;
+
+    /// <summary>
+    /// Gets or sets the content to be projected through `ProjectContainer`.
+    /// </summary>
+    public IView? ProjectedContent
+    {
+        get => (IView?)GetValue(ProjectedContentProperty);
+        set => SetValue(ProjectedContentProperty, value);
+    }
 
     /// <summary>
     /// Gets the active template.

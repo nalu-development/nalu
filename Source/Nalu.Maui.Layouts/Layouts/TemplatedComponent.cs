@@ -3,7 +3,6 @@ namespace Nalu;
 /// <summary>
 /// A <see cref="Component"/> that uses a <see cref="DataTemplate"/> to render content.
 /// </summary>
-[ContentProperty(nameof(ContentTemplate))]
 public class TemplatedComponent : TemplatedComponentBase
 {
     /// <summary>

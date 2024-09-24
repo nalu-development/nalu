@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 public class AnimalModel
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = null!;
 }
 
 public partial class OnePageModel(INavigationService navigationService) : ObservableObject

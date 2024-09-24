@@ -39,6 +39,17 @@
                     <Label Text="{Binding .}"/>
                 </nalu:Component>
             </Border>
+            <nalu:TemplatedComponent>
+                <nalu:TemplatedComponent.ContentTemplate>
+                    <DataTemplate>
+                        <HorizontalStackLayout>
+                            <Label Text="Projected => " />
+                            <nalu:ProjectContainer />
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </nalu:TemplatedComponent.ContentTemplate>
+                <Label Text="I'm here!" />
+            </nalu:TemplatedComponent>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>
