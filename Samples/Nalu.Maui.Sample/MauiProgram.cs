@@ -42,6 +42,7 @@ public static class MauiProgram
             })
             .UseNaluNavigation<App>(nav => nav
                 .AddPages()
+                .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                 .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseNaluLayouts()

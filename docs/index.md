@@ -2,13 +2,13 @@
 
 `Nalu.Maui` provides a set of classes to help you with everyday challenges encountered while working with .NET MAUI.
 
-The very first citizen is the MVVM navigation service, which is a simple and powerful way to navigate between pages and pass parameters.
-The navigation system is based on [`Shell`](https://learn.microsoft.com/dotnet/maui/fundamentals/shell/?view=net-maui-8.0) so you can leverage the simplicity of defining the flyout menu, tabs, and root pages.
-At the same time `Nalu.Maui` provides a set of extension methods to simplify the navigation between pages.
+### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 
-The navigation API is designed to be simple and easy to use, and it features `Relative` and `Absolute` navigation.
+The MVVM navigation service offers a straightforward and robust method for navigating between pages and passing parameters.
 
-### Typed Navigation API
+The navigation system utilizes `Shell` under the hood, allowing you to easily define the flyout menu, tabs, and root pages.
+
+We use a **fluent API** instead of strings to define navigations, supporting both `Relative` and `Absolute` navigation, including navigation guards to prompt the user before leaving a page.
 
 ```csharp
 // Push the page registered with the DetailPageModel
@@ -17,71 +17,46 @@ await _navigationService.GoToAsync(Navigation.Relative().Push<DetailPageModel>()
 await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<SettingsPageModel>());
 ```
 
-You can also pass type-checked parameters to the page model you are navigating to.
+Passing parameters is simple and type-safe.
 
 ```csharp
 // Pop the page and pass a parameter to the previous page model
-// which should implement `IAppearingAware<MyPopIntent>`
 await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(new MyPopIntent()));
+// which should implement `IAppearingAware<MyPopIntent>`
+Task OnAppearingAsync(MyPopIntent intent) { ... }
 ```
 
-And you can easily unit test your navigation logic.
+You can also define navigation guards to prevent navigation from occurring.
 
 ```csharp
-var expectedNavigation = Navigation.Relative().Push<DetailPageModel>();
-navigationSevice.Received().GoToAsync(Arg.Is<Navigation>(n => n.Matches(expectedNavigation)));
+ValueTask<bool> CanLeaveAsync() => { ... ask the user };
 ```
 
-### Intuitive Asynchronous Navigation Lifecycle Events
+There is an embedded **leak-detector** to help you identify memory leaks in your application.
 
-On top of that it provides a set of interfaces to react to navigation lifecycle events and **it takes care of disposing all the resources when the page is popped**.
-The navigation system awaits every navigation lifecycle event, so you can safely perform asynchronous operations with real `async ValueTask` methods instead of relying on `async void` ones.
+See more on the [Navigation Wiki](navigation.md).
 
-```csharp
-Navigation.Relative()
-    .Push<ContactsPageModel>()
-    .Push<ContactDetailPageModel>()
-```
+### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
 
-![Push twice in a row](assets/images/push-push.png)
+Cross-platform layouts and utilities for MAUI applications simplify dealing with templates and `BindinginContext` in XAML.
 
-There's also a "navigation guard" feature that allows you to prevent the navigation to happen if a condition is not met.
-You can leverage that to ask the user to confirm leaving the page.
+- Have you ever dreamed of having an `if` statement in XAML?
+  ```csharp
+    <layouts:ConditionedTemplate Value="{Binding HasPermission}"
+                                 TrueTemplate="{StaticResource AdminFormTemplate}"
+                                 FalseTemplate="{StaticResource PermissionRequestTemplate}" />
+  ```
+- Do you want to scope the binding context of a content?
+  ```csharp
+    <layouts:Component ContentBindingContext="{Binding SelectedAnimal}"
+                       IsVisible="{Binding IsSelected}">
+        <views:AnimalView x:DataType="models:Animal" />
+    </layouts:Component>
+  ```
+- And what about rendering a `TemplateSelector` directly like we do on a `CollectionView`?
+  ```csharp
+    <layouts:TemplatedComponent ContentTemplateSelector="{StaticResource AnimalTemplateSelector}"
+                                ContentBindingContext="{Binding CurrentAnimal}" />
+  ```
 
-```csharp
-// Starting from: RootPageModel > ContactsPageModel > ContactDetailPageModel
-Navigation.Absolute()
-    .ShellContent<RootPageModel>()
-```
-
-![Absolute navigation to root page](assets/images/pop-pop-with-guard.png)
-
-### Leak detection
-
-`Nalu.Maui` automatically detects and reports memory leaks when the debugger is attached.
-An alert dialog will be shown when your `Page` was not collected after navigating away.
-
-In the above example the leak detection on `ContactsPageModel`, `ContactDetailPageModel` and their respective `Page`s triggers after the navigation completed (root page appears).
-
-### Read more
-
-Documentation on this website is coming soon with a lot of examples and best practices.
-
-In the meantime, you can check the [Nalu.Maui GitHub repository's README](https://github.com/nalu-development/nalu) which contains all the information you need to get started.
-
-### Call Dispose() on Page and ViewModel when the page is popped
-
-If you're here just because you want page/vm disposal on the standard `NavigationPage` or `Shell` and you don't want these awesome features, you can just use the following methods to enable calling `Dispose` on page models after page has been removed from navigation stack.
-
-##### NavigationPage
-```csharp
-MainPage = new NavigationPage(new MainPage()).ConfigureForPageDisposal();
-```
-
-##### Shell
-
-```csharp
-MainPage = new AppShell().ConfigureForPageDisposal();
-```
-
-Note: shell content pages will not be disposed.
+Find out more on the [Layouts Wiki](layouts.md).
