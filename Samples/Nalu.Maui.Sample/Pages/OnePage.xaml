@@ -4,6 +4,7 @@
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
              xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
              xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
+             xmlns:layouts="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.OnePage"
              x:DataType="pageModels:OnePageModel"
              Title="Page One"
@@ -24,6 +25,10 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
+
+            <layouts:ViewBox ContentBindingContext="{Binding Animal}">
+                <Label Text="{Binding Name}" x:DataType="pageModels:AnimalModel" />
+            </layouts:ViewBox>
 
             <Button Command="{Binding PushThreeCommand}"
                     Text="Push Three"

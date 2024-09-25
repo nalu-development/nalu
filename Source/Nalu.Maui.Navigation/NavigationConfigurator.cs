@@ -13,10 +13,13 @@ public class NavigationConfigurator : INavigationConfiguration
     private readonly Dictionary<Type, Type> _mapping;
 
     /// <inheritdoc />
-    public ImageSource MenuImage { get; private set; }
+    public ImageSource? MenuImage { get; private set; }
 
     /// <inheritdoc />
-    public ImageSource BackImage { get; private set; } = null!;
+    public ImageSource? BackImage { get; private set; }
+
+    /// <inheritdoc />
+    public NavigationIntentBehavior NavigationIntentBehavior { get; private set; }
 
     /// <inheritdoc />
     public IReadOnlyDictionary<Type, Type> Mapping => _mapping;
@@ -29,10 +32,6 @@ public class NavigationConfigurator : INavigationConfiguration
         _mapping = [];
         _applicationType = applicationType;
         _services = services.AddSingleton<INavigationConfiguration>(this);
-        MenuImage = ImageSource.FromFile("nalu_navigation_menu.png");
-
-        var isApple = OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst();
-        _ = isApple ? WithAppleBackImage() : WithAndroidBackImage();
     }
 
     /// <summary>
@@ -66,20 +65,12 @@ public class NavigationConfigurator : INavigationConfiguration
     }
 
     /// <summary>
-    /// Uses android-style back navigation image.
+    /// Defines how lifecycle events should be handled when an intent is detected.
     /// </summary>
-    public NavigationConfigurator WithAndroidBackImage()
+    /// <param name="behavior">The behavior to use.</param>
+    public NavigationConfigurator WithNavigationIntentBehavior(NavigationIntentBehavior behavior)
     {
-        BackImage = ImageSource.FromFile("nalu_navigation_arrow_back_android.png");
-        return this;
-    }
-
-    /// <summary>
-    /// Uses ios-style back navigation image.
-    /// </summary>
-    public NavigationConfigurator WithAppleBackImage()
-    {
-        BackImage = ImageSource.FromFile("nalu_navigation_arrow_back_ios.png");
+        NavigationIntentBehavior = behavior;
         return this;
     }
 

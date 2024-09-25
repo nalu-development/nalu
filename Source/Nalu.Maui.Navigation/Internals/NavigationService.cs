@@ -44,7 +44,7 @@ internal class NavigationService : INavigationService, IDisposable
 
         NavigationHelper.AssertIntent(page, intent, content.DestroyContent);
 
-        var enteringTask = NavigationHelper.SendEnteringAsync(page, intent).AsTask();
+        var enteringTask = NavigationHelper.SendEnteringAsync(page, intent, Configuration).AsTask();
         if (!enteringTask.IsCompleted)
         {
             throw new NotSupportedException($"OnEnteringAsync() must not be async for the initial page {page.BindingContext!.GetType().FullName}.");
@@ -56,7 +56,7 @@ internal class NavigationService : INavigationService, IDisposable
         await _shellProxy.SelectContentAsync(contentSegmentName).ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
-        await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
+        await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);
     }
 
     public async Task<bool> GoToAsync(INavigationInfo navigation)
@@ -99,7 +99,7 @@ internal class NavigationService : INavigationService, IDisposable
         }).ConfigureAwait(true);
     }
 
-    internal Page CreatePage(Type pageType, Page? parentPage)
+    internal Page CreatePage(Type pageType, Page? parentPage, ImageSource? backButtonImage = null)
     {
         var serviceScope = _serviceProvider.CreateScope();
 
@@ -111,7 +111,7 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
-        ConfigureBackButtonBehavior(page);
+        ConfigureBackButtonBehavior(page, backButtonImage);
 
         var pageContext = new PageNavigationContext(serviceScope);
 
@@ -120,62 +120,25 @@ internal class NavigationService : INavigationService, IDisposable
         return page;
     }
 
-    internal static ImageSource WithColor(ImageSource source, Color color)
+    internal static void ConfigureBackButtonBehavior(Page page, ImageSource? backButtonImage)
     {
-        if (source is FontImageSource fontSource && !fontSource.IsSet(FontImageSource.ColorProperty))
+        if (backButtonImage is null)
         {
-            var clone = new FontImageSource
-            {
-                Glyph = fontSource.Glyph,
-                FontFamily = fontSource.FontFamily,
-                Size = fontSource.Size,
-                Color = color,
-            };
-
-            return clone;
+            return;
         }
 
-        return source;
-    }
-
-    private void ConfigureBackButtonBehavior(Page page)
-    {
         var backButtonBehavior = Shell.GetBackButtonBehavior(page);
-        if (backButtonBehavior is not null)
+        if (backButtonBehavior is null)
         {
-            backButtonBehavior.Command ??= new Command(() => _ = GoToAsync(Navigation.Relative().Pop()));
-            if (_shellProxy is not null)
+            backButtonBehavior = new BackButtonBehavior
             {
-                backButtonBehavior.IconOverride ??= WithColor(Configuration.BackImage, _shellProxy.GetToolbarIconColor(page));
-            }
+                IconOverride = backButtonImage,
+            };
+            Shell.SetBackButtonBehavior(page, backButtonBehavior);
         }
         else
         {
-#pragma warning disable VSTHRD100
-            async void PopAction()
-#pragma warning restore VSTHRD100
-            {
-                try
-                {
-                    await GoToAsync(Navigation.Relative().Pop()).ConfigureAwait(true);
-                }
-#pragma warning disable CS0168 // Variable is declared but never used
-                catch (Exception ex)
-#pragma warning restore CS0168 // Variable is declared but never used
-                {
-                    if (Debugger.IsAttached)
-                    {
-                        Console.WriteLine(ex);
-                    }
-                }
-            }
-
-            backButtonBehavior = new BackButtonBehavior
-            {
-                Command = new Command(PopAction),
-                IconOverride = _shellProxy is not null ? WithColor(Configuration.BackImage, _shellProxy.GetToolbarIconColor(page)) : null,
-            };
-            Shell.SetBackButtonBehavior(page, backButtonBehavior);
+            backButtonBehavior.IconOverride = backButtonImage;
         }
     }
 
@@ -223,7 +186,7 @@ internal class NavigationService : INavigationService, IDisposable
                     await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
                     shellProxy.BeginNavigation();
 
-                    await NavigationHelper.SendAppearingAsync(stackPage.Page, null).ConfigureAwait(true);
+                    await NavigationHelper.SendAppearingAsync(stackPage.Page, null, Configuration).ConfigureAwait(true);
                     var canLeave = await NavigationHelper.CanLeaveAsync(stackPage.Page).ConfigureAwait(true);
                     if (!canLeave)
                     {
@@ -245,10 +208,10 @@ internal class NavigationService : INavigationService, IDisposable
                 var pageType = NavigationHelper.GetPageType(segment.Type, Configuration);
                 var segmentName = segment.SegmentName ?? NavigationSegmentAttribute.GetSegmentName(pageType);
 
-                var page = CreatePage(pageType, stackPage.Page);
+                var page = CreatePage(pageType, stackPage.Page, Configuration.BackImage);
 
                 var isModal = Shell.GetPresentationMode(page).HasFlag(PresentationMode.Modal);
-                await NavigationHelper.SendEnteringAsync(page, intent).ConfigureAwait(true);
+                await NavigationHelper.SendEnteringAsync(page, intent, Configuration).ConfigureAwait(true);
                 await shellProxy.PushAsync(segmentName, page).ConfigureAwait(true);
                 stack.Add(new NavigationStackPage($"{stackPage.Route}/{segmentName}", segmentName, page, isModal));
             }
@@ -263,7 +226,7 @@ internal class NavigationService : INavigationService, IDisposable
             shellProxy.BeginNavigation();
 
             NavigationHelper.AssertIntent(page, intent);
-            await NavigationHelper.SendAppearingAsync(page, intent).ConfigureAwait(true);
+            await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);
         }
 
         return true;
@@ -410,7 +373,7 @@ internal class NavigationService : INavigationService, IDisposable
                     await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
                     shellProxy.BeginNavigation();
 
-                    await NavigationHelper.SendAppearingAsync(contentPage, null).ConfigureAwait(true);
+                    await NavigationHelper.SendAppearingAsync(contentPage, null, Configuration).ConfigureAwait(true);
                     if (!await NavigationHelper.CanLeaveAsync(contentPage).ConfigureAwait(true))
                     {
                         return false;
@@ -445,7 +408,7 @@ internal class NavigationService : INavigationService, IDisposable
         var targetContentPage = targetContent.GetOrCreateContent();
         var targetIsShellContent = navigation.Count == 1;
         var intent = targetIsShellContent ? navigation.Intent : null;
-        await NavigationHelper.SendEnteringAsync(targetContentPage, intent).ConfigureAwait(true);
+        await NavigationHelper.SendEnteringAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
         await ShellProxy.SelectContentAsync(targetContent.SegmentName).ConfigureAwait(true);
 
         if (!targetIsShellContent)
@@ -459,7 +422,7 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
-        await NavigationHelper.SendAppearingAsync(targetContentPage, intent).ConfigureAwait(true);
+        await NavigationHelper.SendAppearingAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
         return true;
     }
 

@@ -7,7 +7,7 @@ internal static class NavigationHelper
     private static readonly MethodInfo _sendEnteringWithIntentAsyncMethod = typeof(NavigationHelper).GetMethod(nameof(SendEnteringWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo _sendAppearingWithIntentAsyncMethod = typeof(NavigationHelper).GetMethod(nameof(SendAppearingWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    public static ValueTask SendEnteringAsync(Page page, object? intent)
+    public static ValueTask SendEnteringAsync(Page page, object? intent, INavigationConfiguration configuration)
     {
         var context = PageNavigationContext.Get(page);
         if (context.Entered)
@@ -30,7 +30,10 @@ internal static class NavigationHelper
                 return (ValueTask)_sendEnteringWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
-            return ValueTask.CompletedTask;
+            if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
+            {
+                return ValueTask.CompletedTask;
+            }
         }
 
         if (target is IEnteringAware enteringAware)
@@ -67,7 +70,7 @@ internal static class NavigationHelper
         return ValueTask.CompletedTask;
     }
 
-    public static ValueTask SendAppearingAsync(Page page, object? intent)
+    public static ValueTask SendAppearingAsync(Page page, object? intent, INavigationConfiguration configuration)
     {
         var context = PageNavigationContext.Get(page);
         if (context.Appeared)
@@ -91,7 +94,10 @@ internal static class NavigationHelper
                 return (ValueTask)_sendAppearingWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
-            return ValueTask.CompletedTask;
+            if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
+            {
+                return ValueTask.CompletedTask;
+            }
         }
 
         if (target is IAppearingAware appearingAware)
