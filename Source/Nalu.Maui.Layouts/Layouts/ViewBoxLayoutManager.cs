@@ -3,10 +3,10 @@ namespace Nalu;
 using Microsoft.Maui.Layouts;
 
 /// <summary>
-/// Layout manager for <see cref="Component"/>.
+/// Layout manager for <see cref="ViewBox"/>.
 /// </summary>
 /// <param name="contentView">The layout using this <see cref="ILayoutManager"/>.</param>
-public class ComponentLayoutManager(IContentView contentView) : ILayoutManager
+public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
 {
     /// <inheritdoc cref="ILayoutManager.Measure"/>
     public Size Measure(double widthConstraint, double heightConstraint)

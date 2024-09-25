@@ -1,12 +1,12 @@
 namespace Nalu.Maui.Test.Layouts;
 
-public class ComponentTests
+public class ViewBoxTests
 {
     [Fact(DisplayName = "Content property should set and get content")]
     public void ContentProperty_Should_SetAndGetContent()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var view = new Label { Text = "Test" };
 
         // Act
@@ -21,7 +21,7 @@ public class ComponentTests
     public void OnContentPropertyChanged_Should_UpdateContent()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var oldView = new Label { Text = "Old" };
         var newView = new Label { Text = "New" };
 
@@ -37,7 +37,7 @@ public class ComponentTests
     public void ContentBindingContextPropertyChangesShouldSetBindingContextOnContent()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var view = new Label();
         component.Content = view;
         var newBindingContext = new object();
@@ -53,7 +53,7 @@ public class ComponentTests
     public void ContentBindingContextPropertyShouldSetBindingContextOnContent()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var view = new Label();
         var newBindingContext = new object();
         component.ContentBindingContext = newBindingContext;
@@ -69,7 +69,7 @@ public class ComponentTests
     public void BindingContextShouldPropagateToContent()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var view = new Label();
         var newBindingContext = new object();
         component.BindingContext = newBindingContext;
@@ -85,7 +85,7 @@ public class ComponentTests
     public void BindingContextShouldBeClearedFromContentOnRemoval()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var view = new Label();
         var newBindingContext = new object();
         component.BindingContext = newBindingContext;
@@ -102,7 +102,7 @@ public class ComponentTests
     public void BindingContextSetThroughContentBindingContextShouldBeClearedFromContentOnRemoval()
     {
         // Arrange
-        var component = new Component();
+        var component = new ViewBox();
         var view = new Label();
         var newBindingContext = new object();
         component.ContentBindingContext = newBindingContext;
@@ -119,7 +119,7 @@ public class ComponentTests
     public void OnPaddingPropertyChanged_Should_InvalidateMeasure()
     {
         // Arrange
-        var component = new Component { IsPlatformEnabled = true };
+        var component = new ViewBox { IsPlatformEnabled = true };
         var newPadding = new Thickness(10);
         var measureInvalidated = false;
         component.MeasureInvalidated += (s, e) => measureInvalidated = true;

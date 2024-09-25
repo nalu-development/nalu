@@ -20,36 +20,36 @@
                 </Label.FormattedText>
             </Label>
             <Button Text="Navigate to /One/Three" Command="{Binding GoToThreeCommand}" />
-            <nalu:ConditionedTemplate Value="True" ContentBindingContext="A true statement">
-                <nalu:ConditionedTemplate.TrueTemplate>
+            <nalu:ToggleTemplate Value="True" ContentBindingContext="A true statement">
+                <nalu:ToggleTemplate.WhenTrue>
                     <DataTemplate x:DataType="x:String">
                         <Label Text="{Binding .}" />
                     </DataTemplate>
-                </nalu:ConditionedTemplate.TrueTemplate>
-                <nalu:ConditionedTemplate.FalseTemplate>
+                </nalu:ToggleTemplate.WhenTrue>
+                <nalu:ToggleTemplate.WhenFalse>
                     <DataTemplate>
                         <Label Text="This is false" />
                     </DataTemplate>
-                </nalu:ConditionedTemplate.FalseTemplate>
-            </nalu:ConditionedTemplate>
+                </nalu:ToggleTemplate.WhenFalse>
+            </nalu:ToggleTemplate>
             <Border BindingContext="Hello world"
                     BackgroundColor="LightBlue"
                     StrokeShape="RoundRectangle 24">
-                <nalu:Component Padding="16,8" x:DataType="x:String">
+                <nalu:ViewBox Padding="16,8" x:DataType="x:String">
                     <Label Text="{Binding .}"/>
-                </nalu:Component>
+                </nalu:ViewBox>
             </Border>
-            <nalu:TemplatedComponent>
-                <nalu:TemplatedComponent.ContentTemplate>
+            <nalu:TemplateBox>
+                <nalu:TemplateBox.ContentTemplate>
                     <DataTemplate>
                         <HorizontalStackLayout>
                             <Label Text="Projected => " />
-                            <nalu:ProjectContainer />
+                            <nalu:TemplateContentPresenter />
                         </HorizontalStackLayout>
                     </DataTemplate>
-                </nalu:TemplatedComponent.ContentTemplate>
+                </nalu:TemplateBox.ContentTemplate>
                 <Label Text="I'm here!" />
-            </nalu:TemplatedComponent>
+            </nalu:TemplateBox>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>

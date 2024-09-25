@@ -34,7 +34,7 @@ ValueTask<bool> CanLeaveAsync() => { ... ask the user };
 
 There is an embedded **leak-detector** to help you identify memory leaks in your application.
 
-See more on the [Navigation Wiki](navigation.md).
+**See more on the [Navigation Wiki](navigation.html)**.
 
 ### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
 
@@ -42,21 +42,21 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
 
 - Have you ever dreamed of having an `if` statement in XAML?
   ```csharp
-    <layouts:ConditionedTemplate Value="{Binding HasPermission}"
-                                 TrueTemplate="{StaticResource AdminFormTemplate}"
-                                 FalseTemplate="{StaticResource PermissionRequestTemplate}" />
+    <nalu:ToggleTemplate Value="{Binding HasPermission}"
+                         WhenTrue="{StaticResource AdminFormTemplate}"
+                         WhenFalse="{StaticResource PermissionRequestTemplate}" />
   ```
 - Do you want to scope the binding context of a content?
   ```csharp
-    <layouts:Component ContentBindingContext="{Binding SelectedAnimal}"
-                       IsVisible="{Binding IsSelected}">
+    <nalu:ViewBox ContentBindingContext="{Binding SelectedAnimal}"
+                  IsVisible="{Binding IsSelected}">
         <views:AnimalView x:DataType="models:Animal" />
-    </layouts:Component>
+    </nalu:ViewBox>
   ```
 - And what about rendering a `TemplateSelector` directly like we do on a `CollectionView`?
   ```csharp
-    <layouts:TemplatedComponent ContentTemplateSelector="{StaticResource AnimalTemplateSelector}"
-                                ContentBindingContext="{Binding CurrentAnimal}" />
+    <nalu:TemplateBox ContentTemplateSelector="{StaticResource AnimalTemplateSelector}"
+                      ContentBindingContext="{Binding CurrentAnimal}" />
   ```
 
-Find out more on the [Layouts Wiki](layouts.md).
+**Find out more on the [Layouts Wiki](layouts.html)**.

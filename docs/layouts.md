@@ -4,66 +4,69 @@ Cross-platform layouts for MAUI applications to simplify dealing with templates 
 
 Can be added to your project using `.UseNaluLayouts()` on your app builder.
 
-### Component
+### ViewBox
 
-`Component` is a lightweight replacement for `ContentView` class which is still based on the legacy Xamarin `Compatibility.Layout`.
-You can simply use `Component` as base class of your custom views instead of using `ContentView`.
+`ViewBox` is a lightweight replacement for `ContentView` class which is still based on the legacy Xamarin `Compatibility.Layout`.
+You can simply use `ViewBox` as base class of your custom views instead of using `ContentView`.
 
-This class also provides a `ContentBindingContext` property that allows you to bind the content to a property of the `Component`'s binding context.
+This class also provides a `ContentBindingContext` property that allows you to bind the content to a property of the `ViewBox`'s binding context.
 This helps to fulfill interface segregation principle.
 
 ```xml
-<layouts:Component ContentBindingContext="{Binding SelectedAnimal}"
-                   IsVisible="{Binding IsSelected}">
+<nalu:ViewBox ContentBindingContext="{Binding SelectedAnimal}"
+              IsVisible="{Binding IsSelected}">
     <views:AnimalView x:DataType="models:Animal" />
-</layouts:Component>
+</nalu:ViewBox>
 ```
 
-### TemplatedComponent
+### TemplateBox
 
-A `Component` that generates a content view based on `DataTemplate` or `DataTemplateSelector`.
+Similarly to `ViewBox` this component holds a view based on `DataTemplate` or `DataTemplateSelector`.
 
 ```xml
-<layouts:TemplatedComponent ContentTemplate="{StaticResource AnimalTemplate}" ContentBindingContext="{Binding CurrentAnimal}" />
-<!-- or -->
-<layouts:TemplatedComponent ContentTemplate="{StaticResource AnimalTemplateSelector}" ContentBindingContext="{Binding CurrentAnimal}" />
+<nalu:TemplateBox ContentTemplate="{StaticResource AnimalTemplate}" ContentBindingContext="{Binding CurrentAnimal}" />
+```
+```xml
+<nalu:TemplateBox ContentTemplate="{StaticResource AnimalTemplateSelector}" ContentBindingContext="{Binding CurrentAnimal}" />
 ```
 
-You can also project the content into the template. The following example will display `Projected => I'm here!`.
+You can also project the content into the template (like you usually do with [ContentPresenter](https://learn.microsoft.com/en-us/dotnet/maui/fundamentals/controltemplate?view=net-maui-8.0#substitute-content-into-a-contentpresenter)).
+
+The following example will display `Projected => I'm here!`.
 
 ```xml
-<layouts:TemplatedComponent>
+<nalu:TemplateBox>
 
-    <layouts:TemplatedComponent.ContentTemplate>
+    <nalu:TemplateBox.ContentTemplate>
         <DataTemplate>
             <HorizontalStackLayout>
                 <Label Text="Projected => " />
-                <layouts:ProjectContainer />
+                <nalu:TemplateContentPresenter />
             </HorizontalStackLayout>
         </DataTemplate>
-    </layouts:TemplatedComponent.ContentTemplate>
+    </nalu:TemplateBox.ContentTemplate>
 
     <Label Text="I'm here!" />
 
-</layouts:TemplatedComponent>
+</nalu:TemplateBox>
 ```
 
-### ConditionedTemplate
+### ToggleTemplate
 
 Usually to switch between views we use `IsVisible` property, but this is not always the best solution.
-Using `IsVisible` still creates the view in the visual tree applying all the bindings.
-`ConditionedTemplate` is a `TemplatedComponent` that generates a content view based on a boolean value and corresponding template(s).
+Using `IsVisible` still creates the view in the visual tree applying all the bindings (performance impact).
+`ToggleTemplate` is a `TemplateBox` that generates a content view based on a boolean value and a corresponding `DataTemplate` (or even `DataTemplateSelector`).
 
 ```xml
-<layouts:ConditionedTemplate Value="{Binding HasPermission}"
-                             TrueTemplate="{StaticResource AdminFormTemplate}"
-                             FalseTemplate="{StaticResource PermissionRequestTemplate}" />
+<nalu:ToggleTemplate Value="{Binding HasPermission}"
+                     WhenTrue="{StaticResource AdminFormTemplate}"
+                     WhenFalse="{StaticResource PermissionRequestTemplate}" />
 ```
 
 This can also be used with one single expensive template:
 ```xml
-<layouts:ConditionedTemplate Value="{Binding ShowExpensiveTemplate}"
-                             TrueTemplate="{StaticResource ExpensiveTemplate}" />
+<nalu:ToggleTemplate Value="{Binding ShowExpensiveTemplate}"
+                     WhenTrue="{StaticResource ExpensiveTemplate}" />
 ```
 
 

@@ -1,28 +1,28 @@
 namespace Nalu;
 
 /// <summary>
-/// A <see cref="Component"/> base class that uses a <see cref="DataTemplate"/> to render content.
+/// A <see cref="ViewBox"/> base class that uses a <see cref="DataTemplate"/> to render content.
 /// </summary>
-[ContentProperty(nameof(ProjectedContent))]
-public abstract class TemplatedComponentBase : ComponentBase
+[ContentProperty(nameof(TemplateContent))]
+public abstract class TemplateBoxBase : ViewBoxBase
 {
     /// <summary>
-    /// Bindable property for <see cref="ProjectedContent"/> property.
+    /// Bindable property for <see cref="TemplateContent"/> property.
     /// </summary>
-    public static readonly BindableProperty ProjectedContentProperty = BindableProperty.Create(
-        nameof(ProjectedContent),
+    public static readonly BindableProperty TemplateContentProperty = BindableProperty.Create(
+        nameof(TemplateContent),
         typeof(IView),
-        typeof(TemplatedComponent));
+        typeof(TemplateBox));
 
     private bool _changingTemplate;
 
     /// <summary>
-    /// Gets or sets the content to be projected through `ProjectContainer`.
+    /// Gets or sets the content to be projected through <see cref="TemplateContentPresenter"/> component.
     /// </summary>
-    public IView? ProjectedContent
+    public IView? TemplateContent
     {
-        get => (IView?)GetValue(ProjectedContentProperty);
-        set => SetValue(ProjectedContentProperty, value);
+        get => (IView?)GetValue(TemplateContentProperty);
+        set => SetValue(TemplateContentProperty, value);
     }
 
     /// <summary>

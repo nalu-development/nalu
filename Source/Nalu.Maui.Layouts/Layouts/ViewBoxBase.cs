@@ -3,15 +3,12 @@ namespace Nalu;
 using Microsoft.Maui.Layouts;
 
 /// <summary>
-/// ContentLayoutBase is a base class for a layout that is used to display a single view.
+/// <see cref="ViewBoxBase"/> is a base class a <see cref="IContentView"/> that is used to display a single view.
 /// </summary>
-/// <remarks>
-/// Can be used as a replacement of <see cref="ContentView"/> (which as-of .NET 8 uses Compatibility.Layout).
-/// </remarks>
-public abstract class ComponentBase : View, IContentView
+public abstract class ViewBoxBase : View, IContentView
 {
     private ILayoutManager? _layoutManager;
-    private ILayoutManager LayoutManager => _layoutManager ??= new ComponentLayoutManager(this);
+    private ILayoutManager LayoutManager => _layoutManager ??= new ViewBoxLayoutManager(this);
 
     /// <summary>
     /// Bindable property for <see cref="Padding"/> property.
@@ -19,12 +16,12 @@ public abstract class ComponentBase : View, IContentView
     public static readonly BindableProperty PaddingProperty = BindableProperty.Create(
         nameof(Padding),
         typeof(Thickness),
-        typeof(ComponentBase),
+        typeof(ViewBoxBase),
         default(Thickness),
         propertyChanged: OnPaddingPropertyChanged);
 
     private static void OnPaddingPropertyChanged(BindableObject bindable, object oldvalue, object newvalue)
-        => ((ComponentBase)bindable).OnPaddingPropertyChanged((Thickness)oldvalue, (Thickness)newvalue);
+        => ((ViewBoxBase)bindable).OnPaddingPropertyChanged((Thickness)oldvalue, (Thickness)newvalue);
 
     /// <summary>
     /// Bindable property for <see cref="ContentBindingContext"/> property.
@@ -32,7 +29,7 @@ public abstract class ComponentBase : View, IContentView
     public static readonly BindableProperty ContentBindingContextProperty = BindableProperty.Create(
         nameof(ContentBindingContext),
         typeof(object),
-        typeof(Component),
+        typeof(ViewBox),
         propertyChanged: ContentBindingContextPropertyChanged);
 
     /// <summary>
@@ -157,9 +154,9 @@ public abstract class ComponentBase : View, IContentView
 
     private static void ContentBindingContextPropertyChanged(BindableObject bindable, object? oldvalue, object? newvalue)
     {
-        if (bindable is ComponentBase contentLayout)
+        if (bindable is ViewBoxBase viewBoxBase)
         {
-            contentLayout.ContentBindingContextPropertyChanged(oldvalue, newvalue);
+            viewBoxBase.ContentBindingContextPropertyChanged(oldvalue, newvalue);
         }
     }
 }

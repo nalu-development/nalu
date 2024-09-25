@@ -237,13 +237,13 @@ With Nalu navigation you can also pass parameters to the target page using the `
 - `IEnteringAware<TIntent>`: defines a `ValueTask OnEnteringAsync(TIntent intent)` called when the page is entering the navigation stack
 - `IAppearingAware<TIntent>`: defines a `ValueTask OnAppearingAsync(TIntent intent)` called when the page is appearing
 
-Note: when an intent is passed to the view model, the `OnEnteringAsync` and `OnAppearingAsync` parameterless methods will not be called,
-unless you explicitly configure Nalu with `Fallthrough` behavior.
+Note: when an intent is passed to the view model, the `OnEnteringAsync` and `OnAppearingAsync` parameterless methods will be invoked only if the intent-specific method is not implemented.
+You can change this behavior by configuring Nalu with `Strict` behavior.
 
 ```csharp
 .UseNaluNavigation<App>(nav => nav
     .AddPages()
-    .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
+    .WithNavigationIntentBehavior(NavigationIntentBehavior.Strict)
 )
 ```
 

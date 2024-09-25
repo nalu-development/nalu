@@ -1,12 +1,12 @@
 namespace Nalu.Maui.Test.Layouts;
 
-public class TemplatedComponentTests
+public class TemplateBoxTests
 {
     [Fact(DisplayName = "ContentTemplate property should set and get content template")]
     public void ContentTemplateProperty_Should_SetAndGetContentTemplate()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var dataTemplate = new DataTemplate(() => new Label { Text = "Test" });
 
         // Act
@@ -21,7 +21,7 @@ public class TemplatedComponentTests
     public void ContentTemplatePropertyShouldUpdateContentAndContentTemplate()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var oldDataTemplate = new DataTemplate(() => new Label { Text = "Old" });
         var newDataTemplate = new DataTemplate(() => new Label { Text = "New" });
 
@@ -39,7 +39,7 @@ public class TemplatedComponentTests
     public void ContentTemplateAcceptsADataTemplateSelectorBasedOnBindingContext()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var dataTemplateSelector = new TestTemplateSelector();
         var bindingContext = "hello";
         templatedComponent.BindingContext = bindingContext;
@@ -59,7 +59,7 @@ public class TemplatedComponentTests
     public void ContentTemplateAcceptsADataTemplateSelectorBasedOnContentBindingContext()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var dataTemplateSelector = new TestTemplateSelector();
         var bindingContext = "hello";
         var contentBindingContext = "world";
@@ -81,7 +81,7 @@ public class TemplatedComponentTests
     public void BindingContextSetThroughContentBindingContextShouldBeClearedFromContentOnRemoval()
     {
         // Arrange
-        var component = new TemplatedComponent();
+        var component = new TemplateBox();
         var newBindingContext = new object();
         component.ContentBindingContext = newBindingContext;
         component.ContentTemplate = new DataTemplate(() => new Label());
@@ -99,7 +99,7 @@ public class TemplatedComponentTests
     public void BindingContextSetThroughBindingContextShouldBeClearedFromContentOnRemoval()
     {
         // Arrange
-        var component = new TemplatedComponent();
+        var component = new TemplateBox();
         var newBindingContext = new object();
         component.BindingContext = newBindingContext;
         component.ContentTemplate = new DataTemplate(() => new Label());
@@ -117,7 +117,7 @@ public class TemplatedComponentTests
     public void ContentTemplateClearsContentWhenDataTemplateSelectorIsUsedOnAnEmptyContentBindingContext()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var dataTemplateSelector = new TestTemplateSelector();
         var contentBindingContext = "world";
         templatedComponent.ContentBindingContext = contentBindingContext;
@@ -137,7 +137,7 @@ public class TemplatedComponentTests
     public void ContentTemplateClearsContentWhenDataTemplateSelectorIsUsedOnAnEmptyBindingContext()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var dataTemplateSelector = new TestTemplateSelector();
         var bindingContext = "world";
         templatedComponent.BindingContext = bindingContext;
@@ -157,7 +157,7 @@ public class TemplatedComponentTests
     public void ContentTemplateChangesBindingContextWhenDataTemplateSelectorReturnsTheSameTemplate()
     {
         // Arrange
-        var templatedComponent = new TemplatedComponent();
+        var templatedComponent = new TemplateBox();
         var dataTemplateSelector = new StaticRefTemplateSelector();
         var bindingContext = "world";
         templatedComponent.BindingContext = bindingContext;
@@ -179,18 +179,18 @@ public class TemplatedComponentTests
         => DispatcherTest.RunWithDispatcherStub(() =>
         {
             // Arrange
-            var templatedComponent = new TemplatedComponent();
-            var dataTemplate = new DataTemplate(() => new ProjectContainer());
+            var templatedComponent = new TemplateBox();
+            var dataTemplate = new DataTemplate(() => new TemplateContentPresenter());
             var bindingContext = "world";
             var projectedContent = new Label { Text = "hello" };
             templatedComponent.BindingContext = bindingContext;
             templatedComponent.ContentTemplate = dataTemplate;
 
             // Act
-            templatedComponent.ProjectedContent = projectedContent;
+            templatedComponent.TemplateContent = projectedContent;
 
             // Assert
-            var container = templatedComponent.PresentedContent as ProjectContainer;
+            var container = templatedComponent.PresentedContent as TemplateContentPresenter;
             container.Should().NotBeNull();
             container!.Content.Should().Be(projectedContent);
         });
