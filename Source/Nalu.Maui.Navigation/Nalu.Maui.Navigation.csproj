@@ -36,24 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Nalu.Maui.Navigation.targets" Pack="True" PackagePath="buildTransitive\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <MauiImage Include="Images\nalu_navigation_arrow_back_android.svg" TintColor="#FFFFFF" />
-    <MauiImage Include="Images\nalu_navigation_arrow_back_ios.svg" TintColor="#FFFFFF" />
-    <MauiImage Include="Images\nalu_navigation_menu.svg" TintColor="#FFFFFF" />
-    <None Include="Images\nalu_navigation_arrow_back_android.svg" Pack="True" PackagePath="buildTransitive\Images\" />
-    <None Include="Images\nalu_navigation_arrow_back_ios.svg" Pack="True" PackagePath="buildTransitive\Images\" />
-    <None Include="Images\nalu_navigation_menu.svg" Pack="True" PackagePath="buildTransitive\Images\" />
-  </ItemGroup>
-
-  <ItemGroup>
       <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Images\" />
     <Folder Include="Platforms\Android\" />
     <Folder Include="Platforms\iOS\" />
     <Folder Include="Platforms\MacCatalyst\" />

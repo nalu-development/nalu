@@ -24,5 +24,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
     <ProjectReference Include="..\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
+    <ProjectReference Include="..\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
   </ItemGroup>
 </Project>
