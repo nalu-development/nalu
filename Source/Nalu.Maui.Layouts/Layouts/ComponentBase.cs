@@ -130,7 +130,7 @@ public abstract class ComponentBase : View, IContentView
     /// <param name="oldValue">The old padding.</param>
     /// <param name="newValue">The new padding.</param>
     protected virtual void OnPaddingPropertyChanged(Thickness oldValue, Thickness newValue)
-        => ((IView)this).InvalidateMeasure();
+        => InvalidateMeasure();
 
     /// <summary>
     /// Gets the content.

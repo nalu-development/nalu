@@ -19,15 +19,15 @@ public class Component : ComponentBase
     /// </summary>
     public IView? Content
     {
-        get => (IView?)GetValue(ContentProperty);
-        set => SetValue(ContentProperty, value);
+        get => GetContent();
+        set => SetContent(value);
     }
 
     /// <inheritdoc />
-    protected override IView? GetContent() => Content;
+    protected override IView? GetContent() => (IView?)GetValue(ContentProperty);
 
     /// <inheritdoc />
-    protected override void SetContent(IView? content) => Content = content;
+    protected override void SetContent(IView? content) => SetValue(ContentProperty, content);
 
     private static void OnContentPropertyChanged(BindableObject bindable, object? oldValue, object? newValue)
         => ((Component)bindable).OnContentPropertyChanged((IView?)oldValue, (IView?)newValue);
