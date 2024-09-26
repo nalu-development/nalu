@@ -38,7 +38,7 @@ ValueTask<bool> CanLeaveAsync() => { ... ask the user };
 
 There is an embedded **leak-detector** to help you identify memory leaks in your application.
 
-**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/).**
+**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/navigation.html).**
 
 ### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
 
@@ -63,4 +63,4 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
                       ContentBindingContext="{Binding CurrentAnimal}" />
   ```
 
-**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/).**
+**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/layouts.html).**
