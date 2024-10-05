@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
-    <Product>Nalu.Maui.Core</Product>
+    <Product>Nalu.Maui.Connectivity</Product>
     <Description>.NET MAUI developer utilities</Description>
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
@@ -26,23 +26,24 @@
       <_Parameter1>Nalu.Maui.Test</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>Nalu.Maui.Connectivity</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="Microsoft.Maui.Controls.XmlnsDefinition">
-      <_Parameter1>https://nalu-development.github.com/nalu/core</_Parameter1>
+      <_Parameter1>https://nalu-development.github.com/nalu/connectivity</_Parameter1>
       <_Parameter2>$(RootNamespace)</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>
 
-   <ItemGroup>
+  <ItemGroup>
       <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
+      <PackageReference Include="ZoneTree" Version="1.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Platforms\Android\" />
-    <Folder Include="Platforms\MacCatalyst\" />
   </ItemGroup>
 </Project>

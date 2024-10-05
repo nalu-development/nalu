@@ -30,6 +30,48 @@
                 <Label Text="{Binding Name}" x:DataType="pageModels:AnimalModel" />
             </layouts:ViewBox>
 
+            <Button Command="{Binding SendRequestCommand}"
+                    Text="Send .NET Request"
+                    HorizontalOptions="Center" />
+            <Button Command="{Binding SendBackgroundRequestCommand}"
+                    Text="Send Background Request"
+                    HorizontalOptions="Center" />
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="State: " />
+                        <Span Text="{Binding RequestHandle1.State}" />
+                        <Span Text=" / Progress: " />
+                        <Span Text="{Binding RequestHandle1.Progress}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+            <Label Text="{Binding Result1}" />
+
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="State: " />
+                        <Span Text="{Binding RequestHandle2.State}" />
+                        <Span Text=" / Progress: " />
+                        <Span Text="{Binding RequestHandle2.Progress}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+            <Label Text="{Binding Result2}" />
+
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="State: " />
+                        <Span Text="{Binding RequestHandle3.State}" />
+                        <Span Text=" / Progress: " />
+                        <Span Text="{Binding RequestHandle3.Progress}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+            <Label Text="{Binding Result3}" />
+
             <Button Command="{Binding PushThreeCommand}"
                     Text="Push Three"
                     HorizontalOptions="Center" />

@@ -45,6 +45,7 @@ public static class MauiProgram
                 .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                 .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
+            .UseNaluBackgroundHttpClient()
             .UseNaluLayouts()
             .UseMauiCommunityToolkit()
             .ConfigureMauiHandlers(handlers =>
@@ -64,8 +65,21 @@ public static class MauiProgram
 
 #if DEBUG
         builder.Logging.AddDebug();
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
 #endif
 
+        builder.Services.AddKeyedSingleton<IBackgroundHttpClient>("dummyjson", (sp, _) =>
+        {
+            var client = ActivatorUtilities.CreateInstance<BackgroundHttpClient>(sp);
+            client.BaseAddress = new Uri("https://dummyjson.com/");
+            return client;
+        });
+        builder.Services.AddKeyedSingleton<HttpClient>("dummyjson", (sp, _) =>
+        {
+            var client = ActivatorUtilities.CreateInstance<HttpClient>(sp);
+            client.BaseAddress = new Uri("https://dummyjson.com/");
+            return client;
+        });
         builder.Services.AddTransientPopup<CanLeavePopup, CanLeavePopupModel>();
 
         return builder.Build();

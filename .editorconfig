@@ -426,6 +426,10 @@ dotnet_naming_rule.parameters_rule.severity             = warning
 # https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/SA1633.md
 dotnet_diagnostic.SA1633.severity = none
 
+# VSTHRD003
+# Justification: We're carefully managing our threading
+dotnet_diagnostic.VSTHRD003.severity = none
+
 # SA1615: Element return value should be documented.
 # Justification: It's annoying to have to document every obvious return value.
 dotnet_diagnostic.SA1615.severity = none
@@ -453,6 +457,9 @@ dotnet_diagnostic.SA1516.severity = none
 
 # SA1512: Single-line comments should not be followed by blank line
 dotnet_diagnostic.SA1512.severity = none
+
+# CA1848: For improved performance, use LoggerMessage delegates
+dotnet_diagnostic.CA1848.severity = suggestion
 
 ##########################################
 # License

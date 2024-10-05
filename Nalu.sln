@@ -83,6 +83,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nalu.Maui.Core", "Source\Na
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.Layouts", "Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj", "{ED3B95C4-683B-4BBF-B411-DD1AF6591C88}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.Connectivity", "Source\Nalu.Maui.Connectivity\Nalu.Maui.Connectivity.csproj", "{53057F63-B538-4DE5-8941-573731280182}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -113,6 +115,10 @@ Global
 		{ED3B95C4-683B-4BBF-B411-DD1AF6591C88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED3B95C4-683B-4BBF-B411-DD1AF6591C88}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED3B95C4-683B-4BBF-B411-DD1AF6591C88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{53057F63-B538-4DE5-8941-573731280182}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{53057F63-B538-4DE5-8941-573731280182}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{53057F63-B538-4DE5-8941-573731280182}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{53057F63-B538-4DE5-8941-573731280182}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -128,6 +134,7 @@ Global
 		{CEB939B1-E5A5-462A-834F-7D32D1893444} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 		{BD63D735-B1BF-42CC-936E-A97991F29B1D} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 		{ED3B95C4-683B-4BBF-B411-DD1AF6591C88} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
+		{53057F63-B538-4DE5-8941-573731280182} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {73F36209-F8D6-4066-8951-D97729F773CF}
