@@ -1,7 +1,6 @@
 namespace Nalu.Maui.Sample.PageModels;
 
 using System.Net.Http.Json;
-using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -115,6 +114,7 @@ public partial class OnePageModel(
 
         var result3 = await RequestHandle3.GetResultAsync();
         Result3 = await result3.Content.ReadAsStringAsync();
+        RequestHandle3.Acknowledge();
     }
 
     // See https://dummyjson.com/docs#intro-test for more information

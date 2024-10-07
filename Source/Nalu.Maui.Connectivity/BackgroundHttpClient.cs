@@ -13,12 +13,18 @@ public class BackgroundHttpClient(
     IBackgroundHttpRequestManager manager,
     IBackgroundHttpRequestPlatformProcessor processor,
     IDispatcher dispatcher)
+#if IOS
     : IBackgroundHttpClient
+#else
+    : HttpClient, IBackgroundHttpClient
+#endif
 {
+#if IOS
     /// <summary>
     /// Gets or sets the base address of the <see cref="BackgroundHttpClient"/>.
     /// </summary>
     public Uri? BaseAddress { get; set; }
+#endif
 
     /// <summary>
     /// Starts a background HTTP request.

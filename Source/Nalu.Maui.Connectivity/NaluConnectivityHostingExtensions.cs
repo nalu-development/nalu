@@ -11,17 +11,25 @@ public static class NaluConnectivityHostingExtensions
     /// Adds the Nalu background HTTP client to the application.
     /// </summary>
     /// <param name="builder">The app builder.</param>
-    public static MauiAppBuilder UseNaluBackgroundHttpClient(this MauiAppBuilder builder)
+    /// <param name="options">The options.</param>
+    public static MauiAppBuilder UseNaluBackgroundHttpClient(this MauiAppBuilder builder, BackgroundClientHttpOptions? options = null)
     {
+        options ??= new BackgroundClientHttpOptions();
+
         builder.UseLifecycleEventHandlers();
         builder.Services.TryAddSingleton<IAppEncryptionProvider, AppEncryptionProvider>();
         builder.Services.TryAddSingleton<ISecureStorage>(SecureStorage.Default);
         builder.Services
+            .AddSingleton<BackgroundClientHttpOptions>(options)
             .AddSingleton<IBackgroundHttpRequestManager, BackgroundHttpRequestManager>()
-#if IOS
+#if ANDROID
             .AddSingleton<BackgroundHttpRequestPlatformProcessor>()
             .AddSingleton<IBackgroundHttpRequestPlatformProcessor>(sp => sp.GetRequiredService<BackgroundHttpRequestPlatformProcessor>())
+#endif
+#if IOS
+            .AddSingleton<BackgroundHttpRequestPlatformProcessor>()
             .AddSingleton<IHandleEventsForBackgroundUrlHandler>(sp => sp.GetRequiredService<BackgroundHttpRequestPlatformProcessor>())
+            .AddSingleton<IBackgroundHttpRequestPlatformProcessor>(sp => sp.GetRequiredService<BackgroundHttpRequestPlatformProcessor>())
 #endif
             ;
 

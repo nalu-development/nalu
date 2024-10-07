@@ -56,6 +56,7 @@ public class BackgroundHttpRequestPlatformProcessor(IBackgroundHttpRequestManage
                 serializedBodyPath = GetRequestBodyPath(handle.RequestName);
                 await using var fileStream = File.Create(serializedBodyPath);
                 await content.CopyToAsync(fileStream).ConfigureAwait(false);
+                content.Dispose();
             }
             else
             {
@@ -63,6 +64,7 @@ public class BackgroundHttpRequestPlatformProcessor(IBackgroundHttpRequestManage
                 await content.CopyToAsync(memoryStream).ConfigureAwait(false);
                 var body = memoryStream.ToArray();
                 nativeHttpRequest.Body = NSData.FromArray(body);
+                content.Dispose();
             }
         }
 
@@ -207,7 +209,7 @@ public class BackgroundHttpRequestPlatformProcessor(IBackgroundHttpRequestManage
         }
 
         var httpResponseMessage = new HttpResponseMessage(downloadTask.GetHttpStatusCode());
-        var fileStream = new FileStream(location.Path!, FileMode.Open, FileAccess.Read);
+        var fileStream = new FileStream(location.Path!, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
         httpResponseMessage.Content = new StreamContent(fileStream);
         ApplyResponseHeaders(httpResponseMessage, response);
         handle.SetResult(httpResponseMessage);
@@ -224,12 +226,12 @@ public class BackgroundHttpRequestPlatformProcessor(IBackgroundHttpRequestManage
         logger.LogDebug("HandleEventsForBackgroundUrl");
 
         var completionTimeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
-        var acknowledgedTasks = manager.GetHandles()
+        var acknowledgeTasks = manager.GetHandles()
             .Where(handle => handle.State is BackgroundHttpRequestState.Running or BackgroundHttpRequestState.Paused)
             .Select(handle => handle.AcknowledgeTask);
 
 #pragma warning disable VSTHRD110
-        Task.WhenAny(completionTimeoutTask, Task.WhenAll(acknowledgedTasks))
+        Task.WhenAny(completionTimeoutTask, Task.WhenAll(acknowledgeTasks))
             .ContinueWith(CompletionDelegate, null, TaskScheduler.Current);
 #pragma warning restore VSTHRD110
 
