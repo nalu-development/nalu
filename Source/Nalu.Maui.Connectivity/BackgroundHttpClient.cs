@@ -1,5 +1,6 @@
 namespace Nalu;
 
+#if IOS || ANDROID
 /// <summary>
 /// A background HTTP client that can be used to send HTTP requests which continue even when the app is in the background.
 /// </summary>
@@ -13,6 +14,16 @@ public class BackgroundHttpClient(
     IBackgroundHttpRequestManager manager,
     IBackgroundHttpRequestPlatformProcessor processor,
     IDispatcher dispatcher)
+#else
+/// <summary>
+/// A background HTTP client that can be used to send HTTP requests which continue even when the app is in the background.
+/// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="BackgroundHttpClient"/> class.
+/// </remarks>
+/// <param name="manager">The manager used to process/store requests.</param>
+public class BackgroundHttpClient(IBackgroundHttpRequestManager manager)
+#endif
 #if IOS
     : IBackgroundHttpClient
 #else
@@ -48,22 +59,41 @@ public class BackgroundHttpClient(
             IsMultiPart = request.Content is MultipartContent,
         };
 
-        var handler = new BackgroundHttpRequestHandle(manager, descriptor);
+        var handle = new BackgroundHttpRequestHandle(manager, descriptor);
 
+#if IOS || ANDROID
         if (dispatcher.IsDispatchRequired)
         {
             await dispatcher.DispatchAsync(async () =>
             {
-                manager.Track(handler);
-                await processor.StartPlatformRequestAsync(this, request, handler).ConfigureAwait(true);
+                manager.Track(handle);
+                await processor.StartPlatformRequestAsync(this, request, handle).ConfigureAwait(true);
             }).ConfigureAwait(true);
         }
         else
         {
-            manager.Track(handler);
-            await processor.StartPlatformRequestAsync(this, request, handler).ConfigureAwait(true);
+            manager.Track(handle);
+            await processor.StartPlatformRequestAsync(this, request, handle).ConfigureAwait(true);
         }
+#else
+        manager.Track(handle);
 
-        return handler;
+        // On desktop, we can freely use the HttpClient in the background
+        try
+        {
+            handle.SetRunning();
+            var response = await SendAsync(request).ConfigureAwait(true);
+            handle.SetResult(response);
+        }
+        catch (HttpRequestException ex)
+        {
+            handle.SetError(ex);
+        }
+        catch (Exception ex)
+        {
+            handle.SetError(new HttpRequestException($"An error occurred while processing the request '{handle.RequestName}'.", ex));
+        }
+#endif
+        return handle;
     }
 }
