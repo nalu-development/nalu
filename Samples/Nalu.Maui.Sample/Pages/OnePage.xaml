@@ -17,6 +17,46 @@
                    Aspect="AspectFit"
                    Margin="0,16,0,24"/>
 
+            <Button Command="{Binding SendRequestCommand}"
+                    Text="Send requests"
+                    HorizontalOptions="Center" />
+
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Parallel Request 1: " />
+                        <Span Text="{Binding Result1}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Parallel Request 2: " />
+                        <Span Text="{Binding Result2}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Follow-up Request 3: " />
+                        <Span Text="{Binding Result3}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+
+            <Label>
+                <Label.FormattedText>
+                    <FormattedString>
+                        <Span Text="Erroring Request 4: " />
+                        <Span Text="{Binding Result4}" />
+                    </FormattedString>
+                </Label.FormattedText>
+            </Label>
+
             <Label>
                 <Label.FormattedText>
                     <FormattedString>

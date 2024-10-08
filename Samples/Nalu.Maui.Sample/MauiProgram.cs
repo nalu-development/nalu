@@ -64,9 +64,23 @@ public static class MauiProgram
 
 #if DEBUG
         builder.Logging.AddDebug();
+        builder.Logging.SetMinimumLevel(LogLevel.Debug);
 #endif
 
         builder.Services.AddTransientPopup<CanLeavePopup, CanLeavePopupModel>();
+
+        builder.Services.AddKeyedSingleton<HttpClient>("dummyjson", (_, _) =>
+        {
+#if IOS
+            var client = new HttpClient(new NSUrlBackgroundSessionHttpMessageHandler())
+#else
+            var client = new HttpClient()
+#endif
+            {
+                BaseAddress = new Uri("https://dummyjson.com/")
+            };
+            return client;
+        });
 
         return builder.Build();
     }
