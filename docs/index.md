@@ -2,6 +2,33 @@
 
 `Nalu.Maui` provides a set of classes to help you with everyday challenges encountered while working with .NET MAUI.
 
+### Core [![Nalu.Maui.Core NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Core.svg)](https://www.nuget.org/packages/Nalu.Maui.Core/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Core)](https://www.nuget.org/packages/Nalu.Maui.Core/)
+
+The core library is intended to provide a set of common use utilities.
+
+Have you ever noticed that when the user backgrounds the app on iOS, the app is suspended, and the network requests will fail due to `The network connection was lost`?
+
+This is really annoying: it forces us to implement complex retry logic, especially considering that the request may have already hit the server.
+
+To solve this issue, we provide a `NSUrlBackgroundSessionHttpMessageHandler` to be used in your `HttpClient` to allow http request to continue even when the app is in the background.
+
+```csharp
+#if IOS
+    var client = new HttpClient(new NSUrlBackgroundSessionHttpMessageHandler());
+#else
+    var client = new HttpClient();
+#endif
+```
+
+To make this work, you need to change your `AppDelegate` as follows:
+```csharp
+[Export("application:handleEventsForBackgroundURLSession:completionHandler:")]
+public virtual void HandleEventsForBackgroundUrl(UIApplication application, string sessionIdentifier, Action completionHandler)
+    => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
+```
+
+**Check out the [Core Wiki](core.html) for more information**.
+
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 
 The MVVM navigation service offers a straightforward and robust method for navigating between pages and passing parameters.
