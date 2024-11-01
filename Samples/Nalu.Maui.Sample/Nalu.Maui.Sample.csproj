@@ -56,12 +56,15 @@
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Maui" Version="9.0.3" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0-rc.2.24473.5" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui\Nalu.Maui.csproj" />
     </ItemGroup>
 </Project>

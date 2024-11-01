@@ -18,8 +18,17 @@
                    Margin="0,16,0,24"/>
 
             <Button Command="{Binding SendRequestCommand}"
-                    Text="Send requests"
+                    Text="Send requests and crash on last"
                     HorizontalOptions="Center" />
+
+            <Label Text="Background Responses from Boot" />
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding BackgroundResponses}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                        <Label Text="{Binding .}"/>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
 
             <Label>
                 <Label.FormattedText>

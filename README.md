@@ -31,7 +31,7 @@ public virtual void HandleEventsForBackgroundUrl(UIApplication application, stri
     => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
 ```
 
-**Check out the [Core Wiki](core.html) for more information**.
+**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/core.html).**
 
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 

@@ -6,6 +6,7 @@ using CommunityToolkit.Maui;
 using PopupModels;
 using Popups;
 using Microsoft.Maui.LifecycleEvents;
+using Services;
 
 #if WINDOWS
 using Microsoft.Maui.Platform;
@@ -16,6 +17,8 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        AppContext.SetSwitch("System.Reflection.NullabilityInfoContext.IsSupported", true);
+
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
@@ -64,6 +67,7 @@ public static class MauiProgram
 
 #if DEBUG
         builder.Logging.AddDebug();
+        builder.Logging.AddSimpleConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
 #endif
 
@@ -81,6 +85,11 @@ public static class MauiProgram
             };
             return client;
         });
+
+        builder.Services.AddSingleton<StartupEventsHandler>();
+#if IOS
+        builder.Services.AddSingleton<INSUrlBackgroundSessionLostMessageHandler>(sp => sp.GetRequiredService<StartupEventsHandler>());
+#endif
 
         return builder.Build();
     }
