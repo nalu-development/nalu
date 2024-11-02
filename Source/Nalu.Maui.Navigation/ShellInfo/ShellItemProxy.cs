@@ -4,7 +4,7 @@ using System.ComponentModel;
 
 #pragma warning disable CS8618
 
-internal class ShellItemProxy : IShellItemProxy, IDisposable
+internal partial class ShellItemProxy : IShellItemProxy, IDisposable
 {
     private readonly ShellItem _item;
     public string SegmentName { get; }

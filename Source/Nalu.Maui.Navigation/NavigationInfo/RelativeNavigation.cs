@@ -67,7 +67,7 @@ public interface IRelativeNavigationBuilder : INavigationInfo
 /// <summary>
 /// Defines a relative navigation.
 /// </summary>
-public class RelativeNavigation : Navigation, IRelativeNavigationInitialBuilder, IRelativeNavigationBuilder, IRelativeNavigationPushOnlyBuilder
+public partial class RelativeNavigation : Navigation, IRelativeNavigationInitialBuilder, IRelativeNavigationBuilder, IRelativeNavigationPushOnlyBuilder
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="RelativeNavigation"/> class.

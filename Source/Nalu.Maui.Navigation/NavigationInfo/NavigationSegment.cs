@@ -8,7 +8,7 @@ using System.ComponentModel;
 /// Represents a segment in a navigation path.
 /// </summary>
 #pragma warning disable CA1036
-public class NavigationSegment : BindableObject, INavigationSegment
+public partial class NavigationSegment : BindableObject, INavigationSegment
 {
     /// <summary>
     /// Defines the segment property.

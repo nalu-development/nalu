@@ -1,6 +1,6 @@
 namespace Nalu;
 
-internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDisposable
+internal sealed partial class PageNavigationContext(IServiceScope serviceScope) : IDisposable
 {
     public IServiceScope ServiceScope => serviceScope;
     public bool Entered { get; set; }

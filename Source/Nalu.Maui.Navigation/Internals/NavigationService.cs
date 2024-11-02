@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 #pragma warning disable IDE0290
 
-internal class NavigationService : INavigationService, IDisposable
+internal partial class NavigationService : INavigationService, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _semaphore = new(1, 1);

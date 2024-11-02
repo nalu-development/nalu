@@ -5,7 +5,7 @@ using System.Text;
 
 #pragma warning disable CS8618
 
-internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
+internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposable
 {
     private readonly ShellSection _section;
     public string SegmentName { get; }

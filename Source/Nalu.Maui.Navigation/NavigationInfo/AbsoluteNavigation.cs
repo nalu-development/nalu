@@ -46,7 +46,7 @@ public interface IAbsoluteNavigationBuilder : INavigationInfo
 /// <summary>
 /// Defines an absolute navigation.
 /// </summary>
-public class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsoluteNavigationInitialBuilder
+public partial class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsoluteNavigationInitialBuilder
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="AbsoluteNavigation"/> class.
