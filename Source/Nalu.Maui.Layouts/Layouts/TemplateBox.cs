@@ -3,7 +3,7 @@ namespace Nalu;
 /// <summary>
 /// A <see cref="ViewBox"/> that uses a <see cref="DataTemplate"/> or <see cref="DataTemplateSelector"/> to render content.
 /// </summary>
-public class TemplateBox : TemplateBoxBase
+public partial class TemplateBox : TemplateBoxBase
 {
     /// <summary>
     /// Bindable property for <see cref="ContentTemplate"/> property.

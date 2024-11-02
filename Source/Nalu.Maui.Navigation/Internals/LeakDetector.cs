@@ -2,7 +2,7 @@ namespace Nalu;
 
 #pragma warning disable IDE0290 // Use primary constructor
 
-internal class LeakDetector : IDisposable
+internal partial class LeakDetector : IDisposable
 {
     private class DisposedObject
     {

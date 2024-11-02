@@ -5,6 +5,8 @@
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <NoWarn>NU5129</NoWarn>
+    <UseRidGraph>true</UseRidGraph>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">

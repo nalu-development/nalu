@@ -3,7 +3,7 @@ namespace Nalu;
 /// <summary>
 /// A <see cref="ViewBox"/> that uses a <see cref="DataTemplate"/> to render content based on a boolean value.
 /// </summary>
-public class ToggleTemplate : TemplateBoxBase
+public partial class ToggleTemplate : TemplateBoxBase
 {
     /// <summary>
     /// Bindable property for <see cref="WhenTrue"/> property.

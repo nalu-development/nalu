@@ -2,7 +2,7 @@ namespace Nalu;
 
 using System.ComponentModel;
 
-internal class ShellProxy : IShellProxy, IDisposable
+internal partial class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
     private readonly ShellRouteFactory _routeFactory = new();

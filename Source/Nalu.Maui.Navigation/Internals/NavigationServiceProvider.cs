@@ -1,6 +1,6 @@
 namespace Nalu;
 
-internal sealed class NavigationServiceProvider : INavigationServiceProviderInternal
+internal sealed partial class NavigationServiceProvider : INavigationServiceProviderInternal
 {
     private readonly Dictionary<Type, object> _services = [];
     private INavigationServiceProvider? _parent;
