@@ -233,10 +233,7 @@ internal partial class ShellProxy : IShellProxy, IDisposable
             }
         }
 
-        Items = _shell.Items
-            .GroupBy(i => i.Route) // HotReload crash-fix
-            .Select(g => g.Last()) // There's a moment where the shell has two items with the same route
-            .Select(i => new ShellItemProxy(i, this)).ToList();
+        Items = _shell.Items.Select(i => new ShellItemProxy(i, this)).ToList();
         _contentsBySegmentName = Items
             .SelectMany(i => i.Sections)
             .SelectMany(s => s.Contents)
