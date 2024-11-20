@@ -33,6 +33,9 @@ jobs:
         with:
           lfs: true
           fetch-depth: 0
+      - name: "Ensure android workload" # https://github.com/actions/runner/issues/3578
+        run: dotnet workload install android
+        shell: pwsh
       - name: "Dotnet Tool Restore"
         run: dotnet tool restore
         shell: pwsh
