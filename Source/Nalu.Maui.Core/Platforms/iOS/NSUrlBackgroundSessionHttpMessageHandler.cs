@@ -5,6 +5,8 @@ using System.Net;
 using Foundation;
 using UIKit;
 
+// ReSharper disable InconsistentNaming
+
 /// <summary>
 /// An <see cref="HttpMessageHandler"/> that uses a background <see cref="NSUrlSession"/> to send requests over the network.
 /// </summary>
