@@ -30,14 +30,13 @@ Task("Build")
     .IsDependentOn("Restore")
     .Does(() =>
     {
-        DotNetBuild(
-            ".",
-            new DotNetBuildSettings()
-            {
-                Configuration = configuration,
-                NoRestore = true,
-            })
-            .EnableBinaryLogger(binlog);
+        var settings = new DotNetBuildSettings()
+                       {
+                           Configuration = configuration,
+                           NoRestore = true,
+                           MSBuildSettings = new DotNetMSBuildSettings().EnableBinaryLogger(binlogPath)
+                       };
+        DotNetBuild(".", settings);
     });
 
 Task("Test")
