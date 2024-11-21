@@ -249,7 +249,11 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
         // This might have taken a while, so let's update the last completed task timestamp
         _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
 
-        var httpResponseMessage = new HttpResponseMessage(task.GetHttpStatusCode());
+        var httpResponseMessage = new HttpResponseMessage(task.GetHttpStatusCode())
+        {
+            RequestMessage = CreateHttpRequestMessage(task.CurrentRequest ?? task.OriginalRequest),
+        };
+
         var fileStream = new FileStream(handle.ResponseContentFile, FileMode.Open, FileAccess.Read, FileShare.Read);
         httpResponseMessage.Content = new AcknowledgingStreamContent(this, handle, fileStream);
         ApplyResponseHeaders(httpResponseMessage, response, handle.CookieContainer);
@@ -320,6 +324,46 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
         Logger.LogDebug("WaitEventsProcessingAndNotify Completed");
 
         DispatchQueue.MainQueue.DispatchAsync(completionHandler);
+    }
+
+    private HttpRequestMessage? CreateHttpRequestMessage(NSUrlRequest? taskRequest)
+    {
+        if (taskRequest is null)
+        {
+            return null;
+        }
+
+        var request = new HttpRequestMessage(new HttpMethod(taskRequest.HttpMethod), taskRequest.Url)
+        {
+            Content = taskRequest.Body is { } body ? new StreamContent(body.AsStream()) : null,
+        };
+
+        foreach (var header in taskRequest.Headers)
+        {
+            if (header.Value is null || header.Key is null)
+            {
+                continue;
+            }
+
+            var key = header.Key.ToString();
+            if (key == SetCookieHeaderKey)
+            {
+                continue;
+            }
+
+            var value = header.Value.ToString();
+
+            var added =
+                request.Headers.TryAddWithoutValidation(key, value) ||
+                (request.Content?.Headers.TryAddWithoutValidation(key, value) ?? false);
+
+            if (!added)
+            {
+                Logger.LogWarning("Failed to add request header on response's request message {HeaderKey}: {HeaderValue}", key, value);
+            }
+        }
+
+        return request;
     }
 
     private void ApplyResponseHeaders(HttpResponseMessage httpResponseMessage, NSHttpUrlResponse response, CookieContainer? cookieContainer)

@@ -86,6 +86,18 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     private bool _sentRequest;
     private CookieContainer? _cookieContainer;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NSUrlBackgroundSessionHttpMessageHandler"/> class.
+    /// </summary>
+    /// <exception cref="PlatformNotSupportedException">this handler is not supported in iOS simulators, use the default one instead.</exception>
+    public NSUrlBackgroundSessionHttpMessageHandler()
+    {
+        if (DeviceInfo.DeviceType == DeviceType.Virtual)
+        {
+            throw new PlatformNotSupportedException("Background sessions are not supported in the simulator. Check DeviceInfo.DeviceType before creating this handler.");
+        }
+    }
+
     private void EnsureModifiability()
     {
         if (_sentRequest)

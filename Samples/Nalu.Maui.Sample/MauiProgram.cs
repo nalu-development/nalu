@@ -76,13 +76,13 @@ public static class MauiProgram
         builder.Services.AddKeyedSingleton<HttpClient>("dummyjson", (_, _) =>
         {
 #if IOS
-            var client = new HttpClient(new NSUrlBackgroundSessionHttpMessageHandler())
+            HttpClient client = DeviceInfo.DeviceType == DeviceType.Virtual
+                ? new()
+                : new(new NSUrlBackgroundSessionHttpMessageHandler());
 #else
-            var client = new HttpClient()
+            HttpClient client = new();
 #endif
-            {
-                BaseAddress = new Uri("https://dummyjson.com/")
-            };
+            client.BaseAddress = new Uri("https://dummyjson.com/");
             return client;
         });
 

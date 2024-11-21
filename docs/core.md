@@ -22,9 +22,11 @@ To solve this issue, we provide a `NSUrlBackgroundSessionHttpMessageHandler` to 
 
 ```csharp
 #if IOS
-    var client = new HttpClient(new NSUrlBackgroundSessionHttpMessageHandler());
+    HttpClient client = DeviceInfo.DeviceType == DeviceType.Virtual
+        ? new() // iOS Simulator doesn't support background sessions
+        : new(new NSUrlBackgroundSessionHttpMessageHandler());
 #else
-    var client = new HttpClient();
+    HttpClient client = new();
 #endif
 ```
 
