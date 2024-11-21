@@ -4,7 +4,6 @@
     <Description>.NET MAUI developer utilities</Description>
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
-    <UseRidGraph>true</UseRidGraph>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">

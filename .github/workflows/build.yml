@@ -48,7 +48,7 @@ jobs:
         with:
           dotnet-version: '8.0.401'
       - name: "Ensure workloads" # https://github.com/actions/runner/issues/3578
-        run: dotnet workload install maui
+        run: dotnet workload install maui --version 8.0.402
         shell: pwsh
       - name: "Dotnet Tool Restore"
         run: dotnet tool restore
