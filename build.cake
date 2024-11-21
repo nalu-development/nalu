@@ -4,12 +4,15 @@ var configuration =
     EnvironmentVariable("Configuration", "Release");
 
 var artefactsDirectory = Directory("./Artefacts");
+var binlogDirectory = Directory("./Binlog");
+var binlogPath = $"{binlogDirectory}/build.binlog";
 
 Task("Clean")
     .Description("Cleans the artefacts, bin and obj directories.")
     .Does(() =>
     {
         CleanDirectory(artefactsDirectory);
+        CleanDirectory(binlogDirectory);
         DeleteDirectories(GetDirectories("**/bin"), new DeleteDirectorySettings() { Force = true, Recursive = true });
         DeleteDirectories(GetDirectories("**/obj"), new DeleteDirectorySettings() { Force = true, Recursive = true });
     });
@@ -33,7 +36,8 @@ Task("Build")
             {
                 Configuration = configuration,
                 NoRestore = true,
-            });
+            })
+            .EnableBinaryLogger(binlog);
     });
 
 Task("Test")
