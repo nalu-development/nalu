@@ -33,8 +33,16 @@ jobs:
         with:
           lfs: true
           fetch-depth: 0
-      - name: "Set JAVA_HOME"
-        run: echo "JAVA_HOME=${{ env.JAVA_HOME_17_X64 }}" >> $GITHUB_ENV
+      - name: configure_java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: validate java config
+        shell: powershell
+        run: |
+          java --version
+          echo $ENV:JAVA_HOME
       - name: "Setup .NET SDK"
         uses: actions/setup-dotnet@v3
         with:
