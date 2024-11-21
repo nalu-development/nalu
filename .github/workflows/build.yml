@@ -12,7 +12,7 @@ on:
 
 env:
   # Disable the .NET logo in the console output.
-  DOTNET_NOLOGO: true
+  # DOTNET_NOLOGO: true
   # Disable the .NET first time experience to skip caching NuGet packages and speed up the build.
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   # Disable sending .NET CLI telemetry to Microsoft.
@@ -33,6 +33,8 @@ jobs:
         with:
           lfs: true
           fetch-depth: 0
+      - name: "Set JAVA_HOME"
+        run: echo "JAVA_HOME=${{ env.JAVA_HOME_17_X64 }}" >> $GITHUB_ENV
       - name: "Setup .NET SDK"
         uses: actions/setup-dotnet@v3
         with:
