@@ -4,6 +4,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using CoreFoundation;
 using Foundation;
 using Microsoft.Extensions.Logging;
@@ -14,7 +16,7 @@ using UIKit;
 /// <summary>
 /// iOS processor for background HTTP requests.
 /// </summary>
-internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownloadDelegate
+internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownloadDelegate
 {
     private const string SetCookieHeaderKey = "Set-Cookie";
     private const string CookieHeaderKey = "Cookie";
@@ -67,7 +69,6 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
         {
             HttpMethod = request.Method.Method,
-            Headers = GetPlatformHeaders(request, cookieContainer),
         };
 
         string? contentPath = null;
@@ -87,6 +88,8 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
                 nativeHttpRequest.Body = NSData.FromArray(body);
             }
         }
+
+        nativeHttpRequest.Headers = GetPlatformHeaders(request, cookieContainer);
 
         NSUrlSessionTask task;
         if (contentPath != null)
@@ -429,27 +432,18 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
 
     private NSMutableDictionary GetPlatformHeaders(HttpRequestMessage request, CookieContainer? cookieContainer)
     {
-        var requestHeaders = request.Headers
-            .Select(header => (HeaderName: header.Key, HeaderValue: string.Join(';', header.Value)))
-            .Where(header => !string.IsNullOrEmpty(header.HeaderValue))
-            .ToDictionary();
+        var headers = new Dictionary<string, string>();
+        AddManagedHeaders(headers, request.Headers);
 
         if (request.Content is { } content)
         {
-            foreach (var contentHeader in content.Headers)
-            {
-                requestHeaders[contentHeader.Key] = string.Join(';', contentHeader.Value);
-            }
+            AddManagedHeaders(headers, content.Headers);
         }
 
-        var headers = requestHeaders
-            .Select(header => (HeaderName: header.Key, HeaderValue: string.Join(';', header.Value)))
-            .Where(header => !string.IsNullOrEmpty(header.HeaderValue))
-            .ToArray();
-
+        var enumeratedHeaders = headers.ToArray();
         var nativeHeaders = NSMutableDictionary.FromObjectsAndKeys(
-            headers.Select(object (h) => h.HeaderValue).ToArray(),
-            headers.Select(object (h) => h.HeaderName).ToArray());
+            enumeratedHeaders.Select(object (h) => h.Value).ToArray(),
+            enumeratedHeaders.Select(object (h) => h.Key).ToArray());
 
         // set header cookies if needed from the managed cookie container if we do use Cookies
         if (Session.Configuration.HttpCookieStorage is not null && cookieContainer is not null)
@@ -471,6 +465,22 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
         return nativeHeaders;
     }
 
+    private static void AddManagedHeaders(Dictionary<string, string> headers, HttpHeaders managedHeaders)
+    {
+        var enumeratedManagedHeaders = managedHeaders.ToString().Split('\n');
+        var regex = HeaderValueRegex();
+        foreach (var header in enumeratedManagedHeaders)
+        {
+            var match = regex.Match(header);
+            if (match.Success)
+            {
+                var key = match.Groups[1].Value;
+                var value = match.Groups[2].Value;
+                headers[key] = value;
+            }
+        }
+    }
+
     private static bool TryGetRequestIdentifier(HttpRequestMessage request, [NotNullWhen(true)] out string? requestIdentifier)
     {
         if (request.Headers.TryGetValues(NSUrlBackgroundSessionHttpMessageHandler.RequestIdentifierHeaderName, out var values))
@@ -490,4 +500,7 @@ internal class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownload
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate> CreateEmptyLogger() => LoggerFactory.Create(_ => { }).CreateLogger<MessageHandlerNSUrlSessionDownloadDelegate>();
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider() => IPlatformApplication.Current?.Services.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+
+    [GeneratedRegex("(.+?): (.+)")]
+    private static partial Regex HeaderValueRegex();
 }
