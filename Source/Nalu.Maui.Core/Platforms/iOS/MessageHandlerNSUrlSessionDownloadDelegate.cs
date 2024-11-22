@@ -61,7 +61,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     public IReadOnlyDictionary<string, Task<HttpResponseMessage>> GetPendingResponses()
         => _pendingRequests.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ResponseCompletionSource.Task);
 
-    public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CookieContainer? cookieContainer, CancellationToken cancellationToken)
+    public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CookieContainer? cookieContainer, TimeSpan defaultTimeout, CancellationToken cancellationToken)
     {
         var requestUrl = new NSUrl(request.RequestUri?.ToString() ?? throw new ArgumentException("RequestUri cannot be null."));
         var requestIdentifier = TryGetRequestIdentifier(request, out var id) ? id : Guid.NewGuid().ToString("N");
@@ -69,6 +69,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
         {
             HttpMethod = request.Method.Method,
+            TimeoutInterval = defaultTimeout.TotalSeconds,
         };
 
         string? contentPath = null;

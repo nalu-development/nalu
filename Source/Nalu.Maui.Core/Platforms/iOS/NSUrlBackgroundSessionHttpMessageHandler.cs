@@ -33,6 +33,19 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     }
 
     /// <summary>
+    /// Gets or sets the default timeout for requests.
+    /// </summary>
+    public TimeSpan DefaultTimeout
+    {
+        get => _defaultTimeout;
+        set
+        {
+            EnsureModifiability();
+            _defaultTimeout = value;
+        }
+    }
+
+    /// <summary>
     /// The name of the header that contains the identifier of the <see cref="NSUrlSessionTask"/> associated with the request.
     /// </summary>
     /// <remarks>
@@ -86,6 +99,10 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     private bool _sentRequest;
     private CookieContainer? _cookieContainer;
 
+    // Use the same default timeout of HttpClient
+    // https://github.com/microsoft/referencesource/blob/master/System/net/System/Net/Http/HttpClient.cs#L13
+    private TimeSpan _defaultTimeout = TimeSpan.FromSeconds(100);
+
     /// <summary>
     /// Initializes a new instance of the <see cref="NSUrlBackgroundSessionHttpMessageHandler"/> class.
     /// </summary>
@@ -126,6 +143,6 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         _sentRequest = true;
-        return MessageHandler.SendAsync(request, _cookieContainer, cancellationToken);
+        return MessageHandler.SendAsync(request, _cookieContainer, DefaultTimeout, cancellationToken);
     }
 }
