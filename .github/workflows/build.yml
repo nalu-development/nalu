@@ -44,7 +44,7 @@ jobs:
           java --version
           echo $ENV:JAVA_HOME
       - name: "Setup .NET SDK"
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.401'
       - name: "Ensure workloads" # https://github.com/actions/runner/issues/3578
