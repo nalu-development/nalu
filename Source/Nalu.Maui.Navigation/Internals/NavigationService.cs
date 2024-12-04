@@ -2,6 +2,7 @@ namespace Nalu;
 
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Nalu.Internals;
 
 #pragma warning disable IDE0290
 
@@ -498,6 +499,11 @@ internal partial class NavigationService : INavigationService, IDisposable
         {
             case Page page:
             {
+                if (Environment.Version.Major < 9)
+                {
+                    DisconnectHandlerHelper.DisconnectHandlers(page);
+                }
+
                 PageNavigationContext.Dispose(page);
                 _leakDetector?.Track(page);
 
@@ -509,6 +515,7 @@ internal partial class NavigationService : INavigationService, IDisposable
                 var contentPage = contentProxy.Page;
                 if (contentPage is not null)
                 {
+                    DisconnectHandlerHelper.DisconnectHandlers(contentPage);
                     contentProxy.DestroyContent();
                     _leakDetector?.Track(contentPage);
                 }
