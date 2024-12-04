@@ -7,7 +7,7 @@ using System.ComponentModel;
 using System.Reflection;
 
 [EditorBrowsable(EditorBrowsableState.Never)]
-public class DisconnectHandlerHelper
+public static class DisconnectHandlerHelper
 {
     private static readonly BindableProperty _disconnectPolicyProperty;
 

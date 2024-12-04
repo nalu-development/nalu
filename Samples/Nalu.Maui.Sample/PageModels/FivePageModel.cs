@@ -7,7 +7,12 @@ public partial class FivePageModel(INavigationService navigationService) : Obser
 {
     private static int _instanceCount;
 
+    [ObservableProperty] private bool _condition;
+
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
+
+    [RelayCommand]
+    private void Toggle() => Condition = !Condition;
 
     [RelayCommand]
     private Task GoToThreeAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<OnePageModel>().Add<ThreePageModel>());
