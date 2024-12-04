@@ -1,5 +1,7 @@
 namespace Nalu;
 
+using Nalu.Internals;
+
 /// <summary>
 /// A <see cref="ViewBox"/> base class that uses a <see cref="DataTemplate"/> to render content.
 /// </summary>
@@ -111,21 +113,26 @@ public abstract class TemplateBoxBase : ViewBoxBase
             throw new InvalidOperationException($"The content of {GetType().Name} should not be set directly.");
         }
 
-        if (oldView is BindableObject bindableObject)
-        {
-            if (oldView is Element oldElement)
-            {
-                RemoveLogicalChild(oldElement);
-            }
-
-            bindableObject.BindingContext = null;
-        }
-
         if (newView is Element newElement)
         {
             AddLogicalChild(newElement);
         }
 
         Handler?.UpdateValue(nameof(IContentView.Content));
+
+        if (oldView != null)
+        {
+            DisconnectHandlerHelper.DisconnectHandlers(oldView);
+
+            if (oldView is BindableObject bindableView)
+            {
+                bindableView.BindingContext = null;
+            }
+
+            if (oldView is Element oldElement)
+            {
+                RemoveLogicalChild(oldElement);
+            }
+        }
     }
 }

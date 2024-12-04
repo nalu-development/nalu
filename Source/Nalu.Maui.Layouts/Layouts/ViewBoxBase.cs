@@ -1,6 +1,7 @@
 namespace Nalu;
 
 using Microsoft.Maui.Layouts;
+using Nalu.Internals;
 
 /// <summary>
 /// <see cref="ViewBoxBase"/> is a base class a <see cref="IContentView"/> that is used to display a single view.
@@ -94,19 +95,6 @@ public abstract class ViewBoxBase : View, IContentView
     /// <param name="newView">The new content.</param>
     protected virtual void OnContentPropertyChanged(IView? oldView, IView? newView)
     {
-        if (oldView != null)
-        {
-            if (IsSet(ContentBindingContextProperty) && oldView is BindableObject bindableView)
-            {
-                bindableView.BindingContext = null;
-            }
-
-            if (oldView is Element oldElement)
-            {
-                RemoveLogicalChild(oldElement);
-            }
-        }
-
         if (newView != null)
         {
             if (IsSet(ContentBindingContextProperty) && newView is BindableObject bindableView)
@@ -117,6 +105,23 @@ public abstract class ViewBoxBase : View, IContentView
             if (newView is Element newElement)
             {
                 AddLogicalChild(newElement);
+            }
+        }
+
+        Handler?.UpdateValue(nameof(IContentView.Content));
+
+        if (oldView != null)
+        {
+            DisconnectHandlerHelper.DisconnectHandlers(oldView);
+
+            if (IsSet(ContentBindingContextProperty) && oldView is BindableObject bindableView)
+            {
+                bindableView.BindingContext = null;
+            }
+
+            if (oldView is Element oldElement)
+            {
+                RemoveLogicalChild(oldElement);
             }
         }
     }
@@ -149,7 +154,6 @@ public abstract class ViewBoxBase : View, IContentView
         _contentView = content;
 
         OnContentPropertyChanged(oldContent, content);
-        Handler?.UpdateValue(nameof(IContentView.Content));
     }
 
     private static void ContentBindingContextPropertyChanged(BindableObject bindable, object? oldvalue, object? newvalue)
