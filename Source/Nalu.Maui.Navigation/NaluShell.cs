@@ -104,13 +104,15 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
         if (!GetIsNavigating())
         {
-            args.Cancel();
-
             var uri = args.Target.Location.OriginalString;
             if (Handler is null || string.IsNullOrEmpty(uri))
             {
+                // We have nothing to do here.
+                // On android this may lead to backgrounding the app when on a root page and back button is pressed.
                 return;
             }
+
+            args.Cancel();
 
             if (uri == "..")
             {
