@@ -33,7 +33,7 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     }
 
     /// <summary>
-    /// Gets or sets the default timeout for requests.
+    /// Gets or sets the default native timeout for requests.
     /// </summary>
     public TimeSpan DefaultTimeout
     {
@@ -99,9 +99,8 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     private bool _sentRequest;
     private CookieContainer? _cookieContainer;
 
-    // Use the same default timeout of HttpClient
-    // https://github.com/microsoft/referencesource/blob/master/System/net/System/Net/Http/HttpClient.cs#L13
-    private TimeSpan _defaultTimeout = TimeSpan.FromSeconds(100);
+    // Do not set a predefined timeout, as the background session will handle the timeout.
+    private TimeSpan _defaultTimeout = Timeout.InfiniteTimeSpan;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NSUrlBackgroundSessionHttpMessageHandler"/> class.

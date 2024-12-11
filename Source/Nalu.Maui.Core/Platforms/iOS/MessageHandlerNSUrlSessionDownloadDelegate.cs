@@ -29,6 +29,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     public static string SessionIdentifier { get; } = $"{NSBundle.MainBundle.BundleIdentifier}.NSUrlBackgroundSessionHttpMessageHandler";
 
     private static readonly TimeSpan _eventProcessingWaitThreshold = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _infiniteTimeout = Timeout.InfiniteTimeSpan;
     private static MessageHandlerNSUrlSessionDownloadDelegate? _instance;
     private NSUrlSession? _nsUrlSession;
     private Action? _processingInBackgroundCompletionHandler;
@@ -44,9 +45,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         {
             if (_nsUrlSession == null)
             {
-                var cfg = NSUrlSessionConfiguration.CreateBackgroundSessionConfiguration(SessionIdentifier);
-                cfg.SessionSendsLaunchEvents = true;
-                _nsUrlSession = NSUrlSession.FromConfiguration(cfg, this, new NSOperationQueue());
+                var config = NSUrlSessionConfiguration.CreateBackgroundSessionConfiguration(SessionIdentifier);
+                config.SessionSendsLaunchEvents = true;
+
+                // We want, by default, the timeout from HttpClient to have precedence over the one from NSUrlSession
+                // Double.MaxValue does not work, so default to 24 hours
+                config.TimeoutIntervalForRequest = 24 * 60 * 60;
+                config.TimeoutIntervalForResource = 24 * 60 * 60;
+
+                _nsUrlSession = NSUrlSession.FromConfiguration(config, this, new NSOperationQueue());
             }
 
             return _nsUrlSession!;
@@ -69,8 +76,12 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
         {
             HttpMethod = request.Method.Method,
-            TimeoutInterval = defaultTimeout.TotalSeconds,
         };
+
+        if (defaultTimeout != _infiniteTimeout)
+        {
+            nativeHttpRequest.TimeoutInterval = defaultTimeout.TotalSeconds;
+        }
 
         string? contentPath = null;
         if (request.Content is { } content)
@@ -105,11 +116,12 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             Logger.LogDebug("Created download task for {RequestName}", requestIdentifier);
         }
 
+        var weakTask = new WeakReference<NSUrlSessionTask>(task);
         var cancellationTokenRegistration = cancellationToken.Register(() =>
         {
-            if (task.State is NSUrlSessionTaskState.Running or NSUrlSessionTaskState.Suspended)
+            if (weakTask.TryGetTarget(out var t) && t?.State is NSUrlSessionTaskState.Running or NSUrlSessionTaskState.Suspended)
             {
-                task.Cancel();
+                t.Cancel();
             }
         });
 
