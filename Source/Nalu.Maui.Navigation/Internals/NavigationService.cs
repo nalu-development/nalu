@@ -451,7 +451,7 @@ internal partial class NavigationService : INavigationService, IDisposable
             ((IList<INavigationSegment>)relativeNavigation).Add(navigation[i]);
         }
 
-        if (navigation is { Intent: { } intent, Count: > 0 })
+        if (navigation.Intent is { } intent && relativeNavigation.Count > 0)
         {
             relativeNavigation.WithIntent(intent);
         }
