@@ -260,10 +260,20 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         // We should be good with a temporary file path considering we're going to read it right away.
         var locationPath = location.Path;
         handle.ResponseContentFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".nsresponse");
-        File.Move(locationPath!, handle.ResponseContentFile, true);
-
-        // This might have taken a while, so let's update the last completed task timestamp
-        _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
+        try
+        {
+            File.Move(locationPath!, handle.ResponseContentFile, true);
+        }
+        catch (Exception ex)
+        {
+            handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Temporary response file is gone", ex));
+            return;
+        }
+        finally
+        {
+            // This might have taken a while, so let's update the last completed task timestamp
+            _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
+        }
 
         var httpResponseMessage = new HttpResponseMessage(task.GetHttpStatusCode())
         {
