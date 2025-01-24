@@ -31,11 +31,22 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     private static readonly TimeSpan _eventProcessingWaitThreshold = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan _infiniteTimeout = Timeout.InfiniteTimeSpan;
     private static MessageHandlerNSUrlSessionDownloadDelegate? _instance;
+    private readonly ILogger _emptyLogger = CreateEmptyLogger();
     private NSUrlSession? _nsUrlSession;
     private Action? _processingInBackgroundCompletionHandler;
     private long _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
     private ILogger? _logger;
-    private ILogger Logger => _logger ??= GetLoggerFromApplicationServiceProvider() ?? CreateEmptyLogger();
+
+    private ILogger Logger
+    {
+        get
+        {
+            _logger ??= GetLoggerFromApplicationServiceProvider();
+            _logger = null;
+            return _logger ?? _emptyLogger;
+        }
+    }
+
     private readonly ConcurrentDictionary<string, NSUrlRequestHandle> _pendingRequests = new();
     private readonly ConcurrentDictionary<string, NSUrlRequestHandle> _processingInBackgroundHandles = [];
 
@@ -522,7 +533,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate> CreateEmptyLogger() => LoggerFactory.Create(_ => { }).CreateLogger<MessageHandlerNSUrlSessionDownloadDelegate>();
 
-    private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider() => IPlatformApplication.Current?.Services.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+    private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider() => IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
 
     [GeneratedRegex("(.+?): (.+)")]
     private static partial Regex HeaderValueRegex();
