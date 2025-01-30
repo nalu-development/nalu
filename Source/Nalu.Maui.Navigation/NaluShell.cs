@@ -1,8 +1,8 @@
 namespace Nalu;
 
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using Nalu.Internals;
 
 #pragma warning disable IDE0290
 #pragma warning disable VSTHRD100
@@ -98,7 +98,40 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     }
 
     /// <inheritdoc />
-    protected override async void OnNavigating(ShellNavigatingEventArgs args)
+    protected override bool OnBackButtonPressed()
+    {
+#if WINDOWS || !(IOS || ANDROID || MACCATALYST)
+        var backButtonBehavior = GetBackButtonBehavior(GetVisiblePage());
+        if (backButtonBehavior != null)
+        {
+            var command = backButtonBehavior.GetPropertyIfSet<System.Windows.Input.ICommand>(BackButtonBehavior.CommandProperty, null!);
+            var commandParameter = backButtonBehavior.GetPropertyIfSet<object>(BackButtonBehavior.CommandParameterProperty, null!);
+
+            if (command != null)
+            {
+                command.Execute(commandParameter);
+                return true;
+            }
+        }
+#endif
+
+        if (GetVisiblePage() is Page page && page.SendBackButtonPressed())
+        {
+            return true;
+        }
+
+        var currentContent = CurrentItem?.CurrentItem;
+        if (currentContent != null && currentContent.Stack.Count > 1)
+        {
+            DispatchNavigation(Nalu.Navigation.Relative().Pop());
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
+    }
+
+    /// <inheritdoc />
+    protected override void OnNavigating(ShellNavigatingEventArgs args)
     {
         base.OnNavigating(args);
 
@@ -116,9 +149,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
             if (uri == "..")
             {
-                await Task.Yield();
-                await Task.Yield();
-                await _navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).ConfigureAwait(true);
+                DispatchNavigation(Nalu.Navigation.Relative().Pop());
                 return;
             }
 
@@ -156,27 +187,28 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
                 }
             }
 
-            await Task.Yield();
-            await Task.Yield();
-            try
-            {
-                await _navigationService.GoToAsync(navigation).ConfigureAwait(true);
-            }
-            catch (InvalidNavigationException ex)
-            {
-                if (Debugger.IsAttached)
-                {
-                    Console.WriteLine(ex.Message);
-                }
-            }
+            DispatchNavigation(navigation);
         }
+    }
+
+    private void DispatchNavigation(INavigationInfo navigation) =>
+        Dispatcher.Dispatch(() => _navigationService.GoToAsync(navigation).FireAndForget(Handler));
+
+    private Page? GetVisiblePage()
+    {
+        if (CurrentItem?.CurrentItem is IShellSectionController scc)
+        {
+            return scc.PresentedPage;
+        }
+
+        return null;
     }
 
     private bool GetIsNavigating() => _isNavigating.Value?.Value ?? false;
 
-    private static readonly Regex _normalizeSegmentRegex = NormalizeSegmentRegex();
     [GeneratedRegex("^(D_FAULT_|IMPL_)")]
     private static partial Regex NormalizeSegmentRegex();
+
     private static string NormalizeSegment(string segment)
-        => _normalizeSegmentRegex.Replace(segment, string.Empty);
+        => NormalizeSegmentRegex().Replace(segment, string.Empty);
 }
