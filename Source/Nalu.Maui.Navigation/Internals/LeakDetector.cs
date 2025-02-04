@@ -87,7 +87,14 @@ internal partial class LeakDetector : IDisposable
 
     private static void LogLeak(IReadOnlyCollection<object> leakedObjects)
     {
+#if NET9_0_OR_GREATER
+#pragma warning disable CA1826 // Do not use Enumerable methods on indexable collections. Instead use the collection directly.
+        var shell = Application.Current?.Windows.FirstOrDefault()?.Page as Shell;
+#pragma warning restore CA1826
+#else
         var shell = Application.Current?.MainPage as Shell;
+#endif
+
         if (shell?.CurrentPage is { } page)
         {
             var verb = leakedObjects.Count > 1 ? "are" : "is";

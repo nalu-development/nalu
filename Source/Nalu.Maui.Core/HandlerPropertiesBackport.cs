@@ -1,3 +1,4 @@
+#if !NET9_0_OR_GREATER
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 namespace Nalu;
@@ -20,3 +21,4 @@ public static class HandlerPropertiesBackport
     public static HandlerDisconnectPolicyBackport GetDisconnectPolicyBackport(BindableObject target)
         => (HandlerDisconnectPolicyBackport)target.GetValue(DisconnectPolicyBackportProperty);
 }
+#endif

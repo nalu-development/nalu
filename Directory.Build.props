@@ -7,7 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <MauiVersion>8.0.82</MauiVersion>
+    <MauiVersion8>8.0.82</MauiVersion8>
+    <MauiVersion9>9.0.10</MauiVersion9>
+    <AllTargetFrameworks>net8.0;net8.0-android;net8.0-ios17.0;net8.0-maccatalyst;net9.0;net9.0-android;net9.0-ios18.0;net9.0-maccatalyst</AllTargetFrameworks>
+    <AllTargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(AllTargetFrameworks);net8.0-windows10.0.19041.0;net9.0-windows10.0.19041.0</AllTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup Label="Package">
@@ -27,7 +30,6 @@
   <ItemGroup Label="Package References">
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" PrivateAssets="all" Version="17.9.28" />
     <PackageReference Include="MinVer" PrivateAssets="all" Version="4.3.0" />
-    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" Version="1.2.0-beta.556" />
   </ItemGroup>
 
 </Project>

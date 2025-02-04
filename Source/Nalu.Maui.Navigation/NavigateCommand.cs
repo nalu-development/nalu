@@ -11,6 +11,9 @@ using Nalu.Internals;
 /// Provides a navigation command that can be used in XAML by providing a <see cref="Navigation"/> object as parameter.
 /// </summary>
 [SuppressMessage("Usage", "VSTHRD101:Avoid unsupported async delegates", Justification = "This is a command, not an async delegate")]
+#if NET9_0_OR_GREATER
+[RequireService([typeof(IProvideValueTarget)])]
+#endif
 public partial class NavigateCommand : IMarkupExtension<ICommand>
 {
     /// <inheritdoc cref="IMarkupExtension{T}.ProvideValue"/>

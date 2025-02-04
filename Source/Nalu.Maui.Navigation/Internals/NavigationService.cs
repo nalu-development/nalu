@@ -427,7 +427,7 @@ internal partial class NavigationService : INavigationService, IDisposable
         return true;
     }
 
-    private RelativeNavigation ToRelativeNavigation(INavigationInfo navigation, IList<NavigationStackPage> navigationStackPages)
+    private RelativeNavigation ToRelativeNavigation(INavigationInfo navigation, IReadOnlyList<NavigationStackPage> navigationStackPages)
     {
         var matchingSegmentsCount = navigation
             .Skip(1)

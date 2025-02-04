@@ -1,3 +1,4 @@
+#if !NET9_0_OR_GREATER
 namespace Nalu;
 
 /// <summary>
@@ -15,3 +16,4 @@ public enum HandlerDisconnectPolicyBackport
     /// </summary>
     Manual,
 }
+#endif
