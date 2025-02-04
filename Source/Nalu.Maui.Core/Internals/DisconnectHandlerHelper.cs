@@ -4,11 +4,14 @@
 namespace Nalu.Internals;
 
 using System.ComponentModel;
+#if !NET9_0_OR_GREATER
 using System.Reflection;
+#endif
 
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class DisconnectHandlerHelper
 {
+#if !NET9_0_OR_GREATER
     private static readonly BindableProperty _disconnectPolicyProperty;
 
     static DisconnectHandlerHelper()
@@ -16,9 +19,11 @@ public static class DisconnectHandlerHelper
         var policyBindableProperty = typeof(Button).Assembly.GetType("Microsoft.Maui.Controls.HandlerProperties")?.GetField("DisconnectPolicyProperty", BindingFlags.Static | BindingFlags.Public)?.GetValue(null) as BindableProperty;
         _disconnectPolicyProperty = policyBindableProperty ?? HandlerPropertiesBackport.DisconnectPolicyBackportProperty;
     }
+#endif
 
     public static void DisconnectHandlers(IView view)
     {
+#if !NET9_0_OR_GREATER
         // For our first go here
         // My thinking is to build a flat list of all views in the tree
         // And then iterate down the list disconnecting handlers.
@@ -55,5 +60,8 @@ public static class DisconnectHandlerHelper
                 }
             }
         }
+#else
+        view.DisconnectHandlers();
+#endif
     }
 }

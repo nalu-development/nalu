@@ -457,6 +457,9 @@ dotnet_diagnostic.SA1512.severity = none
 # SA1601: Partial elements should be documented
 dotnet_diagnostic.SA1601.severity = none
 
+# CA1859: Change type of parameter to ...
+dotnet_diagnostic.CA1859.severity = none
+
 ##########################################
 # License
 ##########################################
