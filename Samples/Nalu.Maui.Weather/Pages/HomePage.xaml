@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Nalu.Maui.Weather.Pages"
+             xmlns:r="clr-namespace:Nalu.Maui.Weather.Resources"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:pageModels="clr-namespace:Nalu.Maui.Weather.PageModels"
+             Shell.NavBarIsVisible="False"
+             x:DataType="pageModels:HomePageModel"
+             x:Class="Nalu.Maui.Weather.Pages.HomePage">
+    <VerticalStackLayout VerticalOptions="Center"
+                         HorizontalOptions="Center"
+                         Spacing="16">
+        <nalu:ExpanderLayout />
+    </VerticalStackLayout>
+</ContentPage>

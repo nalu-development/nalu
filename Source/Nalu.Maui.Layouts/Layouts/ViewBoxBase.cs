@@ -4,12 +4,17 @@ using Microsoft.Maui.Layouts;
 using Nalu.Internals;
 
 /// <summary>
-/// <see cref="ViewBoxBase"/> is a base class a <see cref="IContentView"/> that is used to display a single view.
+/// <see cref="ViewBoxBase"/> is a base class a <see cref="IViewBox"/> that is used to display a single view.
 /// </summary>
-public abstract class ViewBoxBase : View, IContentView
+public abstract class ViewBoxBase : View, IViewBox
 {
     private ILayoutManager? _layoutManager;
     private ILayoutManager LayoutManager => _layoutManager ??= new ViewBoxLayoutManager(this);
+
+    /// <summary>Bindable property for <see cref="IsClippedToBounds"/>.</summary>
+    public static readonly BindableProperty IsClippedToBoundsProperty =
+        BindableProperty.Create(nameof(IsClippedToBounds), typeof(bool), typeof(Layout), false,
+            propertyChanged: IsClippedToBoundsPropertyChanged);
 
     /// <summary>
     /// Bindable property for <see cref="Padding"/> property.
@@ -56,6 +61,16 @@ public abstract class ViewBoxBase : View, IContentView
     }
 
     /// <summary>
+    /// Gets or sets a value which determines if the layout should clip its children to its bounds.
+    /// The default value is <see langword="false"/>.
+    /// </summary>
+    public bool IsClippedToBounds
+    {
+        get => (bool)GetValue(IsClippedToBoundsProperty);
+        set => SetValue(IsClippedToBoundsProperty, value);
+    }
+
+    /// <summary>
     /// Gets or sets the padding around the content.
     /// </summary>
     public Thickness Padding
@@ -71,6 +86,7 @@ public abstract class ViewBoxBase : View, IContentView
     Size IContentView.CrossPlatformMeasure(double widthConstraint, double heightConstraint) => LayoutManager.Measure(widthConstraint, heightConstraint);
     Size IContentView.CrossPlatformArrange(Rect bounds) => LayoutManager.ArrangeChildren(bounds);
     object? IContentView.Content => GetContent();
+    bool IViewBox.ClipsToBounds => IsClippedToBounds;
 
     /// <inheritdoc />
     public IView? PresentedContent => GetContent();
@@ -161,6 +177,14 @@ public abstract class ViewBoxBase : View, IContentView
         if (bindable is ViewBoxBase viewBoxBase)
         {
             viewBoxBase.ContentBindingContextPropertyChanged(oldvalue, newvalue);
+        }
+    }
+
+    private static void IsClippedToBoundsPropertyChanged(BindableObject bindableObject, object oldValue, object newValue)
+    {
+        if (bindableObject is IView view)
+        {
+            view.Handler?.UpdateValue(nameof(IViewBox.ClipsToBounds));
         }
     }
 }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<nalu:NaluShell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
+                xmlns:pages="clr-namespace:Nalu.Maui.Weather.Pages"
+                xmlns:r="clr-namespace:Nalu.Maui.Weather.Resources"
+                x:Class="Nalu.Maui.Weather.AppShell">
+    <ShellContent nalu:Navigation.PageType="pages:InitializationPage"
+                  FlyoutItemIsVisible="False" />
+    <ShellContent nalu:Navigation.PageType="pages:HomePage"
+                  Title="{x:Static r:Texts.HomePage}" />
+</nalu:NaluShell>
