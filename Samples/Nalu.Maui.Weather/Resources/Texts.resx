@@ -30,4 +30,22 @@
   <data name="HomePage" xml:space="preserve">
     <value>Home</value>
   </data>
+  <data name="AirQuality" xml:space="preserve">
+    <value>Air Quality</value>
+  </data>
+  <data name="WeatherForecast" xml:space="preserve">
+    <value>Weather Forecast</value>
+  </data>
+  <data name="ShowMore" xml:space="preserve">
+    <value>Show more</value>
+  </data>
+  <data name="ShowLess" xml:space="preserve">
+    <value>Show less</value>
+  </data>
+  <data name="Pm10" xml:space="preserve">
+    <value>PM10</value>
+  </data>
+  <data name="PM25" xml:space="preserve">
+    <value>PM2.5</value>
+  </data>
 </root>

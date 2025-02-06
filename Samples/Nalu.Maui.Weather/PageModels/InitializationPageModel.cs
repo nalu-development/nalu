@@ -37,7 +37,7 @@ public partial class InitializationPageModel(
 
         var time = timeProvider.GetLocalNow();
         var start = time.Date;
-        var end = start.AddDays(7);
+        var end = start.AddDays(1);
 
         Message = Texts.LoadingIQ;
         var iq = await weatherService.GetAirQualityAsync((float)location.Latitude, (float)location.Longitude, start, end);
@@ -49,6 +49,11 @@ public partial class InitializationPageModel(
         weatherState.AirQualityData.AddRange(iq);
 
         Message = string.Empty;
+
+        // Instead of showing a button, we could just navigate to the main page automatically via dispatcher:
+        // _ = dispatcher.DispatchAsync(NavigateToHomePage);
+
+        // However, we're trying to measure the navigation speed here, so we'll just show the button and wait for user command.
         IsReady = true;
     }
 

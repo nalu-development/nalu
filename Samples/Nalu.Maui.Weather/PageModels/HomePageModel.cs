@@ -12,5 +12,5 @@ public partial class HomePageModel(
     IWeatherService weatherService)
     : ObservableObject
 {
-
+    public WeatherState WeatherState => weatherState;
 }

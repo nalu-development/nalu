@@ -33,7 +33,7 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 
         return times.Select((t, i) => new AirQualityModel
             {
-                UtcTime = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
                 Pm25 = iq.Hourly.Pm2_5![i],
                 Pm10 = iq.Hourly.Pm10![i],
                 O3 = iq.Hourly.Ozone![i],
@@ -67,7 +67,7 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 
         return times.Select((t, i) => new WeatherModel
             {
-                UtcTime = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Utc),
+                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Utc),
                 Temperature = forecast.Hourly.Temperature_2m![i],
                 FeelsLike = forecast.Hourly.Apparent_temperature![i],
                 Humidity = forecast.Hourly.Relativehumidity_2m![i],

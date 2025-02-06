@@ -80,6 +80,9 @@
       <MauiXaml Update="Resources\Styles\Converters.xaml">
         <SubType>Designer</SubType>
       </MauiXaml>
+      <MauiXaml Update="Resources\Styles\KeyedStyles.xaml">
+        <SubType>Designer</SubType>
+      </MauiXaml>
     </ItemGroup>
 
     <ItemGroup>

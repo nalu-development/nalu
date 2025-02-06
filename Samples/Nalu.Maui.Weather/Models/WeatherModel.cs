@@ -2,7 +2,7 @@ namespace Nalu.Maui.Weather.Models;
 
 public class WeatherModel
 {
-    public required DateTime UtcTime { get; set; }
+    public required DateTime Time { get; set; }
     public required float? Temperature { get; set; }
     public required float? FeelsLike { get; set; }
     public required float? Humidity { get; set; }

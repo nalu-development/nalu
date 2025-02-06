@@ -68,5 +68,41 @@ namespace Nalu.Maui.Weather.Resources {
                 return ResourceManager.GetString("HomePage", resourceCulture);
             }
         }
+        
+        internal static string AirQuality {
+            get {
+                return ResourceManager.GetString("AirQuality", resourceCulture);
+            }
+        }
+        
+        internal static string WeatherForecast {
+            get {
+                return ResourceManager.GetString("WeatherForecast", resourceCulture);
+            }
+        }
+        
+        internal static string ShowMore {
+            get {
+                return ResourceManager.GetString("ShowMore", resourceCulture);
+            }
+        }
+        
+        internal static string ShowLess {
+            get {
+                return ResourceManager.GetString("ShowLess", resourceCulture);
+            }
+        }
+        
+        internal static string Pm10 {
+            get {
+                return ResourceManager.GetString("Pm10", resourceCulture);
+            }
+        }
+        
+        internal static string PM25 {
+            get {
+                return ResourceManager.GetString("PM25", resourceCulture);
+            }
+        }
     }
 }

@@ -6,8 +6,131 @@
              xmlns:r="clr-namespace:Nalu.Maui.Weather.Resources"
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Weather.PageModels"
+             xmlns:models="clr-namespace:Nalu.Maui.Weather.Models"
              Shell.NavBarIsVisible="False"
              x:DataType="pageModels:HomePageModel"
              x:Class="Nalu.Maui.Weather.Pages.HomePage">
+    <ScrollView>
+        <VerticalStackLayout>
+            <Label Text="{x:Static r:Texts.WeatherForecast}"
+                   Style="{StaticResource CardHeader}"
+                   Margin="16,4"/>
 
+            <Border Style="{StaticResource Card}"
+                    Margin="16,8">
+                <VerticalStackLayout>
+                    <nalu:ExpanderViewBox CollapsedHeight="280"
+                                          IsExpanded="False"
+                                          x:Name="WeatherExpander">
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding WeatherState.WeatherData}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:WeatherModel">
+                                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Padding="16,8">
+                                        <Border Background="{AppThemeBinding Light={StaticResource WeatherListItemBackground}, Dark={StaticResource WeatherListItemBackgroundDark}}"
+                                                StrokeShape="RoundRectangle 4"
+                                                StrokeThickness="0"
+                                                Padding="8,2"
+                                                Margin="-8,0,0,0"
+                                                Grid.ColumnSpan="2">
+                                            <Label Text="{Binding Time}"
+                                                   FontFamily="SemiBold"/>
+                                        </Border>
+                                        <Label Text="{Binding WeatherCode, Converter={StaticResource WeatherDescriptionConverter}}"
+                                               FontFamily="Regular"
+                                               Grid.ColumnSpan="2"
+                                               Grid.Row="1"/>
+                                        <Image Grid.Column="2"
+                                               Grid.RowSpan="2"
+                                               HorizontalOptions="End"
+                                               VerticalOptions="Center"
+                                               Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
+                                                                        FontFamily=MaterialOutlined,
+                                                                        Color={AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}},
+                                                                        Size=24}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </nalu:ExpanderViewBox>
+                    <Button IsVisible="{Binding Path=WillCollapse,
+                                                Source={x:Reference WeatherExpander},
+                                                x:DataType=nalu:ExpanderViewBox}"
+                            x:Name="WeatherExpanderButton"
+                            BackgroundColor="Transparent"
+                            Clicked="ShowMoreWeatherForecast"
+                            Text="{x:Static r:Texts.ShowMore}"
+                            TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                            Margin="0,8,0,0"/>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label Text="{x:Static r:Texts.AirQuality}"
+                   Style="{StaticResource CardHeader}"
+                   Margin="16,4"/>
+
+            <Border Style="{StaticResource Card}"
+                    Margin="16,8">
+                <VerticalStackLayout>
+                    <nalu:ExpanderViewBox CollapsedHeight="280"
+                                          IsExpanded="False"
+                                          x:Name="AirQualityExpander">
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding WeatherState.AirQualityData}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:AirQualityModel">
+                                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" Padding="16,8">
+                                        <Border Background="{AppThemeBinding Light={StaticResource WeatherListItemBackground}, Dark={StaticResource WeatherListItemBackgroundDark}}"
+                                                StrokeShape="RoundRectangle 4"
+                                                StrokeThickness="0"
+                                                Padding="8,2"
+                                                Margin="-8,0,0,0"
+                                                Grid.ColumnSpan="2">
+                                            <Label Text="{Binding Time}"
+                                                   FontFamily="SemiBold"/>
+                                        </Border>
+                                        <Label Grid.Column="0"
+                                               Grid.Row="1">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{x:Static r:Texts.Pm10}" FontFamily="SemiBold"/>
+                                                    <Span Text=": "/>
+                                                    <Span Text="{Binding Pm10}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label Grid.Column="1"
+                                               Grid.Row="1">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{x:Static r:Texts.PM25}" FontFamily="SemiBold"/>
+                                                    <Span Text=": "/>
+                                                    <Span Text="{Binding Pm25}"/>
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Image Grid.Column="2"
+                                               Grid.RowSpan="2"
+                                               HorizontalOptions="End"
+                                               VerticalOptions="Center"
+                                               Source="{FontImageSource Glyph='&#xefd8;',
+                                                                        FontFamily=MaterialOutlined,
+                                                                        Color={AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}},
+                                                                        Size=24}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </nalu:ExpanderViewBox>
+                    <Button IsVisible="{Binding Path=WillCollapse,
+                                                Source={x:Reference AirQualityExpander},
+                                                x:DataType=nalu:ExpanderViewBox}"
+                            x:Name="AirQualityExpanderButton"
+                            BackgroundColor="Transparent"
+                            Clicked="ShowMoreAirQuality"
+                            Text="{x:Static r:Texts.ShowMore}"
+                            TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}"
+                            Margin="0,8,0,0"/>
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
