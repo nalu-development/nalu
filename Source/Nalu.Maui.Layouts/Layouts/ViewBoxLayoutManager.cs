@@ -5,13 +5,13 @@ using Microsoft.Maui.Layouts;
 /// <summary>
 /// Layout manager for <see cref="ViewBox"/>.
 /// </summary>
-/// <param name="contentView">The layout using this <see cref="ILayoutManager"/>.</param>
-public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
+/// <param name="viewBox">The layout using this <see cref="ILayoutManager"/>.</param>
+public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
 {
     /// <inheritdoc cref="ILayoutManager.Measure"/>
     public Size Measure(double widthConstraint, double heightConstraint)
     {
-        var padding = contentView.Padding;
+        var padding = viewBox.Padding;
 
         var paddingHorizontalThickness = padding.HorizontalThickness;
         var paddingVerticalThickness = padding.VerticalThickness;
@@ -20,7 +20,7 @@ public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
 
         double measuredHeight = 0;
         double measuredWidth = 0;
-        if (contentView.PresentedContent is { Visibility: not Visibility.Collapsed } child)
+        if (viewBox.PresentedContent is { Visibility: not Visibility.Collapsed } child)
         {
             var measure = child.Measure(childWidthConstraint, childHeightConstraint);
             measuredHeight = measure.Height;
@@ -30,7 +30,7 @@ public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
         measuredHeight += paddingVerticalThickness;
         measuredWidth += paddingHorizontalThickness;
 
-        IView layoutView = contentView;
+        IView layoutView = viewBox;
         var finalHeight = LayoutManager.ResolveConstraints(heightConstraint, layoutView.Height, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
         var finalWidth = LayoutManager.ResolveConstraints(widthConstraint, layoutView.Width, measuredWidth, layoutView.MinimumWidth, layoutView.MaximumWidth);
 
@@ -40,7 +40,7 @@ public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
     /// <inheritdoc cref="ILayoutManager.ArrangeChildren"/>
     public Size ArrangeChildren(Rect bounds)
     {
-        var padding = contentView.Padding;
+        var padding = viewBox.Padding;
 
         var top = padding.Top + bounds.Y;
         var left = padding.Left + bounds.X;
@@ -51,7 +51,7 @@ public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
         var width = paddingHorizontalThickness;
         var height = paddingVerticalThickness;
 
-        if (contentView.PresentedContent is { Visibility: not Visibility.Collapsed } child)
+        if (viewBox.PresentedContent is { Visibility: not Visibility.Collapsed } child)
         {
             var destination = new Rect(left, top, availableWidth, availableHeight);
             var arranged = child.Arrange(destination);
@@ -61,6 +61,6 @@ public class ViewBoxLayoutManager(IContentView contentView) : ILayoutManager
 
         var actual = new Size(width, height);
 
-        return actual.AdjustForFill(bounds, contentView);
+        return actual.AdjustForFill(bounds, viewBox);
     }
 }

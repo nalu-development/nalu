@@ -9,9 +9,5 @@
              Shell.NavBarIsVisible="False"
              x:DataType="pageModels:HomePageModel"
              x:Class="Nalu.Maui.Weather.Pages.HomePage">
-    <VerticalStackLayout VerticalOptions="Center"
-                         HorizontalOptions="Center"
-                         Spacing="16">
-        <nalu:ExpanderLayout />
-    </VerticalStackLayout>
+
 </ContentPage>

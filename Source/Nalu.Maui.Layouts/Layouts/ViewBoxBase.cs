@@ -9,12 +9,7 @@ using Nalu.Internals;
 public abstract class ViewBoxBase : View, IViewBox
 {
     private ILayoutManager? _layoutManager;
-    private ILayoutManager LayoutManager => _layoutManager ??= new ViewBoxLayoutManager(this);
-
-    /// <summary>Bindable property for <see cref="IsClippedToBounds"/>.</summary>
-    public static readonly BindableProperty IsClippedToBoundsProperty =
-        BindableProperty.Create(nameof(IsClippedToBounds), typeof(bool), typeof(Layout), false,
-            propertyChanged: IsClippedToBoundsPropertyChanged);
+    private ILayoutManager LayoutManager => _layoutManager ??= CreateLayoutManager();
 
     /// <summary>
     /// Bindable property for <see cref="Padding"/> property.
@@ -61,16 +56,6 @@ public abstract class ViewBoxBase : View, IViewBox
     }
 
     /// <summary>
-    /// Gets or sets a value which determines if the layout should clip its children to its bounds.
-    /// The default value is <see langword="false"/>.
-    /// </summary>
-    public bool IsClippedToBounds
-    {
-        get => (bool)GetValue(IsClippedToBoundsProperty);
-        set => SetValue(IsClippedToBoundsProperty, value);
-    }
-
-    /// <summary>
     /// Gets or sets the padding around the content.
     /// </summary>
     public Thickness Padding
@@ -85,11 +70,18 @@ public abstract class ViewBoxBase : View, IViewBox
 
     Size IContentView.CrossPlatformMeasure(double widthConstraint, double heightConstraint) => LayoutManager.Measure(widthConstraint, heightConstraint);
     Size IContentView.CrossPlatformArrange(Rect bounds) => LayoutManager.ArrangeChildren(bounds);
+
     object? IContentView.Content => GetContent();
-    bool IViewBox.ClipsToBounds => IsClippedToBounds;
+    bool IViewBox.ClipsToBounds => false;
 
     /// <inheritdoc />
     public IView? PresentedContent => GetContent();
+
+    /// <summary>
+    /// Creates a manager object that can measure this container and arrange its content.
+    /// </summary>
+    /// <returns>The instance of the layout manager.</returns>
+    protected virtual ILayoutManager CreateLayoutManager() => new ViewBoxLayoutManager(this);
 
     /// <summary>
     /// Updates the binding context of the content view.
@@ -177,14 +169,6 @@ public abstract class ViewBoxBase : View, IViewBox
         if (bindable is ViewBoxBase viewBoxBase)
         {
             viewBoxBase.ContentBindingContextPropertyChanged(oldvalue, newvalue);
-        }
-    }
-
-    private static void IsClippedToBoundsPropertyChanged(BindableObject bindableObject, object oldValue, object newValue)
-    {
-        if (bindableObject is IView view)
-        {
-            view.Handler?.UpdateValue(nameof(IViewBox.ClipsToBounds));
         }
     }
 }

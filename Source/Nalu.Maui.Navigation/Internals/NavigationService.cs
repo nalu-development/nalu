@@ -39,6 +39,7 @@ internal partial class NavigationService : INavigationService, IDisposable
     public async Task InitializeAsync(IShellProxy shellProxy, string contentSegmentName, object? intent)
     {
         _shellProxy = shellProxy;
+        _shellProxy.InitializeWithContent(contentSegmentName);
 
         var content = _shellProxy.GetContent(contentSegmentName);
         var page = content.GetOrCreateContent();
@@ -54,7 +55,6 @@ internal partial class NavigationService : INavigationService, IDisposable
 #pragma warning disable VSTHRD002
         // Rethrow eventual exceptions
         await enteringTask.ConfigureAwait(true);
-        await _shellProxy.SelectContentAsync(contentSegmentName).ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
         await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);

@@ -1,17 +1,16 @@
 namespace Nalu;
 
+using Microsoft.Maui.Handlers;
+
 #if WINDOWS
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using WRect = global::Windows.Foundation.Rect;
 using WSize = global::Windows.Foundation.Size;
 using PlatformView = Nalu.ViewBoxPanel;
-#endif
+using OriginalPlatformView = Microsoft.Maui.Platform.ContentPanel;
 
-using Microsoft.Maui.Handlers;
-
-#if WINDOWS
-internal class ViewBoxPanel : Microsoft.Maui.Platform.ContentPanel
+internal class ViewBoxPanel : OriginalPlatformView
 {
     public bool ClipsToBounds { get; set; }
 
@@ -29,10 +28,48 @@ internal class ViewBoxPanel : Microsoft.Maui.Platform.ContentPanel
 }
 #endif
 
+#if ANDROID
+using Android.Content;
+using Microsoft.Maui.Platform;
+using ARect = Android.Graphics.Rect;
+using PlatformView = Nalu.ClippableContentViewGroup;
+using OriginalPlatformView = Microsoft.Maui.Platform.ContentViewGroup;
+
+internal class ClippableContentViewGroup : OriginalPlatformView
+{
+    private readonly ARect _clipRect = new();
+
+    public bool ClipsToBounds { get; set; }
+
+#pragma warning disable IDE0290
+    // ReSharper disable once ConvertToPrimaryConstructor
+    public ClippableContentViewGroup(Context context) : base(context)
+    {
+    }
+#pragma warning restore IDE0290
+
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        base.OnLayout(changed, left, top, right, bottom);
+
+        if (ClipsToBounds)
+        {
+            _clipRect.Right = right - left;
+            _clipRect.Bottom = bottom - top;
+            ClipBounds = _clipRect;
+        }
+        else
+        {
+            ClipBounds = null;
+        }
+    }
+}
+#endif
+
 /// <summary>
 /// Handler for the <see cref="IViewBox"/> view.
 /// </summary>
-public class ViewBoxHandler : ContentViewHandler
+public class ViewBoxHandler() : ContentViewHandler(Mapper)
 {
     /// <summary>
     /// The property mapper for the <see cref="IViewBox"/> interface.
@@ -44,7 +81,8 @@ public class ViewBoxHandler : ContentViewHandler
         };
 
 #if WINDOWS
-    protected override PlatformView CreatePlatformView()
+    /// <inheritdoc />
+    protected override OriginalPlatformView CreatePlatformView()
     {
         if (VirtualView == null)
         {
@@ -60,6 +98,26 @@ public class ViewBoxHandler : ContentViewHandler
     }
 #endif
 
+#if ANDROID
+    /// <inheritdoc />
+    protected override OriginalPlatformView CreatePlatformView()
+    {
+        if (VirtualView == null)
+        {
+            throw new InvalidOperationException($"{nameof(VirtualView)} must be set to create a ContentViewGroup");
+        }
+
+        var viewGroup = new PlatformView(Context)
+        {
+            CrossPlatformLayout = VirtualView
+        };
+
+        viewGroup.SetClipChildren(false);
+
+        return viewGroup;
+    }
+#endif
+
     private static void MapClipsToBounds(ViewBoxHandler handler, IViewBox view)
     {
         if (handler.PlatformView is not { } platformView)
@@ -70,9 +128,10 @@ public class ViewBoxHandler : ContentViewHandler
 #if IOS || MACCATALYST
         platformView.ClipsToBounds = view.ClipsToBounds;
 #elif ANDROID
-        platformView.SetClipChildren(view.ClipsToBounds);
+        ((PlatformView)platformView).ClipsToBounds = view.ClipsToBounds;
+        platformView.RequestLayout();
 #elif WINDOWS
-        platformView.ClipsToBounds = view.ClipsToBounds;
+        ((PlatformView)platformView).ClipsToBounds = view.ClipsToBounds;
         platformView.InvalidateArrange();
 #endif
     }

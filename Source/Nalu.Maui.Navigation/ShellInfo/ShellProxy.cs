@@ -202,6 +202,43 @@ internal partial class ShellProxy : IShellProxy, IDisposable
         }
     }
 
+    public void InitializeWithContent(string segmentName)
+    {
+        var contentProxy = (ShellContentProxy)GetContent(segmentName);
+        if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
+        {
+            return;
+        }
+
+        _contentChanged = true;
+        var content = contentProxy.Content;
+        var section = (ShellSection)content.Parent;
+        var item = (ShellItem)section.Parent;
+
+        try
+        {
+            _shell.SetIsNavigating(true);
+            if (section.CurrentItem != content)
+            {
+                section.CurrentItem = content;
+            }
+
+            if (item.CurrentItem != section)
+            {
+                item.CurrentItem = section;
+            }
+
+            if (_shell.CurrentItem != item)
+            {
+                _shell.CurrentItem = item;
+            }
+        }
+        finally
+        {
+            _shell.SetIsNavigating(false);
+        }
+    }
+
     public void Dispose()
     {
         foreach (var itemInfo in Items)

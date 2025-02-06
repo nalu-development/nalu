@@ -7,7 +7,7 @@ namespace Nalu;
 /// Can be used as a replacement of <see cref="ContentView"/> (which as-of .NET 8 uses Compatibility.Layout).
 /// </remarks>
 [ContentProperty(nameof(Content))]
-public partial class ViewBox : ViewBoxBase
+public partial class ViewBox : ClippableViewBoxBase
 {
     /// <summary>
     /// Bindable property for <see cref="Content"/> property.

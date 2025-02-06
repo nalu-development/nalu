@@ -44,7 +44,7 @@ public class ObservingViewBox : ViewBox
     /// <summary>
     /// A factory method that creates the constraints to be used when observing the content size based on the provided width and height constraints.
     /// </summary>
-    public ObservedConstraintsFactory ObservedConstraintsFactory
+    protected ObservedConstraintsFactory ObservedConstraintsFactory
     {
         get => _observedConstraintsFactory;
         set

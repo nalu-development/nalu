@@ -12,6 +12,8 @@ You can simply use `ViewBox` as base class of your custom views instead of using
 This class also provides a `ContentBindingContext` property that allows you to bind the content to a property of the `ViewBox`'s binding context.
 This helps to fulfill interface segregation principle.
 
+On top of that, `ViewBox` offers the possibility to clip the content to the bounds of the view through `IsClippedToBounds` property.
+
 ```xml
 <nalu:ViewBox ContentBindingContext="{Binding SelectedAnimal}"
               IsVisible="{Binding IsSelected}">
@@ -69,5 +71,48 @@ This can also be used with one single expensive template:
                      WhenTrue="{StaticResource ExpensiveTemplate}" />
 ```
 
+### ExpanderViewBox
+
+`ExpanderViewBox` is a custom view that fully displays or **collapses** its content by **animating** the size transition.
+
+It is useful for scenarios where you want to show or hide additional information dynamically or if you want to build an **accordion** control.
+
+Here's an example of how we can use it to build a section that can be expanded or collapsed through a button only when the content exceeds the `CollapsedHeight`.
+
+```csharp
+private void ToggleExpended(object? sender, EventArgs e)
+{
+    TheExpander.IsExpanded = !TheExpander.IsExpanded;
+}
+```
+
+```xml
+<VerticalStackLayout>
+
+    <!-- This button is only visible when the expander's content is bigger than the collapsed size. -->
+    <Button Text="Toggle expanded"
+            Clicked="ToggleExpended"
+            IsVisible="{Binding Path=WillCollapse,
+                                Source={x:Reference TheExpander},
+                                x:DataType=nalu:ExpanderViewBox}"/>
+
+    <nalu:ExpanderViewBox x:Name="TheExpander"
+                          BackgroundColor="Coral"
+                          CollapsedHeight="200">
+
+        <VerticalStackLayout VerticalOptions="Start">
+            <Label Text="List of my friends" />
+            <!--
+                The height of this stack layout depends on the number of friends,
+                so the height will change at runtime and may or may not exceed the collapsed height. 
+            -->
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Friends}"
+                                 BindableLayout.ItemTemplate="{StaticResource FriendTemplate}" />
+        </VerticalStackLayout>
+
+    </nalu:ExpanderViewBox>
+
+</VerticalStackLayout>
+```
 
 
