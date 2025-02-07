@@ -1,51 +1,54 @@
 namespace Nalu.Maui.Weather.Services;
 
+using System.Text.Json;
 using Models;
 using OpenMeteo;
 
 public interface IWeatherService
 {
-    Task<IReadOnlyList<WeatherModel>> GetWeatherAsync(float latitude, float longitude, DateTime start, DateTime end);
-    Task<IReadOnlyList<AirQualityModel>> GetAirQualityAsync(float latitude, float longitude, DateTime start, DateTime end);
+    Task<IReadOnlyList<HourlyWeatherModel>> GetHourlyWeatherAsync(float latitude, float longitude, DateTime start, DateTime end);
+    Task<IReadOnlyList<DailyWeatherModel>> GetDailyWeatherAsync(float latitude, float longitude, DateTime start, DateTime end);
+    Task<IReadOnlyList<HourlyAirQualityModel>> GetHourlyAirQualityAsync(float latitude, float longitude, DateTime start, DateTime end);
 }
 
 public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 {
-    public async Task<IReadOnlyList<AirQualityModel>> GetAirQualityAsync(float latitude, float longitude, DateTime start, DateTime end)
+    public async Task<IReadOnlyList<DailyWeatherModel>> GetDailyWeatherAsync(float latitude, float longitude, DateTime start, DateTime end)
     {
-        var startDate = start.Date.ToString("yyyy-MM-dd");
-        var endDate = end.Date.ToString("yyyy-MM-dd");
+        var startDate = start.ToString("yyyy-MM-dd");
+        var endDate = end.ToString("yyyy-MM-dd");
 
-        var iq = await openMeteo.QueryAsync(new AirQualityOptions(latitude, longitude)
+        var forecast = await openMeteo.QueryAsync(new WeatherForecastOptions(latitude, longitude)
         {
-            Hourly = new AirQualityOptions.HourlyOptions([
-                AirQualityOptions.HourlyOptionsParameter.carbon_monoxide,
-                AirQualityOptions.HourlyOptionsParameter.pm10,
-                AirQualityOptions.HourlyOptionsParameter.pm2_5,
-                AirQualityOptions.HourlyOptionsParameter.ozone,
-            ]),
             Start_date = startDate,
             End_date = endDate,
-            Timezone = TimeZoneInfo.Local.Id
-        }) ?? throw new InvalidOperationException("Cannot retrieve air quality data");
+            Timezone = TimeZoneInfo.Local.Id,
+            Daily = new DailyOptions([
+                DailyOptionsParameter.windspeed_10m_max,
+                DailyOptionsParameter.winddirection_10m_dominant,
+                DailyOptionsParameter.temperature_2m_min,
+                DailyOptionsParameter.temperature_2m_max,
+                DailyOptionsParameter.rain_sum,
+                DailyOptionsParameter.weathercode,
+            ])
+        });
 
-        var times = iq.Hourly!.Time!;
+        var times = forecast!.Daily!.Time!;
 
-        return times.Select((t, i) => new AirQualityModel
+        return times.Select((t, i) => new DailyWeatherModel
             {
                 Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
-                Pm25 = iq.Hourly.Pm2_5![i],
-                Pm10 = iq.Hourly.Pm10![i],
-                O3 = iq.Hourly.Ozone![i],
-                Co = iq.Hourly.Carbon_monoxide![i]
+                TemperatureMin = forecast.Daily.Temperature_2m_min![i],
+                TemperatureMax = forecast.Daily.Temperature_2m_max![i],
+                WeatherCode = (int)forecast.Daily.Weathercode![i],
             })
             .ToList();
     }
 
-    public async Task<IReadOnlyList<WeatherModel>> GetWeatherAsync(float latitude, float longitude, DateTime start, DateTime end)
+    public async Task<IReadOnlyList<HourlyWeatherModel>> GetHourlyWeatherAsync(float latitude, float longitude, DateTime start, DateTime end)
     {
-        var startDate = start.Date.ToString("yyyy-MM-dd");
-        var endDate = end.Date.ToString("yyyy-MM-dd");
+        var startDate = start.ToString("yyyy-MM-dd");
+        var endDate = end.ToString("yyyy-MM-dd");
 
         var forecast = await openMeteo.QueryAsync(new WeatherForecastOptions(latitude, longitude)
         {
@@ -65,9 +68,9 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 
         var times = forecast!.Hourly!.Time!;
 
-        return times.Select((t, i) => new WeatherModel
+        return times.Select((t, i) => new HourlyWeatherModel
             {
-                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Utc),
+                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
                 Temperature = forecast.Hourly.Temperature_2m![i],
                 FeelsLike = forecast.Hourly.Apparent_temperature![i],
                 Humidity = forecast.Hourly.Relativehumidity_2m![i],
@@ -75,6 +78,37 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
                 WindSpeed = forecast.Hourly.Windspeed_10m![i],
                 WindDirection = forecast.Hourly.Winddirection_10m![i],
                 WeatherCode = forecast.Hourly.Weathercode![i]
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<HourlyAirQualityModel>> GetHourlyAirQualityAsync(float latitude, float longitude, DateTime start, DateTime end)
+    {
+        var startDate = start.ToString("yyyy-MM-dd");
+        var endDate = end.ToString("yyyy-MM-dd");
+
+        var iq = await openMeteo.QueryAsync(new AirQualityOptions(latitude, longitude)
+        {
+            Hourly = new AirQualityOptions.HourlyOptions([
+                AirQualityOptions.HourlyOptionsParameter.carbon_monoxide,
+                AirQualityOptions.HourlyOptionsParameter.pm10,
+                AirQualityOptions.HourlyOptionsParameter.pm2_5,
+                AirQualityOptions.HourlyOptionsParameter.ozone,
+            ]),
+            Start_date = startDate,
+            End_date = endDate,
+            Timezone = TimeZoneInfo.Local.Id
+        }) ?? throw new InvalidOperationException("Cannot retrieve air quality data");
+
+        var times = iq.Hourly!.Time!;
+
+        return times.Select((t, i) => new HourlyAirQualityModel
+            {
+                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+                Pm25 = iq.Hourly.Pm2_5![i],
+                Pm10 = iq.Hourly.Pm10![i],
+                O3 = iq.Hourly.Ozone![i],
+                Co = iq.Hourly.Carbon_monoxide![i]
             })
             .ToList();
     }

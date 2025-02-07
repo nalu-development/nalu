@@ -55,8 +55,8 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
 {
 #pragma warning disable IDE1006
     // ReSharper disable once InconsistentNaming
-    private static readonly BindablePropertyKey WillCollapsePropertyKey = BindableProperty.CreateReadOnly(
-        nameof(WillCollapse),
+    private static readonly BindablePropertyKey CanCollapsePropertyKey = BindableProperty.CreateReadOnly(
+        nameof(CanCollapse),
         typeof(bool),
         typeof(ExpanderViewBox),
         false);
@@ -72,9 +72,9 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         propertyChanged: OnContentPropertyChanged);
 
     /// <summary>
-    /// Bindable property for <see cref="WillCollapse"/> property.
+    /// Bindable property for <see cref="CanCollapse"/> property.
     /// </summary>
-    public static readonly BindableProperty WillCollapseProperty = WillCollapsePropertyKey.BindableProperty;
+    public static readonly BindableProperty CanCollapseProperty = CanCollapsePropertyKey.BindableProperty;
 
     /// <summary>
     /// Bindable property for <see cref="CollapsedWidth"/> property.
@@ -110,7 +110,7 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
     private double _arrangeWidth = double.NaN;
     private double _lastArrangeHeight = double.NaN;
     private double _lastArrangeWidth = double.NaN;
-    private bool _willCollapse;
+    private bool _canCollapse;
     private Animation? _animation;
 
     bool IViewBox.ClipsToBounds => true;
@@ -129,10 +129,10 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
     /// <summary>
     /// Gets a value indicating whether the content will collapse when the view box is not expanded.
     /// </summary>
-    public bool WillCollapse
+    public bool CanCollapse
     {
-        get => (bool)GetValue(WillCollapsePropertyKey.BindableProperty);
-        private set => SetValue(WillCollapsePropertyKey, value);
+        get => (bool)GetValue(CanCollapsePropertyKey.BindableProperty);
+        private set => SetValue(CanCollapsePropertyKey, value);
     }
 
     /// <summary>
@@ -180,13 +180,13 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
     /// <inheritdoc />
     protected override void SetContent(IView? content) => SetValue(ContentProperty, content);
 
-    void IExpanderViewBox.SetArrangeSize(double width, double height, bool willCollapse)
+    void IExpanderViewBox.SetArrangeSize(double width, double height, bool canCollapse)
     {
         // Using private field here to avoid setting the bindable property on each method call (performance).
-        if (_willCollapse != willCollapse)
+        if (_canCollapse != canCollapse)
         {
-            _willCollapse = willCollapse;
-            WillCollapse = willCollapse;
+            _canCollapse = canCollapse;
+            CanCollapse = canCollapse;
         }
 
         // Fast path: if the target size is the same as the current one, do nothing.

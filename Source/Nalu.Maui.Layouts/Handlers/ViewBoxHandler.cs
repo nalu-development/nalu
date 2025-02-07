@@ -30,7 +30,6 @@ internal class ViewBoxPanel : OriginalPlatformView
 
 #if ANDROID
 using Android.Content;
-using Microsoft.Maui.Platform;
 using ARect = Android.Graphics.Rect;
 using PlatformView = Nalu.ClippableContentViewGroup;
 using OriginalPlatformView = Microsoft.Maui.Platform.ContentViewGroup;

@@ -92,7 +92,7 @@ private void ToggleExpended(object? sender, EventArgs e)
     <!-- This button is only visible when the expander's content is bigger than the collapsed size. -->
     <Button Text="Toggle expanded"
             Clicked="ToggleExpended"
-            IsVisible="{Binding Path=WillCollapse,
+            IsVisible="{Binding Path=CanCollapse,
                                 Source={x:Reference TheExpander},
                                 x:DataType=nalu:ExpanderViewBox}"/>
 

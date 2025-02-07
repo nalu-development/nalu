@@ -58,6 +58,7 @@
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Maui" Version="11.0.0" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+        <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.30"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0"/>
@@ -83,6 +84,12 @@
       <MauiXaml Update="Resources\Styles\KeyedStyles.xaml">
         <SubType>Designer</SubType>
       </MauiXaml>
+      <MauiXaml Update="Views\ForecastCard.xaml">
+        <SubType>Designer</SubType>
+      </MauiXaml>
+      <MauiXaml Update="Views\AirQualityCard.xaml">
+        <SubType>Designer</SubType>
+      </MauiXaml>
     </ItemGroup>
 
     <ItemGroup>
@@ -97,6 +104,14 @@
       </Compile>
       <Compile Update="Pages\HomePage.xaml.cs">
         <DependentUpon>HomePage.xaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Views\ForecastCard.xaml.cs">
+        <DependentUpon>ForecastCard.xaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
+      <Compile Update="Views\AirQualityCard.xaml.cs">
+        <DependentUpon>AirQualityCard.xaml</DependentUpon>
         <SubType>Code</SubType>
       </Compile>
     </ItemGroup>

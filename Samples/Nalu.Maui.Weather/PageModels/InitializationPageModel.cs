@@ -36,17 +36,25 @@ public partial class InitializationPageModel(
         weatherState.Location = location;
 
         var time = timeProvider.GetLocalNow();
-        var start = time.Date;
-        var end = start.AddDays(1);
+        var today = time.Date;
+        var forecastEnd = today.AddDays(14);
 
         Message = Texts.LoadingIQ;
-        var iq = await weatherService.GetAirQualityAsync((float)location.Latitude, (float)location.Longitude, start, end);
+        var hourlyAirQualityModels = await weatherService.GetHourlyAirQualityAsync(
+            (float)location.Latitude, (float)location.Longitude, today, today);
 
         Message = Texts.LoadingWeatherForecast;
-        var forecast = await weatherService.GetWeatherAsync((float)location.Latitude, (float)location.Longitude, start, end);
 
-        weatherState.WeatherData.AddRange(forecast);
-        weatherState.AirQualityData.AddRange(iq);
+        var hourlyWeatherModels = await weatherService.GetHourlyWeatherAsync(
+            (float)location.Latitude, (float)location.Longitude, today, today);
+        var dailyWeatherModels = await weatherService.GetDailyWeatherAsync(
+            (float)location.Latitude, (float)location.Longitude, today, forecastEnd);
+
+        weatherState.TodayWeather = dailyWeatherModels.First();
+        weatherState.TodayHourlyWeatherData.AddRange(hourlyWeatherModels);
+        weatherState.TodayHourlyAirQualityData.AddRange(hourlyAirQualityModels.Take(24));
+        weatherState.DailyWeatherData.AddRange(dailyWeatherModels.Skip(1));
+        weatherState.UpdateCurrent();
 
         Message = string.Empty;
 
@@ -58,7 +66,13 @@ public partial class InitializationPageModel(
     }
 
     [RelayCommand]
-    private Task NavigateToHomePage() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<HomePageModel>());
+    private Task NavigateToHomePage()
+    {
+        var navigation = Navigation
+            .Absolute(NavigationBehavior.Immediate | NavigationBehavior.PopAllPagesOnItemChange)
+            .ShellContent<HomePageModel>();
+        return navigationService.GoToAsync(navigation);
+    }
 
     private async Task<Location> GetGeoLocationAsync()
     {

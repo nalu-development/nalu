@@ -9,18 +9,14 @@ public partial class HomePage
     {
         BindingContext = model;
         InitializeComponent();
+
+        ScrollableArea.Scrolled += ScrollableArea_Scrolled;
     }
 
-    private void ShowMoreWeatherForecast(object? sender, EventArgs e)
+    private void ScrollableArea_Scrolled(object? sender, ScrolledEventArgs e)
     {
-        WeatherExpander.IsExpanded = !WeatherExpander.IsExpanded;
-        WeatherExpanderButton.Text = WeatherExpander.IsExpanded ? Texts.ShowLess : Texts.ShowMore;
-    }
-
-    private void ShowMoreAirQuality(object? sender, EventArgs e)
-    {
-        AirQualityExpander.IsExpanded = !AirQualityExpander.IsExpanded;
-        AirQualityExpanderButton.Text = AirQualityExpander.IsExpanded ? Texts.ShowLess : Texts.ShowMore;
+        // Parallax effect for the banner image :)
+        BannerImage.TranslationY = e.ScrollY / 3;
     }
 }
 

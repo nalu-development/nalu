@@ -93,9 +93,9 @@ namespace Nalu.Maui.Weather.Resources {
             }
         }
         
-        internal static string Pm10 {
+        internal static string PM10 {
             get {
-                return ResourceManager.GetString("Pm10", resourceCulture);
+                return ResourceManager.GetString("PM10", resourceCulture);
             }
         }
         

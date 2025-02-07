@@ -42,7 +42,7 @@
   <data name="ShowLess" xml:space="preserve">
     <value>Show less</value>
   </data>
-  <data name="Pm10" xml:space="preserve">
+  <data name="PM10" xml:space="preserve">
     <value>PM10</value>
   </data>
   <data name="PM25" xml:space="preserve">

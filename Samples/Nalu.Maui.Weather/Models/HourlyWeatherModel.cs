@@ -1,6 +1,6 @@
 namespace Nalu.Maui.Weather.Models;
 
-public class WeatherModel
+public class HourlyWeatherModel
 {
     public required DateTime Time { get; set; }
     public required float? Temperature { get; set; }
@@ -10,4 +10,6 @@ public class WeatherModel
     public required float? WindSpeed { get; set; }
     public required float? WindDirection { get; set; }
     public required int? WeatherCode { get; set; }
+    public string Hour => Time.ToString("HH:mm");
+    public string TemperatureDegrees => $"{Temperature ?? 0:N0}°";
 }

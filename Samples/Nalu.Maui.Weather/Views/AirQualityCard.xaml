@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Border xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+        xmlns:viewModels="clr-namespace:Nalu.Maui.Weather.ViewModels"
+        xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+        xmlns:models="clr-namespace:Nalu.Maui.Weather.Models"
+        xmlns:r="clr-namespace:Nalu.Maui.Weather.Resources"
+        x:Class="Nalu.Maui.Weather.Views.AirQualityCard"
+        x:DataType="viewModels:WeatherState"
+        Style="{StaticResource CardBorder}">
+    <VerticalStackLayout BackgroundColor="#10000000">
+        <Grid ColumnDefinitions="*,Auto,*"
+              RowDefinitions="Auto,Auto">
+            <Label FontSize="16"
+                   VerticalOptions="End"
+                   HorizontalTextAlignment="End"
+                   FontFamily="SemiBold"
+                   Text="{Binding CurrentAirQuality.DangerousUnit}" />
+            <Label Grid.Row="1"
+                   FontSize="12"
+                   Style="{StaticResource SecondaryText}"
+                   VerticalOptions="Start"
+                   HorizontalTextAlignment="End"
+                   FontFamily="SemiBold"
+                   Text="{Binding CurrentAirQuality.DangerousValue}" />
+            <Image Grid.Column="1"
+                   Grid.RowSpan="2"
+                   Margin="16,4"
+                   Source="{FontImageSource Glyph={Binding CurrentAirQuality.Icon},
+                                        FontFamily=MaterialOutlined,
+                                        Color={Binding CurrentAirQuality.IconColor},
+                                        Size=64}"/>
+            <Label FontSize="16"
+                   Grid.Column="2"
+                   VerticalOptions="End"
+                   FontFamily="SemiBold"
+                   TextColor="{Binding CurrentAirQuality.IconColor}"
+                   Text="{Binding CurrentAirQuality.DangerousLevel}" />
+            <Label Grid.Row="1"
+                   Grid.Column="2"
+                   FontSize="12"
+                   Style="{StaticResource SecondaryText}"
+                   VerticalOptions="Start"
+                   FontFamily="SemiBold"
+                   Text="{Binding CurrentAirQuality.Hour}" />
+        </Grid>
+        <Border Style="{StaticResource CardBorder}"
+                StrokeShape="RoundRectangle 24,24,8,8"
+                Padding="0,8,0,0"
+                Shadow="{x:Null}">
+            <VerticalStackLayout>
+                <nalu:ExpanderViewBox CollapsedHeight="420"
+                                      IsExpanded="False"
+                                      x:Name="Expander">
+                    <VerticalStackLayout>
+
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding TodayHourlyAirQualityData}">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:HourlyAirQualityModel">
+                                    <Grid ColumnDefinitions="*,*,Auto,*"
+                                          RowDefinitions="Auto,Auto"
+                                          Padding="16,8">
+                                        <Label FontFamily="SemiBold"
+                                               FontSize="16"
+                                               VerticalTextAlignment="Center"
+                                               Text="{Binding Hour}"/>
+                                        <Border Grid.Row="1"
+                                                HorizontalOptions="Start"
+                                                VerticalOptions="Center"
+                                                Style="{StaticResource BadgeBorder}"
+                                                BackgroundColor="{Binding IconColor}"
+                                                Margin="-4,4,0,0">
+                                            <Label Text="{Binding DangerousLevel}"
+                                                   TextTransform="Uppercase"
+                                                   TextColor="{StaticResource White}"
+                                                   FontSize="11"/>
+                                        </Border>
+                                        <Image Grid.Column="2"
+                                               Grid.RowSpan="2"
+                                               Margin="8,0"
+                                               Source="{FontImageSource Glyph={Binding Icon},
+                                                            FontFamily=MaterialOutlined,
+                                                            Color={Binding IconColor},
+                                                            Size=24}"/>
+                                        <Label Grid.Column="1"
+                                               FontSize="12"
+                                               VerticalTextAlignment="Center"
+                                               HorizontalTextAlignment="End">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding Pm10Value}" Style="{StaticResource SecondarySpan}" />
+                                                    <Span Text=" " />
+                                                    <Span Text="PM10" FontFamily="SemiBold" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label Grid.Column="1"
+                                               Grid.Row="2"
+                                               FontSize="12"
+                                               VerticalTextAlignment="Center"
+                                               HorizontalTextAlignment="End">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="{Binding Pm25Value}" Style="{StaticResource SecondarySpan}" />
+                                                    <Span Text=" " />
+                                                    <Span Text="PM2.5" FontFamily="SemiBold" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label Grid.Column="3"
+                                               Grid.Row="2"
+                                               FontSize="12"
+                                               VerticalTextAlignment="Center"
+                                               HorizontalTextAlignment="Start">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="CO" FontFamily="SemiBold" />
+                                                    <Span Text=" " />
+                                                    <Span Text="{Binding CoValue}" Style="{StaticResource SecondarySpan}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                        <Label Grid.Column="3"
+                                               FontSize="12"
+                                               VerticalTextAlignment="Center"
+                                               HorizontalTextAlignment="Start">
+                                            <Label.FormattedText>
+                                                <FormattedString>
+                                                    <Span Text="O3" FontFamily="SemiBold" />
+                                                    <Span Text=" " />
+                                                    <Span Text="{Binding O3Value}" Style="{StaticResource SecondarySpan}" />
+                                                </FormattedString>
+                                            </Label.FormattedText>
+                                        </Label>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </nalu:ExpanderViewBox>
+
+                <Button IsVisible="{Binding Path=CanCollapse,
+                                                        Source={x:Reference Expander},
+                                                        x:DataType=nalu:ExpanderViewBox}"
+                        x:Name="ExpanderButton"
+                        BackgroundColor="Transparent"
+                        Clicked="ToggleExpander"
+                        Text="{x:Static r:Texts.ShowMore}"
+                        Style="{StaticResource TextButton}"
+                        Margin="0,8,0,0"/>
+            </VerticalStackLayout>
+        </Border>
+    </VerticalStackLayout>
+</Border>

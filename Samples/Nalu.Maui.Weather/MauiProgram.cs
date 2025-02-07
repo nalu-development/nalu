@@ -1,8 +1,11 @@
 namespace Nalu.Maui.Weather;
 
+#if DEBUG
 using Microsoft.Extensions.Logging;
+#endif
 
 using CommunityToolkit.Maui;
+using FFImageLoading.Maui;
 using Services;
 using ViewModels;
 
@@ -23,6 +26,7 @@ public static class MauiProgram
             .UseNaluLayouts()
             .UseMauiCommunityToolkit()
             .UseOpenMeteo()
+            .UseFFImageLoading()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "Regular");

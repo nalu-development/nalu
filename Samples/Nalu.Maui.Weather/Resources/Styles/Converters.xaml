@@ -13,5 +13,6 @@
     <!-- Custom converters -->
     <converters:WeatherCodeToDescriptionConverter x:Key="WeatherDescriptionConverter" />
     <converters:WeatherCodeToIconConverter x:Key="WeatherIconConverter" />
+    <converters:WeatherCodeToImageConverter x:Key="WeatherImageConverter" />
 
 </ResourceDictionary>
