@@ -3,28 +3,24 @@ namespace Nalu;
 using Microsoft.Maui.Handlers;
 
 #if WINDOWS
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using WRect = global::Windows.Foundation.Rect;
 using WSize = global::Windows.Foundation.Size;
 using PlatformView = Nalu.ViewBoxPanel;
 using OriginalPlatformView = Microsoft.Maui.Platform.ContentPanel;
 
-internal class ViewBoxPanel : OriginalPlatformView
+internal partial class ViewBoxPanel : OriginalPlatformView
 {
     public bool ClipsToBounds { get; set; }
 
     protected override WSize ArrangeOverride(WSize finalSize)
-	{
-		var actual = base.ArrangeOverride(finalSize);
+    {
+        var actual = base.ArrangeOverride(finalSize);
 
-		if (!(Parent is ContentPanel contentPanel && contentPanel.BorderStroke?.Shape is not null))
-		{
-			Clip = ClipsToBounds ? new RectangleGeometry { Rect = new WRect(0, 0, finalSize.Width, finalSize.Height) } : null;
-		}
+        Clip = ClipsToBounds ? new RectangleGeometry { Rect = new WRect(0, 0, finalSize.Width, finalSize.Height) } : null;
 
-		return actual;
-	}
+        return actual;
+    }
 }
 #endif
 

@@ -3,7 +3,7 @@ namespace Nalu;
 /// <summary>
 /// Extends <see cref="ViewBoxBase"/> base class with customizable clipping behavior.
 /// </summary>
-public class ClippableViewBoxBase : ViewBoxBase, IViewBox
+public partial class ClippableViewBoxBase : ViewBoxBase, IViewBox
 {
     /// <summary>
     /// Bindable property for <see cref="IsClippedToBounds"/>.

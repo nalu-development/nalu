@@ -51,7 +51,7 @@ public interface IExpanderViewBox : IViewBox
 /// TODO
 /// </summary>
 [ContentProperty(nameof(Content))]
-public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
+public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
 {
 #pragma warning disable IDE1006
     // ReSharper disable once InconsistentNaming

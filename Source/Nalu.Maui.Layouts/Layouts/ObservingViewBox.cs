@@ -17,7 +17,7 @@ public delegate Size ObservedConstraintsFactory(double widthConstraint, double h
 /// A <see cref="ViewBox"/> which observes the size of its content.
 /// </summary>
 [SuppressMessage("Style", "IDE0290:Use primary constructor")]
-public class ObservingViewBox : ViewBox
+public partial class ObservingViewBox : ViewBox
 {
     private Size _lastSize;
     private ObservedConstraintsFactory _observedConstraintsFactory;
