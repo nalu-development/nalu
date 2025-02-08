@@ -1,6 +1,5 @@
 namespace Nalu.Maui.Weather.Services;
 
-using System.Text.Json;
 using Models;
 using OpenMeteo;
 
@@ -22,7 +21,7 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
         {
             Start_date = startDate,
             End_date = endDate,
-            Timezone = TimeZoneInfo.Local.Id,
+            Timezone = "auto",
             Daily = new DailyOptions([
                 DailyOptionsParameter.windspeed_10m_max,
                 DailyOptionsParameter.winddirection_10m_dominant,
@@ -36,13 +35,12 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
         var times = forecast!.Daily!.Time!;
 
         return times.Select((t, i) => new DailyWeatherModel
-            {
-                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
-                TemperatureMin = forecast.Daily.Temperature_2m_min![i],
-                TemperatureMax = forecast.Daily.Temperature_2m_max![i],
-                WeatherCode = (int)forecast.Daily.Weathercode![i],
-            })
-            .ToList();
+        {
+            Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+            TemperatureMin = forecast.Daily.Temperature_2m_min![i],
+            TemperatureMax = forecast.Daily.Temperature_2m_max![i],
+            WeatherCode = (int)forecast.Daily.Weathercode![i],
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<HourlyWeatherModel>> GetHourlyWeatherAsync(float latitude, float longitude, DateTime start, DateTime end)
@@ -54,7 +52,7 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
         {
             Start_date = startDate,
             End_date = endDate,
-            Timezone = TimeZoneInfo.Local.Id,
+            Timezone = "auto",
             Hourly = new HourlyOptions([
                 HourlyOptionsParameter.uv_index,
                 HourlyOptionsParameter.relativehumidity_2m,
@@ -69,17 +67,16 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
         var times = forecast!.Hourly!.Time!;
 
         return times.Select((t, i) => new HourlyWeatherModel
-            {
-                Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
-                Temperature = forecast.Hourly.Temperature_2m![i],
-                FeelsLike = forecast.Hourly.Apparent_temperature![i],
-                Humidity = forecast.Hourly.Relativehumidity_2m![i],
-                UvIndex = forecast.Hourly.Uv_index![i],
-                WindSpeed = forecast.Hourly.Windspeed_10m![i],
-                WindDirection = forecast.Hourly.Winddirection_10m![i],
-                WeatherCode = forecast.Hourly.Weathercode![i]
-            })
-            .ToList();
+        {
+            Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+            Temperature = forecast.Hourly.Temperature_2m![i],
+            FeelsLike = forecast.Hourly.Apparent_temperature![i],
+            Humidity = forecast.Hourly.Relativehumidity_2m![i],
+            UvIndex = forecast.Hourly.Uv_index![i],
+            WindSpeed = forecast.Hourly.Windspeed_10m![i],
+            WindDirection = forecast.Hourly.Winddirection_10m![i],
+            WeatherCode = forecast.Hourly.Weathercode![i]
+        }).ToList();
     }
 
     public async Task<IReadOnlyList<HourlyAirQualityModel>> GetHourlyAirQualityAsync(float latitude, float longitude, DateTime start, DateTime end)
@@ -97,7 +94,7 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
             ]),
             Start_date = startDate,
             End_date = endDate,
-            Timezone = TimeZoneInfo.Local.Id
+            Timezone = "auto"
         }) ?? throw new InvalidOperationException("Cannot retrieve air quality data");
 
         var times = iq.Hourly!.Time!;
