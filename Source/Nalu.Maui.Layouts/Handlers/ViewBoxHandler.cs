@@ -9,7 +9,13 @@ using WSize = global::Windows.Foundation.Size;
 using PlatformView = Nalu.ViewBoxPanel;
 using OriginalPlatformView = Microsoft.Maui.Platform.ContentPanel;
 
+#if NET9_0_OR_GREATER
 internal partial class ViewBoxPanel : OriginalPlatformView
+#else
+#pragma warning disable CsWinRT1029
+internal partial class ViewBoxPanel : OriginalPlatformView
+#pragma warning restore CsWinRT1029
+#endif
 {
     public bool ClipsToBounds { get; set; }
 
