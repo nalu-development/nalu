@@ -263,6 +263,18 @@ public partial class NavigationServiceTests
                 return segmentToContent[segmentName];
             });
         _shellProxy
+            .When(m => m.InitializeWithContent(Arg.Any<string>()))
+            .Do(callInfo =>
+            {
+                var segmentName = callInfo.Arg<string>();
+                var content = segmentToContent[segmentName];
+                var section = content.Parent;
+                var item = section.Parent;
+                ((TestShellSectionProxy)section).CurrentContent = content;
+                ((TestShellItemProxy)item).CurrentSection = section;
+                _shellProxy.CurrentItem.Returns(item);
+            });
+        _shellProxy
             .SelectContentAsync(Arg.Any<string>())
             .Returns(callInfo =>
             {
