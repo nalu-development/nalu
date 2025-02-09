@@ -67,40 +67,41 @@ public interface IRelativeNavigationBuilder : INavigationInfo
 /// <summary>
 /// Defines a relative navigation.
 /// </summary>
-public partial class RelativeNavigation : Navigation, IRelativeNavigationInitialBuilder, IRelativeNavigationBuilder, IRelativeNavigationPushOnlyBuilder
+public class RelativeNavigation : Navigation, IRelativeNavigationInitialBuilder, IRelativeNavigationBuilder, IRelativeNavigationPushOnlyBuilder
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="RelativeNavigation"/> class.
+    /// Initializes a new instance of the <see cref="RelativeNavigation" /> class.
     /// </summary>
     public RelativeNavigation()
-        : base(false, null)
-    {
-    }
+        : base(false, null) { }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RelativeNavigation"/> class with the specified behavior.
+    /// Initializes a new instance of the <see cref="RelativeNavigation" /> class with the specified behavior.
     /// </summary>
     /// <param name="behavior">The behavior to use during this relative navigation.</param>
     public RelativeNavigation(NavigationBehavior? behavior)
-        : base(false, behavior)
-    {
-    }
+        : base(false, behavior) { }
 
     /// <inheritdoc cref="IRelativeNavigationBuilder.Pop" />
     public IRelativeNavigationBuilder Pop()
     {
         Add(new NavigationPop());
+
         return this;
     }
 
-    /// <inheritdoc cref="IRelativeNavigationBuilder.Push{TPage}"/> />
+    /// <inheritdoc cref="IRelativeNavigationBuilder.Push{TPage}" />
+    /// />
     public IRelativeNavigationPushOnlyBuilder Push<TPage>()
         where TPage : class
     {
-        Add(new NavigationSegment
-        {
-            Type = typeof(TPage),
-        });
+        Add(
+            new NavigationSegment
+            {
+                Type = typeof(TPage)
+            }
+        );
+
         return this;
     }
 
@@ -113,6 +114,7 @@ public partial class RelativeNavigation : Navigation, IRelativeNavigationInitial
         }
 
         Intent = intent;
+
         return this;
     }
 }

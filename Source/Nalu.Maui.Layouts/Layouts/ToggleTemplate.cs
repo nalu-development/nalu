@@ -1,42 +1,42 @@
 namespace Nalu;
 
 /// <summary>
-/// A <see cref="ViewBox"/> that uses a <see cref="DataTemplate"/> to render content based on a boolean value.
+/// A <see cref="ViewBox" /> that uses a <see cref="DataTemplate" /> to render content based on a boolean value.
 /// </summary>
-public partial class ToggleTemplate : TemplateBoxBase
+public class ToggleTemplate : TemplateBoxBase
 {
     /// <summary>
-    /// Bindable property for <see cref="WhenTrue"/> property.
+    /// Bindable property for <see cref="WhenTrue" /> property.
     /// </summary>
     public static readonly BindableProperty WhenTrueProperty =
         BindableProperty.Create(nameof(WhenTrue), typeof(DataTemplate), typeof(ToggleTemplate), propertyChanged: ConditionChanged);
 
     /// <summary>
-    /// Bindable property for <see cref="WhenFalse"/> property.
+    /// Bindable property for <see cref="WhenFalse" /> property.
     /// </summary>
     public static readonly BindableProperty WhenFalseProperty =
         BindableProperty.Create(nameof(WhenFalse), typeof(DataTemplate), typeof(ToggleTemplate), propertyChanged: ConditionChanged);
 
     /// <summary>
-    /// Bindable property for <see cref="Value"/> property.
+    /// Bindable property for <see cref="Value" /> property.
     /// </summary>
     public static readonly BindableProperty ValueProperty = BindableProperty.Create(nameof(Value), typeof(bool?), typeof(ToggleTemplate), propertyChanged: ConditionChanged);
 
     /// <summary>
-    /// Gets or sets the <see cref="DataTemplate"/> to use when the value is false.
+    /// Gets or sets the <see cref="DataTemplate" /> to use when the value is false.
     /// </summary>
     public DataTemplate? WhenFalse
     {
-        get => (DataTemplate?)GetValue(WhenFalseProperty);
+        get => (DataTemplate?) GetValue(WhenFalseProperty);
         set => SetValue(WhenFalseProperty, value);
     }
 
     /// <summary>
-    /// Gets or sets the <see cref="DataTemplate"/> to use when the value is true.
+    /// Gets or sets the <see cref="DataTemplate" /> to use when the value is true.
     /// </summary>
     public DataTemplate? WhenTrue
     {
-        get => (DataTemplate?)GetValue(WhenTrueProperty);
+        get => (DataTemplate?) GetValue(WhenTrueProperty);
         set => SetValue(WhenTrueProperty, value);
     }
 
@@ -45,7 +45,7 @@ public partial class ToggleTemplate : TemplateBoxBase
     /// </summary>
     public bool? Value
     {
-        get => (bool?)GetValue(ValueProperty);
+        get => (bool?) GetValue(ValueProperty);
         set => SetValue(ValueProperty, value);
     }
 
@@ -55,7 +55,7 @@ public partial class ToggleTemplate : TemplateBoxBase
         {
             true => WhenTrue,
             false => WhenFalse,
-            _ => null,
+            _ => null
         };
 
         SetTemplate(template);

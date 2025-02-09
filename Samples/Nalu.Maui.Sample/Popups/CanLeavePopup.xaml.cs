@@ -1,6 +1,6 @@
-namespace Nalu.Maui.Sample.Popups;
+using Nalu.Maui.Sample.PopupModels;
 
-using PopupModels;
+namespace Nalu.Maui.Sample.Popups;
 
 public partial class CanLeavePopup
 {
@@ -14,4 +14,3 @@ public partial class CanLeavePopup
 
     private void NoOnClicked(object? sender, EventArgs e) => Close(false);
 }
-

@@ -1,7 +1,6 @@
-namespace Nalu.Maui.Test.Navigation;
-
 using CommunityToolkit.Mvvm.ComponentModel;
-using FluentAssertions;
+
+namespace Nalu.Maui.Test.NavigationTests;
 
 public class NavigationTests
 {
@@ -56,7 +55,7 @@ public class NavigationTests
     [Fact(DisplayName = "Relative navigation, when pop follows push, throws exception")]
     public void RelativeNavigationWhenPopFollowsPushThrowsException()
     {
-        var r = (IRelativeNavigationInitialBuilder)Nalu.Navigation.Relative().Push<SomePageModel>();
+        var r = (IRelativeNavigationInitialBuilder) Nalu.Navigation.Relative().Push<SomePageModel>();
 
         Action addPop = () => r.Pop();
 
@@ -66,9 +65,9 @@ public class NavigationTests
     [Fact(DisplayName = "Relative navigation, when inserting push before pop, throws exception")]
     public void RelativeNavigationWhenInsertingPushBeforePopThrowsException()
     {
-        var r = (Nalu.Navigation)Nalu.Navigation.Relative().Pop();
+        var r = (Nalu.Navigation) Nalu.Navigation.Relative().Pop();
 
-        var addPop = () => r.Insert(0, (NavigationSegment)typeof(SomePageModel));
+        var addPop = () => r.Insert(0, (NavigationSegment) typeof(SomePageModel));
 
         addPop.Should().Throw<InvalidOperationException>();
     }
@@ -76,7 +75,7 @@ public class NavigationTests
     [Fact(DisplayName = "Relative navigation, when inserting pop after pop, throws exception")]
     public void RelativeNavigationWhenInsertingPopAfterPopThrowsException()
     {
-        var r = (Nalu.Navigation)Nalu.Navigation.Relative().Push<SomePageModel>();
+        var r = (Nalu.Navigation) Nalu.Navigation.Relative().Push<SomePageModel>();
 
         var addPop = () => r.Insert(1, new NavigationPop());
 
@@ -86,7 +85,7 @@ public class NavigationTests
     [Fact(DisplayName = "Absolute navigation, when inserting pop, throws exception")]
     public void AbsoluteNavigationWhenInsertingPopThrowsException()
     {
-        var a = (Nalu.Navigation)Nalu.Navigation.Absolute();
+        var a = (Nalu.Navigation) Nalu.Navigation.Absolute();
 
         var addPop = () => a.Insert(0, new NavigationPop());
 
@@ -96,7 +95,7 @@ public class NavigationTests
     [Fact(DisplayName = "Absolute navigation, when adding pop, throws exception")]
     public void AbsoluteNavigationWhenAddingPopThrowsException()
     {
-        var a = (Nalu.Navigation)Nalu.Navigation.Absolute();
+        var a = (Nalu.Navigation) Nalu.Navigation.Absolute();
 
         var addPop = () => a.Add(new NavigationPop());
 

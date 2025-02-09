@@ -1,7 +1,8 @@
 // ReSharper disable once CheckNamespace
-namespace Microsoft.Maui;
 
 using Nalu;
+
+namespace Microsoft.Maui;
 
 /// <summary>
 /// Provides a fluent API for configuring Nalu navigation.
@@ -23,6 +24,7 @@ public static class NaluMauiAppBuilderExtensions
 
         var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
         configure(configurator);
+
         return builder;
     }
 

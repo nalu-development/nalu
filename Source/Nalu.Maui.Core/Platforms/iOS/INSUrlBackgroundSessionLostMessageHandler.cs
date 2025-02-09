@@ -13,8 +13,8 @@ public interface INSUrlBackgroundSessionLostMessageHandler
     /// </summary>
     /// <param name="responseHandle">The background response handle.</param>
     /// <remarks>
-    /// This method is supposed to invoke <see cref="NSUrlBackgroundResponseHandle.GetResponseAsync()"/>
-    /// and dispose the provided <see cref="HttpResponseMessage"/> as soon as possible,
+    /// This method is supposed to invoke <see cref="NSUrlBackgroundResponseHandle.GetResponseAsync()" />
+    /// and dispose the provided <see cref="HttpResponseMessage" /> as soon as possible,
     /// but not before storing the result where appropriate.
     /// </remarks>
     Task HandleLostMessageAsync(NSUrlBackgroundResponseHandle responseHandle);

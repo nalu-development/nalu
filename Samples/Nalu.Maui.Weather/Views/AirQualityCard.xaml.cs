@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Nalu.Maui.Weather.Resources;
 
 namespace Nalu.Maui.Weather.Views;
-
-using Resources;
 
 public partial class AirQualityCard
 {
@@ -21,4 +15,3 @@ public partial class AirQualityCard
         ExpanderButton.Text = Expander.IsExpanded ? Texts.ShowLess : Texts.ShowMore;
     }
 }
-

@@ -1,8 +1,8 @@
-namespace Nalu.Maui.Sample.PageModels;
-
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Pages;
+using Nalu.Maui.Sample.Pages;
+
+namespace Nalu.Maui.Sample.PageModels;
 
 public partial class FourPageModel(INavigationService navigationService) : ObservableObject
 {
@@ -17,7 +17,8 @@ public partial class FourPageModel(INavigationService navigationService) : Obser
     private Task NavigateToTwoAsync() => navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.IgnoreGuards).ShellContent<TwoPageModel>());
 
     [RelayCommand(AllowConcurrentExecutions = false)]
-    private Task NavigateToFiveAsync() => navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnItemChange | NavigationBehavior.IgnoreGuards).ShellContent<FivePageModel>());
+    private Task NavigateToFiveAsync()
+        => navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnItemChange | NavigationBehavior.IgnoreGuards).ShellContent<FivePageModel>());
 
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task NavigateToSevenAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<SevenPageModel>());

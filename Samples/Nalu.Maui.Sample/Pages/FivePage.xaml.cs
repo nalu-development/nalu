@@ -1,6 +1,6 @@
-namespace Nalu.Maui.Sample.Pages;
+using Nalu.Maui.Sample.PageModels;
 
-using PageModels;
+namespace Nalu.Maui.Sample.Pages;
 
 public partial class FivePage : ContentPage
 {
@@ -10,4 +10,3 @@ public partial class FivePage : ContentPage
         InitializeComponent();
     }
 }
-

@@ -14,6 +14,7 @@ public class NSubstituteLeakTests
     public async Task NSubstituteDoesNotLeak()
     {
         WeakReference<Foo> weakFoo;
+
         {
             var foo = new Foo();
             weakFoo = new WeakReference<Foo>(foo);

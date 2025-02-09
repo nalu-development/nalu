@@ -1,6 +1,8 @@
+using Nalu.Maui.Sample.PageModels;
+
 namespace Nalu.Maui.Sample.Pages;
 
-using FourPageModel = PageModels.FourPageModel;
+using FourPageModel = FourPageModel;
 
 public partial class FourPage : ContentPage
 {
@@ -10,4 +12,3 @@ public partial class FourPage : ContentPage
         InitializeComponent();
     }
 }
-

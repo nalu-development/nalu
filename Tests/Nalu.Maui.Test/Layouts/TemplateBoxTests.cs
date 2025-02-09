@@ -50,7 +50,7 @@ public class TemplateBoxTests
         // Assert
         templatedComponent.ContentTemplate.Should().Be(dataTemplateSelector);
         templatedComponent.PresentedContent.Should().BeOfType<Label>();
-        var label = (Label)templatedComponent.PresentedContent!;
+        var label = (Label) templatedComponent.PresentedContent!;
         label.Text.Should().Be(bindingContext);
         label.BindingContext.Should().Be(bindingContext);
     }
@@ -72,7 +72,7 @@ public class TemplateBoxTests
         // Assert
         templatedComponent.ContentTemplate.Should().Be(dataTemplateSelector);
         templatedComponent.PresentedContent.Should().BeOfType<Label>();
-        var label = (Label)templatedComponent.PresentedContent!;
+        var label = (Label) templatedComponent.PresentedContent!;
         label.Text.Should().Be(contentBindingContext);
         label.BindingContext.Should().Be(contentBindingContext);
     }
@@ -85,7 +85,7 @@ public class TemplateBoxTests
         var newBindingContext = new object();
         component.ContentBindingContext = newBindingContext;
         component.ContentTemplate = new DataTemplate(() => new Label());
-        var view = (Label)component.PresentedContent!;
+        var view = (Label) component.PresentedContent!;
         view.BindingContext.Should().Be(newBindingContext);
 
         // Act
@@ -103,7 +103,7 @@ public class TemplateBoxTests
         var newBindingContext = new object();
         component.BindingContext = newBindingContext;
         component.ContentTemplate = new DataTemplate(() => new Label());
-        var view = (Label)component.PresentedContent!;
+        var view = (Label) component.PresentedContent!;
         view.BindingContext.Should().Be(newBindingContext);
 
         // Act
@@ -122,7 +122,7 @@ public class TemplateBoxTests
         var contentBindingContext = "world";
         templatedComponent.ContentBindingContext = contentBindingContext;
         templatedComponent.ContentTemplate = dataTemplateSelector;
-        var label = (Label)templatedComponent.PresentedContent!;
+        var label = (Label) templatedComponent.PresentedContent!;
         label.BindingContext.Should().Be(contentBindingContext);
 
         // Act
@@ -142,7 +142,7 @@ public class TemplateBoxTests
         var bindingContext = "world";
         templatedComponent.BindingContext = bindingContext;
         templatedComponent.ContentTemplate = dataTemplateSelector;
-        var label = (Label)templatedComponent.PresentedContent!;
+        var label = (Label) templatedComponent.PresentedContent!;
         label.BindingContext.Should().Be(bindingContext);
 
         // Act
@@ -162,7 +162,7 @@ public class TemplateBoxTests
         var bindingContext = "world";
         templatedComponent.BindingContext = bindingContext;
         templatedComponent.ContentTemplate = dataTemplateSelector;
-        var label = (Label)templatedComponent.PresentedContent!;
+        var label = (Label) templatedComponent.PresentedContent!;
         label.BindingContext.Should().Be(bindingContext);
 
         // Act
@@ -176,39 +176,44 @@ public class TemplateBoxTests
 
     [Fact(DisplayName = "ContentTemplate can project content")]
     public Task ContentTemplateCanProjectContent()
-        => DispatcherTest.RunWithDispatcherStub(() =>
-        {
-            // Arrange
-            var templatedComponent = new TemplateBox();
-            var dataTemplate = new DataTemplate(() => new TemplateContentPresenter());
-            var bindingContext = "world";
-            var projectedContent = new Label { Text = "hello" };
-            templatedComponent.BindingContext = bindingContext;
-            templatedComponent.ContentTemplate = dataTemplate;
+        => DispatcherTest.RunWithDispatcherStub(
+            () =>
+            {
+                // Arrange
+                var templatedComponent = new TemplateBox();
+                var dataTemplate = new DataTemplate(() => new TemplateContentPresenter());
+                var bindingContext = "world";
+                var projectedContent = new Label { Text = "hello" };
+                templatedComponent.BindingContext = bindingContext;
+                templatedComponent.ContentTemplate = dataTemplate;
 
-            // Act
-            templatedComponent.TemplateContent = projectedContent;
+                // Act
+                templatedComponent.TemplateContent = projectedContent;
 
-            // Assert
-            var container = templatedComponent.PresentedContent as TemplateContentPresenter;
-            container.Should().NotBeNull();
-            container!.Content.Should().Be(projectedContent);
-        });
+                // Assert
+                var container = templatedComponent.PresentedContent as TemplateContentPresenter;
+                container.Should().NotBeNull();
+                container!.Content.Should().Be(projectedContent);
+            }
+        );
 
     private class TestTemplateSelector : DataTemplateSelector
     {
         protected override DataTemplate OnSelectTemplate(object? item, BindableObject container)
-            => new(() => new Label { Text = (string?)item! });
+            => new(() => new Label { Text = (string?) item! });
     }
 
     private class StaticRefTemplateSelector : DataTemplateSelector
     {
-        private static readonly DataTemplate _template = new(() =>
-        {
-            var label = new Label();
-            label.SetBinding(Label.TextProperty, new Binding("."));
-            return label;
-        });
+        private static readonly DataTemplate _template = new(
+            () =>
+            {
+                var label = new Label();
+                label.SetBinding(Label.TextProperty, new Binding("."));
+
+                return label;
+            }
+        );
 
         protected override DataTemplate OnSelectTemplate(object? item, BindableObject container)
             => _template;

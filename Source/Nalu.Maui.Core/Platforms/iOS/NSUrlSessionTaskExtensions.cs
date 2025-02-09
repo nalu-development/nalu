@@ -1,7 +1,7 @@
-namespace Nalu;
-
 using System.Net;
 using Foundation;
+
+namespace Nalu;
 
 internal static class NSUrlSessionTaskExtensions
 {
@@ -9,5 +9,5 @@ internal static class NSUrlSessionTaskExtensions
         => task.State == NSUrlSessionTaskState.Canceling || (task.Error?.Code ?? 0) == -999;
 
     public static HttpStatusCode GetHttpStatusCode(this NSUrlSessionTask task)
-        => (HttpStatusCode)((task.Response as NSHttpUrlResponse)?.StatusCode ?? 0);
+        => (HttpStatusCode) ((task.Response as NSHttpUrlResponse)?.StatusCode ?? 0);
 }

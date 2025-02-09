@@ -1,6 +1,6 @@
-namespace Nalu;
-
 using System.Reflection;
+
+namespace Nalu;
 
 /// <summary>
 /// Defines an alternative navigation segment name (by default matches the name of the class).
@@ -17,7 +17,7 @@ public class NavigationSegmentAttribute(string segmentName) : Attribute
     public string SegmentName => segmentName;
 
     /// <summary>
-    /// Gets the segment name for the given <paramref name="type"/>.
+    /// Gets the segment name for the given <paramref name="type" />.
     /// </summary>
     /// <param name="type">The given type.</param>
     /// <returns>The segment name, defaults to type name.</returns>
@@ -35,6 +35,7 @@ public class NavigationSegmentAttribute(string segmentName) : Attribute
     private static string GetTypeName(Type type)
     {
         var name = type.Name;
+
         if (!type.IsGenericType)
         {
             return name;
@@ -44,6 +45,7 @@ public class NavigationSegmentAttribute(string segmentName) : Attribute
         name = name[..index];
         var genericArguments = type.GetGenericArguments();
         var genericArgumentsNames = genericArguments.Select(GetTypeName);
+
         return $"{name}-{string.Join("-", genericArgumentsNames)}";
     }
 }

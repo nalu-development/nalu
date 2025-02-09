@@ -1,11 +1,12 @@
-namespace Nalu.Maui.Weather;
+using Nalu.Maui.Weather.PageModels;
+using Nalu.Maui.Weather.Pages;
 
-using PageModels;
-using Pages;
+namespace Nalu.Maui.Weather;
 
 public partial class AppShell
 {
-    public AppShell(INavigationService navigationService) : base(navigationService, typeof(InitializationPage), new StartupIntent())
+    public AppShell(INavigationService navigationService)
+        : base(navigationService, typeof(InitializationPage), new StartupIntent())
     {
         InitializeComponent();
     }

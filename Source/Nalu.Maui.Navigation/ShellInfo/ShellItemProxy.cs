@@ -1,10 +1,10 @@
-namespace Nalu;
-
 using System.ComponentModel;
+
+namespace Nalu;
 
 #pragma warning disable CS8618
 
-internal partial class ShellItemProxy : IShellItemProxy, IDisposable
+internal class ShellItemProxy : IShellItemProxy, IDisposable
 {
     private readonly ShellItem _item;
     public string SegmentName { get; }
@@ -27,7 +27,7 @@ internal partial class ShellItemProxy : IShellItemProxy, IDisposable
     {
         foreach (var sectionInfo in Sections)
         {
-            ((IDisposable)sectionInfo).Dispose();
+            ((IDisposable) sectionInfo).Dispose();
         }
 
         _item.PropertyChanged -= ItemOnPropertyChanged;

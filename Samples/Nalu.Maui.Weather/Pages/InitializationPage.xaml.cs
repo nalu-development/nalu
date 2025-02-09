@@ -1,6 +1,6 @@
-namespace Nalu.Maui.Weather.Pages;
+using Nalu.Maui.Weather.PageModels;
 
-using PageModels;
+namespace Nalu.Maui.Weather.Pages;
 
 public partial class InitializationPage
 {
@@ -10,4 +10,3 @@ public partial class InitializationPage
         InitializeComponent();
     }
 }
-

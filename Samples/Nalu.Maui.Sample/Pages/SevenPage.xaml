@@ -13,7 +13,7 @@
             <Label>
                 <Label.FormattedText>
                     <FormattedString>
-                        <Span Text="Instance: "/>
+                        <Span Text="Instance: " />
                         <Span Text="{Binding InstanceCount}" />
                     </FormattedString>
                 </Label.FormattedText>

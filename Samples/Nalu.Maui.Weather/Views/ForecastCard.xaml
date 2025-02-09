@@ -22,7 +22,7 @@
                             <Label FontFamily="SemiBold"
                                    FontSize="16"
                                    VerticalTextAlignment="Center"
-                                   Text="{Binding DayName}"/>
+                                   Text="{Binding DayName}" />
                             <Border Grid.Row="1"
                                     HorizontalOptions="Start"
                                     VerticalOptions="Center"
@@ -31,7 +31,7 @@
                                 <Label Text="{Binding Date}"
                                        TextTransform="Uppercase"
                                        Style="{StaticResource SecondaryText}"
-                                       FontSize="11"/>
+                                       FontSize="11" />
                             </Border>
                             <Image Grid.Column="1"
                                    Grid.RowSpan="2"
@@ -39,16 +39,16 @@
                                    Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
                                                 FontFamily=MaterialOutlined,
                                                 Color={StaticResource Secondary},
-                                                Size=40}"/>
+                                                Size=40}" />
                             <Label Grid.Column="2"
                                    FontFamily="SemiBold"
                                    HorizontalTextAlignment="Center"
-                                   Text="{Binding TemperatureMaxDegrees}"/>
+                                   Text="{Binding TemperatureMaxDegrees}" />
                             <Label Grid.Column="2"
                                    Grid.Row="1"
                                    Style="{StaticResource SecondaryText}"
                                    HorizontalTextAlignment="Center"
-                                   Text="{Binding TemperatureMinDegrees}"/>
+                                   Text="{Binding TemperatureMinDegrees}" />
                             <Label Grid.Column="3"
                                    FontSize="12"
                                    VerticalTextAlignment="Center"
@@ -80,14 +80,15 @@
             </VerticalStackLayout>
         </nalu:ExpanderViewBox>
 
-        <Button IsVisible="{Binding Path=CanCollapse,
+        <Button
+            IsVisible="{Binding Path=CanCollapse,
                                                 Source={x:Reference Expander},
                                                 x:DataType=nalu:ExpanderViewBox}"
-                x:Name="ExpanderButton"
-                BackgroundColor="Transparent"
-                Clicked="ToggleExpander"
-                Text="{x:Static r:Texts.ShowMore}"
-                Style="{StaticResource TextButton}"
-                Margin="0,8,0,0"/>
+            x:Name="ExpanderButton"
+            BackgroundColor="Transparent"
+            Clicked="ToggleExpander"
+            Text="{x:Static r:Texts.ShowMore}"
+            Style="{StaticResource TextButton}"
+            Margin="0,8,0,0" />
     </VerticalStackLayout>
 </Border>

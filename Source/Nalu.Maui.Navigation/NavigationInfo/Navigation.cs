@@ -1,8 +1,8 @@
-namespace Nalu;
-
 using System.Collections;
 using System.ComponentModel;
 using Nalu.Internals;
+
+namespace Nalu;
 
 #pragma warning disable CA1067
 #pragma warning disable IDE0290
@@ -13,21 +13,27 @@ using Nalu.Internals;
 public abstract class Navigation : BindableObject, IList<INavigationSegment>, INavigationInfo
 {
     /// <summary>
-    /// Gets or sets the page model to be used for the current <see cref="ShellContent"/>.
+    /// Gets or sets the page model to be used for the current <see cref="ShellContent" />.
     /// </summary>
-    public static readonly BindableProperty PageTypeProperty = BindableProperty.CreateAttached("PageType", typeof(Type), typeof(Navigation), null, propertyChanged: PageModelPropertyChanged);
+    public static readonly BindableProperty PageTypeProperty = BindableProperty.CreateAttached(
+        "PageType",
+        typeof(Type),
+        typeof(Navigation),
+        null,
+        propertyChanged: PageModelPropertyChanged
+    );
 
     /// <summary>
-    /// Gets the page model to be used for the current <see cref="ShellContent"/>.
+    /// Gets the page model to be used for the current <see cref="ShellContent" />.
     /// </summary>
-    /// <param name="bindable">The <see cref="ShellContent"/>.</param>
+    /// <param name="bindable">The <see cref="ShellContent" />.</param>
     [TypeConverter(typeof(TypeTypeConverter))]
-    public static Type? GetPageType(BindableObject bindable) => (Type?)bindable.GetValue(PageTypeProperty);
+    public static Type? GetPageType(BindableObject bindable) => (Type?) bindable.GetValue(PageTypeProperty);
 
     /// <summary>
-    /// Sets the page model to be used for the current <see cref="ShellContent"/>.
+    /// Sets the page model to be used for the current <see cref="ShellContent" />.
     /// </summary>
-    /// <param name="bindable">The <see cref="ShellContent"/>.</param>
+    /// <param name="bindable">The <see cref="ShellContent" />.</param>
     /// <param name="value">Type of the page model.</param>
     [TypeConverter(typeof(TypeTypeConverter))]
     public static void SetPageType(BindableObject bindable, Type? value)
@@ -46,17 +52,18 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     public static readonly BindableProperty IntentProperty = BindableProperty.Create(
         nameof(Intent),
         typeof(object),
-        typeof(NavigationSegment));
+        typeof(NavigationSegment)
+    );
 
     /// <summary>
-    /// Creates a fluent <see cref="RelativeNavigation"/> builder.
+    /// Creates a fluent <see cref="RelativeNavigation" /> builder.
     /// </summary>
     /// <param name="behavior">Applies a specific behavior to this navigation instead of using the default one.</param>
     public static IRelativeNavigationInitialBuilder Relative(NavigationBehavior? behavior = null)
         => new RelativeNavigation(behavior);
 
     /// <summary>
-    /// Creates a fluent <see cref="AbsoluteNavigation"/> builder.
+    /// Creates a fluent <see cref="AbsoluteNavigation" /> builder.
     /// </summary>
     /// <param name="behavior">Applies a specific behavior to this navigation instead of using the default one.</param>
     public static IAbsoluteNavigationInitialBuilder Absolute(NavigationBehavior? behavior = null)
@@ -80,10 +87,10 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     /// <inheritdoc />
     public string Path => IsAbsolute ? "//" + string.Join('/', _list) : string.Join('/', _list);
 
-    /// <inheritdoc cref="ICollection{T}.Count"/>
+    /// <inheritdoc cref="ICollection{T}.Count" />
     public int Count => _list.Count;
 
-    /// <inheritdoc cref="ICollection{T}.IsReadOnly"/>
+    /// <inheritdoc cref="ICollection{T}.IsReadOnly" />
     public bool IsReadOnly => false;
 
     /// <summary>
@@ -97,7 +104,7 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Navigation"/> class.
+    /// Initializes a new instance of the <see cref="Navigation" /> class.
     /// </summary>
     /// <param name="isAbsolute">Tells whether this is an absolute navigation.</param>
     /// <param name="behavior">Specifies a custom navigation behavior.</param>
@@ -107,13 +114,13 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
         Behavior = behavior;
     }
 
-    /// <inheritdoc cref="IEnumerable{T}.GetEnumerator"/>
+    /// <inheritdoc cref="IEnumerable{T}.GetEnumerator" />
     public IEnumerator<INavigationSegment> GetEnumerator() => _list.GetEnumerator();
 
-    /// <inheritdoc cref="IEnumerable.GetEnumerator"/>
+    /// <inheritdoc cref="IEnumerable.GetEnumerator" />
     IEnumerator IEnumerable.GetEnumerator() => _list.GetEnumerator();
 
-    /// <inheritdoc cref="ICollection{T}.Add"/>
+    /// <inheritdoc cref="ICollection{T}.Add" />
     public void Add(INavigationSegment item)
     {
         if (IsAbsolute && item.SegmentName == NavigationPop.PopRoute)
@@ -130,22 +137,22 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
         _list.Add(item);
     }
 
-    /// <inheritdoc cref="ICollection{T}.Clear"/>
+    /// <inheritdoc cref="ICollection{T}.Clear" />
     public void Clear() => _list.Clear();
 
-    /// <inheritdoc cref="ICollection{T}.Contains"/>
+    /// <inheritdoc cref="ICollection{T}.Contains" />
     public bool Contains(INavigationSegment item) => _list.Contains(item);
 
-    /// <inheritdoc cref="ICollection{T}.CopyTo"/>
+    /// <inheritdoc cref="ICollection{T}.CopyTo" />
     public void CopyTo(INavigationSegment[] array, int arrayIndex) => _list.CopyTo(array, arrayIndex);
 
-    /// <inheritdoc cref="ICollection{T}.Remove"/>
+    /// <inheritdoc cref="ICollection{T}.Remove" />
     public bool Remove(INavigationSegment item) => _list.Remove(item);
 
-    /// <inheritdoc cref="IList{T}.IndexOf"/>
+    /// <inheritdoc cref="IList{T}.IndexOf" />
     public int IndexOf(INavigationSegment item) => _list.IndexOf(item);
 
-    /// <inheritdoc cref="IList{T}.Insert"/>
+    /// <inheritdoc cref="IList{T}.Insert" />
     public void Insert(int index, INavigationSegment item)
     {
         if (IsAbsolute && item.SegmentName == NavigationPop.PopRoute)
@@ -171,7 +178,7 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
         _list.Insert(index, item);
     }
 
-    /// <inheritdoc cref="IList{T}.RemoveAt"/>
+    /// <inheritdoc cref="IList{T}.RemoveAt" />
     public void RemoveAt(int index) => _list.RemoveAt(index);
 
     private static void PageModelPropertyChanged(BindableObject bindable, object oldvalue, object newvalue)
@@ -192,16 +199,24 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
         }
 
 #pragma warning disable IDE0053
-        shellContent.ContentTemplate = new DataTemplate(() =>
+        shellContent.ContentTemplate = new DataTemplate(
+            () =>
 #pragma warning restore IDE0053
-        {
-            var shell = (Shell?)shellContent.Parent?.Parent?.Parent;
-            var serviceProvider = shell?.Handler?.GetServiceProvider() ?? throw new InvalidOperationException("Cannot provide shell content while detached from active Shell.");
-            var navigationService = (NavigationService)(serviceProvider.GetService<INavigationService>() ?? throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation()."));
-            var navigationConfiguration = serviceProvider.GetService<INavigationConfiguration>() ?? throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
-            var pageType = NavigationHelper.GetPageType(type, navigationConfiguration);
-            var page = navigationService.CreatePage(pageType, null, navigationConfiguration.MenuImage);
-            return page;
-        });
+            {
+                var shell = (Shell?) shellContent.Parent?.Parent?.Parent;
+                var serviceProvider = shell?.Handler?.GetServiceProvider() ?? throw new InvalidOperationException("Cannot provide shell content while detached from active Shell.");
+
+                var navigationService = (NavigationService) (serviceProvider.GetService<INavigationService>() ??
+                                                             throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation()."));
+
+                var navigationConfiguration = serviceProvider.GetService<INavigationConfiguration>() ??
+                                              throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
+
+                var pageType = NavigationHelper.GetPageType(type, navigationConfiguration);
+                var page = navigationService.CreatePage(pageType, null, navigationConfiguration.MenuImage);
+
+                return page;
+            }
+        );
     }
 }

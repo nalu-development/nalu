@@ -1,10 +1,10 @@
-namespace Nalu;
-
 using Microsoft.Maui.Layouts;
 using Nalu.Internals;
 
+namespace Nalu;
+
 /// <summary>
-/// <see cref="ViewBoxBase"/> is a base class a <see cref="IViewBox"/> that is used to display a single view.
+/// <see cref="ViewBoxBase" /> is a base class a <see cref="IViewBox" /> that is used to display a single view.
 /// </summary>
 public abstract class ViewBoxBase : View, IViewBox
 {
@@ -12,36 +12,38 @@ public abstract class ViewBoxBase : View, IViewBox
     private ILayoutManager LayoutManager => _layoutManager ??= CreateLayoutManager();
 
     /// <summary>
-    /// Bindable property for <see cref="Padding"/> property.
+    /// Bindable property for <see cref="Padding" /> property.
     /// </summary>
     public static readonly BindableProperty PaddingProperty = BindableProperty.Create(
         nameof(Padding),
         typeof(Thickness),
         typeof(ViewBoxBase),
         default(Thickness),
-        propertyChanged: OnPaddingPropertyChanged);
+        propertyChanged: OnPaddingPropertyChanged
+    );
 
     private static void OnPaddingPropertyChanged(BindableObject bindable, object oldvalue, object newvalue)
-        => ((ViewBoxBase)bindable).OnPaddingPropertyChanged((Thickness)oldvalue, (Thickness)newvalue);
+        => ((ViewBoxBase) bindable).OnPaddingPropertyChanged((Thickness) oldvalue, (Thickness) newvalue);
 
     /// <summary>
-    /// Bindable property for <see cref="ContentBindingContext"/> property.
+    /// Bindable property for <see cref="ContentBindingContext" /> property.
     /// </summary>
     public static readonly BindableProperty ContentBindingContextProperty = BindableProperty.Create(
         nameof(ContentBindingContext),
         typeof(object),
         typeof(ViewBox),
-        propertyChanged: ContentBindingContextPropertyChanged);
+        propertyChanged: ContentBindingContextPropertyChanged
+    );
 
     /// <summary>
-    /// Gets or sets the <see cref="BindableObject.BindingContext"/> to force on the content view.
+    /// Gets or sets the <see cref="BindableObject.BindingContext" /> to force on the content view.
     /// </summary>
     /// <remarks>
     /// This helps to fulfill interface segregation principle by allowing the content view to be bound
     /// to a property of the parent's binding context.
     /// </remarks>
     /// <example>
-    /// <code>
+    ///     <code>
     /// <![CDATA[
     ///     <ContentLayout ContentBindingContext="{Binding CurrentAnimal}">
     ///         <AnimalView x:DataType="models:Animal" />
@@ -60,7 +62,7 @@ public abstract class ViewBoxBase : View, IViewBox
     /// </summary>
     public Thickness Padding
     {
-        get => (Thickness)GetValue(PaddingProperty);
+        get => (Thickness) GetValue(PaddingProperty);
         set => SetValue(PaddingProperty, value);
     }
 
@@ -135,7 +137,7 @@ public abstract class ViewBoxBase : View, IViewBox
     }
 
     /// <summary>
-    /// Triggered when the <see cref="Padding"/> property changes.
+    /// Triggered when the <see cref="Padding" /> property changes.
     /// </summary>
     /// <param name="oldValue">The old padding.</param>
     /// <param name="newValue">The new padding.</param>
@@ -154,6 +156,7 @@ public abstract class ViewBoxBase : View, IViewBox
     protected virtual void SetContent(IView? content)
     {
         var oldContent = _contentView;
+
         if (ReferenceEquals(oldContent, content))
         {
             return;

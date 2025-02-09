@@ -1,9 +1,6 @@
-namespace Nalu.Maui.Test;
+using System.Diagnostics;
 
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Maui.Dispatching;
+namespace Nalu.Maui.Test;
 
 // ReSharper disable all
 // Code imported from MAUI repo test projects
@@ -101,12 +98,15 @@ public class DispatcherTimerStub : IDispatcherTimer
 
 public sealed class DispatcherProviderStub : IDispatcherProvider, IDisposable
 {
-    ThreadLocal<IDispatcher?> s_dispatcherInstance = new(() =>
-        DispatcherProviderStubOptions.SkipDispatcherCreation
-                                                                 ? null
-                                                                 : new DispatcherStub(
-                                                                     DispatcherProviderStubOptions.IsInvokeRequired,
-                                                                     DispatcherProviderStubOptions.InvokeOnMainThread));
+    ThreadLocal<IDispatcher?> s_dispatcherInstance = new(
+        () =>
+            DispatcherProviderStubOptions.SkipDispatcherCreation
+                ? null
+                : new DispatcherStub(
+                    DispatcherProviderStubOptions.IsInvokeRequired,
+                    DispatcherProviderStubOptions.InvokeOnMainThread
+                )
+    );
 
     public void Dispose() =>
         s_dispatcherInstance.Dispose();
@@ -117,7 +117,7 @@ public sealed class DispatcherProviderStub : IDispatcherProvider, IDisposable
 
         if (x == null)
         {
-            System.Diagnostics.Debug.WriteLine("WTH");
+            Debug.WriteLine("WTH");
         }
 
         return x;
@@ -139,37 +139,45 @@ public class DispatcherProviderStubOptions
 public static class DispatcherTest
 {
     public static Task Run(Action testAction) =>
-        Run(() =>
-        {
-            testAction();
-            return Task.CompletedTask;
-        });
+        Run(
+            () =>
+            {
+                testAction();
+
+                return Task.CompletedTask;
+            }
+        );
 
     public static Task RunWithDispatcherStub(Action testAction) =>
-        Run(() =>
-        {
-            DispatcherProvider.SetCurrent(new DispatcherProviderStub());
-            testAction();
-            return Task.CompletedTask;
-        });
+        Run(
+            () =>
+            {
+                DispatcherProvider.SetCurrent(new DispatcherProviderStub());
+                testAction();
+
+                return Task.CompletedTask;
+            }
+        );
 
     public static Task Run(Func<Task> testAction)
     {
         var tcs = new TaskCompletionSource();
 
-        var thread = new Thread(async () =>
-        {
-            try
+        var thread = new Thread(
+            async () =>
             {
-                await testAction();
+                try
+                {
+                    await testAction();
 
-                tcs.SetResult();
+                    tcs.SetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
             }
-            catch (Exception ex)
-            {
-                tcs.SetException(ex);
-            }
-        });
+        );
 
         thread.Start();
 
@@ -177,9 +185,12 @@ public static class DispatcherTest
     }
 
     public static Task RunWithDispatcherStub(Func<Task> testAction) =>
-        Run(() =>
-        {
-            DispatcherProvider.SetCurrent(new DispatcherProviderStub());
-            return testAction();
-        });
+        Run(
+            () =>
+            {
+                DispatcherProvider.SetCurrent(new DispatcherProviderStub());
+
+                return testAction();
+            }
+        );
 }

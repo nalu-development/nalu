@@ -1,9 +1,9 @@
-namespace Nalu;
-
 using System.Diagnostics.CodeAnalysis;
 
+namespace Nalu;
+
 /// <summary>
-/// Given <see cref="ObservingViewBox"/> measure constraints, returns the constraints to be used when observing the content size.
+/// Given <see cref="ObservingViewBox" /> measure constraints, returns the constraints to be used when observing the content size.
 /// </summary>
 /// <example>
 /// To constrain the width and observe the height:
@@ -14,18 +14,20 @@ using System.Diagnostics.CodeAnalysis;
 public delegate Size ObservedConstraintsFactory(double widthConstraint, double heightConstraint);
 
 /// <summary>
-/// A <see cref="ViewBox"/> which observes the size of its content.
+/// A <see cref="ViewBox" /> which observes the size of its content.
 /// </summary>
 [SuppressMessage("Style", "IDE0290:Use primary constructor")]
-public partial class ObservingViewBox : ViewBox
+public class ObservingViewBox : ViewBox
 {
-    private Size _lastSize;
     private ObservedConstraintsFactory _observedConstraintsFactory;
 
     /// <summary>
-    /// Initializes a new instance of <see cref="ObservingViewBox"/>.
+    /// Initializes a new instance of <see cref="ObservingViewBox" />.
     /// </summary>
-    /// <param name="observedConstraintsFactory">A factory method that creates the constraints to be used when observing the content size based on the provided width and height constraints.</param>
+    /// <param name="observedConstraintsFactory">
+    /// A factory method that creates the constraints to be used when observing the content size based on the provided width and height
+    /// constraints.
+    /// </param>
     public ObservingViewBox(ObservedConstraintsFactory observedConstraintsFactory)
     {
         _observedConstraintsFactory = observedConstraintsFactory;
@@ -34,7 +36,7 @@ public partial class ObservingViewBox : ViewBox
     /// <summary>
     /// Gets the desired size of the content.
     /// </summary>
-    public Size DesiredContentSize => _lastSize;
+    public Size DesiredContentSize { get; private set; }
 
     /// <summary>
     /// Notifies that the size of the content has changed.
@@ -61,9 +63,9 @@ public partial class ObservingViewBox : ViewBox
         {
             MeasureContentSize(widthConstraint, heightConstraint, content);
         }
-        else if (_lastSize != Size.Zero)
+        else if (DesiredContentSize != Size.Zero)
         {
-            _lastSize = Size.Zero;
+            DesiredContentSize = Size.Zero;
             InvokeContentMeasureChanged();
         }
 
@@ -75,17 +77,15 @@ public partial class ObservingViewBox : ViewBox
         var constraints = ObservedConstraintsFactory(widthConstraint, heightConstraint);
         var size = content.Measure(constraints.Width, constraints.Height);
 
-        if (size != _lastSize)
+        if (size != DesiredContentSize)
         {
-            _lastSize = size;
+            DesiredContentSize = size;
             InvokeContentMeasureChanged();
         }
     }
 
-    private void InvokeContentMeasureChanged()
-    {
+    private void InvokeContentMeasureChanged() =>
         // We cannot call ContentMeasureChanged directly because it will cause layout issues given that
         // the layout process is still running here. Let's wait for next UI thread cycle.
         Dispatcher.Dispatch(() => ContentMeasureChanged?.Invoke(this, EventArgs.Empty));
-    }
 }

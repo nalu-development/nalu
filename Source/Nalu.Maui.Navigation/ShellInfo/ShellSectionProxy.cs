@@ -1,11 +1,11 @@
-namespace Nalu;
-
 using System.ComponentModel;
 using System.Text;
 
+namespace Nalu;
+
 #pragma warning disable CS8618
 
-internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposable
+internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 {
     private readonly ShellSection _section;
     public string SegmentName { get; }
@@ -27,12 +27,14 @@ internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposabl
     public IEnumerable<NavigationStackPage> GetNavigationStack(IShellContentProxy? content = null)
     {
         content ??= CurrentContent;
+
         if (content.Page is null)
         {
             yield break;
         }
 
         var baseRoute = $"//{Parent.SegmentName}/{SegmentName}/{content.SegmentName}";
+
         yield return new NavigationStackPage(baseRoute, content.SegmentName, content.Page, false);
 
         if (content != CurrentContent)
@@ -42,6 +44,7 @@ internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposabl
 
         var navigation = _section.Navigation;
         var route = new StringBuilder(baseRoute);
+
         foreach (var stackPage in navigation.NavigationStack)
         {
             if (stackPage is not null)
@@ -49,6 +52,7 @@ internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposabl
                 var segmentName = NavigationSegmentAttribute.GetSegmentName(stackPage.GetType());
                 route.Append('/');
                 route.Append(segmentName);
+
                 yield return new NavigationStackPage(route.ToString(), segmentName, stackPage, false);
             }
         }
@@ -60,6 +64,7 @@ internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposabl
                 var segmentName = NavigationSegmentAttribute.GetSegmentName(stackPage.GetType());
                 route.Append('/');
                 route.Append(segmentName);
+
                 yield return new NavigationStackPage(route.ToString(), segmentName, stackPage, true);
             }
         }
@@ -68,20 +73,23 @@ internal sealed partial class ShellSectionProxy : IShellSectionProxy, IDisposabl
     public Task PopAsync()
     {
         var navigation = _section.Navigation;
+
         if (navigation.ModalStack.Count > 0)
         {
             return navigation.PopModalAsync(true);
         }
 
-        var item = (ShellItem)_section.Parent;
-        var shell = (Shell)item.Parent;
+        var item = (ShellItem) _section.Parent;
+        var shell = (Shell) item.Parent;
         var animated = shell.CurrentItem == item && item.CurrentItem == _section;
+
         return navigation.PopAsync(animated);
     }
 
     public void RemoveStackPages()
     {
         var navigation = _section.Navigation;
+
         while (navigation.NavigationStack.Count > 1)
         {
             navigation.RemovePage(navigation.NavigationStack[^1]);

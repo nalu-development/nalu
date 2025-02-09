@@ -1,6 +1,6 @@
-namespace Nalu.Maui.Sample.PageModels;
-
 using CommunityToolkit.Mvvm.ComponentModel;
+
+namespace Nalu.Maui.Sample.PageModels;
 
 public class SevenPageModel : ObservableObject
 {

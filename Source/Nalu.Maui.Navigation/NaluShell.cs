@@ -1,8 +1,9 @@
-namespace Nalu;
-
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Windows.Input;
 using Nalu.Internals;
+
+namespace Nalu;
 
 #pragma warning disable IDE0290
 #pragma warning disable VSTHRD100
@@ -22,20 +23,20 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     IShellProxy INaluShell.ShellProxy => _shellProxy ?? throw new InvalidOperationException("The shell info is not available yet.");
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NaluShell"/> class.
+    /// Initializes a new instance of the <see cref="NaluShell" /> class.
     /// </summary>
     /// <param name="navigationService">The navigation service.</param>
     /// <param name="rootPageRoute">The custom route used to identify the root shell content.</param>
     /// <param name="rootPageIntent">The optional intent to be provided to the initial root page.</param>
     protected NaluShell(INavigationService navigationService, string rootPageRoute, object? rootPageIntent = null)
     {
-        _navigationService = (NavigationService)navigationService;
+        _navigationService = (NavigationService) navigationService;
         _rootPageIntent = rootPageIntent;
         _rootPageRoute = rootPageRoute;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NaluShell"/> class.
+    /// Initializes a new instance of the <see cref="NaluShell" /> class.
     /// </summary>
     /// <param name="navigationService">The navigation service.</param>
     /// <param name="rootPageType">The initial root page to be used.</param>
@@ -47,7 +48,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
             throw new ArgumentException("The root page type must be a subclass of Page.", nameof(rootPageType));
         }
 
-        _navigationService = (NavigationService)navigationService;
+        _navigationService = (NavigationService) navigationService;
         _rootPageIntent = rootPageIntent;
         _rootPageRoute = NavigationSegmentAttribute.GetSegmentName(rootPageType);
     }
@@ -64,6 +65,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         if (_isNavigating.Value is { } isNavigating)
         {
             isNavigating.Value = value;
+
             return;
         }
 
@@ -71,7 +73,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     }
 
     /// <summary>
-    /// Disposes the resources used by the <see cref="NaluShell"/>.
+    /// Disposes the resources used by the <see cref="NaluShell" />.
     /// </summary>
     /// <param name="disposing">True when disposing managed resources.</param>
     protected virtual void Dispose(bool disposing)
@@ -102,14 +104,16 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     {
 #if WINDOWS || !(IOS || ANDROID || MACCATALYST)
         var backButtonBehavior = GetBackButtonBehavior(GetVisiblePage());
+
         if (backButtonBehavior != null)
         {
-            var command = backButtonBehavior.GetPropertyIfSet<System.Windows.Input.ICommand>(BackButtonBehavior.CommandProperty, null!);
+            var command = backButtonBehavior.GetPropertyIfSet<ICommand>(BackButtonBehavior.CommandProperty, null!);
             var commandParameter = backButtonBehavior.GetPropertyIfSet<object>(BackButtonBehavior.CommandParameterProperty, null!);
 
             if (command != null)
             {
                 command.Execute(commandParameter);
+
                 return true;
             }
         }
@@ -121,9 +125,11 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         }
 
         var currentContent = CurrentItem?.CurrentItem;
+
         if (currentContent != null && currentContent.Stack.Count > 1)
         {
             DispatchNavigation(Nalu.Navigation.Relative().Pop());
+
             return true;
         }
 
@@ -138,6 +144,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         if (!GetIsNavigating())
         {
             var uri = args.Target.Location.OriginalString;
+
             if (Handler is null || string.IsNullOrEmpty(uri))
             {
                 // We have nothing to do here.
@@ -150,40 +157,48 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
             if (uri == "..")
             {
                 DispatchNavigation(Nalu.Navigation.Relative().Pop());
+
                 return;
             }
 
             // Only reason we're here is due to shell content navigation from Shell Flyout or Tab bars
             // Now find the ShellContent target and navigate to it via the navigation service
             var segments = uri
-                .Split('/', StringSplitOptions.RemoveEmptyEntries)
-                .Select(NormalizeSegment)
-                .ToArray();
-            var shellContent = (ShellContentProxy)_shellProxy!.FindContent(segments);
+                           .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                           .Select(NormalizeSegment)
+                           .ToArray();
+
+            var shellContent = (ShellContentProxy) _shellProxy!.FindContent(segments);
             var shellSection = shellContent.Parent;
 
             var ownsNavigationStack = shellSection.CurrentContent == shellContent;
-            var navigation = (Navigation)Nalu.Navigation.Absolute();
+            var navigation = (Navigation) Nalu.Navigation.Absolute();
 
-            navigation.Add(new NavigationSegment
-            {
-                Type = Nalu.Navigation.GetPageType(shellContent.Content),
-                SegmentName = shellContent.SegmentName,
-            });
+            navigation.Add(
+                new NavigationSegment
+                {
+                    Type = Nalu.Navigation.GetPageType(shellContent.Content),
+                    SegmentName = shellContent.SegmentName
+                }
+            );
 
             if (ownsNavigationStack)
             {
                 var navigationStackPages = shellSection.GetNavigationStack().ToArray();
                 var segmentsCount = segments.Length;
                 var navigationStackCount = navigationStackPages.Length;
+
                 for (var i = 1; i < segmentsCount && i < navigationStackCount; i++)
                 {
                     var stackPage = navigationStackPages[i];
-                    navigation.Add(new NavigationSegment
-                    {
-                        Type = stackPage.Page.GetType(),
-                        SegmentName = stackPage.SegmentName,
-                    });
+
+                    navigation.Add(
+                        new NavigationSegment
+                        {
+                            Type = stackPage.Page.GetType(),
+                            SegmentName = stackPage.SegmentName
+                        }
+                    );
                 }
             }
 

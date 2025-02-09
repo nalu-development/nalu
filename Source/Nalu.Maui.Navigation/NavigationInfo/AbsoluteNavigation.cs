@@ -9,14 +9,14 @@ namespace Nalu;
 public interface IAbsoluteNavigationInitialBuilder : INavigationInfo
 {
     /// <summary>
-    /// Navigates to <typeparamref name="TPage"/> shell content using the specified type.
+    /// Navigates to <typeparamref name="TPage" /> shell content using the specified type.
     /// </summary>
     /// <typeparam name="TPage">The type of page used on the `ShellContent`.</typeparam>
     IAbsoluteNavigationBuilder ShellContent<TPage>()
         where TPage : class;
 
     /// <summary>
-    /// Navigates to <typeparamref name="TPage"/> shell content marked with a custom route.
+    /// Navigates to <typeparamref name="TPage" /> shell content marked with a custom route.
     /// </summary>
     /// <param name="customRoute">The custom route defined on `Route` property of `ShellContent`.</param>
     /// <typeparam name="TPage">The type of page used on the `ShellContent`.</typeparam>
@@ -46,24 +46,20 @@ public interface IAbsoluteNavigationBuilder : INavigationInfo
 /// <summary>
 /// Defines an absolute navigation.
 /// </summary>
-public partial class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsoluteNavigationInitialBuilder
+public class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsoluteNavigationInitialBuilder
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="AbsoluteNavigation"/> class.
+    /// Initializes a new instance of the <see cref="AbsoluteNavigation" /> class.
     /// </summary>
     public AbsoluteNavigation()
-        : base(true, null)
-    {
-    }
+        : base(true, null) { }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AbsoluteNavigation"/> class with the specified behavior.
+    /// Initializes a new instance of the <see cref="AbsoluteNavigation" /> class with the specified behavior.
     /// </summary>
     /// <param name="behavior">Custom navigation behavior.</param>
     public AbsoluteNavigation(NavigationBehavior? behavior)
-        : base(true, behavior)
-    {
-    }
+        : base(true, behavior) { }
 
     /// <inheritdoc />
     public IAbsoluteNavigationBuilder ShellContent<TPage>()
@@ -74,10 +70,12 @@ public partial class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder
             throw new InvalidOperationException("Cannot add a shell content on top of another one.");
         }
 
-        Add(new NavigationSegment
-        {
-            Type = typeof(TPage),
-        });
+        Add(
+            new NavigationSegment
+            {
+                Type = typeof(TPage)
+            }
+        );
 
         return this;
     }
@@ -91,11 +89,13 @@ public partial class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder
             throw new InvalidOperationException("Cannot add a shell content on top of another one.");
         }
 
-        Add(new NavigationSegment
-        {
-            Type = typeof(TPage),
-            SegmentName = customRoute,
-        });
+        Add(
+            new NavigationSegment
+            {
+                Type = typeof(TPage),
+                SegmentName = customRoute
+            }
+        );
 
         return this;
     }
@@ -109,10 +109,12 @@ public partial class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder
             throw new InvalidOperationException("Cannot add a page without adding a shell content first.");
         }
 
-        Add(new NavigationSegment
-        {
-            Type = typeof(TPage),
-        });
+        Add(
+            new NavigationSegment
+            {
+                Type = typeof(TPage)
+            }
+        );
 
         return this;
     }
@@ -126,6 +128,7 @@ public partial class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder
         }
 
         Intent = intent;
+
         return this;
     }
 }

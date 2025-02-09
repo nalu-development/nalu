@@ -1,13 +1,14 @@
-namespace Nalu;
-
 using System.Net;
+
+namespace Nalu;
 
 internal class NSUrlRequestHandle(
     string identifier,
     CookieContainer? cookieContainer,
     string? contentFile,
     CancellationTokenRegistration cancellationTokenRegistration,
-    bool isLostRequest = false)
+    bool isLostRequest = false
+)
 {
     private readonly TaskCompletionSource _completedCompletionSource = new();
     private bool _completed;

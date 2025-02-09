@@ -1,6 +1,6 @@
-namespace Nalu;
-
 using Microsoft.Maui.Layouts;
+
+namespace Nalu;
 
 /// <summary>
 /// Represents a view box that can be expanded or collapsed.
@@ -41,8 +41,8 @@ public interface IExpanderViewBox : IViewBox
     /// <summary>
     /// Sets the target arrange size of the view box.
     /// </summary>
-    /// <param name="width">The target <see cref="ArrangeWidth"/>.</param>
-    /// <param name="height">The target <see cref="ArrangeHeight"/>.</param>
+    /// <param name="width">The target <see cref="ArrangeWidth" />.</param>
+    /// <param name="height">The target <see cref="ArrangeHeight" />.</param>
     /// <param name="willCollapse">Whether the content will collapse when the view box is not expanded.</param>
     void SetArrangeSize(double width, double height, bool willCollapse);
 }
@@ -51,7 +51,7 @@ public interface IExpanderViewBox : IViewBox
 /// TODO
 /// </summary>
 [ContentProperty(nameof(Content))]
-public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
+public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
 {
 #pragma warning disable IDE1006
     // ReSharper disable once InconsistentNaming
@@ -59,52 +59,57 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
         nameof(CanCollapse),
         typeof(bool),
         typeof(ExpanderViewBox),
-        false);
+        false
+    );
 #pragma warning restore IDE1006
 
     /// <summary>
-    /// Bindable property for <see cref="Content"/> property.
+    /// Bindable property for <see cref="Content" /> property.
     /// </summary>
     public static readonly BindableProperty ContentProperty = BindableProperty.Create(
         nameof(Content),
         typeof(IView),
         typeof(ViewBox),
-        propertyChanged: OnContentPropertyChanged);
+        propertyChanged: OnContentPropertyChanged
+    );
 
     /// <summary>
-    /// Bindable property for <see cref="CanCollapse"/> property.
+    /// Bindable property for <see cref="CanCollapse" /> property.
     /// </summary>
     public static readonly BindableProperty CanCollapseProperty = CanCollapsePropertyKey.BindableProperty;
 
     /// <summary>
-    /// Bindable property for <see cref="CollapsedWidth"/> property.
+    /// Bindable property for <see cref="CollapsedWidth" /> property.
     /// </summary>
     public static readonly BindableProperty CollapsedWidthProperty = BindableProperty.Create(
         nameof(CollapsedWidth),
         typeof(double),
         typeof(ExpanderViewBox),
         -1.0,
-        propertyChanged: OnExpanderPropertyChanged);
+        propertyChanged: OnExpanderPropertyChanged
+    );
 
     /// <summary>
-    /// Bindable property for <see cref="CollapsedHeight"/> property.
+    /// Bindable property for <see cref="CollapsedHeight" /> property.
     /// </summary>
     public static readonly BindableProperty CollapsedHeightProperty = BindableProperty.Create(
         nameof(CollapsedHeight),
         typeof(double),
         typeof(ExpanderViewBox),
         -1.0,
-        propertyChanged: OnExpanderPropertyChanged);
+        propertyChanged: OnExpanderPropertyChanged
+    );
 
     /// <summary>
-    /// Bindable property for <see cref="IsExpanded"/> property.
+    /// Bindable property for <see cref="IsExpanded" /> property.
     /// </summary>
     public static readonly BindableProperty IsExpandedProperty = BindableProperty.Create(
         nameof(IsExpanded),
         typeof(bool),
         typeof(ExpanderViewBox),
         true,
-        propertyChanged: OnExpanderPropertyChanged);
+        propertyChanged: OnExpanderPropertyChanged
+    );
 
     private double _arrangeHeight = double.NaN;
     private double _arrangeWidth = double.NaN;
@@ -131,7 +136,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
     /// </summary>
     public bool CanCollapse
     {
-        get => (bool)GetValue(CanCollapsePropertyKey.BindableProperty);
+        get => (bool) GetValue(CanCollapsePropertyKey.BindableProperty);
         private set => SetValue(CanCollapsePropertyKey, value);
     }
 
@@ -143,7 +148,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
     /// </remarks>
     public double CollapsedWidth
     {
-        get => (double)GetValue(CollapsedWidthProperty);
+        get => (double) GetValue(CollapsedWidthProperty);
         set => SetValue(CollapsedWidthProperty, value);
     }
 
@@ -155,7 +160,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
     /// </remarks>
     public double CollapsedHeight
     {
-        get => (double)GetValue(CollapsedHeightProperty);
+        get => (double) GetValue(CollapsedHeightProperty);
         set => SetValue(CollapsedHeightProperty, value);
     }
 
@@ -167,7 +172,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
     /// </remarks>
     public bool IsExpanded
     {
-        get => (bool)GetValue(IsExpandedProperty);
+        get => (bool) GetValue(IsExpandedProperty);
         set => SetValue(IsExpandedProperty, value);
     }
 
@@ -175,7 +180,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
     protected override ILayoutManager CreateLayoutManager() => new ExpanderViewBoxLayoutManager(this);
 
     /// <inheritdoc />
-    protected override IView? GetContent() => (IView?)GetValue(ContentProperty);
+    protected override IView? GetContent() => (IView?) GetValue(ContentProperty);
 
     /// <inheritdoc />
     protected override void SetContent(IView? content) => SetValue(ContentProperty, content);
@@ -203,6 +208,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
             _arrangeWidth = width;
             _arrangeHeight = height;
             InvalidateMeasure();
+
             return;
         }
 
@@ -212,6 +218,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
         var deltaHeight = height - originalHeight;
 
         _animation?.Dispose();
+
         _animation = new Animation(
             ratio =>
             {
@@ -219,7 +226,8 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
                 _arrangeHeight = originalHeight + (deltaHeight * ratio);
                 InvalidateMeasure();
             },
-            easing: Easing.CubicInOut);
+            easing: Easing.CubicInOut
+        );
 
         _animation.Commit(this, nameof(IsExpanded));
     }
@@ -233,7 +241,7 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
     }
 
     private static void OnContentPropertyChanged(BindableObject bindable, object? oldValue, object? newValue)
-        => ((ExpanderViewBox)bindable).OnContentPropertyChanged((IView?)oldValue, (IView?)newValue);
+        => ((ExpanderViewBox) bindable).OnContentPropertyChanged((IView?) oldValue, (IView?) newValue);
 
     /// <inheritdoc cref="Dispose()" />
     protected virtual void Dispose(bool disposing)
@@ -251,4 +259,3 @@ public partial class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposabl
         GC.SuppressFinalize(this);
     }
 }
-

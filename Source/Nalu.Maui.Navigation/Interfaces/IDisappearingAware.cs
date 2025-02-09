@@ -1,7 +1,7 @@
 namespace Nalu;
 
 /// <summary>
-/// <see cref="INavigationService"/> will invoke <see cref="OnDisappearingAsync"/> method when the page is
+/// <see cref="INavigationService" /> will invoke <see cref="OnDisappearingAsync" /> method when the page is
 /// disappearing due to another page being pushed onto the navigation stack.
 /// </summary>
 public interface IDisappearingAware

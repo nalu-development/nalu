@@ -1,6 +1,6 @@
-namespace Nalu.Maui.Sample.PopupModels;
-
 using CommunityToolkit.Mvvm.ComponentModel;
+
+namespace Nalu.Maui.Sample.PopupModels;
 
 public class CanLeavePopupModel : ObservableObject
 {

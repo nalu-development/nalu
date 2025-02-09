@@ -15,13 +15,13 @@
             <Label>
                 <Label.FormattedText>
                     <FormattedString>
-                        <Span Text="Instance: "/>
+                        <Span Text="Instance: " />
                         <Span Text="{Binding InstanceCount}" />
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
             <Button Command="{Binding PushSixCommand}"
-                    Text="Push Six"/>
+                    Text="Push Six" />
             <Button Command="{nalu:NavigateCommand}"
                     Text="Push Six Via XAML">
                 <Button.CommandParameter>

@@ -1,7 +1,8 @@
 // ReSharper disable once CheckNamespace
-namespace Microsoft.Maui;
 
 using Nalu;
+
+namespace Microsoft.Maui;
 
 /// <summary>
 /// Provides a fluent API for configuring Nalu layouts.
@@ -15,10 +16,14 @@ public static class NaluLayoutsMauiAppBuilderExtensions
     public static MauiAppBuilder UseNaluLayouts(this MauiAppBuilder builder)
     {
         _ = new XamlInitializer();
-        builder.ConfigureMauiHandlers(handlers =>
-        {
-            handlers.AddHandler<IViewBox, ViewBoxHandler>();
-        });
+
+        builder.ConfigureMauiHandlers(
+            handlers =>
+            {
+                handlers.AddHandler<IViewBox, ViewBoxHandler>();
+            }
+        );
+
         return builder;
     }
 }

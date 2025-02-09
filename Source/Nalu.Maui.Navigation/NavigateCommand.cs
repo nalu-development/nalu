@@ -1,14 +1,14 @@
-namespace Nalu;
-
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
 using Nalu.Internals;
 
+namespace Nalu;
+
 #pragma warning disable CA1725
 
 /// <summary>
-/// Provides a navigation command that can be used in XAML by providing a <see cref="Navigation"/> object as parameter.
+/// Provides a navigation command that can be used in XAML by providing a <see cref="Navigation" /> object as parameter.
 /// </summary>
 [SuppressMessage("Usage", "VSTHRD101:Avoid unsupported async delegates", Justification = "This is a command, not an async delegate")]
 #if NET9_0_OR_GREATER
@@ -16,7 +16,7 @@ using Nalu.Internals;
 #endif
 public partial class NavigateCommand : IMarkupExtension<ICommand>
 {
-    /// <inheritdoc cref="IMarkupExtension{T}.ProvideValue"/>
+    /// <inheritdoc cref="IMarkupExtension{T}.ProvideValue" />
     public ICommand ProvideValue(IServiceProvider xamlProvider)
     {
         var provideValueTarget = xamlProvider.GetRequiredService<IProvideValueTarget>();
@@ -27,7 +27,7 @@ public partial class NavigateCommand : IMarkupExtension<ICommand>
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
 
     [SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "This is a command, not an async delegate")]
-    private sealed partial class NavigateCommandCommand(IProvideValueTarget provideValueTarget) : ICommand
+    private sealed class NavigateCommandCommand(IProvideValueTarget provideValueTarget) : ICommand
     {
         private int _canExecute = 1;
 
@@ -42,7 +42,8 @@ public partial class NavigateCommand : IMarkupExtension<ICommand>
                 throw new ArgumentException("The parameter must be of type Navigation", nameof(parameter));
             }
 
-            var element = (IElement)provideValueTarget.TargetObject;
+            var element = (IElement) provideValueTarget.TargetObject;
+
             while (element.Handler is null && element.Parent is not null)
             {
                 element = element.Parent;
@@ -61,6 +62,7 @@ public partial class NavigateCommand : IMarkupExtension<ICommand>
             CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 
             var navigationService = element.Handler.GetRequiredService<INavigationService>();
+
             try
             {
                 await navigationService.GoToAsync(navigation).ConfigureAwait(true);

@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <?xaml-comp compile="true" ?>
+
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
@@ -32,16 +33,16 @@
     </Style>
 
     <Style TargetType="Border" x:Key="CardBorder">
-        <Setter Property="Shadow" Value="{Shadow Brush={StaticResource BlackBrush}, Offset='1,2', Radius=6, Opacity=.2}"/>
-        <Setter Property="StrokeShape" Value="RoundRectangle 8"/>
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray750}}"/>
+        <Setter Property="Shadow" Value="{Shadow Brush={StaticResource BlackBrush}, Offset='1,2', Radius=6, Opacity=.2}" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray750}}" />
     </Style>
 
     <Style TargetType="Border" x:Key="BadgeBorder">
-        <Setter Property="StrokeShape" Value="RoundRectangle 4"/>
-        <Setter Property="StrokeThickness" Value="0"/>
-        <Setter Property="Padding" Value="4,2"/>
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray950}}"/>
+        <Setter Property="StrokeShape" Value="RoundRectangle 4" />
+        <Setter Property="StrokeThickness" Value="0" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray950}}" />
     </Style>
 
 </ResourceDictionary>

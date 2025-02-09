@@ -1,25 +1,26 @@
 namespace Nalu;
 
 /// <summary>
-/// A <see cref="ViewBox"/> that uses a <see cref="DataTemplate"/> or <see cref="DataTemplateSelector"/> to render content.
+/// A <see cref="ViewBox" /> that uses a <see cref="DataTemplate" /> or <see cref="DataTemplateSelector" /> to render content.
 /// </summary>
-public partial class TemplateBox : TemplateBoxBase
+public class TemplateBox : TemplateBoxBase
 {
     /// <summary>
-    /// Bindable property for <see cref="ContentTemplate"/> property.
+    /// Bindable property for <see cref="ContentTemplate" /> property.
     /// </summary>
     public static readonly BindableProperty ContentTemplateProperty = BindableProperty.Create(
         nameof(ContentTemplate),
         typeof(DataTemplate),
         typeof(TemplateBox),
-        propertyChanged: ContentTemplateChanged);
+        propertyChanged: ContentTemplateChanged
+    );
 
     /// <summary>
-    /// Gets or sets the <see cref="DataTemplate"/> used to render the content.
+    /// Gets or sets the <see cref="DataTemplate" /> used to render the content.
     /// </summary>
     public DataTemplate? ContentTemplate
     {
-        get => (DataTemplate?)GetValue(ContentTemplateProperty);
+        get => (DataTemplate?) GetValue(ContentTemplateProperty);
         set => SetValue(ContentTemplateProperty, value);
     }
 

@@ -1,13 +1,14 @@
-namespace Nalu.Maui.Test.Navigation;
-
 using System.ComponentModel;
 using System.Text;
+
+namespace Nalu.Maui.Test.NavigationTests;
 
 #pragma warning disable IDE0028
 
 public partial class NavigationServiceTests
 {
     private static readonly AsyncLocal<IServiceProvider> _serviceLocator = new();
+
     private class TestShellItemProxy(string segmentName) : IShellItemProxy
     {
         private IShellSectionProxy? _currentSection;
@@ -61,12 +62,14 @@ public partial class NavigationServiceTests
             EnsureStacks();
 
             content ??= CurrentContent;
+
             if (content.Page is null)
             {
                 yield break;
             }
 
             var baseRoute = $"//{Parent.SegmentName}/{SegmentName}/{content.SegmentName}";
+
             yield return new NavigationStackPage(baseRoute, content.SegmentName, content.Page, false);
 
             if (content.Parent.CurrentContent != content)
@@ -77,11 +80,13 @@ public partial class NavigationServiceTests
             var currentContentIndex = CurrentContentIndex;
             var navigationStack = _navigationStacks[currentContentIndex];
             var route = new StringBuilder(baseRoute);
+
             foreach (var stackPage in navigationStack)
             {
                 var segmentName = NavigationSegmentAttribute.GetSegmentName(stackPage.GetType());
                 route.Append('/');
                 route.Append(segmentName);
+
                 yield return new NavigationStackPage(route.ToString(), segmentName, stackPage, Shell.GetPresentationMode(stackPage).HasFlag(PresentationMode.Modal));
             }
         }
@@ -91,6 +96,7 @@ public partial class NavigationServiceTests
             EnsureStacks();
             var navigationStack = _navigationStacks[CurrentContentIndex];
             navigationStack.RemoveAt(navigationStack.Count - 1);
+
             return Task.CompletedTask;
         }
 
@@ -121,7 +127,7 @@ public partial class NavigationServiceTests
         public bool HasGuard => Page?.BindingContext is ILeavingGuard;
         public IShellSectionProxy Parent { get; set; } = null!;
         public Page? Page { get; private set; }
-        public Page GetOrCreateContent() => Page ??= ((NavigationService)_serviceLocator.Value!.GetRequiredService<INavigationService>()).CreatePage(pageType, null);
+        public Page GetOrCreateContent() => Page ??= ((NavigationService) _serviceLocator.Value!.GetRequiredService<INavigationService>()).CreatePage(pageType, null);
 
         public void DestroyContent()
         {
@@ -134,6 +140,7 @@ public partial class NavigationServiceTests
     }
 
     public record EvenIntent(int Value = 0);
+
     public record OddIntent(string Value = "Hello");
 
     private class BaseTestPage : ContentPage
@@ -146,31 +153,40 @@ public partial class NavigationServiceTests
 
     public interface ITestPageModel<in T> :
         INotifyPropertyChanged,
-        IEnteringAware, IEnteringAware<T>,
-        IAppearingAware, IAppearingAware<T>,
+        IEnteringAware,
+        IEnteringAware<T>,
+        IAppearingAware,
+        IAppearingAware<T>,
         IDisappearingAware,
         ILeavingAware,
         IDisposable;
 
     public interface IPage1Model : ITestPageModel<OddIntent>;
+
     private class Page1(IPage1Model model) : BaseTestPage(model);
 
     public interface IPage2Model : ITestPageModel<EvenIntent>;
+
     private class Page2(IPage2Model model) : BaseTestPage(model);
 
     public interface IPage3Model : ITestPageModel<OddIntent>;
+
     private class Page3(IPage3Model model) : BaseTestPage(model);
 
     public interface IPage4Model : ITestPageModel<EvenIntent>;
+
     private class Page4(IPage4Model model) : BaseTestPage(model);
 
     public interface IPage5Model : ITestPageModel<OddIntent>;
+
     private class Page5(IPage5Model model) : BaseTestPage(model);
 
     public interface IPage6Model : ITestPageModel<EvenIntent>;
+
     private class Page6(IPage6Model model) : BaseTestPage(model);
 
     public interface IPage7Model : ITestPageModel<OddIntent>;
+
     private class Page7 : BaseTestPage
     {
         public Page7(IPage7Model model)
@@ -181,9 +197,11 @@ public partial class NavigationServiceTests
     }
 
     public interface IPage8Model : ITestPageModel<EvenIntent>, ILeavingGuard;
+
     private class Page8(IPage8Model model) : BaseTestPage(model);
 
     public interface IPage9Model : ITestPageModel<OddIntent>, ILeavingGuard;
+
     private class Page9(IPage9Model model) : BaseTestPage(model);
 
     /// <summary>
@@ -206,7 +224,7 @@ public partial class NavigationServiceTests
         serviceCollection.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         serviceCollection.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
         _navigationConfiguration = new NavigationConfigurator(serviceCollection, typeof(NavigationServiceTests));
-        var mapping = (IDictionary<Type, Type>)_navigationConfiguration.Mapping;
+        var mapping = (IDictionary<Type, Type>) _navigationConfiguration.Mapping;
 
         mapping.Add(typeof(IPage1Model), typeof(Page1));
         mapping.Add(typeof(IPage2Model), typeof(Page2));
@@ -239,73 +257,98 @@ public partial class NavigationServiceTests
 
         serviceCollection.AddSingleton<INavigationService, NavigationService>();
         _serviceLocator.Value = _serviceProvider = serviceCollection.BuildServiceProvider();
-        _navigationService = (NavigationService)_serviceProvider.GetRequiredService<INavigationService>();
+        _navigationService = (NavigationService) _serviceProvider.GetRequiredService<INavigationService>();
         _shellProxy = Substitute.For<IShellProxy>();
 
         var items = GenerateShellItemProxies(_shellProxy, shellContents);
+
         var segmentToContent = items
-            .SelectMany(i => i.Sections)
-            .SelectMany(s => s.Contents)
-            .ToDictionary(c => c.SegmentName);
+                               .SelectMany(i => i.Sections)
+                               .SelectMany(s => s.Contents)
+                               .ToDictionary(c => c.SegmentName);
 
         _shellProxy.Items.Returns(items);
         _shellProxy.CurrentItem.Returns(items[0]);
-        _shellProxy.CommitNavigationAsync(Arg.Any<Action>()).Returns(callInfo =>
-        {
-            callInfo.Arg<Action>()?.Invoke();
-            return Task.CompletedTask;
-        });
+
+        _shellProxy.CommitNavigationAsync(Arg.Any<Action>())
+                   .Returns(
+                       callInfo =>
+                       {
+                           callInfo.Arg<Action>()?.Invoke();
+
+                           return Task.CompletedTask;
+                       }
+                   );
+
         _shellProxy
             .GetContent(Arg.Any<string>())
-            .Returns(callInfo =>
-            {
-                var segmentName = callInfo.Arg<string>();
-                return segmentToContent[segmentName];
-            });
+            .Returns(
+                callInfo =>
+                {
+                    var segmentName = callInfo.Arg<string>();
+
+                    return segmentToContent[segmentName];
+                }
+            );
+
         _shellProxy
             .When(m => m.InitializeWithContent(Arg.Any<string>()))
-            .Do(callInfo =>
-            {
-                var segmentName = callInfo.Arg<string>();
-                var content = segmentToContent[segmentName];
-                var section = content.Parent;
-                var item = section.Parent;
-                ((TestShellSectionProxy)section).CurrentContent = content;
-                ((TestShellItemProxy)item).CurrentSection = section;
-                _shellProxy.CurrentItem.Returns(item);
-            });
+            .Do(
+                callInfo =>
+                {
+                    var segmentName = callInfo.Arg<string>();
+                    var content = segmentToContent[segmentName];
+                    var section = content.Parent;
+                    var item = section.Parent;
+                    ((TestShellSectionProxy) section).CurrentContent = content;
+                    ((TestShellItemProxy) item).CurrentSection = section;
+                    _shellProxy.CurrentItem.Returns(item);
+                }
+            );
+
         _shellProxy
             .SelectContentAsync(Arg.Any<string>())
-            .Returns(callInfo =>
-            {
-                var segmentName = callInfo.Arg<string>();
-                var content = segmentToContent[segmentName];
-                var section = content.Parent;
-                var item = section.Parent;
-                ((TestShellSectionProxy)section).CurrentContent = content;
-                ((TestShellItemProxy)item).CurrentSection = section;
-                _shellProxy.CurrentItem.Returns(item);
-                return Task.CompletedTask;
-            });
+            .Returns(
+                callInfo =>
+                {
+                    var segmentName = callInfo.Arg<string>();
+                    var content = segmentToContent[segmentName];
+                    var section = content.Parent;
+                    var item = section.Parent;
+                    ((TestShellSectionProxy) section).CurrentContent = content;
+                    ((TestShellItemProxy) item).CurrentSection = section;
+                    _shellProxy.CurrentItem.Returns(item);
+
+                    return Task.CompletedTask;
+                }
+            );
+
         _shellProxy
             .PushAsync(Arg.Any<string>(), Arg.Any<Page>())
-            .Returns(callInfo =>
-            {
-                var page = callInfo.Arg<Page>();
-                var section = (TestShellSectionProxy)_shellProxy.CurrentItem.CurrentSection;
-                section.Push(page);
-                return Task.CompletedTask;
-            });
+            .Returns(
+                callInfo =>
+                {
+                    var page = callInfo.Arg<Page>();
+                    var section = (TestShellSectionProxy) _shellProxy.CurrentItem.CurrentSection;
+                    section.Push(page);
+
+                    return Task.CompletedTask;
+                }
+            );
+
         _shellProxy
             .PopAsync(Arg.Any<IShellSectionProxy>())
-            .Returns(callInfo =>
-            {
-                var section = callInfo.Arg<IShellSectionProxy>() ?? (TestShellSectionProxy)_shellProxy.CurrentItem.CurrentSection;
-                return section.PopAsync();
-            });
+            .Returns(
+                callInfo =>
+                {
+                    var section = callInfo.Arg<IShellSectionProxy>() ?? (TestShellSectionProxy) _shellProxy.CurrentItem.CurrentSection;
+
+                    return section.PopAsync();
+                }
+            );
     }
 
-    /// <inheritdoc cref="ConfigureTestAsync"/>
+    /// <inheritdoc cref="ConfigureTestAsync" />
     private static List<IShellItemProxy> GenerateShellItemProxies(IShellProxy shell, ReadOnlySpan<char> shellContents)
     {
         var shellItemProxies = new List<IShellItemProxy>();
@@ -313,21 +356,22 @@ public partial class NavigationServiceTests
         IShellSectionProxy? currentSection = null;
 
         var pageTypes = new Dictionary<char, Type>
-        {
-            { '1', typeof(Page1) },
-            { '2', typeof(Page2) },
-            { '3', typeof(Page3) },
-            { '4', typeof(Page4) },
-            { '5', typeof(Page5) },
-            { '6', typeof(Page6) },
-            { '7', typeof(Page7) },
-            { '8', typeof(Page8) },
-            { '9', typeof(Page9) },
-        };
+                        {
+                            { '1', typeof(Page1) },
+                            { '2', typeof(Page2) },
+                            { '3', typeof(Page3) },
+                            { '4', typeof(Page4) },
+                            { '5', typeof(Page5) },
+                            { '6', typeof(Page6) },
+                            { '7', typeof(Page7) },
+                            { '8', typeof(Page8) },
+                            { '9', typeof(Page9) }
+                        };
 
         for (var i = 0; i < shellContents.Length; i++)
         {
             var c = shellContents[i];
+
             if (c == 'i')
             {
                 var segmentName = shellContents[i..(i + 2)].ToString();
@@ -341,7 +385,7 @@ public partial class NavigationServiceTests
                 ++i;
                 var item = currentItem ?? new TestShellItemProxy($"IMPL_{segmentName}") { Parent = shell };
                 currentSection = new TestShellSectionProxy(segmentName) { Parent = item };
-                ((IList<IShellSectionProxy>)item.Sections).Add(currentSection);
+                ((IList<IShellSectionProxy>) item.Sections).Add(currentSection);
 
                 if (currentItem is null)
                 {
@@ -354,14 +398,16 @@ public partial class NavigationServiceTests
                 var segmentName = pageType.Name;
                 ++i;
                 var section = currentSection ?? new TestShellSectionProxy($"IMPL_{segmentName}");
-                ((IList<IShellContentProxy>)section.Contents).Add(
-                    new TestShellContentProxy(pageType, segmentName) { Parent = section });
+
+                ((IList<IShellContentProxy>) section.Contents).Add(
+                    new TestShellContentProxy(pageType, segmentName) { Parent = section }
+                );
 
                 if (currentSection is null)
                 {
                     var item = currentItem ?? new TestShellItemProxy($"IMPL_{segmentName}") { Parent = shell };
-                    ((TestShellSectionProxy)section).Parent = item;
-                    ((IList<IShellSectionProxy>)item.Sections).Add(section);
+                    ((TestShellSectionProxy) section).Parent = item;
+                    ((IList<IShellSectionProxy>) item.Sections).Add(section);
 
                     if (currentItem is null)
                     {

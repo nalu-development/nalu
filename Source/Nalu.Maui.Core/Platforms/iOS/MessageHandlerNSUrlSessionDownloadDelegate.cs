@@ -1,5 +1,3 @@
-namespace Nalu;
-
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -10,6 +8,8 @@ using CoreFoundation;
 using Foundation;
 using Microsoft.Extensions.Logging;
 using UIKit;
+
+namespace Nalu;
 
 #pragma warning disable VSTHRD103, VSTHRD100, VSTHRD003, IDE0290, CA1848
 
@@ -22,7 +22,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     private const string CookieHeaderKey = "Cookie";
 
     /// <summary>
-    /// Gets the singleton instance of the <see cref="MessageHandlerNSUrlSessionDownloadDelegate"/>.
+    /// Gets the singleton instance of the <see cref="MessageHandlerNSUrlSessionDownloadDelegate" />.
     /// </summary>
     public static MessageHandlerNSUrlSessionDownloadDelegate Current => _instance ??= new MessageHandlerNSUrlSessionDownloadDelegate();
 
@@ -42,6 +42,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         get
         {
             _logger ??= GetLoggerFromApplicationServiceProvider();
+
             return _logger ?? _emptyLogger;
         }
     }
@@ -84,9 +85,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var requestIdentifier = TryGetRequestIdentifier(request, out var id) ? id : Guid.NewGuid().ToString("N");
 
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
-        {
-            HttpMethod = request.Method.Method,
-        };
+                                {
+                                    HttpMethod = request.Method.Method
+                                };
 
         if (defaultTimeout != _infiniteTimeout)
         {
@@ -94,6 +95,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         string? contentPath = null;
+
         if (request.Content is { } content)
         {
             if (content is MultipartContent or StreamContent)
@@ -114,6 +116,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         nativeHttpRequest.Headers = GetPlatformHeaders(request, cookieContainer);
 
         NSUrlSessionTask task;
+
         if (contentPath != null)
         {
             var fileUrl = NSUrl.CreateFileUrl(contentPath, null);
@@ -127,13 +130,16 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var weakTask = new WeakReference<NSUrlSessionTask>(task);
-        var cancellationTokenRegistration = cancellationToken.Register(() =>
-        {
-            if (weakTask.TryGetTarget(out var t) && t?.State is NSUrlSessionTaskState.Running or NSUrlSessionTaskState.Suspended)
+
+        var cancellationTokenRegistration = cancellationToken.Register(
+            () =>
             {
-                t.Cancel();
+                if (weakTask.TryGetTarget(out var t) && t?.State is NSUrlSessionTaskState.Running or NSUrlSessionTaskState.Suspended)
+                {
+                    t.Cancel();
+                }
             }
-        });
+        );
 
         var requestHandle = new NSUrlRequestHandle(requestIdentifier, cookieContainer, contentPath, cancellationTokenRegistration);
         _pendingRequests[requestIdentifier] = requestHandle;
@@ -142,10 +148,11 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         task.Resume();
 
         await Task.Yield();
+
         return await requestHandle.ResponseCompletionSource.Task.ConfigureAwait(false);
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public override void DidBecomeInvalid(NSUrlSession session, NSError? error)
     {
         Logger.LogDebug("DidBecomeInvalid");
@@ -157,7 +164,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public override void DidCompleteWithError(NSUrlSession session, NSUrlSessionTask task, NSError? error)
     {
         _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
@@ -167,13 +174,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         if (string.IsNullOrWhiteSpace(task.TaskDescription))
         {
             Logger.LogError("DidCompleteWithError TaskDescription is null or empty");
+
             return;
         }
 
         var requestIdentifier = task.TaskDescription!;
+
         if (!_pendingRequests.TryGetValue(requestIdentifier, out var handle))
         {
-            handle = new NSUrlRequestHandle(requestIdentifier, null, null, default, isLostRequest: true);
+            handle = new NSUrlRequestHandle(requestIdentifier, null, null, default, true);
             _pendingRequests[requestIdentifier] = handle;
         }
 
@@ -189,16 +198,19 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 Logger.LogError("Task {RequestIdentifier} completed callback invoked with running state: {Error}", requestIdentifier, error?.ToString());
                 handle.ResponseCompletionSource.TrySetException(new InvalidOperationException("Task completed callback invoked with running state"));
                 CompleteAndRemoveHandle(handle);
+
                 break;
             case NSUrlSessionTaskState.Suspended:
                 Logger.LogError("Task {RequestIdentifier} completed callback invoked with suspended state: {Error}", requestIdentifier, error?.ToString());
                 handle.ResponseCompletionSource.TrySetException(new InvalidOperationException("Task completed callback invoked with suspended state"));
                 CompleteAndRemoveHandle(handle);
+
                 break;
             case NSUrlSessionTaskState.Canceling:
                 Logger.LogDebug("Task {RequestIdentifier} completed with canceling state", requestIdentifier);
                 handle.ResponseCompletionSource.TrySetCanceled();
                 CompleteAndRemoveHandle(handle);
+
                 break;
             case NSUrlSessionTaskState.Completed:
                 if (task.Error != null)
@@ -228,11 +240,12 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 Logger.LogError("Task {RequestIdentifier} unknown task state {TaskState}", requestIdentifier, task.State);
                 handle.ResponseCompletionSource.TrySetException(new HttpRequestException($"Unknown task state: {task.State}"));
                 CompleteAndRemoveHandle(handle);
+
                 break;
         }
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public override void DidFinishDownloading(NSUrlSession session, NSUrlSessionDownloadTask task, NSUrl location)
     {
         _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
@@ -240,14 +253,16 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         if (string.IsNullOrWhiteSpace(task.TaskDescription))
         {
             Logger.LogError("DidFinishDownloading TaskDescription is null or empty");
+
             return;
         }
 
         var requestIdentifier = task.TaskDescription!;
         Logger.LogDebug("DidFinishDownloading {RequestIdentifier}", requestIdentifier);
+
         if (!_pendingRequests.TryGetValue(requestIdentifier, out var handle))
         {
-            handle = new NSUrlRequestHandle(requestIdentifier, null, null, default, isLostRequest: true);
+            handle = new NSUrlRequestHandle(requestIdentifier, null, null, default, true);
             _pendingRequests[requestIdentifier] = handle;
         }
 
@@ -262,6 +277,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             Logger.LogError("Response is not NSHttpUrlResponse");
             handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Response is not NSHttpUrlResponse"));
             CompleteAndRemoveHandle(handle);
+
             return;
         }
 
@@ -270,6 +286,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         // We should be good with a temporary file path considering we're going to read it right away.
         var locationPath = location.Path;
         handle.ResponseContentFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".nsresponse");
+
         try
         {
             File.Move(locationPath!, handle.ResponseContentFile, true);
@@ -277,6 +294,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         catch (Exception ex)
         {
             handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Temporary response file is gone", ex));
+
             return;
         }
         finally
@@ -286,9 +304,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var httpResponseMessage = new HttpResponseMessage(task.GetHttpStatusCode())
-        {
-            RequestMessage = CreateHttpRequestMessage(task.CurrentRequest ?? task.OriginalRequest),
-        };
+                                  {
+                                      RequestMessage = CreateHttpRequestMessage(task.CurrentRequest ?? task.OriginalRequest)
+                                  };
 
         var fileStream = new FileStream(handle.ResponseContentFile, FileMode.Open, FileAccess.Read, FileShare.Read);
         httpResponseMessage.Content = new AcknowledgingStreamContent(this, handle, fileStream);
@@ -304,6 +322,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         void HandleLostMessage()
         {
             var lostMessageHandler = GetLostMessageHandler();
+
             if (lostMessageHandler != null)
             {
                 var responseHandle = new NSUrlBackgroundResponseHandle(requestIdentifier, handle.ResponseCompletionSource.Task);
@@ -328,6 +347,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         _processingInBackgroundCompletionHandler = completionHandler;
         _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
         WaitEventsProcessingAndNotify();
+
         return true;
     }
 #pragma warning restore IDE0060, VSTHRD110
@@ -346,6 +366,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var maxWaitTime = 6500;
+
         while (Stopwatch.GetElapsedTime(_lastCompletedTaskTimestamp) < _eventProcessingWaitThreshold)
         {
             await Task.Delay(200).ConfigureAwait(false);
@@ -370,9 +391,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var request = new HttpRequestMessage(new HttpMethod(taskRequest.HttpMethod), taskRequest.Url)
-        {
-            Content = taskRequest.Body is { } body ? new StreamContent(body.AsStream()) : null,
-        };
+                      {
+                          Content = taskRequest.Body is { } body ? new StreamContent(body.AsStream()) : null
+                      };
 
         foreach (var header in taskRequest.Headers)
         {
@@ -382,6 +403,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             }
 
             var key = header.Key.ToString();
+
             if (key == SetCookieHeaderKey)
             {
                 continue;
@@ -412,6 +434,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             }
 
             var key = header.Key.ToString();
+
             if (key == SetCookieHeaderKey)
             {
                 continue;
@@ -435,6 +458,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             var absoluteUri = new Uri(responseUrl.AbsoluteString!);
             var cookies = cookieStorage.CookiesForUrl(responseUrl);
             UpdateManagedCookieContainer(cookieContainer, absoluteUri, cookies);
+
             for (var index = 0; index < cookies.Length; index++)
             {
                 httpResponseMessage.Headers.TryAddWithoutValidation(SetCookieHeaderKey, cookies[index].GetHeaderValue());
@@ -457,8 +481,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     private static INSUrlBackgroundSessionLostMessageHandler? GetLostMessageHandler() =>
         IPlatformApplication.Current?
-            .Services
-            .GetService<INSUrlBackgroundSessionLostMessageHandler>();
+                            .Services
+                            .GetService<INSUrlBackgroundSessionLostMessageHandler>();
 
     private static string GetRequestBodyPath(string requestIdentifier)
         => Path.Combine(Path.GetTempPath(), $"{requestIdentifier}.nsrequest");
@@ -474,15 +498,18 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var enumeratedHeaders = headers.ToArray();
+
         var nativeHeaders = NSMutableDictionary.FromObjectsAndKeys(
             enumeratedHeaders.Select(object (h) => h.Value).ToArray(),
-            enumeratedHeaders.Select(object (h) => h.Key).ToArray());
+            enumeratedHeaders.Select(object (h) => h.Key).ToArray()
+        );
 
         // set header cookies if needed from the managed cookie container if we do use Cookies
         if (Session.Configuration.HttpCookieStorage is not null && cookieContainer is not null)
         {
             // As per docs: An HTTP cookie header, with strings representing Cookie instances delimited by semicolons.
             var cookies = cookieContainer.GetCookieHeader(request.RequestUri!);
+
             if (!string.IsNullOrEmpty(cookies))
             {
 #pragma warning disable CS0618
@@ -502,9 +529,11 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     {
         var enumeratedManagedHeaders = managedHeaders.ToString().Split('\n');
         var regex = HeaderValueRegex();
+
         foreach (var header in enumeratedManagedHeaders)
         {
             var match = regex.Match(header);
+
             if (match.Success)
             {
                 var key = match.Groups[1].Value;
@@ -519,20 +548,25 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         if (request.Headers.TryGetValues(NSUrlBackgroundSessionHttpMessageHandler.RequestIdentifierHeaderName, out var values))
         {
             var id = values.FirstOrDefault();
+
             if (!string.IsNullOrWhiteSpace(id))
             {
                 requestIdentifier = id;
+
                 return true;
             }
         }
 
         requestIdentifier = null;
+
         return false;
     }
 
-    private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate> CreateEmptyLogger() => LoggerFactory.Create(_ => { }).CreateLogger<MessageHandlerNSUrlSessionDownloadDelegate>();
+    private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate> CreateEmptyLogger()
+        => LoggerFactory.Create(_ => { }).CreateLogger<MessageHandlerNSUrlSessionDownloadDelegate>();
 
-    private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider() => IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+    private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider()
+        => IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
 
     [GeneratedRegex("(.+?): (.+)")]
     private static partial Regex HeaderValueRegex();

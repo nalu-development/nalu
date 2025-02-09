@@ -14,7 +14,7 @@ public interface INavigationSegment
     /// Gets the type corresponding to the segment.
     /// </summary>
     /// <remarks>
-    /// Can be <see langword="null"/> if the segment is a pop segment.
+    /// Can be <see langword="null" /> if the segment is a pop segment.
     /// </remarks>
     Type? Type { get; }
 

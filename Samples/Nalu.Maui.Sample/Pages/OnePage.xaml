@@ -1,4 +1,5 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8"?>
+
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
@@ -15,7 +16,7 @@
             <Image Source="banner.png"
                    HeightRequest="128"
                    Aspect="AspectFit"
-                   Margin="0,16,0,24"/>
+                   Margin="0,16,0,24" />
 
             <Button Command="{Binding SendRequestCommand}"
                     Text="Send requests and crash on last"
@@ -25,7 +26,7 @@
             <VerticalStackLayout BindableLayout.ItemsSource="{Binding BackgroundResponses}">
                 <BindableLayout.ItemTemplate>
                     <DataTemplate x:DataType="x:String">
-                        <Label Text="{Binding .}"/>
+                        <Label Text="{Binding .}" />
                     </DataTemplate>
                 </BindableLayout.ItemTemplate>
             </VerticalStackLayout>
@@ -69,7 +70,7 @@
             <Label>
                 <Label.FormattedText>
                     <FormattedString>
-                        <Span Text="Instance: "/>
+                        <Span Text="Instance: " />
                         <Span Text="{Binding InstanceCount}" />
                     </FormattedString>
                 </Label.FormattedText>

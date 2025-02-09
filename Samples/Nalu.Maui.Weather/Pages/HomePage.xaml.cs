@@ -1,7 +1,6 @@
-namespace Nalu.Maui.Weather.Pages;
+using Nalu.Maui.Weather.PageModels;
 
-using PageModels;
-using Resources;
+namespace Nalu.Maui.Weather.Pages;
 
 public partial class HomePage
 {
@@ -19,4 +18,3 @@ public partial class HomePage
         BannerImage.TranslationY = e.ScrollY / 3;
     }
 }
-
