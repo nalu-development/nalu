@@ -82,12 +82,12 @@ jobs:
       url: https://github.com/nalu-development/nalu/packages
     permissions:
       packages: write
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - name: "Download Artefact"
         uses: actions/download-artifact@v4.1.8
         with:
-          name: "windows-2019"
+          name: "windows-latest"
       - name: "Dotnet NuGet Add Source"
         run: dotnet nuget add source https://nuget.pkg.github.com/nalu-development/index.json --name GitHub --username albyrock87 --password ${{secrets.GITHUB_TOKEN}}
         shell: pwsh
@@ -107,7 +107,7 @@ jobs:
       - name: "Download Artefact"
         uses: actions/download-artifact@v4.1.8
         with:
-          name: "windows-2019"
+          name: "windows-latest"
       - name: "Dotnet NuGet Push"
         run: |
           Get-ChildItem .\ -Filter *.nupkg |
