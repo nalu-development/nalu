@@ -6,7 +6,7 @@ using Nalu.Internals;
 /// A <see cref="ViewBox"/> base class that uses a <see cref="DataTemplate"/> to render content.
 /// </summary>
 [ContentProperty(nameof(TemplateContent))]
-public abstract class TemplateBoxBase : ViewBoxBase
+public abstract class TemplateBoxBase : ClippableViewBoxBase
 {
     /// <summary>
     /// Bindable property for <see cref="TemplateContent"/> property.

@@ -20,7 +20,7 @@ public partial class NavigationServiceTests
         ConfigureTestAsync("c1");
         await _navigationService.InitializeAsync(_shellProxy, segmentName, null);
 
-        _ = _shellProxy.Received().SelectContentAsync(segmentName);
+        _shellProxy.Received().InitializeWithContent(segmentName);
         var page = _shellProxy.GetContent(segmentName).Page!;
         var model = (IPage1Model)page.BindingContext;
 
@@ -41,7 +41,7 @@ public partial class NavigationServiceTests
         ConfigureTestAsync("c1");
         await _navigationService.InitializeAsync(_shellProxy, segmentName, intent);
 
-        _ = _shellProxy.Received().SelectContentAsync(segmentName);
+        _shellProxy.Received().InitializeWithContent(segmentName);
         var page = _shellProxy.GetContent(segmentName).Page!;
         var model = (IPage1Model)page.BindingContext;
 

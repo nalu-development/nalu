@@ -15,6 +15,10 @@ public static class NaluLayoutsMauiAppBuilderExtensions
     public static MauiAppBuilder UseNaluLayouts(this MauiAppBuilder builder)
     {
         _ = new XamlInitializer();
+        builder.ConfigureMauiHandlers(handlers =>
+        {
+            handlers.AddHandler<IViewBox, ViewBoxHandler>();
+        });
         return builder;
     }
 }

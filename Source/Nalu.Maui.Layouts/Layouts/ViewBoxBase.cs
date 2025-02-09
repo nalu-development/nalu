@@ -4,12 +4,12 @@ using Microsoft.Maui.Layouts;
 using Nalu.Internals;
 
 /// <summary>
-/// <see cref="ViewBoxBase"/> is a base class a <see cref="IContentView"/> that is used to display a single view.
+/// <see cref="ViewBoxBase"/> is a base class a <see cref="IViewBox"/> that is used to display a single view.
 /// </summary>
-public abstract class ViewBoxBase : View, IContentView
+public abstract class ViewBoxBase : View, IViewBox
 {
     private ILayoutManager? _layoutManager;
-    private ILayoutManager LayoutManager => _layoutManager ??= new ViewBoxLayoutManager(this);
+    private ILayoutManager LayoutManager => _layoutManager ??= CreateLayoutManager();
 
     /// <summary>
     /// Bindable property for <see cref="Padding"/> property.
@@ -70,10 +70,18 @@ public abstract class ViewBoxBase : View, IContentView
 
     Size IContentView.CrossPlatformMeasure(double widthConstraint, double heightConstraint) => LayoutManager.Measure(widthConstraint, heightConstraint);
     Size IContentView.CrossPlatformArrange(Rect bounds) => LayoutManager.ArrangeChildren(bounds);
+
     object? IContentView.Content => GetContent();
+    bool IViewBox.ClipsToBounds => false;
 
     /// <inheritdoc />
     public IView? PresentedContent => GetContent();
+
+    /// <summary>
+    /// Creates a manager object that can measure this container and arrange its content.
+    /// </summary>
+    /// <returns>The instance of the layout manager.</returns>
+    protected virtual ILayoutManager CreateLayoutManager() => new ViewBoxLayoutManager(this);
 
     /// <summary>
     /// Updates the binding context of the content view.

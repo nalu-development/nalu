@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Border xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+        xmlns:viewModels="clr-namespace:Nalu.Maui.Weather.ViewModels"
+        xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+        xmlns:models="clr-namespace:Nalu.Maui.Weather.Models"
+        xmlns:r="clr-namespace:Nalu.Maui.Weather.Resources"
+        x:Class="Nalu.Maui.Weather.Views.ForecastCard"
+        x:DataType="viewModels:WeatherState"
+        Style="{StaticResource CardBorder}">
+    <VerticalStackLayout>
+        <nalu:ExpanderViewBox CollapsedHeight="420"
+                              IsExpanded="False"
+                              x:Name="Expander">
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding DailyWeatherData}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:DailyWeatherModel">
+                        <Grid ColumnDefinitions="*,Auto,Auto,*"
+                              RowDefinitions="Auto,Auto"
+                              Padding="16,8">
+                            <Label FontFamily="SemiBold"
+                                   FontSize="16"
+                                   VerticalTextAlignment="Center"
+                                   Text="{Binding DayName}"/>
+                            <Border Grid.Row="1"
+                                    HorizontalOptions="Start"
+                                    VerticalOptions="Center"
+                                    Style="{StaticResource BadgeBorder}"
+                                    Margin="-4,4,0,0">
+                                <Label Text="{Binding Date}"
+                                       TextTransform="Uppercase"
+                                       Style="{StaticResource SecondaryText}"
+                                       FontSize="11"/>
+                            </Border>
+                            <Image Grid.Column="1"
+                                   Grid.RowSpan="2"
+                                   Margin="0,0,8,0"
+                                   Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
+                                                FontFamily=MaterialOutlined,
+                                                Color={StaticResource Secondary},
+                                                Size=40}"/>
+                            <Label Grid.Column="2"
+                                   FontFamily="SemiBold"
+                                   HorizontalTextAlignment="Center"
+                                   Text="{Binding TemperatureMaxDegrees}"/>
+                            <Label Grid.Column="2"
+                                   Grid.Row="1"
+                                   Style="{StaticResource SecondaryText}"
+                                   HorizontalTextAlignment="Center"
+                                   Text="{Binding TemperatureMinDegrees}"/>
+                            <Label Grid.Column="3"
+                                   FontSize="12"
+                                   VerticalTextAlignment="Center"
+                                   HorizontalTextAlignment="End">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="{Binding RainSumMm}" Style="{StaticResource SecondarySpan}" />
+                                        <Span Text=" " />
+                                        <Span Text="&#xe798;" FontFamily="MaterialOutlined" Style="{StaticResource SecondarySpan}" />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                            <Label Grid.Column="3"
+                                   Grid.Row="2"
+                                   FontSize="12"
+                                   VerticalTextAlignment="Center"
+                                   HorizontalTextAlignment="End">
+                                <Label.FormattedText>
+                                    <FormattedString>
+                                        <Span Text="{Binding WindSpeedKmh}" Style="{StaticResource SecondarySpan}" />
+                                        <Span Text=" " />
+                                        <Span Text="&#xefd8;" FontFamily="MaterialOutlined" Style="{StaticResource SecondarySpan}" />
+                                    </FormattedString>
+                                </Label.FormattedText>
+                            </Label>
+                        </Grid>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </nalu:ExpanderViewBox>
+
+        <Button IsVisible="{Binding Path=CanCollapse,
+                                                Source={x:Reference Expander},
+                                                x:DataType=nalu:ExpanderViewBox}"
+                x:Name="ExpanderButton"
+                BackgroundColor="Transparent"
+                Clicked="ToggleExpander"
+                Text="{x:Static r:Texts.ShowMore}"
+                Style="{StaticResource TextButton}"
+                Margin="0,8,0,0"/>
+    </VerticalStackLayout>
+</Border>

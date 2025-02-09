@@ -1,5 +1,7 @@
 namespace Nalu;
 
+using System;
+
 /// <summary>
 /// Defines the navigation behavior.
 /// </summary>

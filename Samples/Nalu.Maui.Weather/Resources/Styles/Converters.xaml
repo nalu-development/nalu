@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xaml-comp compile="true" ?>
+
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:xct="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    xmlns:converters="clr-namespace:Nalu.Maui.Weather.Converters">
+
+    <!-- https://learn.microsoft.com/en-us/xamarin/community-toolkit/ -->
+    <xct:InvertedBoolConverter x:Key="Not" />
+
+    <!-- Custom converters -->
+    <converters:WeatherCodeToDescriptionConverter x:Key="WeatherDescriptionConverter" />
+    <converters:WeatherCodeToIconConverter x:Key="WeatherIconConverter" />
+    <converters:WeatherCodeToImageConverter x:Key="WeatherImageConverter" />
+
+</ResourceDictionary>

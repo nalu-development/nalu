@@ -1,13 +1,13 @@
 namespace Nalu;
 
 /// <summary>
-/// ContentLayout is a layout that is used to display a single view.
+/// ViewBox is container that is used to display a single view.
 /// </summary>
 /// <remarks>
 /// Can be used as a replacement of <see cref="ContentView"/> (which as-of .NET 8 uses Compatibility.Layout).
 /// </remarks>
 [ContentProperty(nameof(Content))]
-public partial class ViewBox : ViewBoxBase
+public partial class ViewBox : ClippableViewBoxBase
 {
     /// <summary>
     /// Bindable property for <see cref="Content"/> property.

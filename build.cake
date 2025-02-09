@@ -22,7 +22,7 @@ Task("Restore")
     .IsDependentOn("Clean")
     .Does(() =>
     {
-        DotNetRestore();
+        DotNetRestore("Nalu.Pack.slnf");
     });
 
 Task("Build")
@@ -36,7 +36,7 @@ Task("Build")
                            NoRestore = true,
                            MSBuildSettings = new DotNetMSBuildSettings().EnableBinaryLogger(binlogPath)
                        };
-        DotNetBuild(".", settings);
+        DotNetBuild("Nalu.Pack.slnf", settings);
     });
 
 Task("Test")
@@ -68,7 +68,7 @@ Task("Pack")
     .Does(() =>
     {
         DotNetPack(
-            ".",
+            "Nalu.Pack.slnf",
             new DotNetPackSettings()
             {
                 Configuration = configuration,
