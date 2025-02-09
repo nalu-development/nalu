@@ -32,9 +32,9 @@ public class NavigationTests
     [Fact(DisplayName = "Absolute navigation, equals to another relative navigation with same segments")]
     public void AbsoluteNavigationEqualsToAnotherRelativeNavigationWithSameSegments()
     {
-        var a1 = Nalu.Navigation.Absolute().ShellContent<SomePageModel>();
-        var a2 = Nalu.Navigation.Absolute().ShellContent<SomePageModel>();
-        var a3 = Nalu.Navigation.Absolute().ShellContent<SomePageModel>().Add<SomePageModel>();
+        var a1 = Nalu.Navigation.Absolute().Root<SomePageModel>();
+        var a2 = Nalu.Navigation.Absolute().Root<SomePageModel>();
+        var a3 = Nalu.Navigation.Absolute().Root<SomePageModel>().Add<SomePageModel>();
 
         a1.Matches(a2).Should().BeTrue();
         a1.Matches(a3).Should().BeFalse();
@@ -44,9 +44,9 @@ public class NavigationTests
     public void AbsoluteNavigationWithIntentEqualsToAnotherRelativeNavigationWithSameSegments()
     {
         const string intent = "Hello";
-        var a1 = Nalu.Navigation.Absolute().ShellContent<SomePageModel>().WithIntent(intent);
-        var a2 = Nalu.Navigation.Absolute().ShellContent<SomePageModel>().WithIntent(intent);
-        var a3 = Nalu.Navigation.Absolute().ShellContent<SomePageModel>();
+        var a1 = Nalu.Navigation.Absolute().Root<SomePageModel>().WithIntent(intent);
+        var a2 = Nalu.Navigation.Absolute().Root<SomePageModel>().WithIntent(intent);
+        var a3 = Nalu.Navigation.Absolute().Root<SomePageModel>();
 
         a1.Matches(a2).Should().BeTrue();
         a1.Matches(a3).Should().BeFalse();

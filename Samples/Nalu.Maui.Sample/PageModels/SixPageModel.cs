@@ -10,5 +10,5 @@ public partial class SixPageModel(INavigationService navigationService) : Observ
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
 
     [RelayCommand(AllowConcurrentExecutions = false)]
-    private Task GoToOneAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<OnePageModel>());
+    private Task GoToOneAsync() => navigationService.GoToAsync(Navigation.Absolute().Root<OnePageModel>());
 }

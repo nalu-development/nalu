@@ -426,14 +426,14 @@ public partial class NavigationServiceTests
         model1.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>().Add<IPage9Model>().Add<IPage2Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage1Model>().Add<IPage9Model>().Add<IPage2Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
         var model2 = (IPage9Model) page2.BindingContext;
         var page3 = navigationStackPages[2].Page;
         var model3 = (IPage2Model) page3.BindingContext;
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>().Add<IPage9Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage1Model>().Add<IPage9Model>());
 
         Received.InOrder(
             () =>
@@ -473,7 +473,7 @@ public partial class NavigationServiceTests
 
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -511,7 +511,7 @@ public partial class NavigationServiceTests
 
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>().Add<IPage4Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage5Model>().Add<IPage4Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -554,7 +554,7 @@ public partial class NavigationServiceTests
         model2.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -597,7 +597,7 @@ public partial class NavigationServiceTests
         model2.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -640,7 +640,7 @@ public partial class NavigationServiceTests
         model2.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnSectionChange).ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnSectionChange).Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -666,8 +666,8 @@ public partial class NavigationServiceTests
     {
         ConfigureTestAsync("i1[c1,c2,c3],c5");
         await _navigationService.InitializeAsync(_shellProxy, nameof(Page2), null);
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage3Model>());
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage3Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage1Model>());
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellContent2 = _shellProxy.GetContent(nameof(Page2));
         var shellContent3 = _shellProxy.GetContent(nameof(Page3));
@@ -690,7 +690,7 @@ public partial class NavigationServiceTests
         model4.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -734,7 +734,7 @@ public partial class NavigationServiceTests
         model2.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.None).ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.None).Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -778,7 +778,7 @@ public partial class NavigationServiceTests
         model2.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.IgnoreGuards | NavigationBehavior.PopAllPagesOnItemChange).ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.IgnoreGuards | NavigationBehavior.PopAllPagesOnItemChange).Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
@@ -821,7 +821,7 @@ public partial class NavigationServiceTests
         model2.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
-        await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;

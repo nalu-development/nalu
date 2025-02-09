@@ -85,7 +85,7 @@ public partial class InitializationPageModel(
     {
         var navigation = Navigation
                          .Absolute(NavigationBehavior.Immediate | NavigationBehavior.PopAllPagesOnItemChange)
-                         .ShellContent<HomePageModel>();
+                         .Root<HomePageModel>();
 
         return navigationService.GoToAsync(navigation);
     }

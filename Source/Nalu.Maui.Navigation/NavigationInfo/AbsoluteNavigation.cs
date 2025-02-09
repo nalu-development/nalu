@@ -12,6 +12,7 @@ public interface IAbsoluteNavigationInitialBuilder : INavigationInfo
     /// Navigates to <typeparamref name="TPage" /> shell content using the specified type.
     /// </summary>
     /// <typeparam name="TPage">The type of page used on the `ShellContent`.</typeparam>
+    [Obsolete("Use Root<TPage>() instead.")]
     IAbsoluteNavigationBuilder ShellContent<TPage>()
         where TPage : class;
 
@@ -20,7 +21,23 @@ public interface IAbsoluteNavigationInitialBuilder : INavigationInfo
     /// </summary>
     /// <param name="customRoute">The custom route defined on `Route` property of `ShellContent`.</param>
     /// <typeparam name="TPage">The type of page used on the `ShellContent`.</typeparam>
+    [Obsolete("Use Root<TPage>() instead.")]
     IAbsoluteNavigationBuilder ShellContent<TPage>(string customRoute)
+        where TPage : class;
+
+    /// <summary>
+    /// Navigates to <typeparamref name="TPage" /> root page using the specified type.
+    /// </summary>
+    /// <typeparam name="TPage">The type of page used on the `ShellContent`.</typeparam>
+    IAbsoluteNavigationBuilder Root<TPage>()
+        where TPage : class;
+
+    /// <summary>
+    /// Navigates to <typeparamref name="TPage" /> root page marked with a custom route.
+    /// </summary>
+    /// <param name="customRoute">The custom route defined on `Route` property of `ShellContent`.</param>
+    /// <typeparam name="TPage">The type of page used on the `ShellContent`.</typeparam>
+    IAbsoluteNavigationBuilder Root<TPage>(string customRoute)
         where TPage : class;
 }
 
@@ -64,6 +81,16 @@ public class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsol
     /// <inheritdoc />
     public IAbsoluteNavigationBuilder ShellContent<TPage>()
         where TPage : class
+        => Root<TPage>();
+
+    /// <inheritdoc />
+    public IAbsoluteNavigationBuilder ShellContent<TPage>(string customRoute)
+        where TPage : class
+        => Root<TPage>(customRoute);
+
+    /// <inheritdoc />
+    public IAbsoluteNavigationBuilder Root<TPage>()
+        where TPage : class
     {
         if (Count != 0)
         {
@@ -81,7 +108,7 @@ public class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsol
     }
 
     /// <inheritdoc />
-    public IAbsoluteNavigationBuilder ShellContent<TPage>(string customRoute)
+    public IAbsoluteNavigationBuilder Root<TPage>(string customRoute)
         where TPage : class
     {
         if (Count != 0)

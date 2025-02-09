@@ -16,5 +16,5 @@ public partial class FivePageModel(INavigationService navigationService) : Obser
     private void Toggle() => Condition = !Condition;
 
     [RelayCommand]
-    private Task GoToThreeAsync() => navigationService.GoToAsync(Navigation.Absolute().ShellContent<OnePageModel>().Add<ThreePageModel>());
+    private Task GoToThreeAsync() => navigationService.GoToAsync(Navigation.Absolute().Root<OnePageModel>().Add<ThreePageModel>());
 }

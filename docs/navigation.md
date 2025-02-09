@@ -20,7 +20,7 @@ You can leverage that to ask the user to confirm leaving the page.
 ```csharp
 // Starting from: RootPageModel > ContactsPageModel > ContactDetailPageModel
 Navigation.Absolute()
-    .ShellContent<RootPageModel>()
+    .Root<RootPageModel>()
 
 // This is gonna trigger the navigation guard on ContactDetailPageModel
 ValueTask<bool> CanLeaveAsync() => { ... ask the user };
@@ -315,9 +315,9 @@ await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(myInte
 // Pop two pages than push a new one
 await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop().Push<ThreePageModel>());
 // Pop to the root page using absolute navigation
-await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<MainPageModel>());
+await _navigationService.GoToAsync(Navigation.Absolute().Root<MainPageModel>());
 // Switch to a different shell content and push a page there
-await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<OtherPageModel>().Push<OtherChildPageModel>());
+await _navigationService.GoToAsync(Navigation.Absolute().Root<OtherPageModel>().Push<OtherChildPageModel>());
 ```
 
 Note:
