@@ -14,9 +14,9 @@
         <Label FontFamily="SemiBold"
                Text="{Binding Message}" />
         <ActivityIndicator IsRunning="{Binding IsReady, Converter={StaticResource Not}}"
-                           HorizontalOptions="Center"/>
+                           HorizontalOptions="Center" />
         <Button Command="{Binding NavigateToHomePageCommand}"
                 Text="{x:Static r:Texts.HomePage}"
-                IsVisible="{Binding IsReady}"/>
+                IsVisible="{Binding IsReady}" />
     </VerticalStackLayout>
 </ContentPage>

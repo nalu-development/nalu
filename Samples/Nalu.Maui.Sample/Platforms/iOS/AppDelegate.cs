@@ -1,7 +1,7 @@
-﻿namespace Nalu.Maui.Sample;
-
-using Foundation;
+﻿using Foundation;
 using UIKit;
+
+namespace Nalu.Maui.Sample;
 
 [Register("AppDelegate")]
 public class AppDelegate : MauiUIApplicationDelegate

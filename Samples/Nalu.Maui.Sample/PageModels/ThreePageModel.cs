@@ -1,9 +1,9 @@
-namespace Nalu.Maui.Sample.PageModels;
-
 using CommunityToolkit.Maui.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using PopupModels;
+using Nalu.Maui.Sample.PopupModels;
+
+namespace Nalu.Maui.Sample.PageModels;
 
 public partial class ThreePageModel(INavigationService navigationService, IPopupService popupService) : ObservableObject, ILeavingGuard
 {
@@ -19,5 +19,5 @@ public partial class ThreePageModel(INavigationService navigationService, IPopup
 
     public async ValueTask<bool> CanLeaveAsync()
         // this will leak: https://github.com/CommunityToolkit/Maui/issues/1676
-        => (bool)(await popupService.ShowPopupAsync<CanLeavePopupModel>() ?? false);
+        => (bool) (await popupService.ShowPopupAsync<CanLeavePopupModel>() ?? false);
 }

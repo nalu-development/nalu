@@ -1,15 +1,13 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using Nalu.Maui.Weather.Services;
+using Nalu.Maui.Weather.ViewModels;
+
 namespace Nalu.Maui.Weather.PageModels;
 
-using CommunityToolkit.Mvvm.ComponentModel;
-using Models;
-using OpenMeteo;
-using Resources;
-using Services;
-using ViewModels;
-
-public partial class HomePageModel(
+public class HomePageModel(
     WeatherState weatherState,
-    IWeatherService weatherService)
+    IWeatherService weatherService
+)
     : ObservableObject
 {
     public WeatherState WeatherState => weatherState;

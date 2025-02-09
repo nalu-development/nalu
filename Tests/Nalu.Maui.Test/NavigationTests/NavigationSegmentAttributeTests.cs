@@ -1,4 +1,4 @@
-namespace Nalu.Maui.Test.Navigation;
+namespace Nalu.Maui.Test.NavigationTests;
 
 public class NavigationSegmentAttributeTests
 {

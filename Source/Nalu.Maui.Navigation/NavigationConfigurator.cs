@@ -1,7 +1,7 @@
-namespace Nalu;
-
 using System.ComponentModel;
 using System.Reflection;
+
+namespace Nalu;
 
 /// <summary>
 /// Provides a fluent API for configuring Nalu navigation.
@@ -41,6 +41,7 @@ public class NavigationConfigurator : INavigationConfiguration
     public NavigationConfigurator WithLeakDetectorState(NavigationLeakDetectorState state)
     {
         LeakDetectorState = state;
+
         return this;
     }
 
@@ -51,6 +52,7 @@ public class NavigationConfigurator : INavigationConfiguration
     public NavigationConfigurator WithBackImage(ImageSource imageSource)
     {
         BackImage = imageSource;
+
         return this;
     }
 
@@ -61,6 +63,7 @@ public class NavigationConfigurator : INavigationConfiguration
     public NavigationConfigurator WithMenuImage(ImageSource imageSource)
     {
         MenuImage = imageSource;
+
         return this;
     }
 
@@ -71,12 +74,13 @@ public class NavigationConfigurator : INavigationConfiguration
     public NavigationConfigurator WithNavigationIntentBehavior(NavigationIntentBehavior behavior)
     {
         NavigationIntentBehavior = behavior;
+
         return this;
     }
 
     /// <summary>
-    /// Registers <typeparamref name="TPage"/> as the view for <typeparamref name="TPageModel"/>.
-    /// Adds <typeparamref name="TPage"/> and <typeparamref name="TPageModel"/> as scoped services.
+    /// Registers <typeparamref name="TPage" /> as the view for <typeparamref name="TPageModel" />.
+    /// Adds <typeparamref name="TPage" /> and <typeparamref name="TPageModel" /> as scoped services.
     /// </summary>
     /// <typeparam name="TPageModel">Type of the page model.</typeparam>
     /// <typeparam name="TPage">Type of the page.</typeparam>
@@ -86,8 +90,8 @@ public class NavigationConfigurator : INavigationConfiguration
         => AddPage(typeof(TPageModel), typeof(TPage));
 
     /// <summary>
-    /// Registers <typeparamref name="TPage"/> as the view for <typeparamref name="TPageModel"/>.
-    /// Adds <typeparamref name="TPage"/> and <typeparamref name="TPageModel"/> as scoped services.
+    /// Registers <typeparamref name="TPage" /> as the view for <typeparamref name="TPageModel" />.
+    /// Adds <typeparamref name="TPage" /> and <typeparamref name="TPageModel" /> as scoped services.
     /// </summary>
     /// <typeparam name="TPageModel">Type of the page model.</typeparam>
     /// <typeparam name="TPageModelImplementation">Type of the page model implementation.</typeparam>
@@ -99,8 +103,8 @@ public class NavigationConfigurator : INavigationConfiguration
         => AddPage(typeof(TPageModel), typeof(TPageModelImplementation), typeof(TPage));
 
     /// <summary>
-    /// Registers <paramref name="pageType"/> as the view for <paramref name="pageModelType"/>.
-    /// Adds <paramref name="pageType"/> and <paramref name="pageModelType"/> as scoped services.
+    /// Registers <paramref name="pageType" /> as the view for <paramref name="pageModelType" />.
+    /// Adds <paramref name="pageType" /> and <paramref name="pageModelType" /> as scoped services.
     /// </summary>
     /// <param name="pageModelType">Type of the page model.</param>
     /// <param name="pageType">Type of the page.</param>
@@ -117,8 +121,8 @@ public class NavigationConfigurator : INavigationConfiguration
     }
 
     /// <summary>
-    /// Registers <paramref name="pageType"/> as the view for <paramref name="pageModelType"/>.
-    /// Adds <paramref name="pageType"/> and <paramref name="pageModelType"/> as scoped services.
+    /// Registers <paramref name="pageType" /> as the view for <paramref name="pageModelType" />.
+    /// Adds <paramref name="pageType" /> and <paramref name="pageModelType" /> as scoped services.
     /// </summary>
     /// <param name="pageModelType">Type of the page model interface.</param>
     /// <param name="pageModelImplementationType">Type of the page model implementation.</param>
@@ -136,7 +140,7 @@ public class NavigationConfigurator : INavigationConfiguration
     }
 
     /// <summary>
-    /// Registers all <see cref="ContentPage"/>s matching a page model via default naming convention
+    /// Registers all <see cref="ContentPage" />s matching a page model via default naming convention
     /// `MyPage => MyPageModel` naming convention and adds them all as scoped services.
     /// </summary>
     /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
@@ -144,8 +148,8 @@ public class NavigationConfigurator : INavigationConfiguration
         => AddPages(pageName => $"{pageName}Model", otherAssemblies);
 
     /// <summary>
-    /// Registers all <see cref="ContentPage"/>s matching a page model via provided
-    /// `<paramref name="pageToModelNameConvention"/>` naming convention and adds them all as scoped services.
+    /// Registers all <see cref="ContentPage" />s matching a page model via provided
+    /// `<paramref name="pageToModelNameConvention" />` naming convention and adds them all as scoped services.
     /// </summary>
     /// <remarks>If corresponding interface is found `IMyPageModel` the view model will be registered through the interface.</remarks>
     /// <param name="pageToModelNameConvention">Given a page class name returns the corresponding page model class name.</param>
@@ -156,26 +160,28 @@ public class NavigationConfigurator : INavigationConfiguration
         var types = assemblies.SelectMany(a => a.GetTypes()).ToList();
 
         var notifyPropertyChangedInterfaces = types
-            .Where(t => t.IsInterface && t.IsAssignableTo(typeof(INotifyPropertyChanged)))
-            .GroupBy(t => t.Name)
-            .ToDictionary(g => g.Key, g => g.First());
+                                              .Where(t => t.IsInterface && t.IsAssignableTo(typeof(INotifyPropertyChanged)))
+                                              .GroupBy(t => t.Name)
+                                              .ToDictionary(g => g.Key, g => g.First());
 
         var notifyPropertyChangedClasses = types
-            .Where(t => t is { IsClass: true, IsAbstract: false } && t.IsAssignableTo(typeof(INotifyPropertyChanged)))
-            .GroupBy(t => t.Name)
-            .ToDictionary(g => g.Key, g => g.First());
+                                           .Where(t => t is { IsClass: true, IsAbstract: false } && t.IsAssignableTo(typeof(INotifyPropertyChanged)))
+                                           .GroupBy(t => t.Name)
+                                           .ToDictionary(g => g.Key, g => g.First());
 
         var pageTypes = types.Where(t => t.IsSubclassOf(typeof(ContentPage)));
 
         foreach (var pageType in pageTypes)
         {
             var pageModelTypeName = pageToModelNameConvention(pageType.Name);
+
             if (!notifyPropertyChangedClasses.TryGetValue(pageModelTypeName, out var pageModelType))
             {
                 continue;
             }
 
             var pageModelInterfaceTypeName = $"I{pageModelTypeName}";
+
             if (notifyPropertyChangedInterfaces.TryGetValue(pageModelInterfaceTypeName, out var pageModelInterfaceType) &&
                 _mapping.TryAdd(pageModelInterfaceType, pageType))
             {

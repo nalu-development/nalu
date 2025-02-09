@@ -1,36 +1,39 @@
-﻿namespace Nalu.Internals;
-
+﻿#if !NET9_0_OR_GREATER
 using Microsoft.Maui.Handlers;
 
+namespace Nalu.Internals;
+
 /// <summary>
-/// Provides extension methods for <see cref="IElementHandler"/> to access <see cref="IServiceProvider"/>.
+/// Provides extension methods for <see cref="IElementHandler" /> to access <see cref="IServiceProvider" />.
 /// </summary>
 public static class NaluElementHandlerExtensions
 {
     /// <summary>
-    /// Gets the <see cref="IServiceProvider"/> from the <see cref="IElementHandler"/>.
+    /// Gets the <see cref="IServiceProvider" /> from the <see cref="IElementHandler" />.
     /// </summary>
     /// <returns>Handler's service provider.</returns>
     /// <param name="handler">Element's handler.</param>
-    /// <exception cref="InvalidOperationException"><see cref="MauiContext"/> and its services must be set.</exception>
+    /// <exception cref="InvalidOperationException"><see cref="MauiContext" /> and its services must be set.</exception>
     public static IServiceProvider GetServiceProvider(this IElementHandler handler)
     {
         var context = handler.MauiContext ??
                       throw new InvalidOperationException($"Unable to find the context. The {nameof(ElementHandler.MauiContext)} property should have been set by the host.");
 
         var services = context.Services ??
-                       throw new InvalidOperationException($"Unable to find the service provider. The {nameof(ElementHandler.MauiContext)} property should have been set by the host.");
+                       throw new InvalidOperationException(
+                           $"Unable to find the service provider. The {nameof(ElementHandler.MauiContext)} property should have been set by the host."
+                       );
 
         return services;
     }
 
     /// <summary>
-    /// Gets the service from the <see cref="IElementHandler"/>'s <see cref="MauiContext"/>.
+    /// Gets the service from the <see cref="IElementHandler" />'s <see cref="MauiContext" />.
     /// </summary>
     /// <param name="handler">Element's handler.</param>
     /// <typeparam name="T">Desired service type.</typeparam>
     /// <returns>Service type instance.</returns>
-    /// <exception cref="InvalidOperationException"><see cref="MauiContext"/> or its services are null.</exception>
+    /// <exception cref="InvalidOperationException"><see cref="MauiContext" /> or its services are null.</exception>
     public static T? GetService<T>(this IElementHandler handler)
     {
         var services = handler.GetServiceProvider();
@@ -41,12 +44,12 @@ public static class NaluElementHandlerExtensions
     }
 
     /// <summary>
-    /// Gets the service from the <see cref="IElementHandler"/>'s <see cref="MauiContext"/>.
+    /// Gets the service from the <see cref="IElementHandler" />'s <see cref="MauiContext" />.
     /// </summary>
     /// <param name="handler">Element's handler.</param>
     /// <typeparam name="T">Desired service type.</typeparam>
     /// <returns>Service type instance.</returns>
-    /// <exception cref="InvalidOperationException"><see cref="MauiContext"/> or its services are null or there is no registered service of type <typeparamref name="T"/>.</exception>
+    /// <exception cref="InvalidOperationException"><see cref="MauiContext" /> or its services are null or there is no registered service of type <typeparamref name="T" />.</exception>
     public static T GetRequiredService<T>(this IElementHandler handler)
         where T : notnull
     {
@@ -57,3 +60,4 @@ public static class NaluElementHandlerExtensions
         return service;
     }
 }
+#endif

@@ -4,13 +4,13 @@ namespace Nalu;
 /// ViewBox is container that is used to display a single view.
 /// </summary>
 /// <remarks>
-/// Can be used as a replacement of <see cref="ContentView"/> (which as-of .NET 8 uses Compatibility.Layout).
+/// Can be used as a replacement of <see cref="ContentView" /> (which as-of .NET 8 uses Compatibility.Layout).
 /// </remarks>
 [ContentProperty(nameof(Content))]
-public partial class ViewBox : ClippableViewBoxBase
+public class ViewBox : ClippableViewBoxBase
 {
     /// <summary>
-    /// Bindable property for <see cref="Content"/> property.
+    /// Bindable property for <see cref="Content" /> property.
     /// </summary>
     public static readonly BindableProperty ContentProperty = BindableProperty.Create(nameof(Content), typeof(IView), typeof(ViewBox), propertyChanged: OnContentPropertyChanged);
 
@@ -24,11 +24,11 @@ public partial class ViewBox : ClippableViewBoxBase
     }
 
     /// <inheritdoc />
-    protected override IView? GetContent() => (IView?)GetValue(ContentProperty);
+    protected override IView? GetContent() => (IView?) GetValue(ContentProperty);
 
     /// <inheritdoc />
     protected override void SetContent(IView? content) => SetValue(ContentProperty, content);
 
     private static void OnContentPropertyChanged(BindableObject bindable, object? oldValue, object? newValue)
-        => ((ViewBox)bindable).OnContentPropertyChanged((IView?)oldValue, (IView?)newValue);
+        => ((ViewBox) bindable).OnContentPropertyChanged((IView?) oldValue, (IView?) newValue);
 }

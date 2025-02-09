@@ -1,8 +1,6 @@
-namespace Nalu.Maui.Weather.Converters;
-
-using System;
 using System.Globalization;
-using Microsoft.Maui.Controls;
+
+namespace Nalu.Maui.Weather.Converters;
 
 public class WeatherCodeToIconConverter : IValueConverter
 {
@@ -13,10 +11,9 @@ public class WeatherCodeToIconConverter : IValueConverter
             return weatherInfo.Icon;
         }
 
-        return "help";  // Default icon if code is unknown
+        return "help"; // Default icon if code is unknown
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotImplementedException(); // One-way binding, no need for ConvertBack
 }
-

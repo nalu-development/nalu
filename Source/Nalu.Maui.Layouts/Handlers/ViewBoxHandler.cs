@@ -1,6 +1,11 @@
-namespace Nalu;
-
 using Microsoft.Maui.Handlers;
+
+#if ANDROID
+using Android.Content;
+using ARect = Android.Graphics.Rect;
+using PlatformView = Nalu.ClippableContentViewGroup;
+using OriginalPlatformView = Microsoft.Maui.Platform.ContentViewGroup;
+#endif
 
 #if WINDOWS
 using Microsoft.UI.Xaml.Media;
@@ -8,6 +13,11 @@ using WRect = global::Windows.Foundation.Rect;
 using WSize = global::Windows.Foundation.Size;
 using PlatformView = Nalu.ViewBoxPanel;
 using OriginalPlatformView = Microsoft.Maui.Platform.ContentPanel;
+#endif
+
+namespace Nalu;
+
+#if WINDOWS
 
 #if NET9_0_OR_GREATER
 internal partial class ViewBoxPanel : OriginalPlatformView
@@ -31,10 +41,6 @@ internal partial class ViewBoxPanel : OriginalPlatformView
 #endif
 
 #if ANDROID
-using Android.Content;
-using ARect = Android.Graphics.Rect;
-using PlatformView = Nalu.ClippableContentViewGroup;
-using OriginalPlatformView = Microsoft.Maui.Platform.ContentViewGroup;
 
 internal class ClippableContentViewGroup : OriginalPlatformView
 {
@@ -44,9 +50,8 @@ internal class ClippableContentViewGroup : OriginalPlatformView
 
 #pragma warning disable IDE0290
     // ReSharper disable once ConvertToPrimaryConstructor
-    public ClippableContentViewGroup(Context context) : base(context)
-    {
-    }
+    public ClippableContentViewGroup(Context context)
+        : base(context) { }
 #pragma warning restore IDE0290
 
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
@@ -68,17 +73,17 @@ internal class ClippableContentViewGroup : OriginalPlatformView
 #endif
 
 /// <summary>
-/// Handler for the <see cref="IViewBox"/> view.
+/// Handler for the <see cref="IViewBox" /> view.
 /// </summary>
 public class ViewBoxHandler() : ContentViewHandler(Mapper)
 {
     /// <summary>
-    /// The property mapper for the <see cref="IViewBox"/> interface.
+    /// The property mapper for the <see cref="IViewBox" /> interface.
     /// </summary>
-    public static new readonly IPropertyMapper<IViewBox, ViewBoxHandler> Mapper =
+    public new static readonly IPropertyMapper<IViewBox, ViewBoxHandler> Mapper =
         new PropertyMapper<IViewBox, ViewBoxHandler>(ContentViewHandler.Mapper)
         {
-            [nameof(IViewBox.ClipsToBounds)] = MapClipsToBounds,
+            [nameof(IViewBox.ClipsToBounds)] = MapClipsToBounds
         };
 
 #if WINDOWS
@@ -91,9 +96,9 @@ public class ViewBoxHandler() : ContentViewHandler(Mapper)
         }
 
         var view = new PlatformView
-        {
-            CrossPlatformLayout = VirtualView
-        };
+                   {
+                       CrossPlatformLayout = VirtualView
+                   };
 
         return view;
     }
@@ -109,9 +114,9 @@ public class ViewBoxHandler() : ContentViewHandler(Mapper)
         }
 
         var viewGroup = new PlatformView(Context)
-        {
-            CrossPlatformLayout = VirtualView
-        };
+                        {
+                            CrossPlatformLayout = VirtualView
+                        };
 
         viewGroup.SetClipChildren(false);
 
@@ -129,10 +134,10 @@ public class ViewBoxHandler() : ContentViewHandler(Mapper)
 #if IOS || MACCATALYST
         platformView.ClipsToBounds = view.ClipsToBounds;
 #elif ANDROID
-        ((PlatformView)platformView).ClipsToBounds = view.ClipsToBounds;
+        ((PlatformView) platformView).ClipsToBounds = view.ClipsToBounds;
         platformView.RequestLayout();
 #elif WINDOWS
-        ((PlatformView)platformView).ClipsToBounds = view.ClipsToBounds;
+        ((PlatformView) platformView).ClipsToBounds = view.ClipsToBounds;
         platformView.InvalidateArrange();
 #endif
     }

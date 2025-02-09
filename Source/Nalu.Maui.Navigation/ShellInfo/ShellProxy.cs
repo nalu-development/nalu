@@ -1,8 +1,8 @@
-namespace Nalu;
-
 using System.ComponentModel;
 
-internal partial class ShellProxy : IShellProxy, IDisposable
+namespace Nalu;
+
+internal class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
     private readonly ShellRouteFactory _routeFactory = new();
@@ -22,7 +22,7 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
         UpdateItems();
         shell.PropertyChanged += ShellOnPropertyChanged;
-        ((IShellController)shell).StructureChanged += ShellOnStructureChanged;
+        ((IShellController) shell).StructureChanged += ShellOnStructureChanged;
     }
 
     public bool BeginNavigation()
@@ -35,6 +35,7 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
         _navigationTarget = _shell.CurrentState.Location.OriginalString;
         _navigationCurrentSection = CurrentItem.CurrentSection;
+
         return true;
     }
 
@@ -86,9 +87,11 @@ internal partial class ShellProxy : IShellProxy, IDisposable
     {
         var namesLength = names.Length;
         var name = names[0];
+
         for (var i = 0; i < namesLength; i++)
         {
             name = names[i];
+
             if (_contentsBySegmentName.TryGetValue(name, out var content))
             {
                 return content;
@@ -158,7 +161,8 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
     public async Task SelectContentAsync(string segmentName)
     {
-        var contentProxy = (ShellContentProxy)GetContent(segmentName);
+        var contentProxy = (ShellContentProxy) GetContent(segmentName);
+
         if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
         {
             return;
@@ -166,19 +170,21 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
         _contentChanged = true;
         var content = contentProxy.Content;
-        var section = (ShellSection)content.Parent;
-        var item = (ShellItem)section.Parent;
+        var section = (ShellSection) content.Parent;
+        var item = (ShellItem) section.Parent;
 
         if (_navigationTarget is not null)
         {
             _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
                                 ?? $"//{item.Route}/{section.Route}/{content.Route}";
+
             return;
         }
 
         try
         {
             _shell.SetIsNavigating(true);
+
             if (section.CurrentItem != content)
             {
                 section.CurrentItem = content;
@@ -204,7 +210,8 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
     public void InitializeWithContent(string segmentName)
     {
-        var contentProxy = (ShellContentProxy)GetContent(segmentName);
+        var contentProxy = (ShellContentProxy) GetContent(segmentName);
+
         if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
         {
             return;
@@ -212,12 +219,13 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
         _contentChanged = true;
         var content = contentProxy.Content;
-        var section = (ShellSection)content.Parent;
-        var item = (ShellItem)section.Parent;
+        var section = (ShellSection) content.Parent;
+        var item = (ShellItem) section.Parent;
 
         try
         {
             _shell.SetIsNavigating(true);
+
             if (section.CurrentItem != content)
             {
                 section.CurrentItem = content;
@@ -243,11 +251,11 @@ internal partial class ShellProxy : IShellProxy, IDisposable
     {
         foreach (var itemInfo in Items)
         {
-            ((IDisposable)itemInfo).Dispose();
+            ((IDisposable) itemInfo).Dispose();
         }
 
         _shell.PropertyChanged -= ShellOnPropertyChanged;
-        ((IShellController)_shell).StructureChanged -= ShellOnStructureChanged;
+        ((IShellController) _shell).StructureChanged -= ShellOnStructureChanged;
     }
 
     private void ShellOnStructureChanged(object? sender, EventArgs e) => UpdateItems();
@@ -266,15 +274,17 @@ internal partial class ShellProxy : IShellProxy, IDisposable
         {
             foreach (var itemInfo in items)
             {
-                ((IDisposable)itemInfo).Dispose();
+                ((IDisposable) itemInfo).Dispose();
             }
         }
 
         Items = _shell.Items.Select(i => new ShellItemProxy(i, this)).ToList();
+
         _contentsBySegmentName = Items
-            .SelectMany(i => i.Sections)
-            .SelectMany(s => s.Contents)
-            .ToDictionary(c => c.SegmentName);
+                                 .SelectMany(i => i.Sections)
+                                 .SelectMany(s => s.Contents)
+                                 .ToDictionary(c => c.SegmentName);
+
         UpdateCurrentItem();
     }
 

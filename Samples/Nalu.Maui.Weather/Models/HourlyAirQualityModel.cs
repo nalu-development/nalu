@@ -1,7 +1,6 @@
-namespace Nalu.Maui.Weather.Models;
+using Nalu.Maui.Weather.Resources;
 
-using CommunityToolkit.Mvvm.ComponentModel;
-using Resources;
+namespace Nalu.Maui.Weather.Models;
 
 public class HourlyAirQualityModel
 {
@@ -77,6 +76,7 @@ public class HourlyAirQualityModel
         get
         {
             var dangerousUnit = DangerousUnit;
+
             if (dangerousUnit == Texts.PM25)
             {
                 return Pm25Value;

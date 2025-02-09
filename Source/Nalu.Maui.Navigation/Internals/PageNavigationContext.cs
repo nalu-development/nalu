@@ -1,16 +1,21 @@
 namespace Nalu;
 
-internal sealed partial class PageNavigationContext(IServiceScope serviceScope) : IDisposable
+internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDisposable
 {
     public IServiceScope ServiceScope => serviceScope;
     public bool Entered { get; set; }
     public bool Appeared { get; set; }
 
-    private static readonly BindableProperty _navigationContextProperty = BindableProperty.CreateAttached("PageNavigationContext", typeof(PageNavigationContext), typeof(PageNavigationContext), null);
+    private static readonly BindableProperty _navigationContextProperty = BindableProperty.CreateAttached(
+        "PageNavigationContext",
+        typeof(PageNavigationContext),
+        typeof(PageNavigationContext),
+        null
+    );
 
     public static PageNavigationContext Get(Page page)
     {
-        var pageNavigationContext = (PageNavigationContext)page.GetValue(_navigationContextProperty);
+        var pageNavigationContext = (PageNavigationContext) page.GetValue(_navigationContextProperty);
 #pragma warning disable IDE0270
         if (pageNavigationContext is null)
 #pragma warning restore IDE0270

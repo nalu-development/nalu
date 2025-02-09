@@ -11,6 +11,7 @@ public class PatchedShellRenderer : ShellRenderer
         // https://github.com/dotnet/maui/issues/7045
         var shellToolbarTracker = base.CreateTrackerForToolbar(toolbar);
         shellToolbarTracker.TintColor = Colors.Yellow;
+
         return shellToolbarTracker;
     }
 }

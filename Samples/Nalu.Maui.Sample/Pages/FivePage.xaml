@@ -14,7 +14,7 @@
             <Label>
                 <Label.FormattedText>
                     <FormattedString>
-                        <Span Text="Instance: "/>
+                        <Span Text="Instance: " />
                         <Span Text="{Binding InstanceCount}" />
                     </FormattedString>
                 </Label.FormattedText>
@@ -37,7 +37,7 @@
                     BackgroundColor="LightBlue"
                     StrokeShape="RoundRectangle 24">
                 <nalu:ViewBox Padding="16,8" x:DataType="x:String">
-                    <Label Text="{Binding .}"/>
+                    <Label Text="{Binding .}" />
                 </nalu:ViewBox>
             </Border>
             <nalu:TemplateBox>

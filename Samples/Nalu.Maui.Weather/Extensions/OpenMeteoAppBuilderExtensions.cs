@@ -1,7 +1,8 @@
-namespace Nalu.Maui.Weather;
-
+using System.Net.Http.Headers;
 using System.Reflection;
 using OpenMeteo;
+
+namespace Nalu.Maui.Weather;
 
 public static class OpenMeteoAppBuilderExtensions
 {
@@ -15,24 +16,29 @@ public static class OpenMeteoAppBuilderExtensions
         HttpClient httpClient = new();
 #endif
         httpClient.DefaultRequestHeaders.Accept.Clear();
+
         httpClient.DefaultRequestHeaders.Accept.Add(
-            new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json")
+            new MediaTypeWithQualityHeaderValue("application/json")
         );
+
         httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("om-dotnet");
 
         // We have to use reflection to set our own HttpClient, sad, isn't it?
         // https://github.com/AlienDwarf/open-meteo-dotnet/blob/master/OpenMeteo/HttpController.cs
         var openMeteoClient = new OpenMeteoClient();
+
         var controller = openMeteoClient
-            .GetType()!
-            .GetField("httpController", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(openMeteoClient)!;
+                         .GetType()
+                         .GetField("httpController", BindingFlags.Instance | BindingFlags.NonPublic)!
+                         .GetValue(openMeteoClient)!;
+
         controller
-            .GetType()!
+            .GetType()
             .GetField("_httpClient", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(controller, httpClient);
 
-        builder.Services.AddSingleton<OpenMeteoClient>(openMeteoClient);
+        builder.Services.AddSingleton(openMeteoClient);
+
         return builder;
     }
 }

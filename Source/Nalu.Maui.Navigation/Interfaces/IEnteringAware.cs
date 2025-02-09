@@ -1,7 +1,7 @@
 namespace Nalu;
 
 /// <summary>
-/// <see cref="INavigationService"/> will invoke <see cref="OnEnteringAsync"/> method when the page is being
+/// <see cref="INavigationService" /> will invoke <see cref="OnEnteringAsync" /> method when the page is being
 /// pushed onto the navigation stack and no navigation intent has been provided.
 /// </summary>
 /// <remarks>
@@ -17,8 +17,8 @@ public interface IEnteringAware
 }
 
 /// <summary>
-/// <see cref="INavigationService"/> will invoke <see cref="OnEnteringAsync"/> method when the page is being
-/// pushed onto the navigation stack and a <typeparamref name="TIntent"/> navigation intent has been provided.
+/// <see cref="INavigationService" /> will invoke <see cref="OnEnteringAsync" /> method when the page is being
+/// pushed onto the navigation stack and a <typeparamref name="TIntent" /> navigation intent has been provided.
 /// </summary>
 /// <remarks>
 /// It's not recommended to implement long operations in this method.
@@ -28,7 +28,7 @@ public interface IEnteringAware
 public interface IEnteringAware<in TIntent>
 {
     /// <summary>
-    /// Invoked when the page is appearing with a <typeparamref name="TIntent"/> navigation intent.
+    /// Invoked when the page is appearing with a <typeparamref name="TIntent" /> navigation intent.
     /// </summary>
     /// <param name="intent">The navigation intent.</param>
     ValueTask OnEnteringAsync(TIntent intent);

@@ -1,7 +1,8 @@
+using Nalu.Maui.Sample.PageModels;
+
 namespace Nalu.Maui.Sample.Pages;
 
-using PageModels;
-using TwoPageModel = Sample.PageModels.TwoPageModel;
+using TwoPageModel = TwoPageModel;
 
 public partial class TwoPage : ContentPage
 {
@@ -11,4 +12,3 @@ public partial class TwoPage : ContentPage
         InitializeComponent();
     }
 }
-

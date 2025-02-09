@@ -5,7 +5,7 @@ namespace Nalu;
 /// </summary>
 public interface INavigationInfo : IReadOnlyList<INavigationSegment>
 {
-    /// <inheritdoc cref="NavigationBehavior"/>
+    /// <inheritdoc cref="NavigationBehavior" />
     NavigationBehavior? Behavior { get; }
 
     /// <summary>

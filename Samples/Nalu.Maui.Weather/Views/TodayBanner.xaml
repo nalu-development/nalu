@@ -8,57 +8,57 @@
               x:Class="Nalu.Maui.Weather.Views.TodayBanner"
               x:DataType="viewModels:WeatherState">
     <Grid BackgroundColor="{StaticResource Primary}"
-                  ColumnDefinitions="*,Auto,*"
-                  RowDefinitions="Auto,Auto">
-                <Label FontSize="36"
-                       TextColor="{StaticResource White}"
-                       VerticalTextAlignment="Center"
-                       HorizontalTextAlignment="End"
-                       FontFamily="SemiBold"
-                       Text="{Binding CurrentWeather.TemperatureDegrees}" />
-                <Image Grid.Column="1"
-                       Margin="16"
-                       Source="{FontImageSource Glyph={Binding CurrentWeather.WeatherCode, Converter={StaticResource WeatherIconConverter}},
+          ColumnDefinitions="*,Auto,*"
+          RowDefinitions="Auto,Auto">
+        <Label FontSize="36"
+               TextColor="{StaticResource White}"
+               VerticalTextAlignment="Center"
+               HorizontalTextAlignment="End"
+               FontFamily="SemiBold"
+               Text="{Binding CurrentWeather.TemperatureDegrees}" />
+        <Image Grid.Column="1"
+               Margin="16"
+               Source="{FontImageSource Glyph={Binding CurrentWeather.WeatherCode, Converter={StaticResource WeatherIconConverter}},
                                                 FontFamily=MaterialOutlined,
                                                 Color={StaticResource White},
-                                                Size=64}"/>
-                <Label Grid.Column="2"
-                       VerticalTextAlignment="Center"
-                       HorizontalTextAlignment="Start">
-                    <Label.FormattedText>
-                        <FormattedString>
-                            <Span Text="{Binding CurrentWeather.Hour}"
-                                  TextColor="{StaticResource White}"/>
-                            <Span Text="&#10;"/>
-                            <Span Text="{Binding CurrentWeather.WeatherCode, Converter={StaticResource WeatherDescriptionConverter}}"
-                                  FontFamily="SemiBold"
-                                  TextColor="{StaticResource White}"/>
-                        </FormattedString>
-                    </Label.FormattedText>
-                </Label>
+                                                Size=64}" />
+        <Label Grid.Column="2"
+               VerticalTextAlignment="Center"
+               HorizontalTextAlignment="Start">
+            <Label.FormattedText>
+                <FormattedString>
+                    <Span Text="{Binding CurrentWeather.Hour}"
+                          TextColor="{StaticResource White}" />
+                    <Span Text="&#10;" />
+                    <Span Text="{Binding CurrentWeather.WeatherCode, Converter={StaticResource WeatherDescriptionConverter}}"
+                          FontFamily="SemiBold"
+                          TextColor="{StaticResource White}" />
+                </FormattedString>
+            </Label.FormattedText>
+        </Label>
 
-                <CollectionView ItemsSource="{Binding TodayHourlyWeatherData}"
-                                ItemsLayout="HorizontalList"
-                                HeightRequest="68"
-                                BackgroundColor="{StaticResource PrimaryDark}"
-                                Grid.Row="1"
-                                Grid.ColumnSpan="3">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:HourlyWeatherModel">
-                            <VerticalStackLayout Padding="0,8,0,0">
-                                <Label Text="{Binding Hour}"
-                                       TextColor="{StaticResource White}"
-                                       HorizontalTextAlignment="Center"
-                                       FontSize="12"/>
-                                <Image Margin="12,8"
-                                       Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
+        <CollectionView ItemsSource="{Binding TodayHourlyWeatherData}"
+                        ItemsLayout="HorizontalList"
+                        HeightRequest="68"
+                        BackgroundColor="{StaticResource PrimaryDark}"
+                        Grid.Row="1"
+                        Grid.ColumnSpan="3">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:HourlyWeatherModel">
+                    <VerticalStackLayout Padding="0,8,0,0">
+                        <Label Text="{Binding Hour}"
+                               TextColor="{StaticResource White}"
+                               HorizontalTextAlignment="Center"
+                               FontSize="12" />
+                        <Image Margin="12,8"
+                               Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
                                                 FontFamily=MaterialOutlined,
                                                 Color={StaticResource Secondary},
-                                                Size=24}"/>
-                            </VerticalStackLayout>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
+                                                Size=24}" />
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
 
-                </CollectionView>
-            </Grid>
+        </CollectionView>
+    </Grid>
 </nalu:ViewBox>

@@ -1,12 +1,13 @@
+using System.ComponentModel;
+
 #pragma warning disable CS0618 // Type or member is obsolete
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
-namespace Nalu.Internals;
-
-using System.ComponentModel;
 #if !NET9_0_OR_GREATER
 using System.Reflection;
 #endif
+
+namespace Nalu.Internals;
 
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class DisconnectHandlerHelper
@@ -16,7 +17,9 @@ public static class DisconnectHandlerHelper
 
     static DisconnectHandlerHelper()
     {
-        var policyBindableProperty = typeof(Button).Assembly.GetType("Microsoft.Maui.Controls.HandlerProperties")?.GetField("DisconnectPolicyProperty", BindingFlags.Static | BindingFlags.Public)?.GetValue(null) as BindableProperty;
+        var policyBindableProperty =
+            typeof(Button).Assembly.GetType("Microsoft.Maui.Controls.HandlerProperties")?.GetField("DisconnectPolicyProperty", BindingFlags.Static | BindingFlags.Public)?.GetValue(null) as BindableProperty;
+
         _disconnectPolicyProperty = policyBindableProperty ?? HandlerPropertiesBackport.DisconnectPolicyBackportProperty;
     }
 #endif
@@ -42,7 +45,7 @@ public static class DisconnectHandlerHelper
 
         static void BuildFlatList(IView view, List<IView> flatList)
         {
-            if (view is BindableObject bindable && (int)bindable.GetValue(_disconnectPolicyProperty) == 1)
+            if (view is BindableObject bindable && (int) bindable.GetValue(_disconnectPolicyProperty) == 1)
             {
                 return;
             }

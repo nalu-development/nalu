@@ -1,14 +1,14 @@
-namespace Nalu;
-
 using Microsoft.Maui.Layouts;
 
+namespace Nalu;
+
 /// <summary>
-/// Layout manager for <see cref="ViewBox"/>.
+/// Layout manager for <see cref="ViewBox" />.
 /// </summary>
-/// <param name="viewBox">The layout using this <see cref="ILayoutManager"/>.</param>
+/// <param name="viewBox">The layout using this <see cref="ILayoutManager" />.</param>
 public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
 {
-    /// <inheritdoc cref="ILayoutManager.Measure"/>
+    /// <inheritdoc cref="ILayoutManager.Measure" />
     public Size Measure(double widthConstraint, double heightConstraint)
     {
         var padding = viewBox.Padding;
@@ -20,6 +20,7 @@ public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
 
         double measuredHeight = 0;
         double measuredWidth = 0;
+
         if (viewBox.PresentedContent is { Visibility: not Visibility.Collapsed } child)
         {
             var measure = child.Measure(childWidthConstraint, childHeightConstraint);
@@ -37,7 +38,7 @@ public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
         return new Size(finalWidth, finalHeight);
     }
 
-    /// <inheritdoc cref="ILayoutManager.ArrangeChildren"/>
+    /// <inheritdoc cref="ILayoutManager.ArrangeChildren" />
     public Size ArrangeChildren(Rect bounds)
     {
         var padding = viewBox.Padding;

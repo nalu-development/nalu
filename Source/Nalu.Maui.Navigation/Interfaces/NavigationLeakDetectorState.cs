@@ -18,5 +18,5 @@ public enum NavigationLeakDetectorState
     /// <summary>
     /// Leak detector is always enabled.
     /// </summary>
-    Enabled,
+    Enabled
 }

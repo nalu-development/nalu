@@ -1,12 +1,12 @@
-namespace Nalu;
-
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Nalu.Internals;
 
+namespace Nalu;
+
 #pragma warning disable IDE0290
 
-internal partial class NavigationService : INavigationService, IDisposable
+internal class NavigationService : INavigationService, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
@@ -27,6 +27,7 @@ internal partial class NavigationService : INavigationService, IDisposable
         var trackLeaks
             = (Configuration.LeakDetectorState == NavigationLeakDetectorState.EnabledWithDebugger && Debugger.IsAttached) ||
               Configuration.LeakDetectorState == NavigationLeakDetectorState.Enabled;
+
         _leakDetector = trackLeaks ? new LeakDetector() : null;
     }
 
@@ -47,6 +48,7 @@ internal partial class NavigationService : INavigationService, IDisposable
         NavigationHelper.AssertIntent(page, intent, content.DestroyContent);
 
         var enteringTask = NavigationHelper.SendEnteringAsync(page, intent, Configuration).AsTask();
+
         if (!enteringTask.IsCompleted)
         {
             throw new NotSupportedException($"OnEnteringAsync() must not be async for the initial page {page.BindingContext!.GetType().FullName}.");
@@ -70,34 +72,42 @@ internal partial class NavigationService : INavigationService, IDisposable
         var disposeBag = new HashSet<object>();
         var shellProxy = ShellProxy;
 
-        return await ExecuteNavigationAsync(async () =>
-        {
-            if (navigation.Behavior?.HasFlag(NavigationBehavior.Immediate) != true)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(60), _timeProvider).ConfigureAwait(true);
-            }
-
-            shellProxy.BeginNavigation();
-            try
-            {
-                var ignoreGuards = navigation.Behavior?.HasFlag(NavigationBehavior.IgnoreGuards) ?? false;
-                return await (navigation switch
+        return await ExecuteNavigationAsync(
+                async () =>
                 {
-                    { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards).ConfigureAwait(true),
-                    _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards).ConfigureAwait(true),
-                });
-            }
-            finally
-            {
-                await shellProxy.CommitNavigationAsync(() =>
-                {
-                    foreach (var toDispose in disposeBag)
+                    if (navigation.Behavior?.HasFlag(NavigationBehavior.Immediate) != true)
                     {
-                        DisposePage(toDispose);
+                        await Task.Delay(TimeSpan.FromMilliseconds(60), _timeProvider).ConfigureAwait(true);
                     }
-                }).ConfigureAwait(true);
-            }
-        }).ConfigureAwait(true);
+
+                    shellProxy.BeginNavigation();
+
+                    try
+                    {
+                        var ignoreGuards = navigation.Behavior?.HasFlag(NavigationBehavior.IgnoreGuards) ?? false;
+
+                        return await (navigation switch
+                        {
+                            { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards).ConfigureAwait(true),
+                            _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards).ConfigureAwait(true)
+                        });
+                    }
+                    finally
+                    {
+                        await shellProxy.CommitNavigationAsync(
+                                            () =>
+                                            {
+                                                foreach (var toDispose in disposeBag)
+                                                {
+                                                    DisposePage(toDispose);
+                                                }
+                                            }
+                                        )
+                                        .ConfigureAwait(true);
+                    }
+                }
+            )
+            .ConfigureAwait(true);
     }
 
     internal Page CreatePage(Type pageType, Page? parentPage, ImageSource? backButtonImage = null)
@@ -111,7 +121,7 @@ internal partial class NavigationService : INavigationService, IDisposable
             navigationServiceProvider.SetParent(parentNavigationServiceProvider);
         }
 
-        var page = (Page)serviceScope.ServiceProvider.GetRequiredService(pageType);
+        var page = (Page) serviceScope.ServiceProvider.GetRequiredService(pageType);
         ConfigureBackButtonBehavior(page, backButtonImage);
 
         var pageContext = new PageNavigationContext(serviceScope);
@@ -129,12 +139,14 @@ internal partial class NavigationService : INavigationService, IDisposable
         }
 
         var backButtonBehavior = Shell.GetBackButtonBehavior(page);
+
         if (backButtonBehavior is null)
         {
             backButtonBehavior = new BackButtonBehavior
-            {
-                IconOverride = backButtonImage,
-            };
+                                 {
+                                     IconOverride = backButtonImage
+                                 };
+
             Shell.SetBackButtonBehavior(page, backButtonBehavior);
         }
         else
@@ -150,7 +162,8 @@ internal partial class NavigationService : INavigationService, IDisposable
         List<NavigationStackPage>? stack = null,
         bool sendAppearingToTarget = true,
         bool ignoreGuards = false,
-        Func<Task>? onCheckingGuardAsync = null)
+        Func<Task>? onCheckingGuardAsync = null
+    )
     {
         if (navigation.Count == 0)
         {
@@ -162,21 +175,25 @@ internal partial class NavigationService : INavigationService, IDisposable
         stack ??= section.GetNavigationStack().ToList();
 
         var popCount = navigation.Count(segment => segment.SegmentName == NavigationPop.PopRoute);
+
         if (popCount >= stack.Count)
         {
             throw new InvalidNavigationException("Cannot pop more pages than the stack contains.");
         }
 
         var navigationCount = navigation.Count;
+
         for (var i = 0; i < navigationCount; i++)
         {
             var segment = navigation[i];
             var stackPage = stack[^1];
             var intent = i == navigationCount - 1 ? navigation.Intent : null;
             var isPop = segment.SegmentName == NavigationPop.PopRoute;
+
             if (isPop)
             {
                 var isGuarded = !ignoreGuards && stackPage.Page.BindingContext is ILeavingGuard;
+
                 if (isGuarded)
                 {
                     if (onCheckingGuardAsync is not null)
@@ -189,6 +206,7 @@ internal partial class NavigationService : INavigationService, IDisposable
 
                     await NavigationHelper.SendAppearingAsync(stackPage.Page, null, Configuration).ConfigureAwait(true);
                     var canLeave = await NavigationHelper.CanLeaveAsync(stackPage.Page).ConfigureAwait(true);
+
                     if (!canLeave)
                     {
                         return false;
@@ -246,17 +264,21 @@ internal partial class NavigationService : INavigationService, IDisposable
         var currentContent = currentSection.CurrentContent;
         var navigationStack = currentSection.GetNavigationStack().ToList();
         var rootStackPage = navigationStack[0];
+
         if (rootStackPage.SegmentName == rootSegmentName)
         {
             // If we're in the same ShellContent, this is just a relative navigation
             var relativeNavigation = ToRelativeNavigation(navigation, navigationStack);
+
             return await ExecuteRelativeNavigationAsync(relativeNavigation, disposeBag, currentSection, navigationStack, ignoreGuards: ignoreGuards).ConfigureAwait(true);
         }
 
         var modalPages = navigationStack.Count(page => page.IsModal);
+
         if (modalPages > 0)
         {
             var popModalsNavigation = PopTimes(modalPages);
+
             if (!await ExecuteRelativeNavigationAsync(popModalsNavigation, disposeBag, currentSection, navigationStack, false, ignoreGuards).ConfigureAwait(true))
             {
                 return false;
@@ -278,13 +300,17 @@ internal partial class NavigationService : INavigationService, IDisposable
             if (behavior.HasFlag(NavigationBehavior.PopAllPagesOnItemChange))
             {
                 leaveMode = ContentLeaveMode.Destroy;
-                contentsToLeave = [..currentItem
-                    .Sections
-                    .SelectMany(section => section.Contents)
-                    .Where(content => content.Page is not null)
-                    .OrderByDescending(content => content.Parent == currentSection)
-                    .ThenBy(content => content.Parent.SegmentName)
-                    .ThenByDescending(content => content == currentContent)];
+
+                contentsToLeave =
+                [
+                    ..currentItem
+                      .Sections
+                      .SelectMany(section => section.Contents)
+                      .Where(content => content.Page is not null)
+                      .OrderByDescending(content => content.Parent == currentSection)
+                      .ThenBy(content => content.Parent.SegmentName)
+                      .ThenByDescending(content => content == currentContent)
+                ];
             }
             else
             {
@@ -297,10 +323,14 @@ internal partial class NavigationService : INavigationService, IDisposable
             if (behavior.HasFlag(NavigationBehavior.PopAllPagesOnSectionChange))
             {
                 leaveMode = ContentLeaveMode.Destroy;
-                contentsToLeave = [..currentSection
-                    .Contents
-                    .Where(content => content.Page is not null)
-                    .OrderByDescending(content => content == currentContent)];
+
+                contentsToLeave =
+                [
+                    ..currentSection
+                      .Contents
+                      .Where(content => content.Page is not null)
+                      .OrderByDescending(content => content == currentContent)
+                ];
             }
             else
             {
@@ -321,7 +351,7 @@ internal partial class NavigationService : INavigationService, IDisposable
     {
         None,
         ClearStack,
-        Destroy,
+        Destroy
     }
 
     private async Task<bool> ExecuteCrossContentNavigationAsync(
@@ -330,12 +360,14 @@ internal partial class NavigationService : INavigationService, IDisposable
         IList<IShellContentProxy> contentsToLeave,
         IShellContentProxy targetContent,
         ContentLeaveMode leaveMode,
-        bool ignoreGuards)
+        bool ignoreGuards
+    )
     {
         var shellProxy = ShellProxy;
         shellProxy.BeginNavigation();
 
         var groupedContentsToLeave = contentsToLeave.GroupBy(content => content.Parent).ToList();
+
         foreach (var sectionContentsToLeave in groupedContentsToLeave)
         {
             foreach (var contentToLeave in sectionContentsToLeave)
@@ -346,27 +378,33 @@ internal partial class NavigationService : INavigationService, IDisposable
                 {
                     await EnsureContentIsSelectedAsync().ConfigureAwait(true);
                     await NavigationHelper.SendDisappearingAsync(navigationStack[^1].Page).ConfigureAwait(true);
+
                     continue;
                 }
 
                 var popCount = navigationStack.Count - 1;
+
                 if (popCount > 0)
                 {
                     var popNavigation = PopTimes(popCount);
+
                     if (!await ExecuteRelativeNavigationAsync(
-                            popNavigation,
-                            disposeBag,
-                            contentToLeave.Parent,
-                            navigationStack,
-                            false,
-                            ignoreGuards,
-                            EnsureContentIsSelectedAsync).ConfigureAwait(true))
+                                popNavigation,
+                                disposeBag,
+                                contentToLeave.Parent,
+                                navigationStack,
+                                false,
+                                ignoreGuards,
+                                EnsureContentIsSelectedAsync
+                            )
+                            .ConfigureAwait(true))
                     {
                         return false;
                     }
                 }
 
                 var contentPage = contentToLeave.Page!;
+
                 if (!ignoreGuards && contentToLeave.HasGuard)
                 {
                     await EnsureContentIsSelectedAsync().ConfigureAwait(true);
@@ -375,6 +413,7 @@ internal partial class NavigationService : INavigationService, IDisposable
                     shellProxy.BeginNavigation();
 
                     await NavigationHelper.SendAppearingAsync(contentPage, null, Configuration).ConfigureAwait(true);
+
                     if (!await NavigationHelper.CanLeaveAsync(contentPage).ConfigureAwait(true))
                     {
                         return false;
@@ -390,14 +429,17 @@ internal partial class NavigationService : INavigationService, IDisposable
                 }
 
                 Task EnsureContentIsSelectedAsync()
-                    => shellProxy.CurrentItem.CurrentSection.CurrentContent == contentToLeave
+                {
+                    return shellProxy.CurrentItem.CurrentSection.CurrentContent == contentToLeave
                         ? Task.CompletedTask
                         : ShellProxy.SelectContentAsync(contentToLeave.SegmentName);
+                }
             }
 
             if (leaveMode == ContentLeaveMode.Destroy)
             {
                 var sectionToLeave = sectionContentsToLeave.Key;
+
                 if (sectionToLeave != targetContent.Parent)
                 {
                     disposeBag.Add(sectionToLeave);
@@ -419,27 +461,30 @@ internal partial class NavigationService : INavigationService, IDisposable
             var relativeNavigation = ToRelativeNavigation(navigation, targetStack);
             var result = await ExecuteRelativeNavigationAsync(relativeNavigation, disposeBag, targetSection, targetStack, ignoreGuards: ignoreGuards).ConfigureAwait(true);
             await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
+
             return result;
         }
 
         await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
         await NavigationHelper.SendAppearingAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
+
         return true;
     }
 
     private RelativeNavigation ToRelativeNavigation(INavigationInfo navigation, IReadOnlyList<NavigationStackPage> navigationStackPages)
     {
         var matchingSegmentsCount = navigation
-            .Skip(1)
-            .Select(segment => NavigationHelper.GetSegmentName(segment, Configuration))
-            .Zip(navigationStackPages.Skip(1).Select(stackPage => stackPage.SegmentName), (s1, s2) => (s1, s2))
-            .TakeWhile(pair => pair.s1 == pair.s2)
-            .Count();
+                                    .Skip(1)
+                                    .Select(segment => NavigationHelper.GetSegmentName(segment, Configuration))
+                                    .Zip(navigationStackPages.Skip(1).Select(stackPage => stackPage.SegmentName), (s1, s2) => (s1, s2))
+                                    .TakeWhile(pair => pair.s1 == pair.s2)
+                                    .Count();
 
         var relativeNavigation = new RelativeNavigation();
 
         // Add pop segments
         var popCount = navigationStackPages.Count - 1 - matchingSegmentsCount;
+
         while (popCount-- > 0)
         {
             relativeNavigation.Pop();
@@ -448,7 +493,7 @@ internal partial class NavigationService : INavigationService, IDisposable
         // Add push segments
         for (var i = 1 + matchingSegmentsCount; i < navigation.Count; i++)
         {
-            ((IList<INavigationSegment>)relativeNavigation).Add(navigation[i]);
+            ((IList<INavigationSegment>) relativeNavigation).Add(navigation[i]);
         }
 
         if (navigation.Intent is { } intent && relativeNavigation.Count > 0)
@@ -475,6 +520,7 @@ internal partial class NavigationService : INavigationService, IDisposable
         {
             // State has changed, abort the navigation
             _semaphore.Release();
+
             return false;
         }
 
@@ -483,6 +529,7 @@ internal partial class NavigationService : INavigationService, IDisposable
         try
         {
             var result = await navigationFunc().ConfigureAwait(true);
+
             return result;
         }
         finally
@@ -513,6 +560,7 @@ internal partial class NavigationService : INavigationService, IDisposable
             case IShellContentProxy contentProxy:
             {
                 var contentPage = contentProxy.Page;
+
                 if (contentPage is not null)
                 {
                     DisconnectHandlerHelper.DisconnectHandlers(contentPage);
@@ -526,6 +574,7 @@ internal partial class NavigationService : INavigationService, IDisposable
             case IShellSectionProxy sectionProxy:
             {
                 sectionProxy.RemoveStackPages();
+
                 break;
             }
 
@@ -539,6 +588,7 @@ internal partial class NavigationService : INavigationService, IDisposable
     private static INavigationInfo PopTimes(int popCount)
     {
         var navigation = Navigation.Relative();
+
         while (popCount-- > 0)
         {
             navigation.Pop();

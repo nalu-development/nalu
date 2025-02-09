@@ -1,26 +1,27 @@
-namespace Nalu;
-
 using System.Collections;
 using System.Reflection;
 
+namespace Nalu;
+
 /// <summary>
-/// <see cref="INavigationInfo"/> extension methods.
+/// <see cref="INavigationInfo" /> extension methods.
 /// </summary>
 public static class NavigationExtensions
 {
     /// <summary>
-    /// Compares two <see cref="Navigation"/>s for equality.
+    /// Compares two <see cref="Navigation" />s for equality.
     /// </summary>
     /// <param name="self">The navigation to compare.</param>
     /// <param name="other">The other navigation object.</param>
     public static bool Matches(this INavigationInfo self, INavigationInfo? other)
     {
         ArgumentNullException.ThrowIfNull(self);
+
         return Matches(self, other, GetIntentComparer(self.Intent ?? other?.Intent));
     }
 
     /// <summary>
-    /// Compares two <see cref="Navigation"/>s for equality.
+    /// Compares two <see cref="Navigation" />s for equality.
     /// </summary>
     /// <param name="self">The navigation to compare.</param>
     /// <param name="other">The other navigation object.</param>
@@ -28,6 +29,7 @@ public static class NavigationExtensions
     public static bool Matches(this INavigationInfo self, INavigationInfo? other, IEqualityComparer? intentComparer)
     {
         ArgumentNullException.ThrowIfNull(self);
+
         if (other is null || other.Path != self.Path)
         {
             return false;
@@ -52,7 +54,7 @@ public static class NavigationExtensions
     }
 
     /// <summary>
-    /// Compares two <see cref="Navigation"/>s for equality.
+    /// Compares two <see cref="Navigation" />s for equality.
     /// </summary>
     /// <typeparam name="TIntent">Expected type for intents.</typeparam>
     /// <param name="self">The navigation to compare.</param>
@@ -61,6 +63,7 @@ public static class NavigationExtensions
     public static bool Matches<TIntent>(this INavigationInfo self, INavigationInfo? other, Func<TIntent, TIntent, bool> intentComparer)
     {
         ArgumentNullException.ThrowIfNull(self);
+
         return other is not null &&
                other.Path == self.Path &&
                ((self.Intent == null && other.Intent == null) || (self.Intent is TIntent intent &&
@@ -78,6 +81,7 @@ public static class NavigationExtensions
         var type = intent.GetType();
         var equalityComparerType = typeof(EqualityComparer<>).MakeGenericType(type);
         var defaultProperty = equalityComparerType.GetProperty(nameof(EqualityComparer<object>.Default), BindingFlags.Public | BindingFlags.Static);
-        return (IEqualityComparer)defaultProperty?.GetValue(null)!;
+
+        return (IEqualityComparer) defaultProperty?.GetValue(null)!;
     }
 }

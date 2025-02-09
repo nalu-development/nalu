@@ -1,8 +1,8 @@
-namespace Nalu.Internals;
-
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+
+namespace Nalu.Internals;
 
 [SuppressMessage("Usage", "VSTHRD003:Avoid awaiting foreign Tasks", Justification = "Proven safe in MAUI")]
 [SuppressMessage("Usage", "VSTHRD100:Avoid async void methods", Justification = "Proven safe in MAUI")]
@@ -11,6 +11,7 @@ internal static class NaluTaskExtensions
     public static async void FireAndForget<TResult>(this Task<TResult> task, Action<Exception>? errorCallback = null)
     {
         TResult? result = default;
+
         try
         {
             result = await task.ConfigureAwait(false);

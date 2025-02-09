@@ -1,4 +1,5 @@
 // ReSharper disable once CheckNamespace
+
 namespace Microsoft.Maui;
 
 /// <summary>
@@ -15,9 +16,9 @@ public static class NaluMauiNavigationExtensions
         where T : Shell
     {
         var navigationStacks = shell.Items
-            .SelectMany(item => item.Items)
-            .SelectMany(section => GetNavigationStack(section.Navigation))
-            .ToHashSet();
+                                    .SelectMany(item => item.Items)
+                                    .SelectMany(section => GetNavigationStack(section.Navigation))
+                                    .ToHashSet();
 
         shell.Navigated += ShellOnNavigated;
 
@@ -28,9 +29,10 @@ public static class NaluMauiNavigationExtensions
 #pragma warning restore VSTHRD100
         {
             var newNavigationStacks = shell.Items
-                .SelectMany(item => item.Items)
-                .SelectMany(section => GetNavigationStack(section.Navigation))
-                .ToHashSet();
+                                           .SelectMany(item => item.Items)
+                                           .SelectMany(section => GetNavigationStack(section.Navigation))
+                                           .ToHashSet();
+
             var pagesToDispose = navigationStacks.Except(newNavigationStacks);
             navigationStacks = newNavigationStacks;
 
@@ -83,6 +85,7 @@ public static class NaluMauiNavigationExtensions
 
     private static HashSet<Page> GetNavigationStack(INavigation navigation)
         => navigation.NavigationStack
-            .Concat(navigation.ModalStack)
-            .Where(p => p is not null).ToHashSet();
+                     .Concat(navigation.ModalStack)
+                     .Where(p => p is not null)
+                     .ToHashSet();
 }

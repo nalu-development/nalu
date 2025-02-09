@@ -1,8 +1,8 @@
-namespace Nalu.Maui.Sample.Services;
-
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
+
+namespace Nalu.Maui.Sample.Services;
 
 [SuppressMessage("Performance", "CA1848:Use the LoggerMessage delegates")]
 public class StartupEventsHandler(ILogger<StartupEventsHandler> logger)

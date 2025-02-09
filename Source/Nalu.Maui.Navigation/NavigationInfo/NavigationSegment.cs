@@ -1,6 +1,6 @@
-namespace Nalu;
-
 using System.ComponentModel;
+
+namespace Nalu;
 
 #pragma warning disable SA1402 // File may only contain a single type
 
@@ -8,7 +8,7 @@ using System.ComponentModel;
 /// Represents a segment in a navigation path.
 /// </summary>
 #pragma warning disable CA1036
-public partial class NavigationSegment : BindableObject, INavigationSegment
+public class NavigationSegment : BindableObject, INavigationSegment
 {
     /// <summary>
     /// Defines the segment property.
@@ -19,7 +19,8 @@ public partial class NavigationSegment : BindableObject, INavigationSegment
         typeof(NavigationSegment),
         propertyChanging: (_, newvalue, _) =>
         {
-            var route = (string?)newvalue;
+            var route = (string?) newvalue;
+
             if (route is not null)
             {
                 if (route.Contains('/'))
@@ -32,7 +33,8 @@ public partial class NavigationSegment : BindableObject, INavigationSegment
                     throw new InvalidOperationException($"Route cannot contain '{NavigationPop.PopRoute}'.");
                 }
             }
-        });
+        }
+    );
 
     /// <summary>
     /// Defines the page model type property.
@@ -40,14 +42,15 @@ public partial class NavigationSegment : BindableObject, INavigationSegment
     public static readonly BindableProperty TypeProperty = BindableProperty.Create(
         nameof(Type),
         typeof(Type),
-        typeof(NavigationSegment));
+        typeof(NavigationSegment)
+    );
 
     /// <summary>
     /// Gets or sets the segment content.
     /// </summary>
     public string? SegmentName
     {
-        get => (string?)GetValue(RouteProperty);
+        get => (string?) GetValue(RouteProperty);
         set => SetValue(RouteProperty, value);
     }
 
@@ -57,11 +60,11 @@ public partial class NavigationSegment : BindableObject, INavigationSegment
     [TypeConverter(typeof(TypeTypeConverter))]
     public Type? Type
     {
-        get => (Type?)GetValue(TypeProperty);
+        get => (Type?) GetValue(TypeProperty);
         set => SetValue(TypeProperty, value);
     }
 
-    /// <inheritdoc cref="INavigationSegment.AssertValid"/>
+    /// <inheritdoc cref="INavigationSegment.AssertValid" />
     public void AssertValid()
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(SegmentName, nameof(SegmentName));
@@ -71,11 +74,11 @@ public partial class NavigationSegment : BindableObject, INavigationSegment
     /// <summary>
     /// Converts a page model type to a navigation segment.
     /// </summary>
-    /// <param name="type">Page mode type which implements <see cref="INotifyPropertyChanged"/>.</param>
+    /// <param name="type">Page mode type which implements <see cref="INotifyPropertyChanged" />.</param>
     public static implicit operator NavigationSegment(Type type) => new()
-    {
-        Type = type,
-    };
+                                                                    {
+                                                                        Type = type
+                                                                    };
 
     /// <summary>
     /// Converts a navigation segment to a string.

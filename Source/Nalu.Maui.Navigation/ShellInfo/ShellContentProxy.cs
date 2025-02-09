@@ -1,6 +1,6 @@
-namespace Nalu;
-
 using System.Reflection;
+
+namespace Nalu;
 
 #pragma warning disable CS8618
 
@@ -12,8 +12,9 @@ internal class ShellContentProxy(ShellContent content, IShellSectionProxy parent
     public string SegmentName => content.Route;
     public bool HasGuard => Page?.BindingContext is ILeavingGuard;
     public IShellSectionProxy Parent { get; } = parent;
-    public Page? Page => ((IShellContentController)content).Page;
-    public Page GetOrCreateContent() => ((IShellContentController)content).GetOrCreateContent();
+    public Page? Page => ((IShellContentController) content).Page;
+    public Page GetOrCreateContent() => ((IShellContentController) content).GetOrCreateContent();
+
     public void DestroyContent()
     {
         if (Page is not { } page)

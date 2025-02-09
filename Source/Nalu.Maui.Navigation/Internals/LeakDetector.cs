@@ -2,7 +2,7 @@ namespace Nalu;
 
 #pragma warning disable IDE0290 // Use primary constructor
 
-internal partial class LeakDetector : IDisposable
+internal class LeakDetector : IDisposable
 {
     private class DisposedObject
     {
@@ -19,6 +19,7 @@ internal partial class LeakDetector : IDisposable
         public bool TryGetTarget(out object? target)
         {
             Checks++;
+
             return _weakRef.TryGetTarget(out target);
         }
     }
@@ -49,6 +50,7 @@ internal partial class LeakDetector : IDisposable
         await Task.Yield();
 
         const int maxAttempts = 5;
+
         while (HasDisposedObjects())
         {
             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
@@ -56,11 +58,13 @@ internal partial class LeakDetector : IDisposable
             GC.WaitForPendingFinalizers();
 
             var leakedObjects = new List<object>();
+
             lock (_disposedObjects)
             {
                 for (var i = 0; i < _disposedObjects.Count; i++)
                 {
                     var disposedObject = _disposedObjects[i];
+
                     if (disposedObject.TryGetTarget(out var leakedObject) && disposedObject.Checks >= maxAttempts)
                     {
                         leakedObjects.Add(leakedObject!);
@@ -99,8 +103,11 @@ internal partial class LeakDetector : IDisposable
         {
             var verb = leakedObjects.Count > 1 ? "are" : "is";
             var objectNames = string.Join(", ", leakedObjects.Select(o => o.GetType().Name));
-            page.Dispatcher.Dispatch(() =>
-                _ = page.DisplayAlert("Leak detected", $"{objectNames} {verb} still alive", "OK"));
+
+            page.Dispatcher.Dispatch(
+                () =>
+                    _ = page.DisplayAlert("Leak detected", $"{objectNames} {verb} still alive", "OK")
+            );
         }
     }
 }

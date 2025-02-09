@@ -27,5 +27,5 @@ public enum NavigationIntentBehavior
     /// public ValueTask OnAppearingAsync(MyIntent)
     /// </code>
     /// </example>
-    Strict,
+    Strict
 }

@@ -1,10 +1,7 @@
-#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
-namespace Nalu.Maui.Test.Navigation;
 
-using Navigation = Nalu.Navigation;
+namespace Nalu.Maui.Test.NavigationTests;
 
-#pragma warning disable CA2012
-#pragma warning disable VSTHRD110
+#pragma warning disable CA2012,CS4014,VSTHRD110
 
 public partial class NavigationServiceTests
 {
@@ -22,13 +19,16 @@ public partial class NavigationServiceTests
 
         _shellProxy.Received().InitializeWithContent(segmentName);
         var page = _shellProxy.GetContent(segmentName).Page!;
-        var model = (IPage1Model)page.BindingContext;
+        var model = (IPage1Model) page.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model.OnEnteringAsync();
-            model.OnAppearingAsync();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model.OnEnteringAsync();
+                model.OnAppearingAsync();
+            }
+        );
+
         model.DidNotReceive().OnEnteringAsync(null!);
         model.DidNotReceive().OnAppearingAsync(null!);
     }
@@ -43,13 +43,16 @@ public partial class NavigationServiceTests
 
         _shellProxy.Received().InitializeWithContent(segmentName);
         var page = _shellProxy.GetContent(segmentName).Page!;
-        var model = (IPage1Model)page.BindingContext;
+        var model = (IPage1Model) page.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model.OnEnteringAsync(intent);
-            model.OnAppearingAsync(intent);
-        });
+        Received.InOrder(
+            () =>
+            {
+                model.OnEnteringAsync(intent);
+                model.OnAppearingAsync(intent);
+            }
+        );
+
         model.DidNotReceive().OnEnteringAsync();
         model.DidNotReceive().OnAppearingAsync();
     }
@@ -73,21 +76,24 @@ public partial class NavigationServiceTests
 
         var content1 = _shellProxy.GetContent(nameof(Page1));
         var page1 = content1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         model1.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
         var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model1.OnDisappearingAsync();
-            model2.OnEnteringAsync();
-            _shellProxy.PushAsync(nameof(Page2), page2);
-            model2.OnAppearingAsync();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model1.OnDisappearingAsync();
+                model2.OnEnteringAsync();
+                _shellProxy.PushAsync(nameof(Page2), page2);
+                model2.OnAppearingAsync();
+            }
+        );
+
         model1.DidNotReceive().OnLeavingAsync();
         model2.DidNotReceive().OnEnteringAsync(null!);
         model2.DidNotReceive().OnAppearingAsync(null!);
@@ -102,21 +108,24 @@ public partial class NavigationServiceTests
 
         var content1 = _shellProxy.GetContent(nameof(Page1));
         var page1 = content1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         model1.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>().WithIntent(intent));
 
         var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model1.OnDisappearingAsync();
-            model2.OnEnteringAsync(intent);
-            _shellProxy.PushAsync(nameof(Page2), page2);
-            model2.OnAppearingAsync(intent);
-        });
+        Received.InOrder(
+            () =>
+            {
+                model1.OnDisappearingAsync();
+                model2.OnEnteringAsync(intent);
+                _shellProxy.PushAsync(nameof(Page2), page2);
+                model2.OnAppearingAsync(intent);
+            }
+        );
+
         model1.DidNotReceive().OnLeavingAsync();
         model2.DidNotReceive().OnEnteringAsync();
         model2.DidNotReceive().OnAppearingAsync();
@@ -141,12 +150,13 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
         WeakReference<Page> weakPage;
+
         {
             var shellContent = _shellProxy.GetContent(nameof(Page1));
             var shellSection = shellContent.Parent;
             var navigationStackPages = shellSection.GetNavigationStack().ToList();
             var page2 = navigationStackPages[1].Page;
-            var model2 = (IPage2Model)page2.BindingContext;
+            var model2 = (IPage2Model) page2.BindingContext;
             model2.ClearReceivedCalls();
             weakPage = new WeakReference<Page>(page2);
         }
@@ -172,22 +182,25 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Pop());
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnAppearingAsync();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnAppearingAsync();
+                model2.Dispose();
+            }
+        );
+
         model1.DidNotReceive().OnEnteringAsync();
     }
 
@@ -202,23 +215,26 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
         var intent = new OddIntent();
         await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(intent));
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnAppearingAsync(intent);
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnAppearingAsync(intent);
+                model2.Dispose();
+            }
+        );
+
         model1.DidNotReceive().OnEnteringAsync(intent);
         model1.DidNotReceive().OnEnteringAsync();
         model1.DidNotReceive().OnAppearingAsync();
@@ -235,9 +251,9 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
@@ -259,28 +275,31 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         var page3 = navigationStackPages[2].Page;
-        var model3 = (IPage3Model)page3.BindingContext;
+        var model3 = (IPage3Model) page3.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
         model3.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop());
 
-        Received.InOrder(() =>
-        {
-            model3.OnDisappearingAsync();
-            model3.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnAppearingAsync();
-            model3.Dispose();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model3.OnDisappearingAsync();
+                model3.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnAppearingAsync();
+                model3.Dispose();
+                model2.Dispose();
+            }
+        );
+
         model1.DidNotReceive().OnEnteringAsync();
         model2.DidNotReceive().OnAppearingAsync();
         model2.DidNotReceive().OnDisappearingAsync();
@@ -297,9 +316,9 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage9Model)page2.BindingContext;
+        var model2 = (IPage9Model) page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
@@ -326,9 +345,9 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage9Model)page2.BindingContext;
+        var model2 = (IPage9Model) page2.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
 
@@ -338,15 +357,17 @@ public partial class NavigationServiceTests
 
         navigatedToTarget.Should().BeTrue();
 
-        Received.InOrder(() =>
-        {
-            model2.CanLeaveAsync();
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnAppearingAsync();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.CanLeaveAsync();
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnAppearingAsync();
+                model2.Dispose();
+            }
+        );
     }
 
     [Fact(DisplayName = "NavigationService, when popping a non-current guarded page, appears and evaluates guard")]
@@ -360,11 +381,11 @@ public partial class NavigationServiceTests
         var shellSection = shellContent.Parent;
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage9Model)page2.BindingContext;
+        var model2 = (IPage9Model) page2.BindingContext;
         var page3 = navigationStackPages[2].Page;
-        var model3 = (IPage2Model)page3.BindingContext;
+        var model3 = (IPage2Model) page3.BindingContext;
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
         model3.ClearReceivedCalls();
@@ -375,20 +396,22 @@ public partial class NavigationServiceTests
 
         navigatedToTarget.Should().BeTrue();
 
-        Received.InOrder(() =>
-        {
-            model3.OnDisappearingAsync();
-            model3.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model2.OnAppearingAsync();
-            model2.CanLeaveAsync();
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnAppearingAsync();
-            model3.Dispose();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model3.OnDisappearingAsync();
+                model3.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model2.OnAppearingAsync();
+                model2.CanLeaveAsync();
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnAppearingAsync();
+                model3.Dispose();
+                model2.Dispose();
+            }
+        );
     }
 
     [Fact(DisplayName = "NavigationService, when doing absolute navigation on same content, should act as relative navigation")]
@@ -399,32 +422,35 @@ public partial class NavigationServiceTests
         var shellContent = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent.Parent;
         var page1 = shellContent.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         model1.ClearReceivedCalls();
         _shellProxy.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>().Add<IPage9Model>().Add<IPage2Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage9Model)page2.BindingContext;
+        var model2 = (IPage9Model) page2.BindingContext;
         var page3 = navigationStackPages[2].Page;
-        var model3 = (IPage2Model)page3.BindingContext;
+        var model3 = (IPage2Model) page3.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage1Model>().Add<IPage9Model>());
 
-        Received.InOrder(() =>
-        {
-            model2.OnEnteringAsync();
-            _shellProxy.PushAsync(nameof(Page9), page2);
-            model3.OnEnteringAsync();
-            _shellProxy.PushAsync(nameof(Page2), page3);
-            model3.OnAppearingAsync();
-            model3.OnDisappearingAsync();
-            model3.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model2.OnAppearingAsync();
-            model3.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnEnteringAsync();
+                _shellProxy.PushAsync(nameof(Page9), page2);
+                model3.OnEnteringAsync();
+                _shellProxy.PushAsync(nameof(Page2), page3);
+                model3.OnAppearingAsync();
+                model3.OnDisappearingAsync();
+                model3.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model2.OnAppearingAsync();
+                model3.Dispose();
+            }
+        );
+
         _shellProxy.DidNotReceive().SelectContentAsync(Arg.Any<string>());
     }
 
@@ -436,13 +462,13 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         model1.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         model2.ClearReceivedCalls();
 
         _shellProxy.ClearReceivedCalls();
@@ -450,18 +476,20 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+                model2.Dispose();
+            }
+        );
     }
 
     [Fact(DisplayName = "NavigationService, when doing absolute navigation, can push on the new stack")]
@@ -472,13 +500,13 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         model1.ClearReceivedCalls();
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
         var navigationStackPages1 = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages1[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         model2.ClearReceivedCalls();
 
         _shellProxy.ClearReceivedCalls();
@@ -486,23 +514,25 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>().Add<IPage4Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
         var navigationStackPages5 = shellSection.GetNavigationStack().ToList();
         var page4 = navigationStackPages5[1].Page;
-        var model4 = (IPage4Model)page4.BindingContext;
+        var model4 = (IPage4Model) page4.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model4.OnEnteringAsync();
-            _shellProxy.PushAsync(nameof(Page4), page4);
-            model4.OnAppearingAsync();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model4.OnEnteringAsync();
+                _shellProxy.PushAsync(nameof(Page4), page4);
+                model4.OnAppearingAsync();
+                model2.Dispose();
+            }
+        );
     }
 
     [Fact(DisplayName = "NavigationService, when doing absolute navigation on same item but different section, should keep navigation stack")]
@@ -513,12 +543,12 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
 
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
@@ -527,15 +557,18 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+            }
+        );
+
         model1.DidNotReceive().OnLeavingAsync();
         model1.DidNotReceive().OnAppearingAsync();
         model1.DidNotReceive().OnDisappearingAsync();
@@ -553,12 +586,12 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage7Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage7Model)page2.BindingContext;
+        var model2 = (IPage7Model) page2.BindingContext;
 
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
@@ -567,18 +600,21 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-            model2.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+                model2.Dispose();
+            }
+        );
+
         model1.DidNotReceive().OnLeavingAsync();
         model1.DidNotReceive().OnAppearingAsync();
         model1.DidNotReceive().OnDisappearingAsync();
@@ -593,12 +629,12 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
 
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
@@ -607,20 +643,22 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.PopAllPagesOnSectionChange).ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnLeavingAsync();
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-            model2.Dispose();
-            model1.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnLeavingAsync();
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+                model2.Dispose();
+                model1.Dispose();
+            }
+        );
     }
 
     [Fact(DisplayName = "NavigationService, when doing absolute navigation on different item, should pop navigation stacks")]
@@ -635,16 +673,16 @@ public partial class NavigationServiceTests
         var shellContent3 = _shellProxy.GetContent(nameof(Page3));
         var shellSection1 = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
         var page2 = shellContent2.Page!;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
         var page3 = shellContent3.Page!;
-        var model3 = (IPage3Model)page3.BindingContext;
+        var model3 = (IPage3Model) page3.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage4Model>());
         var navigationStackPages = shellSection1.GetNavigationStack().ToList();
         var page4 = navigationStackPages[1].Page;
-        var model4 = (IPage4Model)page4.BindingContext;
+        var model4 = (IPage4Model) page4.BindingContext;
 
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
@@ -655,24 +693,26 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model4.OnDisappearingAsync();
-            model4.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection1);
-            model1.OnLeavingAsync();
-            model2.OnLeavingAsync();
-            model3.OnLeavingAsync();
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-            model4.Dispose();
-            model1.Dispose();
-            model2.Dispose();
-            model3.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model4.OnDisappearingAsync();
+                model4.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection1);
+                model1.OnLeavingAsync();
+                model2.OnLeavingAsync();
+                model3.OnLeavingAsync();
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+                model4.Dispose();
+                model1.Dispose();
+                model2.Dispose();
+                model3.Dispose();
+            }
+        );
     }
 
     [Fact(DisplayName = "NavigationService, when doing absolute navigation on different item without default behavior, should not pop navigation stacks")]
@@ -683,12 +723,12 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage2Model)page2.BindingContext;
+        var model2 = (IPage2Model) page2.BindingContext;
 
         model1.ClearReceivedCalls();
         model2.ClearReceivedCalls();
@@ -697,15 +737,18 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.None).ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+            }
+        );
+
         model1.DidNotReceive().OnLeavingAsync();
         model1.DidNotReceive().OnAppearingAsync();
         model1.DidNotReceive().OnDisappearingAsync();
@@ -723,12 +766,12 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage9Model)page2.BindingContext;
+        var model2 = (IPage9Model) page2.BindingContext;
         model2.CanLeaveAsync().Returns(ValueTask.FromResult(false));
 
         model1.ClearReceivedCalls();
@@ -738,20 +781,23 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute(NavigationBehavior.IgnoreGuards | NavigationBehavior.PopAllPagesOnItemChange).ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnLeavingAsync();
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-            model2.Dispose();
-            model1.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnLeavingAsync();
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+                model2.Dispose();
+                model1.Dispose();
+            }
+        );
+
         model2.DidNotReceive().CanLeaveAsync();
     }
 
@@ -763,12 +809,12 @@ public partial class NavigationServiceTests
         var shellContent1 = _shellProxy.GetContent(nameof(Page1));
         var shellSection = shellContent1.Parent;
         var page1 = shellContent1.Page!;
-        var model1 = (IPage1Model)page1.BindingContext;
+        var model1 = (IPage1Model) page1.BindingContext;
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage9Model>());
         var navigationStackPages = shellSection.GetNavigationStack().ToList();
         var page2 = navigationStackPages[1].Page;
-        var model2 = (IPage9Model)page2.BindingContext;
+        var model2 = (IPage9Model) page2.BindingContext;
         model2.CanLeaveAsync().Returns(ValueTask.FromResult(true));
 
         model1.ClearReceivedCalls();
@@ -778,21 +824,23 @@ public partial class NavigationServiceTests
         await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<IPage5Model>());
         var shellContent5 = _shellProxy.GetContent(nameof(Page5));
         var page5 = shellContent5.Page!;
-        var model5 = (IPage5Model)page5.BindingContext;
+        var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(() =>
-        {
-            model2.CanLeaveAsync();
-            model2.OnDisappearingAsync();
-            model2.OnLeavingAsync();
-            _shellProxy.PopAsync(shellSection);
-            model1.OnLeavingAsync();
-            model5.OnEnteringAsync();
-            _shellProxy.SelectContentAsync(nameof(Page5));
-            model5.OnAppearingAsync();
-            model2.Dispose();
-            model1.Dispose();
-        });
+        Received.InOrder(
+            () =>
+            {
+                model2.CanLeaveAsync();
+                model2.OnDisappearingAsync();
+                model2.OnLeavingAsync();
+                _shellProxy.PopAsync(shellSection);
+                model1.OnLeavingAsync();
+                model5.OnEnteringAsync();
+                _shellProxy.SelectContentAsync(nameof(Page5));
+                model5.OnAppearingAsync();
+                model2.Dispose();
+                model1.Dispose();
+            }
+        );
     }
 
     public interface ISomeContext;
@@ -805,16 +853,16 @@ public partial class NavigationServiceTests
 
         var content1 = _shellProxy.GetContent(nameof(Page1));
         var page1 = content1.Page!;
-        var page1nsp = PageNavigationContext.Get(page1).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
+        var page1Nsp = PageNavigationContext.Get(page1).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
         var context = Substitute.For<ISomeContext>();
-        page1nsp.AddNavigationScoped(context);
+        page1Nsp.AddNavigationScoped(context);
 
         await _navigationService.GoToAsync(Navigation.Relative().Push<IPage2Model>());
 
         var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
-        var page2nsp = PageNavigationContext.Get(page2).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
+        using var page2Nsp = PageNavigationContext.Get(page2).ServiceScope.ServiceProvider.GetRequiredService<INavigationServiceProvider>();
 
-        context.Should().BeSameAs(page2nsp.GetRequiredService<ISomeContext>());
+        context.Should().BeSameAs(page2Nsp.GetRequiredService<ISomeContext>());
     }
 
     [Fact(DisplayName = "NavigationService, GoToAsync, can be easily testable")]
@@ -822,6 +870,7 @@ public partial class NavigationServiceTests
     {
         var navigationService = Substitute.For<INavigationService>();
         navigationService.GoToAsync(Arg.Any<Navigation>()).Returns(Task.FromResult(true));
+
         {
             // Simulate what would be the code to be tested
             var intent = new OddIntent("hello");

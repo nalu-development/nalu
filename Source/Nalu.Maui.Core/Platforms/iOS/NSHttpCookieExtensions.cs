@@ -1,9 +1,10 @@
 // ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-namespace Nalu;
 
 using System.Globalization;
 using System.Text;
 using Foundation;
+
+namespace Nalu;
 
 // useful extensions for the class in order to set it in a header
 internal static class NsHttpCookieExtensions
@@ -13,13 +14,13 @@ internal static class NsHttpCookieExtensions
     {
         var header = new StringBuilder();
         AppendSegment(header, cookie.Name, cookie.Value);
-        AppendSegment(header, NSHttpCookie.KeyPath.ToString(), cookie.Path.ToString());
-        AppendSegment(header, NSHttpCookie.KeyDomain.ToString(), cookie.Domain.ToString());
+        AppendSegment(header, NSHttpCookie.KeyPath.ToString(), cookie.Path);
+        AppendSegment(header, NSHttpCookie.KeyDomain.ToString(), cookie.Domain);
         AppendSegment(header, NSHttpCookie.KeyVersion.ToString(), cookie.Version.ToString(CultureInfo.InvariantCulture));
 
         if (cookie.Comment is not null)
         {
-            AppendSegment(header, NSHttpCookie.KeyComment.ToString(), cookie.Comment.ToString());
+            AppendSegment(header, NSHttpCookie.KeyComment.ToString(), cookie.Comment);
         }
 
         if (cookie.CommentUrl is not null)
@@ -35,13 +36,13 @@ internal static class NsHttpCookieExtensions
         if (cookie.ExpiresDate is not null)
         {
             // Format according to RFC1123; 'r' uses invariant info(DateTimeFormatInfo.InvariantInfo)
-            var dateStr = ((DateTime)cookie.ExpiresDate).ToUniversalTime().ToString("r", CultureInfo.InvariantCulture);
+            var dateStr = ((DateTime) cookie.ExpiresDate).ToUniversalTime().ToString("r", CultureInfo.InvariantCulture);
             AppendSegment(header, NSHttpCookie.KeyExpires.ToString(), dateStr);
         }
 
         if (cookie.Properties.ContainsKey(NSHttpCookie.KeyMaximumAge))
         {
-            var timeStampString = (NSString)cookie.Properties[NSHttpCookie.KeyMaximumAge];
+            var timeStampString = (NSString) cookie.Properties[NSHttpCookie.KeyMaximumAge];
             AppendSegment(header, NSHttpCookie.KeyMaximumAge.ToString(), timeStampString);
         }
 
@@ -66,6 +67,7 @@ internal static class NsHttpCookieExtensions
         }
 
         builder.Append(name);
+
         if (value is not null)
         {
             builder.Append('=').Append(value);

@@ -1,10 +1,10 @@
-namespace Nalu.Maui.Weather.PageModels;
-
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Resources;
-using Services;
-using ViewModels;
+using Nalu.Maui.Weather.Resources;
+using Nalu.Maui.Weather.Services;
+using Nalu.Maui.Weather.ViewModels;
+
+namespace Nalu.Maui.Weather.PageModels;
 
 public class StartupIntent;
 
@@ -17,7 +17,8 @@ public partial class InitializationPageModel(
     TimeProvider timeProvider,
     WeatherState weatherState,
     IWeatherService weatherService,
-    INavigationService navigationService)
+    INavigationService navigationService
+)
     : ObservableObject, IAppearingAware<StartupIntent>
 {
     [ObservableProperty]
@@ -40,15 +41,29 @@ public partial class InitializationPageModel(
         var forecastEnd = today.AddDays(14);
 
         Message = Texts.LoadingIQ;
+
         var hourlyAirQualityModels = await weatherService.GetHourlyAirQualityAsync(
-            (float)location.Latitude, (float)location.Longitude, today, today);
+            (float) location.Latitude,
+            (float) location.Longitude,
+            today,
+            today
+        );
 
         Message = Texts.LoadingWeatherForecast;
 
         var hourlyWeatherModels = await weatherService.GetHourlyWeatherAsync(
-            (float)location.Latitude, (float)location.Longitude, today, today);
+            (float) location.Latitude,
+            (float) location.Longitude,
+            today,
+            today
+        );
+
         var dailyWeatherModels = await weatherService.GetDailyWeatherAsync(
-            (float)location.Latitude, (float)location.Longitude, today, forecastEnd);
+            (float) location.Latitude,
+            (float) location.Longitude,
+            today,
+            forecastEnd
+        );
 
         weatherState.TodayWeather = dailyWeatherModels.First();
         weatherState.TodayHourlyWeatherData.AddRange(hourlyWeatherModels);
@@ -69,8 +84,9 @@ public partial class InitializationPageModel(
     private Task NavigateToHomePage()
     {
         var navigation = Navigation
-            .Absolute(NavigationBehavior.Immediate | NavigationBehavior.PopAllPagesOnItemChange)
-            .ShellContent<HomePageModel>();
+                         .Absolute(NavigationBehavior.Immediate | NavigationBehavior.PopAllPagesOnItemChange)
+                         .ShellContent<HomePageModel>();
+
         return navigationService.GoToAsync(navigation);
     }
 

@@ -1,7 +1,7 @@
 namespace Nalu;
 
 /// <summary>
-/// <see cref="INavigationService"/> will invoke <see cref="CanLeaveAsync"/> method when the page is requested to
+/// <see cref="INavigationService" /> will invoke <see cref="CanLeaveAsync" /> method when the page is requested to
 /// be removed from the navigation stack.
 /// </summary>
 public interface ILeavingGuard

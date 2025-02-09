@@ -1,8 +1,6 @@
-namespace Nalu.Maui.Weather.Converters;
-
-using System;
 using System.Globalization;
-using Microsoft.Maui.Controls;
+
+namespace Nalu.Maui.Weather.Converters;
 
 public class WeatherCodeToDescriptionConverter : IValueConverter
 {

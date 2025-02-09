@@ -1,14 +1,14 @@
-namespace Nalu;
-
 using Microsoft.Maui.Layouts;
 
+namespace Nalu;
+
 /// <summary>
-/// Layout manager for <see cref="IExpanderViewBox"/>.
+/// Layout manager for <see cref="IExpanderViewBox" />.
 /// </summary>
-/// <param name="expander">The layout using this <see cref="ILayoutManager"/>.</param>
+/// <param name="expander">The layout using this <see cref="ILayoutManager" />.</param>
 public class ExpanderViewBoxLayoutManager(IExpanderViewBox expander) : ILayoutManager
 {
-    /// <inheritdoc cref="ILayoutManager.Measure"/>
+    /// <inheritdoc cref="ILayoutManager.Measure" />
     public Size Measure(double widthConstraint, double heightConstraint)
     {
         var padding = expander.Padding;
@@ -33,6 +33,7 @@ public class ExpanderViewBoxLayoutManager(IExpanderViewBox expander) : ILayoutMa
 
         double measuredHeight = 0;
         double measuredWidth = 0;
+
         if (expander.PresentedContent is { Visibility: not Visibility.Collapsed } child)
         {
             var measure = child.Measure(childWidthConstraint, childHeightConstraint);
@@ -68,7 +69,7 @@ public class ExpanderViewBoxLayoutManager(IExpanderViewBox expander) : ILayoutMa
         return new Size(finalWidth, finalHeight);
     }
 
-    /// <inheritdoc cref="ILayoutManager.ArrangeChildren"/>
+    /// <inheritdoc cref="ILayoutManager.ArrangeChildren" />
     public Size ArrangeChildren(Rect bounds)
     {
         var padding = expander.Padding;

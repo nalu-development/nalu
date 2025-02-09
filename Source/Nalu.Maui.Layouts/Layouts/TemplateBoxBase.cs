@@ -1,29 +1,30 @@
-namespace Nalu;
-
 using Nalu.Internals;
 
+namespace Nalu;
+
 /// <summary>
-/// A <see cref="ViewBox"/> base class that uses a <see cref="DataTemplate"/> to render content.
+/// A <see cref="ViewBox" /> base class that uses a <see cref="DataTemplate" /> to render content.
 /// </summary>
 [ContentProperty(nameof(TemplateContent))]
 public abstract class TemplateBoxBase : ClippableViewBoxBase
 {
     /// <summary>
-    /// Bindable property for <see cref="TemplateContent"/> property.
+    /// Bindable property for <see cref="TemplateContent" /> property.
     /// </summary>
     public static readonly BindableProperty TemplateContentProperty = BindableProperty.Create(
         nameof(TemplateContent),
         typeof(IView),
-        typeof(TemplateBox));
+        typeof(TemplateBox)
+    );
 
     private bool _changingTemplate;
 
     /// <summary>
-    /// Gets or sets the content to be projected through <see cref="TemplateContentPresenter"/> component.
+    /// Gets or sets the content to be projected through <see cref="TemplateContentPresenter" /> component.
     /// </summary>
     public IView? TemplateContent
     {
-        get => (IView?)GetValue(TemplateContentProperty);
+        get => (IView?) GetValue(TemplateContentProperty);
         set => SetValue(TemplateContentProperty, value);
     }
 
@@ -36,23 +37,25 @@ public abstract class TemplateBoxBase : ClippableViewBoxBase
     /// Gets the current template used to render content.
     /// </summary>
     /// <remarks>
-    /// Matches the <see cref="Template"/> property unless a <see cref="DataTemplateSelector"/> is used.
+    /// Matches the <see cref="Template" /> property unless a <see cref="DataTemplateSelector" /> is used.
     /// </remarks>
     protected DataTemplate? ActualTemplate { get; private set; }
 
     /// <summary>
     /// Sets the template to use for rendering content.
     /// </summary>
-    /// <param name="dataTemplate">The <see cref="DataTemplate"/> or <see cref="DataTemplateSelector"/> to use.</param>
+    /// <param name="dataTemplate">The <see cref="DataTemplate" /> or <see cref="DataTemplateSelector" /> to use.</param>
     protected void SetTemplate(DataTemplate? dataTemplate)
     {
         try
         {
             _changingTemplate = true;
+
             if (dataTemplate == null)
             {
                 ActualTemplate = null;
                 SetContent(null);
+
                 return;
             }
 
@@ -60,10 +63,12 @@ public abstract class TemplateBoxBase : ClippableViewBoxBase
 
             var bindingContext = IsSet(ContentBindingContextProperty) ? ContentBindingContext : BindingContext;
             var dataTemplateSelector = dataTemplate as DataTemplateSelector;
+
             if (bindingContext is null && dataTemplateSelector != null)
             {
                 ActualTemplate = null;
                 SetContent(null);
+
                 return;
             }
 
@@ -81,7 +86,8 @@ public abstract class TemplateBoxBase : ClippableViewBoxBase
 
             ActualTemplate = actualTemplate;
 
-            var content = (IView)actualTemplate.CreateContent();
+            var content = (IView) actualTemplate.CreateContent();
+
             if (content is BindableObject bindableContent)
             {
                 bindableContent.BindingContext = bindingContext;

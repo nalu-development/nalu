@@ -1,7 +1,7 @@
-namespace Nalu.Maui.Sample.PageModels;
-
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+
+namespace Nalu.Maui.Sample.PageModels;
 
 public partial class SixPageModel(INavigationService navigationService) : ObservableObject
 {

@@ -10,14 +10,12 @@ public class NavigationPop : INavigationSegment
     /// </summary>
     public const string PopRoute = "..";
 
-    /// <inheritdoc cref="INavigationSegment.SegmentName"/>
+    /// <inheritdoc cref="INavigationSegment.SegmentName" />
     public string SegmentName => PopRoute;
 
-    /// <inheritdoc cref="INavigationSegment.Type"/>
+    /// <inheritdoc cref="INavigationSegment.Type" />
     public Type? Type => null;
 
-    /// <inheritdoc cref="INavigationSegment.AssertValid"/>
-    public void AssertValid()
-    {
-    }
+    /// <inheritdoc cref="INavigationSegment.AssertValid" />
+    public void AssertValid() { }
 }

@@ -1,6 +1,6 @@
-﻿namespace Nalu.Maui.Sample;
+﻿using UIKit;
 
-using UIKit;
+namespace Nalu.Maui.Sample;
 
 public class Program
 {

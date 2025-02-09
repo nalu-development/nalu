@@ -1,10 +1,10 @@
-namespace Nalu.Maui.Sample.PageModels;
-
 using System.Collections.ObjectModel;
 using System.Net.Http.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Services;
+using Nalu.Maui.Sample.Services;
+
+namespace Nalu.Maui.Sample.PageModels;
 
 public class AnimalModel
 {
@@ -14,7 +14,8 @@ public class AnimalModel
 public partial class OnePageModel(
     StartupEventsHandler startupEventsHandler,
     INavigationService navigationService,
-    [FromKeyedServices("dummyjson")] HttpClient httpClient) : ObservableObject
+    [FromKeyedServices("dummyjson")] HttpClient httpClient
+) : ObservableObject
 {
     private static int _instanceCount;
 
@@ -47,7 +48,7 @@ public partial class OnePageModel(
         Result3 = null;
         Result4 = null;
 
-        var parallelRequestTask1 = SendRequestAsync(CreateTestLongRequest(5000));
+        var parallelRequestTask1 = SendRequestAsync(CreateTestLongRequest());
         Result1 = "waiting...";
         var parallelRequestTask2 = SendRequestAsync(CreateTestLongRequest(4000));
         Result2 = "waiting...";
@@ -55,7 +56,7 @@ public partial class OnePageModel(
         Result1 = await parallelRequestTask1;
         Result2 = await parallelRequestTask2;
 
-        var followUpRequest = SendRequestAsync(CreateTestLongRequest(5000));
+        var followUpRequest = SendRequestAsync(CreateTestLongRequest());
         Result3 = "waiting...";
         Result3 = await followUpRequest;
 
@@ -66,12 +67,14 @@ public partial class OnePageModel(
         await Task.Delay(2000);
         _ = SendRequestAsync(CreateTestLongRequest(5000, "MySuperDuperRequestId-" + Guid.NewGuid()));
         await Task.Delay(1000);
+
         throw new InvalidOperationException("Crashing the app on purpose");
     }
 
     private async Task<string> SendRequestAsync(HttpRequestMessage requestMessage)
     {
         string result;
+
         try
         {
             using var responseMessage = await httpClient.SendAsync(requestMessage);
@@ -92,11 +95,11 @@ public partial class OnePageModel(
     private HttpRequestMessage CreateTestLongRequest(int delayMs = 5000, string? identifier = null)
     {
         var httpRequestMessage = new HttpRequestMessage
-        {
-            RequestUri = new Uri($"test?delay={delayMs}", UriKind.Relative),
-            Method = HttpMethod.Post,
-            Content = JsonContent.Create(Animal),
-        };
+                                 {
+                                     RequestUri = new Uri($"test?delay={delayMs}", UriKind.Relative),
+                                     Method = HttpMethod.Post,
+                                     Content = JsonContent.Create(Animal)
+                                 };
 
 #if IOS
         if (identifier is not null)
