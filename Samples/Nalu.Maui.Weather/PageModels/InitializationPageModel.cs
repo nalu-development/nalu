@@ -58,11 +58,11 @@ public partial class InitializationPageModel(
 
         Message = string.Empty;
 
-        // Instead of showing a button, we could just navigate to the main page automatically via dispatcher:
-        // _ = dispatcher.DispatchAsync(NavigateToHomePage);
-
-        // However, we're trying to measure the navigation speed here, so we'll just show the button and wait for user command.
-        IsReady = true;
+        // We can navigate to the main page now by either:
+        // 1. Showing a button for the user to click: useful for navigation performance benchmarking
+        // IsReady = true;
+        // 2. Automatically navigating to the main page: useful for real-world user experience
+        _ = dispatcher.DispatchAsync(NavigateToHomePage);
     }
 
     [RelayCommand]

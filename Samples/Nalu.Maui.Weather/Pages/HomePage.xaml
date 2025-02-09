@@ -16,7 +16,7 @@
         <VerticalStackLayout>
             <ff:CachedImage x:Name="BannerImage"
                             Aspect="AspectFill"
-                            HeightRequest="160"
+                            HeightRequest="232"
                             Source="{Binding Path=WeatherState.TodayWeather.WeatherCode,
                                              Converter={StaticResource WeatherImageConverter}}" />
 
