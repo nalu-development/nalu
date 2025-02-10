@@ -1,4 +1,5 @@
 using Microsoft.Maui.Layouts;
+using ScheduledAnimation = (double originalWidth, double originalHeight, double deltaWidth, double deltaHeight);
 
 namespace Nalu;
 
@@ -117,6 +118,7 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
     private double _lastArrangeWidth = double.NaN;
     private bool _canCollapse;
     private Animation? _animation;
+    private ScheduledAnimation? _scheduledAnimation;
 
     bool IViewBox.ClipsToBounds => true;
     double IExpanderViewBox.ArrangeHeight => _arrangeHeight;
@@ -217,19 +219,33 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         var deltaWidth = width - originalWidth;
         var deltaHeight = height - originalHeight;
 
-        _animation?.Dispose();
+        _scheduledAnimation = (originalWidth, originalHeight, deltaWidth, deltaHeight);
+    }
 
-        _animation = new Animation(
-            ratio =>
-            {
-                _arrangeWidth = originalWidth + (deltaWidth * ratio);
-                _arrangeHeight = originalHeight + (deltaHeight * ratio);
-                InvalidateMeasure();
-            },
-            easing: Easing.CubicInOut
-        );
+    /// <inheritdoc />
+    protected override Size ArrangeOverride(Rect bounds)
+    {
+        if (_scheduledAnimation is { } scheduledAnimation)
+        {
+            _scheduledAnimation = null;
+            var (originalWidth, originalHeight, deltaWidth, deltaHeight) = scheduledAnimation;
 
-        _animation.Commit(this, nameof(IsExpanded));
+            _animation?.Dispose();
+
+            _animation = new Animation(
+                ratio =>
+                {
+                    _arrangeWidth = originalWidth + (deltaWidth * ratio);
+                    _arrangeHeight = originalHeight + (deltaHeight * ratio);
+                    InvalidateMeasure();
+                },
+                easing: Easing.CubicInOut
+            );
+
+            _animation.Commit(this, nameof(IsExpanded));
+        }
+
+        return base.ArrangeOverride(bounds);
     }
 
     private static void OnExpanderPropertyChanged(BindableObject bindable, object oldvalue, object newvalue)
