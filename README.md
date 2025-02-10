@@ -91,5 +91,7 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
     <nalu:TemplateBox ContentTemplateSelector="{StaticResource AnimalTemplateSelector}"
                       ContentBindingContext="{Binding CurrentAnimal}" />
   ```
+- Need to animate size changes or implement an accordion control?
+  ![Expander demo](docs/assets/images/expander.gif)
 
 **Find out more at [Nalu Website](https://nalu-development.github.io/nalu/layouts.html).**

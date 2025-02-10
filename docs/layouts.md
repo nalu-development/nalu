@@ -75,7 +75,11 @@ This can also be used with one single expensive template:
 
 `ExpanderViewBox` is a custom view that fully displays or **collapses** its content by **animating** the size transition.
 
-It is useful for scenarios where you want to show or hide additional information dynamically or if you want to build an **accordion** control.
+You can use `+Infinity` collapse size to enable size-change animations.
+
+![Expander demo](assets/images/expander.gif)
+
+This component is also useful for scenarios where you want to show or hide additional information dynamically or if you want to build an **accordion** control.
 
 Here's an example of how we can use it to build a section that can be expanded or collapsed through a button only when the content exceeds the `CollapsedHeight`.
 
@@ -114,5 +118,3 @@ private void ToggleExpended(object? sender, EventArgs e)
 
 </VerticalStackLayout>
 ```
-
-
