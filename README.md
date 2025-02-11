@@ -92,6 +92,7 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
                       ContentBindingContext="{Binding CurrentAnimal}" />
   ```
 - Need to animate size changes or implement an accordion control?
+  `ExpanderViewBox` have you covered, even when you need it inside a `CollectionView`.
   ![Expander demo](docs/assets/images/expander.gif)
 
 **Find out more at [Nalu Website](https://nalu-development.github.io/nalu/layouts.html).**

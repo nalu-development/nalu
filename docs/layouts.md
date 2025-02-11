@@ -118,3 +118,43 @@ private void ToggleExpended(object? sender, EventArgs e)
 
 </VerticalStackLayout>
 ```
+
+You can even use `ExpanderViewBox` as a `CollectionView`'s `ItemTemplate` to animate the size change of each item.
+
+![Expander in CollectionView demo](assets/images/expander-cv.gif)
+
+```csharp
+private void ScrollToMe(object? sender, EventArgs e)
+{
+    TheCollectionView.ScrollTo((sender as BindableObject)?.BindingContext);
+}
+```
+
+```xml
+<CollectionView ItemsSource="{Binding Items}"
+                x:Name="TheCollectionView">
+    <CollectionView.ItemTemplate>
+        <DataTemplate x:DataType="pageModels:MyItem">
+            <nalu:ViewBox Padding="16,8">
+                <Border StrokeShape="RoundRectangle 12"
+                        BackgroundColor="Coral">
+                    <VerticalStackLayout>
+                        <nalu:ExpanderViewBox CollapsedHeight="126"
+                                              IsExpanded="{Binding IsExpanded}">
+                            <VerticalStackLayout Padding="16,8">
+                                <Label Text="{Binding Name}" FontSize="Large"/>
+                                <Label Text="{Binding Description}"/>
+                            </VerticalStackLayout>
+                        </nalu:ExpanderViewBox>
+                        <Button Text="Toggle"
+                                BackgroundColor="Coral"
+                                TextColor="Black"
+                                Clicked="ScrollToMe"
+                                Command="{Binding ToggleCommand}"/>
+                    </VerticalStackLayout>
+                </Border>
+            </nalu:ViewBox>
+        </DataTemplate>
+    </CollectionView.ItemTemplate>
+</CollectionView>
+```
