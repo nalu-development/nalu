@@ -49,7 +49,34 @@ public interface IExpanderViewBox : IViewBox
 }
 
 /// <summary>
-/// TODO
+/// Describes the behavior of the expander animation.
+/// </summary>
+public enum ExpanderAnimationBehavior
+{
+    /// <summary>
+    /// When appearing for the first time and when <see cref="BindableObject.BindingContext" /> changes, the view box won't animate.
+    /// </summary>
+    /// <remarks>
+    /// This is the default behavior as it serves to properly handle collection views.
+    /// </remarks>
+    Default,
+
+    /// <summary>
+    /// When <see cref="BindableObject.BindingContext" /> changes, the view box will animate.
+    /// </summary>
+    /// <remarks>
+    /// When appearing for the first time, the view box won't animate.
+    /// </remarks>
+    AnimateOnBindingContextChange,
+
+    /// <summary>
+    /// When appearing for the first time and when <see cref="BindableObject.BindingContext" /> changes, the view box will animate.
+    /// </summary>
+    Always,
+}
+
+/// <summary>
+/// Represents a view box that can be expanded or collapsed with an animation.
 /// </summary>
 [ContentProperty(nameof(Content))]
 public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
@@ -63,6 +90,16 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         false
     );
 #pragma warning restore IDE1006
+
+    /// <summary>
+    /// Bindable property for <see cref="AnimationBehavior" /> property.
+    /// </summary>
+    public static readonly BindableProperty AnimationBehaviorProperty = BindableProperty.Create(
+        nameof(AnimationBehavior),
+        typeof(ExpanderAnimationBehavior),
+        typeof(ExpanderViewBox),
+        ExpanderAnimationBehavior.Default
+    );
 
     /// <summary>
     /// Bindable property for <see cref="Content" /> property.
@@ -112,12 +149,14 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         propertyChanged: OnExpanderPropertyChanged
     );
 
-    private double _arrangeHeight = double.NaN;
-    private double _arrangeWidth = double.NaN;
-    private double _lastArrangeHeight = double.NaN;
-    private double _lastArrangeWidth = double.NaN;
+    private double _arrangeHeight;
+    private double _arrangeWidth;
+    private double _lastArrangeHeight;
+    private double _lastArrangeWidth;
     private bool _canCollapse;
+    private bool _arranged;
     private Animation? _animation;
+    private bool _scheduledCanCollapse;
     private ScheduledAnimation? _scheduledAnimation;
 
     bool IViewBox.ClipsToBounds => true;
@@ -131,6 +170,15 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
     {
         get => GetContent();
         set => SetContent(value);
+    }
+
+    /// <summary>
+    /// Gets or sets the behavior of the expander animation.
+    /// </summary>
+    public ExpanderAnimationBehavior AnimationBehavior
+    {
+        get => (ExpanderAnimationBehavior) GetValue(AnimationBehaviorProperty);
+        set => SetValue(AnimationBehaviorProperty, value);
     }
 
     /// <summary>
@@ -189,12 +237,7 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
 
     void IExpanderViewBox.SetArrangeSize(double width, double height, bool canCollapse)
     {
-        // Using private field here to avoid setting the bindable property on each method call (performance).
-        if (_canCollapse != canCollapse)
-        {
-            _canCollapse = canCollapse;
-            CanCollapse = canCollapse;
-        }
+        _scheduledCanCollapse = canCollapse;
 
         // Fast path: if the target size is the same as the current one, do nothing.
         if (_lastArrangeHeight == height && _lastArrangeWidth == width)
@@ -205,7 +248,7 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         _lastArrangeWidth = width;
         _lastArrangeHeight = height;
 
-        if (!IsPlatformEnabled || double.IsNaN(_arrangeWidth))
+        if ((!IsPlatformEnabled || !_arranged) && AnimationBehavior != ExpanderAnimationBehavior.Always)
         {
             _arrangeWidth = width;
             _arrangeHeight = height;
@@ -223,8 +266,40 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
     }
 
     /// <inheritdoc />
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+
+        if (Handler is null)
+        {
+            ClearArrangeData();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnBindingContextChanged()
+    {
+        if (AnimationBehavior == ExpanderAnimationBehavior.Default)
+        {
+            // Do not animate when the binding context changes (usually when the view is reused within collection view).
+            ClearArrangeData();
+        }
+
+        base.OnBindingContextChanged();
+    }
+
+    /// <inheritdoc />
     protected override Size ArrangeOverride(Rect bounds)
     {
+        _arranged = true;
+
+        // Using private field here to avoid setting the bindable property on each method call (performance).
+        if (_canCollapse != _scheduledCanCollapse)
+        {
+            _canCollapse = _scheduledCanCollapse;
+            CanCollapse = _scheduledCanCollapse;
+        }
+
         if (_scheduledAnimation is { } scheduledAnimation)
         {
             _scheduledAnimation = null;
@@ -246,6 +321,16 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         }
 
         return base.ArrangeOverride(bounds);
+    }
+
+    private void ClearArrangeData()
+    {
+        _lastArrangeHeight = 0;
+        _lastArrangeWidth = 0;
+        _arrangeHeight = 0;
+        _arrangeWidth = 0;
+        _scheduledAnimation = null;
+        _arranged = false;
     }
 
     private static void OnExpanderPropertyChanged(BindableObject bindable, object oldvalue, object newvalue)

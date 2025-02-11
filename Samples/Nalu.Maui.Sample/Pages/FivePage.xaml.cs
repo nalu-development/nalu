@@ -9,4 +9,9 @@ public partial class FivePage : ContentPage
         BindingContext = pageModel;
         InitializeComponent();
     }
+
+    private void ScrollToMe(object? sender, EventArgs e)
+    {
+        TheCollectionView.ScrollTo((sender as BindableObject)?.BindingContext);
+    }
 }

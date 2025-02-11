@@ -45,26 +45,27 @@ public class ExpanderViewBoxLayoutManager(IExpanderViewBox expander) : ILayoutMa
         measuredWidth += paddingHorizontalThickness;
 
         IView layoutView = expander;
-        var finalHeight = LayoutManager.ResolveConstraints(heightConstraint, layoutView.Height, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
-        var finalWidth = LayoutManager.ResolveConstraints(widthConstraint, layoutView.Width, measuredWidth, layoutView.MinimumWidth, layoutView.MaximumWidth);
-
+        
         var isExpanded = expander.IsExpanded;
-        var arrangeWidth = isExpanded || expanderWidthConstraint < 0 ? finalWidth : Math.Min(expanderWidthConstraint, finalWidth);
-        var arrangeHeight = isExpanded || expanderHeightConstraint < 0 ? finalHeight : Math.Min(expanderHeightConstraint, finalHeight);
-        var willCollapseWidth = expanderWidthConstraint >= 0 && finalWidth > expanderWidthConstraint;
-        var willCollapseHeight = expanderHeightConstraint >= 0 && finalHeight > expanderHeightConstraint;
+        var arrangeWidth = isExpanded || expanderWidthConstraint < 0 ? measuredWidth : Math.Min(expanderWidthConstraint, measuredWidth);
+        var arrangeHeight = isExpanded || expanderHeightConstraint < 0 ? measuredHeight : Math.Min(expanderHeightConstraint, measuredHeight);
+        var willCollapseWidth = expanderWidthConstraint >= 0 && measuredWidth > expanderWidthConstraint;
+        var willCollapseHeight = expanderHeightConstraint >= 0 && measuredHeight > expanderHeightConstraint;
 
         expander.SetArrangeSize(arrangeWidth, arrangeHeight, willCollapseWidth || willCollapseHeight);
 
         if (expanderHeightConstraint >= 0)
         {
-            finalHeight = expander.ArrangeHeight;
+            measuredHeight = expander.ArrangeHeight;
         }
 
         if (expanderWidthConstraint >= 0)
         {
-            finalWidth = expander.ArrangeWidth;
+            measuredWidth = expander.ArrangeWidth;
         }
+
+        var finalHeight = LayoutManager.ResolveConstraints(heightConstraint, layoutView.Height, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
+        var finalWidth = LayoutManager.ResolveConstraints(widthConstraint, layoutView.Width, measuredWidth, layoutView.MinimumWidth, layoutView.MaximumWidth);
 
         return new Size(finalWidth, finalHeight);
     }
