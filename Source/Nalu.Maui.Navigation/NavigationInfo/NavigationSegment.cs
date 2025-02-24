@@ -89,5 +89,5 @@ public class NavigationSegment : BindableObject, INavigationSegment
     /// <summary>
     /// Gets the string representation of the navigation segment.
     /// </summary>
-    public override string ToString() => SegmentName ?? string.Empty;
+    public override string ToString() => SegmentName ?? Type?.Name ?? string.Empty;
 }

@@ -10,7 +10,7 @@ internal static class NavigationHelper
     private static readonly MethodInfo _sendAppearingWithIntentAsyncMethod =
         typeof(NavigationHelper).GetMethod(nameof(SendAppearingWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    public static ValueTask SendEnteringAsync(Page page, object? intent, INavigationConfiguration configuration)
+    public static ValueTask SendEnteringAsync(IShellProxy shell, Page page, object? intent, INavigationConfiguration configuration)
     {
         var context = PageNavigationContext.Get(page);
 
@@ -32,11 +32,13 @@ internal static class NavigationHelper
 #if DEBUG
                 Console.WriteLine($"Entering {target.GetType().FullName} with intent {intent.GetType().FullName}");
 #endif
+                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.HandledWithIntent, intent));
                 return (ValueTask) _sendEnteringWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
             {
+                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.NotHandled, intent));
                 return ValueTask.CompletedTask;
             }
         }
@@ -46,13 +48,15 @@ internal static class NavigationHelper
 #if DEBUG
             Console.WriteLine($"Entering {target.GetType().FullName}");
 #endif
+            shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.Handled, intent));
             return enteringAware.OnEnteringAsync();
         }
 
+        shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.NotHandled, intent));
         return ValueTask.CompletedTask;
     }
 
-    public static ValueTask SendLeavingAsync(Page page)
+    public static ValueTask SendLeavingAsync(IShellProxy shell, Page page)
     {
         var context = PageNavigationContext.Get(page);
 
@@ -70,13 +74,16 @@ internal static class NavigationHelper
 #if DEBUG
             Console.WriteLine($"Leaving {target.GetType().FullName}");
 #endif
+            // ReSharper disable once RedundantArgumentDefaultValue
+            shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Leaving, target, NavigationLifecycleHandling.Handled));
             return enteringAware.OnLeavingAsync();
         }
 
+        shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Leaving, target, NavigationLifecycleHandling.NotHandled));
         return ValueTask.CompletedTask;
     }
 
-    public static ValueTask SendAppearingAsync(Page page, object? intent, INavigationConfiguration configuration)
+    public static ValueTask SendAppearingAsync(IShellProxy shell, Page page, object? intent, INavigationConfiguration configuration)
     {
         var context = PageNavigationContext.Get(page);
 
@@ -99,11 +106,13 @@ internal static class NavigationHelper
 #if DEBUG
                 Console.WriteLine($"Appearing {target.GetType().FullName} with intent {intent.GetType().FullName}");
 #endif
+                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.HandledWithIntent, intent));
                 return (ValueTask) _sendAppearingWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
             {
+                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.NotHandled, intent));
                 return ValueTask.CompletedTask;
             }
         }
@@ -113,13 +122,15 @@ internal static class NavigationHelper
 #if DEBUG
             Console.WriteLine($"Appearing {target.GetType().FullName}");
 #endif
+            shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.Handled, intent));
             return appearingAware.OnAppearingAsync();
         }
 
+        shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.NotHandled, intent));
         return ValueTask.CompletedTask;
     }
 
-    public static ValueTask SendDisappearingAsync(Page page)
+    public static ValueTask SendDisappearingAsync(IShellProxy shell, Page page)
     {
         var context = PageNavigationContext.Get(page);
 
@@ -137,13 +148,16 @@ internal static class NavigationHelper
 #if DEBUG
             Console.WriteLine($"Disappearing {target.GetType().FullName}");
 #endif
+            // ReSharper disable once RedundantArgumentDefaultValue
+            shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Disappearing, target, NavigationLifecycleHandling.Handled));
             return enteringAware.OnDisappearingAsync();
         }
 
+        shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Disappearing, target, NavigationLifecycleHandling.NotHandled));
         return ValueTask.CompletedTask;
     }
 
-    public static ValueTask<bool> CanLeaveAsync(Page page)
+    public static ValueTask<bool> CanLeaveAsync(IShellProxy shell, Page page)
     {
         var target = page.BindingContext;
 
@@ -152,6 +166,7 @@ internal static class NavigationHelper
 #if DEBUG
             Console.WriteLine($"Can leave {target.GetType().FullName}");
 #endif
+            shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.LeavingGuard, target));
             return leavingGuard.CanLeaveAsync();
         }
 
