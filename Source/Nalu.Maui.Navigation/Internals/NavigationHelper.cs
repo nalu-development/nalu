@@ -32,13 +32,17 @@ internal static class NavigationHelper
 #if DEBUG
                 Console.WriteLine($"Entering {target.GetType().FullName} with intent {intent.GetType().FullName}");
 #endif
-                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.HandledWithIntent, intent));
+                shell.SendNavigationLifecycleEvent(
+                    new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.HandledWithIntent, intent)
+                );
+
                 return (ValueTask) _sendEnteringWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
             {
                 shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.NotHandled, intent));
+
                 return ValueTask.CompletedTask;
             }
         }
@@ -49,10 +53,12 @@ internal static class NavigationHelper
             Console.WriteLine($"Entering {target.GetType().FullName}");
 #endif
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.Handled, intent));
+
             return enteringAware.OnEnteringAsync();
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.NotHandled, intent));
+
         return ValueTask.CompletedTask;
     }
 
@@ -76,10 +82,12 @@ internal static class NavigationHelper
 #endif
             // ReSharper disable once RedundantArgumentDefaultValue
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Leaving, target, NavigationLifecycleHandling.Handled));
+
             return enteringAware.OnLeavingAsync();
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Leaving, target, NavigationLifecycleHandling.NotHandled));
+
         return ValueTask.CompletedTask;
     }
 
@@ -106,13 +114,19 @@ internal static class NavigationHelper
 #if DEBUG
                 Console.WriteLine($"Appearing {target.GetType().FullName} with intent {intent.GetType().FullName}");
 #endif
-                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.HandledWithIntent, intent));
+                shell.SendNavigationLifecycleEvent(
+                    new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.HandledWithIntent, intent)
+                );
+
                 return (ValueTask) _sendAppearingWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
             {
-                shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.NotHandled, intent));
+                shell.SendNavigationLifecycleEvent(
+                    new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.NotHandled, intent)
+                );
+
                 return ValueTask.CompletedTask;
             }
         }
@@ -123,10 +137,12 @@ internal static class NavigationHelper
             Console.WriteLine($"Appearing {target.GetType().FullName}");
 #endif
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.Handled, intent));
+
             return appearingAware.OnAppearingAsync();
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.NotHandled, intent));
+
         return ValueTask.CompletedTask;
     }
 
@@ -150,10 +166,12 @@ internal static class NavigationHelper
 #endif
             // ReSharper disable once RedundantArgumentDefaultValue
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Disappearing, target, NavigationLifecycleHandling.Handled));
+
             return enteringAware.OnDisappearingAsync();
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Disappearing, target, NavigationLifecycleHandling.NotHandled));
+
         return ValueTask.CompletedTask;
     }
 
@@ -167,6 +185,7 @@ internal static class NavigationHelper
             Console.WriteLine($"Can leave {target.GetType().FullName}");
 #endif
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.LeavingGuard, target));
+
             return leavingGuard.CanLeaveAsync();
         }
 

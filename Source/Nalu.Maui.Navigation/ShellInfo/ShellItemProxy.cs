@@ -8,7 +8,7 @@ namespace Nalu;
 internal class ShellItemProxy : IShellItemProxy, IDisposable
 {
     private readonly ShellItem _item;
-    private List<ShellSectionProxy> _sections = [];
+    private readonly List<ShellSectionProxy> _sections = [];
     public string SegmentName { get; }
     public IShellSectionProxy CurrentSection { get; private set; }
     public IReadOnlyList<IShellSectionProxy> Sections => _sections;
@@ -24,10 +24,11 @@ internal class ShellItemProxy : IShellItemProxy, IDisposable
         UpdateCurrentSection();
 
         item.PropertyChanged += ItemOnPropertyChanged;
+
         if (item.Items is INotifyCollectionChanged observableCollection)
         {
             observableCollection.CollectionChanged += OnItemsCollectionChanged;
-        } 
+        }
     }
 
     private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

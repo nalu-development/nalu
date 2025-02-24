@@ -10,12 +10,14 @@ public enum NavigationLifecycleHandling
     /// The event has not been handled.
     /// </summary>
     NotHandled = 0,
+
     /// <summary>
     /// The event has been handled.
     /// </summary>
     Handled = 1,
+
     /// <summary>
     /// The event has been handled with an intent.
     /// </summary>
-    HandledWithIntent = Handled | 2,
+    HandledWithIntent = Handled | 2
 }

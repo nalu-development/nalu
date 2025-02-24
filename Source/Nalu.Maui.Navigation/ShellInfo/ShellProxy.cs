@@ -8,9 +8,9 @@ internal class ShellProxy : IShellProxy, IDisposable
     private readonly NaluShell _shell;
     private readonly ShellRouteFactory _routeFactory = new();
     private readonly HashSet<string> _registeredSegments = [];
+    private readonly List<ShellItemProxy> _items;
 
     private Dictionary<string, IShellContentProxy> _contentsBySegmentName = null!;
-    private List<ShellItemProxy> _items;
     private string? _navigationTarget;
     private bool _contentChanged;
     private IShellSectionProxy? _navigationCurrentSection;
@@ -28,10 +28,11 @@ internal class ShellProxy : IShellProxy, IDisposable
 
         ((IShellController) shell).StructureChanged += ShellOnStructureChanged;
         shell.PropertyChanged += ShellOnPropertyChanged;
+
         if (shell.Items is INotifyCollectionChanged observableCollection)
         {
             observableCollection.CollectionChanged += OnItemsCollectionChanged;
-        } 
+        }
     }
 
     private void ShellOnStructureChanged(object? sender, EventArgs e)
@@ -65,6 +66,7 @@ internal class ShellProxy : IShellProxy, IDisposable
         if (_navigationTarget is not { } targetState || targetState == _shell.CurrentState.Location.OriginalString)
         {
             completeAction?.Invoke();
+
             return;
         }
 
@@ -131,7 +133,7 @@ internal class ShellProxy : IShellProxy, IDisposable
         }
 
         _navigationTarget = finalRoute;
-        
+
         return Task.CompletedTask;
     }
 
@@ -147,11 +149,13 @@ internal class ShellProxy : IShellProxy, IDisposable
         if (section != _navigationCurrentSection)
         {
             section.RemoveStackPages(1);
+
             return Task.CompletedTask;
         }
-        
+
         var previousSegmentEnd = _navigationTarget.LastIndexOf('/');
         _navigationTarget = _navigationTarget[..previousSegmentEnd];
+
         return Task.CompletedTask;
     }
 
@@ -220,6 +224,7 @@ internal class ShellProxy : IShellProxy, IDisposable
         }
 
         _shell.PropertyChanged -= ShellOnPropertyChanged;
+
         if (_shell.Items is INotifyCollectionChanged observableCollection)
         {
             observableCollection.CollectionChanged -= OnItemsCollectionChanged;

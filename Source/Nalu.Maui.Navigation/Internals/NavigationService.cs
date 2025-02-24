@@ -8,7 +8,6 @@ namespace Nalu;
 
 internal class NavigationService : INavigationService, IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
     private readonly LeakDetector? _leakDetector;
@@ -18,12 +17,12 @@ internal class NavigationService : INavigationService, IDisposable
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
     public INavigationConfiguration Configuration { get; }
 
-    internal IServiceProvider ServiceProvider => _serviceProvider;
+    internal IServiceProvider ServiceProvider { get; }
 
     public NavigationService(INavigationConfiguration configuration, IServiceProvider serviceProvider)
     {
         Configuration = configuration;
-        _serviceProvider = serviceProvider;
+        ServiceProvider = serviceProvider;
         _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
 
         var trackLeaks
@@ -83,7 +82,10 @@ internal class NavigationService : INavigationService, IDisposable
                     }
 
                     var targetState = GetTargetState(Configuration, navigation);
-                    shellProxy.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.NavigationRequested, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State)));
+
+                    shellProxy.SendNavigationLifecycleEvent(
+                        new NavigationLifecycleEventArgs(NavigationLifecycleEventType.NavigationRequested, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State))
+                    );
 
                     shellProxy.BeginNavigation();
 
@@ -98,7 +100,10 @@ internal class NavigationService : INavigationService, IDisposable
                         });
 
                         var navigationLifecycleEventType = result ? NavigationLifecycleEventType.NavigationCompleted : NavigationLifecycleEventType.NavigationFailed;
-                        shellProxy.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(navigationLifecycleEventType, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State)));
+
+                        shellProxy.SendNavigationLifecycleEvent(
+                            new NavigationLifecycleEventArgs(navigationLifecycleEventType, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State))
+                        );
 
                         return result;
                     }
@@ -122,7 +127,7 @@ internal class NavigationService : INavigationService, IDisposable
 
     internal Page CreatePage(Type pageType, Page? parentPage, ImageSource? backButtonImage = null)
     {
-        var serviceScope = _serviceProvider.CreateScope();
+        var serviceScope = ServiceProvider.CreateScope();
 
         if (parentPage is not null && PageNavigationContext.Get(parentPage) is { ServiceScope: { } parentScope })
         {
@@ -606,7 +611,10 @@ internal class NavigationService : INavigationService, IDisposable
 
     private static string GetTargetState(INavigationConfiguration configuration, INavigationInfo navigation)
     {
-        var target = (navigation.IsAbsolute ? "//" : "./") + string.Join('/', navigation.Select(s => s.Type != null ? NavigationHelper.GetPageType(s.Type, configuration).Name : s.SegmentName));
+        var target = (navigation.IsAbsolute ? "//" : "./") + string.Join(
+            '/',
+            navigation.Select(s => s.Type != null ? NavigationHelper.GetPageType(s.Type, configuration).Name : s.SegmentName)
+        );
 
         if (navigation.Intent is { } intent)
         {

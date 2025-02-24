@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows.Input;
+#if !NET9_0_OR_GREATER
 using Nalu.Internals;
+#endif
 
 namespace Nalu;
 
@@ -14,6 +16,7 @@ namespace Nalu;
 #if NET9_0_OR_GREATER
 [RequireService([typeof(IProvideValueTarget)])]
 #endif
+// ReSharper disable once PartialTypeWithSinglePart
 public partial class NavigateCommand : IMarkupExtension<ICommand>
 {
     /// <inheritdoc cref="IMarkupExtension{T}.ProvideValue" />

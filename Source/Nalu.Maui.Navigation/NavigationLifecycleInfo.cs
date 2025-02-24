@@ -9,17 +9,19 @@ public class NavigationLifecycleInfo
     /// Gets the requested navigation object.
     /// </summary>
     public INavigationInfo Navigation { get; }
+
     /// <summary>
     /// Gets the requested state of the navigation.
     /// </summary>
     public string RequestedState { get; }
+
     /// <summary>
     /// Gets the current state of the navigation.
     /// </summary>
     public string CurrentState { get; }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NavigationLifecycleInfo"/> class.
+    /// Initializes a new instance of the <see cref="NavigationLifecycleInfo" /> class.
     /// </summary>
     /// <param name="navigation">The requested navigation object.</param>
     /// <param name="requestedState">The requested navigation state.</param>

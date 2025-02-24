@@ -221,7 +221,8 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
             () =>
 #pragma warning restore IDE0053
             {
-                var shell = (NaluShell?) shellContent.Parent?.Parent?.Parent ?? throw new InvalidOperationException("Cannot create ShellContent Page while detached from NaluShell.");
+                var shell = (NaluShell?) shellContent.Parent?.Parent?.Parent ??
+                            throw new InvalidOperationException("Cannot create ShellContent Page while detached from NaluShell.");
 
                 var navigationService = shell.NavigationService;
                 var serviceProvider = navigationService.ServiceProvider;

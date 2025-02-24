@@ -9,7 +9,7 @@ namespace Nalu;
 internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 {
     private readonly ShellSection _section;
-    private List<ShellContentProxy> _contents;
+    private readonly List<ShellContentProxy> _contents;
     public string SegmentName { get; }
     public IShellContentProxy CurrentContent { get; private set; }
     public IReadOnlyList<IShellContentProxy> Contents => _contents;
@@ -25,10 +25,11 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
         UpdateCurrentContent();
 
         section.PropertyChanged += SectionOnPropertyChanged;
+
         if (section.Items is INotifyCollectionChanged observableCollection)
         {
             observableCollection.CollectionChanged += OnItemsCollectionChanged;
-        } 
+        }
     }
 
     private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -116,10 +117,9 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
         CurrentContent = Contents.First(c => c.SegmentName == currentSegmentName);
     }
 
-    
     public static bool IsPageMarkedForRemoval(Page page) => (bool) page.GetValue(_navigationRemovalProperty);
     private static void MarkPageForRemoval(Page page) => page.SetValue(_navigationRemovalProperty, true);
-    
+
     private static readonly BindableProperty _navigationRemovalProperty = BindableProperty.CreateAttached(
         "PageNavigationRemoval",
         typeof(bool),

@@ -139,8 +139,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
             Handler is null || // Shell initialization process
             string.IsNullOrEmpty(uri) || // An empty URI is very likely Android trying to background the app when on a root page and back button is pressed.
             IsRemovingStackPages(args) || // ShellSectionProxy removing pages from the stack during cross-item navigation
-            uri.EndsWith("?nalu") // Nalu-triggered navigations
-        )
+            uri.EndsWith("?nalu")) // Nalu-triggered navigations
         {
             return;
         }
@@ -206,9 +205,9 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         }
 
         var segments = args.Target.Location.OriginalString
-                       .Split('/', StringSplitOptions.RemoveEmptyEntries)
-                       .Select(NormalizeSegment)
-                       .ToArray();
+                           .Split('/', StringSplitOptions.RemoveEmptyEntries)
+                           .Select(NormalizeSegment)
+                           .ToArray();
 
         var shellContent = (ShellContentProxy) _shellProxy!.FindContent(segments);
         var shellSection = shellContent.Parent;
@@ -216,7 +215,8 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         // If the ShellContent relative to a stack page being removed does not have a page,
         // it means this can only be Nalu navigation cleaning up the stack after a cross-item navigation.
         // If that's not null, then check if any of the pages in the stack is marked for removal.
-        var isRemovingStackPages = shellContent.Page is null || shellSection.GetNavigationStack(shellContent).Any(stackPage => ShellSectionProxy.IsPageMarkedForRemoval(stackPage.Page));
+        var isRemovingStackPages = shellContent.Page is null ||
+                                   shellSection.GetNavigationStack(shellContent).Any(stackPage => ShellSectionProxy.IsPageMarkedForRemoval(stackPage.Page));
 
         return isRemovingStackPages;
     }
