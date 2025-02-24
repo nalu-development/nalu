@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 
 namespace Nalu;
@@ -7,9 +8,10 @@ namespace Nalu;
 internal class ShellItemProxy : IShellItemProxy, IDisposable
 {
     private readonly ShellItem _item;
+    private List<ShellSectionProxy> _sections = [];
     public string SegmentName { get; }
     public IShellSectionProxy CurrentSection { get; private set; }
-    public IReadOnlyList<IShellSectionProxy> Sections { get; }
+    public IReadOnlyList<IShellSectionProxy> Sections => _sections;
     public IShellProxy Parent { get; }
 
     public ShellItemProxy(ShellItem item, IShellProxy parent)
@@ -18,9 +20,20 @@ internal class ShellItemProxy : IShellItemProxy, IDisposable
 
         Parent = parent;
         SegmentName = item.Route;
-        Sections = item.Items.Select(s => new ShellSectionProxy(s, this)).ToList();
+        _sections = item.Items.Select(s => new ShellSectionProxy(s, this)).ToList();
         UpdateCurrentSection();
+
         item.PropertyChanged += ItemOnPropertyChanged;
+        if (item.Items is INotifyCollectionChanged observableCollection)
+        {
+            observableCollection.CollectionChanged += OnItemsCollectionChanged;
+        } 
+    }
+
+    private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        ShellProxyHelper.UpdateProxyItemsCollection<ShellSection, ShellSectionProxy>(e, _sections, item => new ShellSectionProxy(item, this));
+        UpdateCurrentSection();
     }
 
     public void Dispose()

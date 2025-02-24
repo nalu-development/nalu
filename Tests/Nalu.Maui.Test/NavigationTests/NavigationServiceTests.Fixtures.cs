@@ -100,9 +100,20 @@ public partial class NavigationServiceTests
             return Task.CompletedTask;
         }
 
-        public void RemoveStackPages()
+        public void RemoveStackPages(int count = -1)
         {
-            // Not needed for tests.
+            EnsureStacks();
+            var navigationStack = _navigationStacks[CurrentContentIndex];
+
+            if (count < 0)
+            {
+                count = navigationStack.Count;
+            }
+
+            while(count > 1)
+            {
+                _navigationStacks.RemoveAt(_navigationStacks.Count - 1);
+            }
         }
 
         public void Push(Page page)
@@ -341,8 +352,7 @@ public partial class NavigationServiceTests
             .Returns(
                 callInfo =>
                 {
-                    var section = callInfo.Arg<IShellSectionProxy>() ?? (TestShellSectionProxy) _shellProxy.CurrentItem.CurrentSection;
-
+                    var section = (TestShellSectionProxy) (callInfo.Arg<IShellSectionProxy>() ?? _shellProxy.CurrentItem.CurrentSection);
                     return section.PopAsync();
                 }
             );
