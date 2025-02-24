@@ -1,6 +1,5 @@
 using System.Collections;
 using System.ComponentModel;
-using Nalu.Internals;
 
 namespace Nalu;
 
@@ -203,11 +202,10 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
             () =>
 #pragma warning restore IDE0053
             {
-                var shell = (Shell?) shellContent.Parent?.Parent?.Parent;
-                var serviceProvider = shell?.Handler?.GetServiceProvider() ?? throw new InvalidOperationException("Cannot provide shell content while detached from active Shell.");
+                var shell = (NaluShell?) shellContent.Parent?.Parent?.Parent ?? throw new InvalidOperationException("Cannot create ShellContent Page while detached from NaluShell.");
 
-                var navigationService = (NavigationService) (serviceProvider.GetService<INavigationService>() ??
-                                                             throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation()."));
+                var navigationService = shell.NavigationService;
+                var serviceProvider = navigationService.ServiceProvider;
 
                 var navigationConfiguration = serviceProvider.GetService<INavigationConfiguration>() ??
                                               throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");

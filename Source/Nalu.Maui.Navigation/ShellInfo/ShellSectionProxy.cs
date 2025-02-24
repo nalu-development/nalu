@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Text;
 
@@ -8,9 +9,10 @@ namespace Nalu;
 internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 {
     private readonly ShellSection _section;
+    private List<ShellContentProxy> _contents;
     public string SegmentName { get; }
     public IShellContentProxy CurrentContent { get; private set; }
-    public IReadOnlyList<IShellContentProxy> Contents { get; init; }
+    public IReadOnlyList<IShellContentProxy> Contents => _contents;
     public IShellItemProxy Parent { get; init; }
 
     public ShellSectionProxy(ShellSection section, IShellItemProxy parent)
@@ -19,9 +21,20 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 
         Parent = parent;
         SegmentName = section.Route;
-        Contents = section.Items.Select(i => new ShellContentProxy(i, this)).ToList();
+        _contents = section.Items.Select(i => new ShellContentProxy(i, this)).ToList();
         UpdateCurrentContent();
+
         section.PropertyChanged += SectionOnPropertyChanged;
+        if (section.Items is INotifyCollectionChanged observableCollection)
+        {
+            observableCollection.CollectionChanged += OnItemsCollectionChanged;
+        } 
+    }
+
+    private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        ShellProxyHelper.UpdateProxyItemsCollection<ShellContent, ShellContentProxy>(e, _contents, item => new ShellContentProxy(item, this));
+        UpdateCurrentContent();
     }
 
     public IEnumerable<NavigationStackPage> GetNavigationStack(IShellContentProxy? content = null)
@@ -70,29 +83,20 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
         }
     }
 
-    public Task PopAsync()
+    public void RemoveStackPages(int count = -1)
     {
         var navigation = _section.Navigation;
 
-        if (navigation.ModalStack.Count > 0)
+        if (count < 0)
         {
-            return navigation.PopModalAsync(true);
+            count = navigation.NavigationStack.Count - 1;
         }
 
-        var item = (ShellItem) _section.Parent;
-        var shell = (Shell) item.Parent;
-        var animated = shell.CurrentItem == item && item.CurrentItem == _section;
-
-        return navigation.PopAsync(animated);
-    }
-
-    public void RemoveStackPages()
-    {
-        var navigation = _section.Navigation;
-
-        while (navigation.NavigationStack.Count > 1)
+        while (count-- > 0)
         {
-            navigation.RemovePage(navigation.NavigationStack[^1]);
+            var pageToRemove = navigation.NavigationStack[^1];
+            MarkPageForRemoval(pageToRemove);
+            navigation.RemovePage(pageToRemove);
         }
     }
 
@@ -111,4 +115,15 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
         var currentSegmentName = _section.CurrentItem.Route;
         CurrentContent = Contents.First(c => c.SegmentName == currentSegmentName);
     }
+
+    
+    public static bool IsPageMarkedForRemoval(Page page) => (bool) page.GetValue(_navigationRemovalProperty);
+    private static void MarkPageForRemoval(Page page) => page.SetValue(_navigationRemovalProperty, true);
+    
+    private static readonly BindableProperty _navigationRemovalProperty = BindableProperty.CreateAttached(
+        "PageNavigationRemoval",
+        typeof(bool),
+        typeof(ShellSectionProxy),
+        false
+    );
 }

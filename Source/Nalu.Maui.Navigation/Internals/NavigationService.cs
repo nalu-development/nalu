@@ -18,6 +18,8 @@ internal class NavigationService : INavigationService, IDisposable
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
     public INavigationConfiguration Configuration { get; }
 
+    internal IServiceProvider ServiceProvider => _serviceProvider;
+
     public NavigationService(INavigationConfiguration configuration, IServiceProvider serviceProvider)
     {
         Configuration = configuration;
@@ -99,7 +101,7 @@ internal class NavigationService : INavigationService, IDisposable
                                             {
                                                 foreach (var toDispose in disposeBag)
                                                 {
-                                                    DisposePage(toDispose);
+                                                    DisposeElement(toDispose);
                                                 }
                                             }
                                         )
@@ -454,11 +456,12 @@ internal class NavigationService : INavigationService, IDisposable
         await NavigationHelper.SendEnteringAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
         await ShellProxy.SelectContentAsync(targetContent.SegmentName).ConfigureAwait(true);
 
-        if (!targetIsShellContent)
+        var targetSection = targetContent.Parent;
+        var targetStack = targetSection.GetNavigationStack(targetContent).ToList();
+        var relativeNavigation = ToRelativeNavigation(navigation, targetStack);
+
+        if (relativeNavigation.Count > 0)
         {
-            var targetSection = targetContent.Parent;
-            var targetStack = targetSection.GetNavigationStack(targetContent).ToList();
-            var relativeNavigation = ToRelativeNavigation(navigation, targetStack);
             var result = await ExecuteRelativeNavigationAsync(relativeNavigation, disposeBag, targetSection, targetStack, ignoreGuards: ignoreGuards).ConfigureAwait(true);
             await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
 
@@ -540,17 +543,13 @@ internal class NavigationService : INavigationService, IDisposable
         }
     }
 
-    private void DisposePage(object toDispose)
+    private void DisposeElement(object toDispose)
     {
         switch (toDispose)
         {
             case Page page:
             {
-                if (Environment.Version.Major < 9)
-                {
-                    DisconnectHandlerHelper.DisconnectHandlers(page);
-                }
-
+                DisconnectHandlerHelper.DisconnectHandlers(page);
                 PageNavigationContext.Dispose(page);
                 _leakDetector?.Track(page);
 

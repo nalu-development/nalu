@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.ComponentModel;
 
 namespace Nalu;
@@ -8,21 +9,41 @@ internal class ShellProxy : IShellProxy, IDisposable
     private readonly ShellRouteFactory _routeFactory = new();
     private readonly HashSet<string> _registeredSegments = [];
 
-    public IShellItemProxy CurrentItem { get; private set; } = null!;
-    public IReadOnlyList<IShellItemProxy> Items { get; private set; } = null!;
     private Dictionary<string, IShellContentProxy> _contentsBySegmentName = null!;
+    private List<ShellItemProxy> _items;
     private string? _navigationTarget;
     private bool _contentChanged;
     private IShellSectionProxy? _navigationCurrentSection;
+
+    public IShellItemProxy CurrentItem { get; private set; } = null!;
+    public IReadOnlyList<IShellItemProxy> Items => _items;
     public string State => _shell.CurrentState.Location.OriginalString;
 
     public ShellProxy(NaluShell shell)
     {
         _shell = shell;
+        _items = shell.Items.Select(i => new ShellItemProxy(i, this)).ToList();
+        ShellOnStructureChanged(shell, EventArgs.Empty);
+        UpdateCurrentItem();
 
-        UpdateItems();
-        shell.PropertyChanged += ShellOnPropertyChanged;
         ((IShellController) shell).StructureChanged += ShellOnStructureChanged;
+        shell.PropertyChanged += ShellOnPropertyChanged;
+        if (shell.Items is INotifyCollectionChanged observableCollection)
+        {
+            observableCollection.CollectionChanged += OnItemsCollectionChanged;
+        } 
+    }
+
+    private void ShellOnStructureChanged(object? sender, EventArgs e)
+        => _contentsBySegmentName = Items
+                                    .SelectMany(i => i.Sections)
+                                    .SelectMany(s => s.Contents)
+                                    .ToDictionary(c => c.SegmentName);
+
+    private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        ShellProxyHelper.UpdateProxyItemsCollection<ShellItem, ShellItemProxy>(e, _items, item => new ShellItemProxy(item, this));
+        UpdateCurrentItem();
     }
 
     public bool BeginNavigation()
@@ -43,13 +64,7 @@ internal class ShellProxy : IShellProxy, IDisposable
     {
         if (_navigationTarget is not { } targetState || targetState == _shell.CurrentState.Location.OriginalString)
         {
-            if (completeAction is not null)
-            {
-                _shell.SetIsNavigating(true);
-                completeAction();
-                _shell.SetIsNavigating(false);
-            }
-
+            completeAction?.Invoke();
             return;
         }
 
@@ -58,15 +73,7 @@ internal class ShellProxy : IShellProxy, IDisposable
         _contentChanged = false;
         _navigationCurrentSection = null;
 
-        try
-        {
-            _shell.SetIsNavigating(true);
-            await _shell.GoToAsync(targetState, true).ConfigureAwait(true);
-        }
-        finally
-        {
-            _shell.SetIsNavigating(false);
-        }
+        await _shell.GoToAsync(targetState + "?nalu", true).ConfigureAwait(true);
 
         await Task.Yield();
 
@@ -104,8 +111,13 @@ internal class ShellProxy : IShellProxy, IDisposable
     public Color GetToolbarIconColor(Page page) =>
         Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
 
-    public async Task PushAsync(string segmentName, Page page)
+    public Task PushAsync(string segmentName, Page page)
     {
+        if (_navigationTarget == null)
+        {
+            throw new NotSupportedException("PushAsync is not supported outside of a navigation batch");
+        }
+
         var baseRoute = _navigationTarget ?? _shell.CurrentState.Location.OriginalString;
         var finalRoute = $"{baseRoute}/{segmentName}";
 
@@ -118,54 +130,43 @@ internal class ShellProxy : IShellProxy, IDisposable
             _registeredSegments.Add(segmentName);
         }
 
-        if (_navigationTarget != null)
-        {
-            _navigationTarget = finalRoute;
-        }
-        else
-        {
-            try
-            {
-                _shell.SetIsNavigating(true);
-                await _shell.GoToAsync(finalRoute).ConfigureAwait(true);
-            }
-            finally
-            {
-                _shell.SetIsNavigating(false);
-            }
-        }
+        _navigationTarget = finalRoute;
+        
+        return Task.CompletedTask;
     }
 
-    public async Task PopAsync(IShellSectionProxy? section = null)
+    public Task PopAsync(IShellSectionProxy? section = null)
     {
+        if (_navigationTarget == null)
+        {
+            throw new NotSupportedException("PopAsync is not supported outside of a navigation batch");
+        }
+
         section ??= CurrentItem.CurrentSection;
 
-        if (section == _navigationCurrentSection && _navigationTarget != null)
+        if (section != _navigationCurrentSection)
         {
-            var previousSegmentEnd = _navigationTarget.LastIndexOf('/');
-            _navigationTarget = _navigationTarget[..previousSegmentEnd];
+            section.RemoveStackPages(1);
+            return Task.CompletedTask;
         }
-        else
-        {
-            try
-            {
-                _shell.SetIsNavigating(true);
-                await section.PopAsync().ConfigureAwait(true);
-            }
-            finally
-            {
-                _shell.SetIsNavigating(false);
-            }
-        }
+        
+        var previousSegmentEnd = _navigationTarget.LastIndexOf('/');
+        _navigationTarget = _navigationTarget[..previousSegmentEnd];
+        return Task.CompletedTask;
     }
 
-    public async Task SelectContentAsync(string segmentName)
+    public Task SelectContentAsync(string segmentName)
     {
+        if (_navigationTarget is null)
+        {
+            throw new NotSupportedException("SelectContentAsync is not supported outside of a navigation batch");
+        }
+
         var contentProxy = (ShellContentProxy) GetContent(segmentName);
 
         if (CurrentItem.CurrentSection.CurrentContent == contentProxy)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         _contentChanged = true;
@@ -173,39 +174,10 @@ internal class ShellProxy : IShellProxy, IDisposable
         var section = (ShellSection) content.Parent;
         var item = (ShellItem) section.Parent;
 
-        if (_navigationTarget is not null)
-        {
-            _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
-                                ?? $"//{item.Route}/{section.Route}/{content.Route}";
+        _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
+                            ?? $"//{item.Route}/{section.Route}/{content.Route}";
 
-            return;
-        }
-
-        try
-        {
-            _shell.SetIsNavigating(true);
-
-            if (section.CurrentItem != content)
-            {
-                section.CurrentItem = content;
-            }
-
-            if (item.CurrentItem != section)
-            {
-                item.CurrentItem = section;
-            }
-
-            if (_shell.CurrentItem != item)
-            {
-                _shell.CurrentItem = item;
-            }
-
-            await Task.Delay(500).ConfigureAwait(true);
-        }
-        finally
-        {
-            _shell.SetIsNavigating(false);
-        }
+        return Task.CompletedTask;
     }
 
     public void InitializeWithContent(string segmentName)
@@ -222,28 +194,19 @@ internal class ShellProxy : IShellProxy, IDisposable
         var section = (ShellSection) content.Parent;
         var item = (ShellItem) section.Parent;
 
-        try
+        if (section.CurrentItem != content)
         {
-            _shell.SetIsNavigating(true);
-
-            if (section.CurrentItem != content)
-            {
-                section.CurrentItem = content;
-            }
-
-            if (item.CurrentItem != section)
-            {
-                item.CurrentItem = section;
-            }
-
-            if (_shell.CurrentItem != item)
-            {
-                _shell.CurrentItem = item;
-            }
+            section.CurrentItem = content;
         }
-        finally
+
+        if (item.CurrentItem != section)
         {
-            _shell.SetIsNavigating(false);
+            item.CurrentItem = section;
+        }
+
+        if (_shell.CurrentItem != item)
+        {
+            _shell.CurrentItem = item;
         }
     }
 
@@ -255,10 +218,11 @@ internal class ShellProxy : IShellProxy, IDisposable
         }
 
         _shell.PropertyChanged -= ShellOnPropertyChanged;
-        ((IShellController) _shell).StructureChanged -= ShellOnStructureChanged;
+        if (_shell.Items is INotifyCollectionChanged observableCollection)
+        {
+            observableCollection.CollectionChanged -= OnItemsCollectionChanged;
+        }
     }
-
-    private void ShellOnStructureChanged(object? sender, EventArgs e) => UpdateItems();
 
     private void ShellOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -266,26 +230,6 @@ internal class ShellProxy : IShellProxy, IDisposable
         {
             UpdateCurrentItem();
         }
-    }
-
-    private void UpdateItems()
-    {
-        if (Items is { } items)
-        {
-            foreach (var itemInfo in items)
-            {
-                ((IDisposable) itemInfo).Dispose();
-            }
-        }
-
-        Items = _shell.Items.Select(i => new ShellItemProxy(i, this)).ToList();
-
-        _contentsBySegmentName = Items
-                                 .SelectMany(i => i.Sections)
-                                 .SelectMany(s => s.Contents)
-                                 .ToDictionary(c => c.SegmentName);
-
-        UpdateCurrentItem();
     }
 
     private void UpdateCurrentItem()

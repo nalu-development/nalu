@@ -26,6 +26,8 @@ internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDispo
         return pageNavigationContext;
     }
 
+    public static bool HasNavigationContext(Page page) => page.GetValue(_navigationContextProperty) is not null;
+
     public static void Set(Page page, PageNavigationContext? context) => page.SetValue(_navigationContextProperty, context);
 
     public static void Dispose(Page page)
