@@ -84,7 +84,15 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     }
 
     /// <inheritdoc />
-    public string Path => IsAbsolute ? "//" + string.Join('/', _list) : string.Join('/', _list);
+    public string Path
+    {
+        get
+        {
+            var path = string.Join('/', _list);
+
+            return IsAbsolute ? "//" + path : path;
+        }
+    }
 
     /// <inheritdoc cref="ICollection{T}.Count" />
     public int Count => _list.Count;
@@ -111,6 +119,17 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     {
         IsAbsolute = isAbsolute;
         Behavior = behavior;
+    }
+
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        if (Intent == null)
+        {
+            return Path;
+        }
+
+        return $"{Path}?({Intent.GetType().Name})";
     }
 
     /// <inheritdoc cref="IEnumerable{T}.GetEnumerator" />

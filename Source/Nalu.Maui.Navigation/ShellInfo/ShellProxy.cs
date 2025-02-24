@@ -155,6 +155,8 @@ internal class ShellProxy : IShellProxy, IDisposable
         return Task.CompletedTask;
     }
 
+    public void SendNavigationLifecycleEvent(NavigationLifecycleEventArgs args) => _shell.SendNavigationLifecycleEvent(args);
+
     public Task SelectContentAsync(string segmentName)
     {
         if (_navigationTarget is null)

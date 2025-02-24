@@ -49,7 +49,7 @@ internal class NavigationService : INavigationService, IDisposable
 
         NavigationHelper.AssertIntent(page, intent, content.DestroyContent);
 
-        var enteringTask = NavigationHelper.SendEnteringAsync(page, intent, Configuration).AsTask();
+        var enteringTask = NavigationHelper.SendEnteringAsync(ShellProxy, page, intent, Configuration).AsTask();
 
         if (!enteringTask.IsCompleted)
         {
@@ -61,7 +61,7 @@ internal class NavigationService : INavigationService, IDisposable
         await enteringTask.ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
-        await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);
+        await NavigationHelper.SendAppearingAsync(ShellProxy, page, intent, Configuration).ConfigureAwait(true);
     }
 
     public async Task<bool> GoToAsync(INavigationInfo navigation)
@@ -82,17 +82,25 @@ internal class NavigationService : INavigationService, IDisposable
                         await Task.Delay(TimeSpan.FromMilliseconds(60), _timeProvider).ConfigureAwait(true);
                     }
 
+                    var targetState = GetTargetState(Configuration, navigation);
+                    shellProxy.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.NavigationRequested, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State)));
+
                     shellProxy.BeginNavigation();
 
                     try
                     {
                         var ignoreGuards = navigation.Behavior?.HasFlag(NavigationBehavior.IgnoreGuards) ?? false;
 
-                        return await (navigation switch
+                        var result = await (navigation switch
                         {
                             { IsAbsolute: true } => ExecuteAbsoluteNavigationAsync(navigation, disposeBag, ignoreGuards).ConfigureAwait(true),
                             _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards).ConfigureAwait(true)
                         });
+
+                        var navigationLifecycleEventType = result ? NavigationLifecycleEventType.NavigationCompleted : NavigationLifecycleEventType.NavigationFailed;
+                        shellProxy.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(navigationLifecycleEventType, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State)));
+
+                        return result;
                     }
                     finally
                     {
@@ -206,8 +214,8 @@ internal class NavigationService : INavigationService, IDisposable
                     await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
                     shellProxy.BeginNavigation();
 
-                    await NavigationHelper.SendAppearingAsync(stackPage.Page, null, Configuration).ConfigureAwait(true);
-                    var canLeave = await NavigationHelper.CanLeaveAsync(stackPage.Page).ConfigureAwait(true);
+                    await NavigationHelper.SendAppearingAsync(ShellProxy, stackPage.Page, null, Configuration).ConfigureAwait(true);
+                    var canLeave = await NavigationHelper.CanLeaveAsync(ShellProxy, stackPage.Page).ConfigureAwait(true);
 
                     if (!canLeave)
                     {
@@ -215,8 +223,8 @@ internal class NavigationService : INavigationService, IDisposable
                     }
                 }
 
-                await NavigationHelper.SendDisappearingAsync(stackPage.Page).ConfigureAwait(true);
-                await NavigationHelper.SendLeavingAsync(stackPage.Page).ConfigureAwait(true);
+                await NavigationHelper.SendDisappearingAsync(ShellProxy, stackPage.Page).ConfigureAwait(true);
+                await NavigationHelper.SendLeavingAsync(ShellProxy, stackPage.Page).ConfigureAwait(true);
 
                 stack.RemoveAt(stack.Count - 1);
                 await shellProxy.PopAsync(section).ConfigureAwait(true);
@@ -225,14 +233,14 @@ internal class NavigationService : INavigationService, IDisposable
             }
             else
             {
-                await NavigationHelper.SendDisappearingAsync(stackPage.Page).ConfigureAwait(true);
+                await NavigationHelper.SendDisappearingAsync(ShellProxy, stackPage.Page).ConfigureAwait(true);
                 var pageType = NavigationHelper.GetPageType(segment.Type, Configuration);
                 var segmentName = segment.SegmentName ?? NavigationSegmentAttribute.GetSegmentName(pageType);
 
                 var page = CreatePage(pageType, stackPage.Page, Configuration.BackImage);
 
                 var isModal = Shell.GetPresentationMode(page).HasFlag(PresentationMode.Modal);
-                await NavigationHelper.SendEnteringAsync(page, intent, Configuration).ConfigureAwait(true);
+                await NavigationHelper.SendEnteringAsync(ShellProxy, page, intent, Configuration).ConfigureAwait(true);
                 await shellProxy.PushAsync(segmentName, page).ConfigureAwait(true);
                 stack.Add(new NavigationStackPage($"{stackPage.Route}/{segmentName}", segmentName, page, isModal));
             }
@@ -247,7 +255,7 @@ internal class NavigationService : INavigationService, IDisposable
             shellProxy.BeginNavigation();
 
             NavigationHelper.AssertIntent(page, intent);
-            await NavigationHelper.SendAppearingAsync(page, intent, Configuration).ConfigureAwait(true);
+            await NavigationHelper.SendAppearingAsync(ShellProxy, page, intent, Configuration).ConfigureAwait(true);
         }
 
         return true;
@@ -379,7 +387,7 @@ internal class NavigationService : INavigationService, IDisposable
                 if (leaveMode == ContentLeaveMode.None)
                 {
                     await EnsureContentIsSelectedAsync().ConfigureAwait(true);
-                    await NavigationHelper.SendDisappearingAsync(navigationStack[^1].Page).ConfigureAwait(true);
+                    await NavigationHelper.SendDisappearingAsync(ShellProxy, navigationStack[^1].Page).ConfigureAwait(true);
 
                     continue;
                 }
@@ -414,16 +422,16 @@ internal class NavigationService : INavigationService, IDisposable
                     await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
                     shellProxy.BeginNavigation();
 
-                    await NavigationHelper.SendAppearingAsync(contentPage, null, Configuration).ConfigureAwait(true);
+                    await NavigationHelper.SendAppearingAsync(ShellProxy, contentPage, null, Configuration).ConfigureAwait(true);
 
-                    if (!await NavigationHelper.CanLeaveAsync(contentPage).ConfigureAwait(true))
+                    if (!await NavigationHelper.CanLeaveAsync(ShellProxy, contentPage).ConfigureAwait(true))
                     {
                         return false;
                     }
                 }
 
-                await NavigationHelper.SendDisappearingAsync(contentPage).ConfigureAwait(true);
-                await NavigationHelper.SendLeavingAsync(contentPage).ConfigureAwait(true);
+                await NavigationHelper.SendDisappearingAsync(ShellProxy, contentPage).ConfigureAwait(true);
+                await NavigationHelper.SendLeavingAsync(ShellProxy, contentPage).ConfigureAwait(true);
 
                 if (leaveMode == ContentLeaveMode.Destroy)
                 {
@@ -453,7 +461,7 @@ internal class NavigationService : INavigationService, IDisposable
         var targetContentPage = targetContent.GetOrCreateContent();
         var targetIsShellContent = navigation.Count == 1;
         var intent = targetIsShellContent ? navigation.Intent : null;
-        await NavigationHelper.SendEnteringAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
+        await NavigationHelper.SendEnteringAsync(ShellProxy, targetContentPage, intent, Configuration).ConfigureAwait(true);
         await ShellProxy.SelectContentAsync(targetContent.SegmentName).ConfigureAwait(true);
 
         var targetSection = targetContent.Parent;
@@ -469,7 +477,7 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
-        await NavigationHelper.SendAppearingAsync(targetContentPage, intent, Configuration).ConfigureAwait(true);
+        await NavigationHelper.SendAppearingAsync(ShellProxy, targetContentPage, intent, Configuration).ConfigureAwait(true);
 
         return true;
     }
@@ -594,5 +602,17 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         return navigation;
+    }
+
+    private static string GetTargetState(INavigationConfiguration configuration, INavigationInfo navigation)
+    {
+        var target = (navigation.IsAbsolute ? "//" : "./") + string.Join('/', navigation.Select(s => s.Type != null ? NavigationHelper.GetPageType(s.Type, configuration).Name : s.SegmentName));
+
+        if (navigation.Intent is { } intent)
+        {
+            target += $"?({intent.GetType().Name})";
+        }
+
+        return target;
     }
 }

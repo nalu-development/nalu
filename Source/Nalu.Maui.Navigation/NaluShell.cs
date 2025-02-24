@@ -18,6 +18,11 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     private bool _initialized;
     private ShellProxy? _shellProxy;
 
+    /// <summary>
+    /// Occurs when a navigation event is triggered.
+    /// </summary>
+    public event EventHandler<NavigationLifecycleEventArgs>? NavigationEvent;
+
     internal NavigationService NavigationService { get; }
 
     IShellProxy INaluShell.ShellProxy => _shellProxy ?? throw new InvalidOperationException("The shell info is not available yet.");
@@ -215,6 +220,8 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
         return isRemovingStackPages;
     }
+
+    internal void SendNavigationLifecycleEvent(NavigationLifecycleEventArgs args) => NavigationEvent?.Invoke(this, args);
 
     private void DispatchNavigation(INavigationInfo navigation) =>
         Dispatcher.Dispatch(() => NavigationService.GoToAsync(navigation).FireAndForget(Handler));
