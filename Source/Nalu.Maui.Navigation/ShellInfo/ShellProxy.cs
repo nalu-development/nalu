@@ -1,9 +1,10 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 
 namespace Nalu;
 
-internal class ShellProxy : IShellProxy, IDisposable
+internal partial class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
     private readonly ShellRouteFactory _routeFactory = new();
@@ -74,6 +75,26 @@ internal class ShellProxy : IShellProxy, IDisposable
         _navigationTarget = null;
         _contentChanged = false;
         _navigationCurrentSection = null;
+
+        var currentState = _shell.CurrentState.Location.OriginalString;
+        var currentContentState = TrimRouteToContent(currentState);
+        var targetContentState = TrimRouteToContent(targetState);
+
+        if (targetContentState.StartsWith(currentContentState))
+        {
+            if (targetContentState.Length != currentContentState.Length)
+            {
+                var commonPathLength = currentContentState.Length + 1; // includes path separator which we don't want
+                targetState = targetContentState[commonPathLength..];
+            }
+
+            // else: do nothing, we're already at the target state
+        }
+        else if (currentContentState.StartsWith(targetContentState))
+        {
+            var popCount = currentContentState[targetContentState.Length..].Count(c => c == '/');
+            targetState = string.Concat(Enumerable.Repeat("../", popCount));
+        }
 
         await _shell.GoToAsync(targetState + "?nalu", true).ConfigureAwait(true);
 
@@ -244,4 +265,9 @@ internal class ShellProxy : IShellProxy, IDisposable
         var currentSegmentName = _shell.CurrentItem.Route;
         CurrentItem = Items.First(i => i.SegmentName == currentSegmentName);
     }
+    
+    private static string TrimRouteToContent(string uri) => TrimRouteToContentRegex().Replace(uri, string.Empty);
+
+    [GeneratedRegex("^//[^/]+/[^/]+/")]
+    private static partial Regex TrimRouteToContentRegex();
 }
