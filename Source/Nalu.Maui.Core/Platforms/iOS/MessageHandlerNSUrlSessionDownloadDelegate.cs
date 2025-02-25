@@ -374,7 +374,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var acknowledgeTasks = _processingInBackgroundHandles.Values.Select(h => h.CompletedTask).ToList();
-        await Task.WhenAny(Task.WhenAll(acknowledgeTasks), Task.Delay(maxWaitTime)).ConfigureAwait(false);
+        await Task.WhenAny(Task.WhenAll(acknowledgeTasks), Task.Delay(Math.Max(500, maxWaitTime))).ConfigureAwait(false);
 
         _processingInBackgroundHandles.Clear();
         _processingInBackgroundCompletionHandler = null;

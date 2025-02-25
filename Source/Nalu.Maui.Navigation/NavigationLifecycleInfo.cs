@@ -11,9 +11,14 @@ public class NavigationLifecycleInfo
     public INavigationInfo Navigation { get; }
 
     /// <summary>
-    /// Gets the requested state of the navigation.
+    /// Gets the requested navigation.
     /// </summary>
-    public string RequestedState { get; }
+    public string RequestedNavigation { get; }
+
+    /// <summary>
+    /// Gets the target state of the navigation.
+    /// </summary>
+    public string TargetState { get; }
 
     /// <summary>
     /// Gets the current state of the navigation.
@@ -24,12 +29,14 @@ public class NavigationLifecycleInfo
     /// Initializes a new instance of the <see cref="NavigationLifecycleInfo" /> class.
     /// </summary>
     /// <param name="navigation">The requested navigation object.</param>
-    /// <param name="requestedState">The requested navigation state.</param>
+    /// <param name="requestedNavigation">The requested navigation.</param>
+    /// <param name="targetState">The target navigation state.</param>
     /// <param name="currentState">The current navigation state.</param>
-    public NavigationLifecycleInfo(INavigationInfo navigation, string requestedState, string currentState)
+    public NavigationLifecycleInfo(INavigationInfo navigation, string requestedNavigation, string targetState, string currentState)
     {
         Navigation = navigation;
-        RequestedState = requestedState;
+        RequestedNavigation = requestedNavigation;
+        TargetState = targetState;
         CurrentState = currentState;
     }
 }

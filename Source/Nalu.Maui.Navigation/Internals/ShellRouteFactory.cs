@@ -8,7 +8,7 @@ internal class ShellRouteFactory
     {
         if (!_factories.TryGetValue(pageType, out var factory))
         {
-            factory = new TypeRouteFactory();
+            factory = new TypeRouteFactory(pageType);
             _factories[pageType] = factory;
         }
 

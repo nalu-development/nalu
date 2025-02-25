@@ -81,10 +81,14 @@ internal class NavigationService : INavigationService, IDisposable
                         await Task.Delay(TimeSpan.FromMilliseconds(60), _timeProvider).ConfigureAwait(true);
                     }
 
-                    var targetState = GetTargetState(Configuration, navigation);
+                    var initialState = ComputeCurrentState(shellProxy);
+                    var (requestedNavigation, targetState) = ComputeNavigationState(Configuration, navigation, initialState);
 
                     shellProxy.SendNavigationLifecycleEvent(
-                        new NavigationLifecycleEventArgs(NavigationLifecycleEventType.NavigationRequested, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State))
+                        new NavigationLifecycleEventArgs(
+                            NavigationLifecycleEventType.NavigationRequested,
+                            new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, initialState)
+                        )
                     );
 
                     shellProxy.BeginNavigation();
@@ -102,10 +106,25 @@ internal class NavigationService : INavigationService, IDisposable
                         var navigationLifecycleEventType = result ? NavigationLifecycleEventType.NavigationCompleted : NavigationLifecycleEventType.NavigationFailed;
 
                         shellProxy.SendNavigationLifecycleEvent(
-                            new NavigationLifecycleEventArgs(navigationLifecycleEventType, new NavigationLifecycleInfo(navigation, targetState, shellProxy.State))
+                            new NavigationLifecycleEventArgs(
+                                navigationLifecycleEventType,
+                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, ComputeCurrentState(shellProxy))
+                            )
                         );
 
                         return result;
+                    }
+                    catch (Exception ex)
+                    {
+                        shellProxy.SendNavigationLifecycleEvent(
+                            new NavigationLifecycleEventArgs(
+                                NavigationLifecycleEventType.NavigationFailed,
+                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, ComputeCurrentState(shellProxy)),
+                                data: ex
+                            )
+                        );
+
+                        throw;
                     }
                     finally
                     {
@@ -609,18 +628,34 @@ internal class NavigationService : INavigationService, IDisposable
         return navigation;
     }
 
-    private static string GetTargetState(INavigationConfiguration configuration, INavigationInfo navigation)
+    private static (string RequestedNavigation, string TargetState) ComputeNavigationState(INavigationConfiguration configuration, INavigationInfo navigation, string initialState)
     {
-        var target = (navigation.IsAbsolute ? "//" : "./") + string.Join(
-            '/',
-            navigation.Select(s => s.Type != null ? NavigationHelper.GetPageType(s.Type, configuration).Name : s.SegmentName)
-        );
+        string requestedNavigation;
+        string targetState;
+
+        var segments = navigation.Select(s => s.Type != null ? NavigationHelper.GetPageType(s.Type, configuration).Name : s.SegmentName).ToArray();
+
+        if (navigation.IsAbsolute)
+        {
+            requestedNavigation = targetState = $"//{string.Join('/', segments)}";
+        }
+        else
+        {
+            var currentSegments = initialState.Split('/', StringSplitOptions.RemoveEmptyEntries).ToArray();
+            var popCount = segments.Count(segment => segment == NavigationPop.PopRoute);
+            var maintainedSegmentsCount = currentSegments.Length - popCount;
+            var pushBase = maintainedSegmentsCount > 0 ? currentSegments.Take(maintainedSegmentsCount) : [];
+            requestedNavigation = $"{string.Join('/', segments)}";
+            targetState = $"//{string.Join('/', pushBase.Concat(segments))}";
+        }
 
         if (navigation.Intent is { } intent)
         {
-            target += $"?({intent.GetType().Name})";
+            requestedNavigation += $"?Intent={intent.GetType().Name}";
         }
 
-        return target;
+        return (requestedNavigation, targetState);
     }
+
+    private static string ComputeCurrentState(IShellProxy shellProxy) => "//" + string.Join('/', shellProxy.State.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(2));
 }
