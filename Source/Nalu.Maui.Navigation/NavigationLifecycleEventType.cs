@@ -16,6 +16,16 @@ public enum NavigationLifecycleEventType
     NavigationCompleted,
 
     /// <summary>
+    /// Triggered when a navigation request is canceled.
+    /// </summary>
+    NavigationCanceled,
+
+    /// <summary>
+    /// Triggered when a navigation request is ignored because it has been triggered on a different navigation state.
+    /// </summary>
+    NavigationIgnored,
+
+    /// <summary>
     /// Triggered when a navigation request fails.
     /// </summary>
     NavigationFailed,

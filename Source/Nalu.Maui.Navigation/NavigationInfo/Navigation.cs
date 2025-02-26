@@ -231,7 +231,7 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
                                               throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
 
                 var pageType = NavigationHelper.GetPageType(type, navigationConfiguration);
-                var page = navigationService.CreatePage(pageType, null, navigationConfiguration.MenuImage);
+                var page = navigationService.CreatePage(pageType, null);
 
                 return page;
             }

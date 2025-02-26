@@ -128,11 +128,20 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         return base.OnBackButtonPressed();
     }
 
-    /// <inheritdoc />
-    protected override void OnNavigating(ShellNavigatingEventArgs args)
-    {
-        base.OnNavigating(args);
+    /// <summary>
+    /// Triggered when a navigation is about to happen.
+    /// </summary>
+    /// <remarks>
+    /// Gives the ability to cancel the navigation.
+    /// </remarks>
+    /// <param name="args"></param>
+    protected virtual void OnNavigating(NaluShellNavigatingEventArgs args) { }
 
+    internal void SendOnNavigating(NaluShellNavigatingEventArgs args) => OnNavigating(args);
+
+    /// <inheritdoc />
+    protected sealed override void OnNavigating(ShellNavigatingEventArgs args)
+    {
         var uri = args.Target.Location.OriginalString;
 
         if (!_initialized || // Shell initialization process

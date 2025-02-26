@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
+using Microsoft.Extensions.Logging;
 using Nalu.Internals;
 
 namespace Nalu;
@@ -12,6 +14,7 @@ internal class NavigationService : INavigationService, IDisposable
     private readonly AsyncLocal<StrongBox<bool>> _isNavigating = new();
     private readonly LeakDetector? _leakDetector;
     private readonly TimeProvider _timeProvider;
+    private readonly ICommand _backCommand;
     private IShellProxy? _shellProxy;
 
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
@@ -21,15 +24,24 @@ internal class NavigationService : INavigationService, IDisposable
 
     public NavigationService(INavigationConfiguration configuration, IServiceProvider serviceProvider)
     {
+        var logger = serviceProvider.GetService<ILogger<NavigationService>>(); // TODO: add log messages all around in this class
+
         Configuration = configuration;
         ServiceProvider = serviceProvider;
         _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
+        _backCommand = new Command(NavigateBack);
 
         var trackLeaks
             = (Configuration.LeakDetectorState == NavigationLeakDetectorState.EnabledWithDebugger && Debugger.IsAttached) ||
               Configuration.LeakDetectorState == NavigationLeakDetectorState.Enabled;
 
         _leakDetector = trackLeaks ? new LeakDetector() : null;
+
+        void NavigateBack()
+        {
+            var popNavigation = Navigation.Relative().Pop();
+            GoToAsync(popNavigation).FireAndForget(logger);
+        }
     }
 
     public void Dispose()
@@ -74,14 +86,14 @@ internal class NavigationService : INavigationService, IDisposable
         var shellProxy = ShellProxy;
 
         return await ExecuteNavigationAsync(
-                async () =>
+                navigation,
+                async initialState =>
                 {
                     if (navigation.Behavior?.HasFlag(NavigationBehavior.Immediate) != true)
                     {
                         await Task.Delay(TimeSpan.FromMilliseconds(60), _timeProvider).ConfigureAwait(true);
                     }
 
-                    var initialState = ComputeCurrentState(shellProxy);
                     var (requestedNavigation, targetState) = ComputeNavigationState(Configuration, navigation, initialState);
 
                     shellProxy.SendNavigationLifecycleEvent(
@@ -90,6 +102,19 @@ internal class NavigationService : INavigationService, IDisposable
                             new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, initialState)
                         )
                     );
+
+                    // Propose the navigation to the shell
+                    if (!shellProxy.ProposeNavigation(navigation))
+                    {
+                        shellProxy.SendNavigationLifecycleEvent(
+                            new NavigationLifecycleEventArgs(
+                                NavigationLifecycleEventType.NavigationCanceled,
+                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, initialState)
+                            )
+                        );
+
+                        return false;
+                    }
 
                     shellProxy.BeginNavigation();
 
@@ -103,12 +128,12 @@ internal class NavigationService : INavigationService, IDisposable
                             _ => ExecuteRelativeNavigationAsync(navigation, disposeBag, ignoreGuards: ignoreGuards).ConfigureAwait(true)
                         });
 
-                        var navigationLifecycleEventType = result ? NavigationLifecycleEventType.NavigationCompleted : NavigationLifecycleEventType.NavigationFailed;
+                        var navigationLifecycleEventType = result ? NavigationLifecycleEventType.NavigationCompleted : NavigationLifecycleEventType.NavigationCanceled;
 
                         shellProxy.SendNavigationLifecycleEvent(
                             new NavigationLifecycleEventArgs(
                                 navigationLifecycleEventType,
-                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, ComputeCurrentState(shellProxy))
+                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, shellProxy.State)
                             )
                         );
 
@@ -119,7 +144,7 @@ internal class NavigationService : INavigationService, IDisposable
                         shellProxy.SendNavigationLifecycleEvent(
                             new NavigationLifecycleEventArgs(
                                 NavigationLifecycleEventType.NavigationFailed,
-                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, ComputeCurrentState(shellProxy)),
+                                new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, shellProxy.State),
                                 data: ex
                             )
                         );
@@ -144,7 +169,7 @@ internal class NavigationService : INavigationService, IDisposable
             .ConfigureAwait(true);
     }
 
-    internal Page CreatePage(Type pageType, Page? parentPage, ImageSource? backButtonImage = null)
+    internal Page CreatePage(Type pageType, Page? parentPage)
     {
         var serviceScope = ServiceProvider.CreateScope();
 
@@ -156,7 +181,8 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         var page = (Page) serviceScope.ServiceProvider.GetRequiredService(pageType);
-        ConfigureBackButtonBehavior(page, backButtonImage);
+        var isRoot = parentPage is null;
+        ConfigureBackButtonBehavior(page, isRoot);
 
         var pageContext = new PageNavigationContext(serviceScope);
 
@@ -165,9 +191,11 @@ internal class NavigationService : INavigationService, IDisposable
         return page;
     }
 
-    internal static void ConfigureBackButtonBehavior(Page page, ImageSource? backButtonImage)
+    private void ConfigureBackButtonBehavior(Page page, bool isRoot)
     {
-        if (backButtonImage is null)
+        var backButtonImage = isRoot ? Configuration.MenuImage : Configuration.BackImage;
+
+        if (backButtonImage is null && isRoot)
         {
             return;
         }
@@ -176,16 +204,18 @@ internal class NavigationService : INavigationService, IDisposable
 
         if (backButtonBehavior is null)
         {
-            backButtonBehavior = new BackButtonBehavior
-                                 {
-                                     IconOverride = backButtonImage
-                                 };
-
+            backButtonBehavior = new BackButtonBehavior();
             Shell.SetBackButtonBehavior(page, backButtonBehavior);
         }
-        else
+
+        if (backButtonImage is not null)
         {
             backButtonBehavior.IconOverride = backButtonImage;
+        }
+
+        if (!isRoot)
+        {
+            backButtonBehavior.Command = _backCommand;
         }
     }
 
@@ -261,7 +291,7 @@ internal class NavigationService : INavigationService, IDisposable
                 var pageType = NavigationHelper.GetPageType(segment.Type, Configuration);
                 var segmentName = segment.SegmentName ?? NavigationSegmentAttribute.GetSegmentName(pageType);
 
-                var page = CreatePage(pageType, stackPage.Page, Configuration.BackImage);
+                var page = CreatePage(pageType, stackPage.Page);
 
                 var isModal = Shell.GetPresentationMode(page).HasFlag(PresentationMode.Modal);
                 await NavigationHelper.SendEnteringAsync(ShellProxy, page, intent, Configuration).ConfigureAwait(true);
@@ -539,7 +569,7 @@ internal class NavigationService : INavigationService, IDisposable
         return relativeNavigation;
     }
 
-    private async Task<bool> ExecuteNavigationAsync(Func<Task<bool>> navigationFunc)
+    private async Task<bool> ExecuteNavigationAsync(INavigationInfo navigation, Func<string, Task<bool>> navigationFunc)
     {
         if (_isNavigating.Value is { Value: true })
         {
@@ -551,9 +581,20 @@ internal class NavigationService : INavigationService, IDisposable
 
         await _semaphore.WaitAsync().ConfigureAwait(true);
 
-        if (initialState != shellProxy.State)
+        var currentState = shellProxy.State;
+
+        if (initialState != currentState)
         {
             // State has changed, abort the navigation
+            var (requestedNavigation, targetState) = ComputeNavigationState(Configuration, navigation, initialState);
+
+            shellProxy.SendNavigationLifecycleEvent(
+                new NavigationLifecycleEventArgs(
+                    NavigationLifecycleEventType.NavigationIgnored,
+                    new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, currentState)
+                )
+            );
+
             _semaphore.Release();
 
             return false;
@@ -563,7 +604,7 @@ internal class NavigationService : INavigationService, IDisposable
 
         try
         {
-            var result = await navigationFunc().ConfigureAwait(true);
+            var result = await navigationFunc(initialState).ConfigureAwait(true);
 
             return result;
         }
@@ -646,7 +687,7 @@ internal class NavigationService : INavigationService, IDisposable
             var maintainedSegmentsCount = currentSegments.Length - popCount;
             var pushBase = maintainedSegmentsCount > 0 ? currentSegments.Take(maintainedSegmentsCount) : [];
             requestedNavigation = $"{string.Join('/', segments)}";
-            targetState = $"//{string.Join('/', pushBase.Concat(segments))}";
+            targetState = $"//{string.Join('/', pushBase.Concat(segments.Skip(popCount)))}";
         }
 
         if (navigation.Intent is { } intent)
@@ -656,6 +697,4 @@ internal class NavigationService : INavigationService, IDisposable
 
         return (requestedNavigation, targetState);
     }
-
-    private static string ComputeCurrentState(IShellProxy shellProxy) => "//" + string.Join('/', shellProxy.State.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(2));
 }

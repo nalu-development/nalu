@@ -280,6 +280,7 @@ public partial class NavigationServiceTests
 
         _shellProxy.Items.Returns(items);
         _shellProxy.CurrentItem.Returns(items[0]);
+        _shellProxy.ProposeNavigation(Arg.Any<INavigationInfo>()).Returns(true);
 
         _shellProxy.CommitNavigationAsync(Arg.Any<Action>())
                    .Returns(
