@@ -28,7 +28,7 @@
                    Grid.RowSpan="2"
                    Margin="16,4"
                    Source="{FontImageSource Glyph={Binding CurrentAirQuality.Icon},
-                                        FontFamily=MaterialOutlined,
+                                        FontFamily=Material,
                                         Color={Binding CurrentAirQuality.IconColor},
                                         Size=64}" />
             <Label FontSize="16"
@@ -80,7 +80,7 @@
                                                Grid.RowSpan="2"
                                                Margin="8,0"
                                                Source="{FontImageSource Glyph={Binding Icon},
-                                                            FontFamily=MaterialOutlined,
+                                                            FontFamily=Material,
                                                             Color={Binding IconColor},
                                                             Size=24}" />
                                         <Label Grid.Column="1"

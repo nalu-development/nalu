@@ -37,7 +37,7 @@
                                    Grid.RowSpan="2"
                                    Margin="0,0,8,0"
                                    Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
-                                                FontFamily=MaterialOutlined,
+                                                FontFamily=Material,
                                                 Color={StaticResource Secondary},
                                                 Size=40}" />
                             <Label Grid.Column="2"
@@ -57,7 +57,7 @@
                                     <FormattedString>
                                         <Span Text="{Binding RainSumMm}" Style="{StaticResource SecondarySpan}" />
                                         <Span Text=" " />
-                                        <Span Text="&#xe798;" FontFamily="MaterialOutlined" Style="{StaticResource SecondarySpan}" />
+                                        <Span Text="&#xe798;" FontFamily="Material" Style="{StaticResource SecondarySpan}" />
                                     </FormattedString>
                                 </Label.FormattedText>
                             </Label>
@@ -70,7 +70,7 @@
                                     <FormattedString>
                                         <Span Text="{Binding WindSpeedKmh}" Style="{StaticResource SecondarySpan}" />
                                         <Span Text=" " />
-                                        <Span Text="&#xefd8;" FontFamily="MaterialOutlined" Style="{StaticResource SecondarySpan}" />
+                                        <Span Text="&#xefd8;" FontFamily="Material" Style="{StaticResource SecondarySpan}" />
                                     </FormattedString>
                                 </Label.FormattedText>
                             </Label>

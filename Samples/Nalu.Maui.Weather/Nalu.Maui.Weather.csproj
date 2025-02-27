@@ -60,7 +60,7 @@
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
-        <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.30"/>
+        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0"/>
         <PackageReference Include="OpenMeteo.dotnet" Version="2.0.0" />
     </ItemGroup>

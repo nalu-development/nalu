@@ -19,7 +19,7 @@
         <Image Grid.Column="1"
                Margin="16"
                Source="{FontImageSource Glyph={Binding CurrentWeather.WeatherCode, Converter={StaticResource WeatherIconConverter}},
-                                                FontFamily=MaterialOutlined,
+                                                FontFamily=Material,
                                                 Color={StaticResource White},
                                                 Size=64}" />
         <Label Grid.Column="2"
@@ -52,7 +52,7 @@
                                FontSize="12" />
                         <Image Margin="12,8"
                                Source="{FontImageSource Glyph={Binding WeatherCode, Converter={StaticResource WeatherIconConverter}},
-                                                FontFamily=MaterialOutlined,
+                                                FontFamily=Material,
                                                 Color={StaticResource Secondary},
                                                 Size=24}" />
                     </VerticalStackLayout>
