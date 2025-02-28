@@ -317,7 +317,7 @@ await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop().Push<ThreeP
 // Pop to the root page using absolute navigation
 await _navigationService.GoToAsync(Navigation.Absolute().Root<MainPageModel>());
 // Switch to a different shell content and push a page there
-await _navigationService.GoToAsync(Navigation.Absolute().Root<OtherPageModel>().Push<OtherChildPageModel>());
+await _navigationService.GoToAsync(Navigation.Absolute().Root<OtherPageModel>().Add<OtherChildPageModel>());
 ```
 
 Note:
