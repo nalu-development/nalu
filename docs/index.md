@@ -41,7 +41,7 @@ We use a **fluent API** instead of strings to define navigations, supporting bot
 // Push the page registered with the DetailPageModel
 await _navigationService.GoToAsync(Navigation.Relative().Push<DetailPageModel>());
 // Navigate to the `SettingsPageModel` root page
-await _navigationService.GoToAsync(Navigation.Absolute().ShellContent<SettingsPageModel>());
+await _navigationService.GoToAsync(Navigation.Absolute().Root<SettingsPageModel>());
 ```
 
 Passing parameters is simple and type-safe.
