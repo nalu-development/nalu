@@ -2,7 +2,7 @@ namespace Nalu;
 
 internal interface IShellProxy
 {
-    string OriginalState { get; }
+    string Location { get; }
     string State { get; }
     bool BeginNavigation();
     bool ProposeNavigation(INavigationInfo navigation);

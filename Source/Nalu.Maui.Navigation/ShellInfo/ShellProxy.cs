@@ -18,7 +18,7 @@ internal partial class ShellProxy : IShellProxy, IDisposable
 
     public IShellItemProxy CurrentItem { get; private set; } = null!;
     public IReadOnlyList<IShellItemProxy> Items => _items;
-    public string OriginalState => _shell.CurrentState.Location.OriginalString;
+    public string Location => _shell.CurrentState.Location.OriginalString;
     public string State => "//" + string.Join("/", CurrentItem.CurrentSection.GetNavigationStack().Select(p => p.SegmentName));
 
     public ShellProxy(NaluShell shell)

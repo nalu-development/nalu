@@ -578,13 +578,14 @@ internal class NavigationService : INavigationService, IDisposable
 
         var shellProxy = ShellProxy;
         var initialState = shellProxy.State;
+        var initialLocation = shellProxy.Location;
 
         await _semaphore.WaitAsync().ConfigureAwait(true);
 
-        var currentState = shellProxy.State;
-
-        if (initialState != currentState)
+        var currentLocation = shellProxy.Location;
+        if (initialLocation != currentLocation)
         {
+            var currentState = shellProxy.State;
             // State has changed, abort the navigation
             var (requestedNavigation, targetState) = ComputeNavigationState(Configuration, navigation, initialState);
 
