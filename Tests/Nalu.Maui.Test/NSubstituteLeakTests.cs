@@ -6,7 +6,7 @@ public class NSubstituteLeakTests
 
     public interface IInterface
     {
-        public void Method(Foo foo);
+        void Method(Foo foo);
     }
 
     // private readonly IInterface _interfaceMock = Substitute.For<IInterface>();
