@@ -8,5 +8,5 @@ public interface IViewBox : IContentView
     /// <summary>
     /// Specifies whether the <see cref="IViewBox" /> clips its content to its boundaries
     /// </summary>
-    public bool ClipsToBounds { get; }
+    bool ClipsToBounds { get; }
 }

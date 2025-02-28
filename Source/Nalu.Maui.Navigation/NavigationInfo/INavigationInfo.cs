@@ -21,5 +21,5 @@ public interface INavigationInfo : IReadOnlyList<INavigationSegment>
     /// <summary>
     /// Gets the path to navigate to.
     /// </summary>
-    public string Path { get; }
+    string Path { get; }
 }
