@@ -15,7 +15,7 @@ public static class NaluLayoutsMauiAppBuilderExtensions
     /// <param name="builder">Maui app builder.</param>
     public static MauiAppBuilder UseNaluLayouts(this MauiAppBuilder builder)
     {
-        _ = new XamlInitializer();
+        _ = new NaluXamlLayoutsInitializer();
 
         builder.ConfigureMauiHandlers(
             handlers =>

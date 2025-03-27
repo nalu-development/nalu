@@ -4,6 +4,7 @@ using Microsoft.Maui.LifecycleEvents;
 using Nalu.Maui.Sample.PopupModels;
 using Nalu.Maui.Sample.Popups;
 using Nalu.Maui.Sample.Services;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace Nalu.Maui.Sample;
 
@@ -54,7 +55,9 @@ public static class MauiProgram
                        .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                        .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
+            .UseSkiaSharp()
             .UseNaluLayouts()
+            .UseNaluControls()
             .UseMauiCommunityToolkit()
             .ConfigureMauiHandlers(
                 handlers =>
@@ -88,7 +91,7 @@ public static class MauiProgram
             (_, _) =>
             {
 #if IOS
-                HttpClient client = DeviceInfo.DeviceType == DeviceType.Virtual
+                var client = DeviceInfo.DeviceType == DeviceType.Virtual
                     ? new HttpClient()
                     : new(new NSUrlBackgroundSessionHttpMessageHandler());
 #else

@@ -5,6 +5,7 @@
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
              xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
              xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
+             xmlns:controls="https://nalu-development.github.com/nalu/controls"
              x:Class="Nalu.Maui.Sample.Pages.TwoPage"
              x:DataType="pageModels:TwoPageModel"
              Title="Page Two"
@@ -30,6 +31,16 @@
                     </nalu:RelativeNavigation>
                 </Button.CommandParameter>
             </Button>
+
+            <Grid>
+                <controls:DurationWheel x:Name="DurationWheel"
+                                        Duration="{Binding Duration}" />
+                <Label HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       FontSize="24"
+                       InputTransparent="True"
+                       Text="{Binding DurationText}" />
+            </Grid>
         </VerticalStackLayout>
     </ContentPage.Content>
 </ContentPage>
