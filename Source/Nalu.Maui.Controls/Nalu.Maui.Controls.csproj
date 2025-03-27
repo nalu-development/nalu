@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
-    <Product>Nalu.Maui</Product>
+    <Product>Nalu.Maui.Controls</Product>
     <Description>.NET MAUI developer utilities</Description>
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
@@ -21,9 +21,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nalu.Maui.Controls\Nalu.Maui.Controls.csproj" />
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Nalu.Maui.Test</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="Microsoft.Maui.Controls.XmlnsDefinition">
+      <_Parameter1>https://nalu-development.github.com/nalu/controls</_Parameter1>
+      <_Parameter2>$(RootNamespace)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Condition="$(TargetFramework.StartsWith('net8'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion8)"/>
+    <PackageReference Condition="$(TargetFramework.StartsWith('net9'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion9)"/>
+    <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.116.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
-    <ProjectReference Include="..\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
-    <ProjectReference Include="..\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
   </ItemGroup>
 </Project>

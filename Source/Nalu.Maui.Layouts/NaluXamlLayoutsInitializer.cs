@@ -3,4 +3,4 @@ namespace Nalu;
 /// <summary>
 /// Nalu Layouts Options.
 /// </summary>
-public class XamlInitializer;
+public class NaluXamlLayoutsInitializer;
