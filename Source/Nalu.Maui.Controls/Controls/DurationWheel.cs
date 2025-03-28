@@ -353,6 +353,16 @@ public class DurationWheel : InteractableCanvasView
     }
 
     /// <summary>
+    /// Triggered when the user has started rotating the wheel.
+    /// </summary>
+    public EventHandler? RotationStarted;
+
+    /// <summary>
+    /// Triggered when the user has finished rotating the wheel.
+    /// </summary>
+    public EventHandler? RotationEnded;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="DurationWheel" /> class.
     /// </summary>
     public DurationWheel() { }
@@ -537,6 +547,7 @@ public class DurationWheel : InteractableCanvasView
             _isDragging = true;
             _lastPointerPosition = position;
             args.StopPropagation();
+            RotationStarted?.Invoke(this, EventArgs.Empty);
         }
         else
         {
@@ -620,6 +631,7 @@ public class DurationWheel : InteractableCanvasView
             args.StopPropagation();
             UpdateDuration(args.Position);
             _isDragging = false;
+            RotationEnded?.Invoke(this, EventArgs.Empty);
         }
     }
 
