@@ -63,12 +63,12 @@ jobs:
         run: dotnet cake --target=Pack
         shell: pwsh
       - name: "Publish Artefacts"
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{matrix.os}}
           path: "./Artefacts"
       - name: "Publish Binlog"
-        uses: actions/upload-artifact@v4.6.1
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{matrix.os}}-binlog
           path: "./Binlog"
