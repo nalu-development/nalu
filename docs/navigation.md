@@ -231,14 +231,14 @@ is equivalent to
 That said, `Nalu` navigation provides the following navigation behavior when switching between `ShellContent`s:
 - if the content is in the same `ShellSection`, navigation stack will be popped
 - if the content is in a different `ShellSection` but in the same `ShellItem`, the current navigation stack will be persisted
-- if the content is in a different `ShellItem`, all of the current item's navigation stacks will be popped and the `ShellContent` pages will be destroyed
+- if the content is in a different `ShellItem`, all the current item's navigation stacks will be popped and the `ShellContent` pages will be destroyed
 
 You can customize this behavior by providing a custom `NavigationBehavior` to the `Navigation` object.
 
-For example you can also use the `IgnoreGuards` behavior to ignore the `ILeavingGuard` when popping a page:
+For example, you can also use the `IgnoreGuards` behavior to ignore the `ILeavingGuard` when popping a page:
 
 ```csharp
-await _navigationService.GoToAsync(Navigation.Relative(NavigationBehavior.IgnoreGuards).Pop());
+await _navigationService.GoToAsync(Navigation.Relative(NavigationBehavior.DefaultIgnoreGuards).Pop());
 ```
 
 #### Navigation events

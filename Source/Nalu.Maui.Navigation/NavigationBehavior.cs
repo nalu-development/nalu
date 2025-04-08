@@ -17,6 +17,7 @@ public enum NavigationBehavior
     /// </summary>
     /// <remarks>
     /// Does not affect relative navigation.
+    /// Using this flag alone will not pop pages when switching to a different <see cref="ShellItem" />.
     /// </remarks>
     PopAllPagesOnSectionChange = 0x01,
 
@@ -32,6 +33,10 @@ public enum NavigationBehavior
     /// <summary>
     /// When popping a page, the <see cref="ILeavingGuard" />s will be ignored.
     /// </summary>
+    /// <remarks>
+    /// Using this flag alone will not pop pages when switching to a different <see cref="ShellItem" />,
+    /// evaluate using <see cref="DefaultIgnoreGuards"/> instead.
+    /// </remarks>
     IgnoreGuards = 0x04,
 
     /// <summary>
@@ -39,6 +44,23 @@ public enum NavigationBehavior
     /// </summary>
     /// <remarks>
     /// Default behavior is to wait 60 milliseconds before navigating to the target page to let touch be displayed.
+    /// Using this flag alone will not pop pages when switching to a different <see cref="ShellItem" />,
+    /// evaluate using <see cref="DefaultImmediate"/> instead.
     /// </remarks>
-    Immediate = 0x08
+    Immediate = 0x08,
+
+    /// <summary>
+    /// Combines <see cref="IgnoreGuards" /> with the default <see cref="PopAllPagesOnItemChange" /> behavior.
+    /// </summary>
+    DefaultIgnoreGuards = IgnoreGuards | PopAllPagesOnItemChange,
+
+    /// <summary>
+    /// Combines <see cref="IgnoreGuards" /> with the default <see cref="PopAllPagesOnItemChange" /> behavior.
+    /// </summary>
+    DefaultImmediate = Immediate | PopAllPagesOnItemChange,
+
+    /// <summary>
+    /// Combines <see cref="Immediate" /> and <see cref="IgnoreGuards" /> with the default <see cref="PopAllPagesOnItemChange" /> behavior.
+    /// </summary>
+    DefaultImmediateIgnoreGuards = Immediate | IgnoreGuards | PopAllPagesOnItemChange,
 }
