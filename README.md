@@ -96,3 +96,11 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
   ![Expander demo](docs/assets/images/expander.gif)
 
 **Find out more at [Nalu Website](https://nalu-development.github.io/nalu/layouts.html).**
+
+### Controls [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
+
+The controls library provides a set of cross-platform controls to simplify your development.
+
+- A `InteractableCanvasView` which is a `SkiaSharp` `SKCanvasView` with touch-events support where you can choose to stop touch event propagation to avoid interaction with ancestors (like `ScrollView`)
+- A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel
+  See video here: https://github.com/user-attachments/assets/447449e7-62fb-45e2-b2b7-e8974f356e75
