@@ -56,13 +56,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="CommunityToolkit.Maui" Version="11.0.0" />
+        <PackageReference Include="CommunityToolkit.Maui" Version="11.2.0" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-        <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0"/>
         <PackageReference Include="OpenMeteo.dotnet" Version="2.0.0" />
+        <!--
+        <PackageReference Include="FFImageLoading.Maui" Version="1.2.7" />
+        https://github.com/microspaze/FFImageLoading.Maui/pull/65
+        -->
     </ItemGroup>
 
     <ItemGroup>
@@ -72,47 +75,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <MauiXaml Update="Pages\InitializationPage.xaml">
-        <SubType>Designer</SubType>
-      </MauiXaml>
-      <MauiXaml Update="Pages\HomePage.xaml">
-        <SubType>Designer</SubType>
-      </MauiXaml>
-      <MauiXaml Update="Resources\Styles\Converters.xaml">
-        <SubType>Designer</SubType>
-      </MauiXaml>
-      <MauiXaml Update="Resources\Styles\KeyedStyles.xaml">
-        <SubType>Designer</SubType>
-      </MauiXaml>
-      <MauiXaml Update="Views\ForecastCard.xaml">
-        <SubType>Designer</SubType>
-      </MauiXaml>
-      <MauiXaml Update="Views\AirQualityCard.xaml">
-        <SubType>Designer</SubType>
-      </MauiXaml>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Compile Update="Pages\InitializationPage.xaml.cs">
-        <DependentUpon>AppShell.xaml</DependentUpon>
-        <SubType>Code</SubType>
-      </Compile>
       <Compile Update="Resources\Texts.Designer.cs">
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>Texts.resx</DependentUpon>
-      </Compile>
-      <Compile Update="Pages\HomePage.xaml.cs">
-        <DependentUpon>HomePage.xaml</DependentUpon>
-        <SubType>Code</SubType>
-      </Compile>
-      <Compile Update="Views\ForecastCard.xaml.cs">
-        <DependentUpon>ForecastCard.xaml</DependentUpon>
-        <SubType>Code</SubType>
-      </Compile>
-      <Compile Update="Views\AirQualityCard.xaml.cs">
-        <DependentUpon>AirQualityCard.xaml</DependentUpon>
-        <SubType>Code</SubType>
       </Compile>
     </ItemGroup>
 

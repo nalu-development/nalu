@@ -313,11 +313,13 @@ public class DurationWheel : InteractableCanvasView
             typeof(TimeSpan),
             typeof(DurationWheel),
             TimeSpan.FromHours(1),
-            propertyChanged: InvalidateDrawing
+            propertyChanged: (bindable, _, _) =>
+            {
+                var durationWheel = (DurationWheel) bindable;
+                durationWheel.InvalidateSurface();
+                durationWheel.OnDurationChanged(durationWheel.Duration);
+            }
         );
-
-    private static void InvalidateDrawing(BindableObject bindable, object oldvalue, object newvalue)
-        => ((DurationWheel) bindable).InvalidateSurface();
 
     /// <summary>
     /// Bindable property for the MaximumDuration property.
@@ -355,12 +357,12 @@ public class DurationWheel : InteractableCanvasView
     /// <summary>
     /// Triggered when the user has started rotating the wheel.
     /// </summary>
-    public EventHandler? RotationStarted;
+    public event EventHandler? RotationStarted;
 
     /// <summary>
     /// Triggered when the user has finished rotating the wheel.
     /// </summary>
-    public EventHandler? RotationEnded;
+    public event EventHandler? RotationEnded;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DurationWheel" /> class.
@@ -429,6 +431,7 @@ public class DurationWheel : InteractableCanvasView
         paint.Color = _highValueColor;
         var handleRadius = arcSize / 2;
         centerX += radius - handleRadius;
+        centerY -= 1;
         var circleRect = new SKRect(centerX - handleRadius, centerY - handleRadius, centerX + handleRadius, centerY + handleRadius);
         canvas.DrawArc(circleRect, 0, 180f, true, paint);
         canvas.Restore();
@@ -610,10 +613,11 @@ public class DurationWheel : InteractableCanvasView
         var newDuration = TimeSpan.FromTicks(newTicks);
 
         // If MaximumDuration is set, clamp the value.
-        if (MaximumDuration.HasValue && newDuration > MaximumDuration.Value)
+        if (MaximumDuration is { } maximumDuration && newDuration > maximumDuration)
         {
-            newDuration = MaximumDuration.Value;
-            _angle = MaximumDuration.Value.Ticks / 360.0f;
+            newDuration = maximumDuration;
+            _duration = maximumDuration;
+            _angle = (float) ((double) maximumDuration.Ticks / WholeDuration.Ticks * 360);
         }
 
         Duration = newDuration;

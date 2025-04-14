@@ -10,4 +10,6 @@
                   FlyoutItemIsVisible="False" />
     <ShellContent nalu:Navigation.PageType="pages:HomePage"
                   Title="{x:Static r:Texts.HomePage}" />
+    <ShellContent nalu:Navigation.PageType="pages:SettingsPage"
+                  Title="{x:Static r:Texts.Settings}" />
 </nalu:NaluShell>

@@ -17,7 +17,8 @@ public partial class InitializationPageModel(
     TimeProvider timeProvider,
     WeatherState weatherState,
     IWeatherService weatherService,
-    INavigationService navigationService
+    INavigationService navigationService,
+    IPreferences preferences
 )
     : ObservableObject, IAppearingAware<StartupIntent>
 {
@@ -36,9 +37,11 @@ public partial class InitializationPageModel(
         var location = await GetGeoLocationAsync();
         weatherState.Location = location;
 
+        var forecastTicks = preferences.Get(Constants.PrefForecastDays, TimeSpan.FromDays(7).Ticks);
+
         var time = timeProvider.GetLocalNow();
         var today = time.Date;
-        var forecastEnd = today.AddDays(14);
+        var forecastEnd = today.AddTicks(forecastTicks);
 
         Message = Texts.LoadingIQ;
 

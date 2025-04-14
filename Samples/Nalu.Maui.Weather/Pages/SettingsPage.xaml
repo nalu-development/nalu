@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:Nalu.Maui.Weather.Pages"
+             xmlns:r="clr-namespace:Nalu.Maui.Weather.Resources"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:pageModels="clr-namespace:Nalu.Maui.Weather.PageModels"
+             xmlns:models="clr-namespace:Nalu.Maui.Weather.Models"
+             xmlns:views="clr-namespace:Nalu.Maui.Weather.Views"
+             Title="{x:Static r:Texts.Settings}"
+             x:DataType="pageModels:SettingsPageModel"
+             x:Class="Nalu.Maui.Weather.Pages.SettingsPage">
+    <ScrollView x:Name="ScrollableArea">
+        <Grid Padding="24"
+              ColumnDefinitions="Auto, *"
+              RowDefinitions="Auto">
+            <Label Grid.Row="0"
+                   VerticalOptions="Center"
+                   Text="Sync forecast data for:" />
+            <Button Grid.Row="0" 
+                    Grid.Column="1"
+                    Style="{StaticResource TextButton}"
+                    VerticalOptions="Center"
+                    HorizontalOptions="End"
+                    Command="{Binding Path=EditDurationCommand}"
+                    Text="{Binding DurationText}" />
+        </Grid>
+    </ScrollView>
+</ContentPage>

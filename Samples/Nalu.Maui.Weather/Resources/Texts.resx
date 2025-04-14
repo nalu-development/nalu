@@ -48,4 +48,7 @@
   <data name="PM25" xml:space="preserve">
     <value>PM2.5</value>
   </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
 </root>

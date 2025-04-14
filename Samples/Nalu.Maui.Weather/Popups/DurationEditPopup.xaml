@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<toolkit:Popup xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+               xmlns:nalu="https://nalu-development.github.com/nalu/controls"
+               xmlns:popups="clr-namespace:Nalu.Maui.Weather.Popups"
+               x:Class="Nalu.Maui.Weather.Popups.DurationEditPopup"
+               x:DataType="popups:DurationEdit">
+
+    <VerticalStackLayout Padding="16">
+        <Label Text="Turn the wheel"
+               FontSize="24"
+               HorizontalOptions="Center"/>
+        <Grid Margin="0,16,0,24">
+            <nalu:DurationWheel x:Name="DurationWheel"
+                                ValueWidth="16"
+                                OuterBackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray950}}"
+                                InnerBackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray750}}"
+                                MarkersColor="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray300}}"
+                                HighValueColor="{StaticResource Secondary}"
+                                LowValueColor="{StaticResource PrimaryDark}"
+                                Duration="{Binding Duration}"
+                                WholeDuration="{Binding WholeDuration}"
+                                MaximumDuration="{Binding MaxDuration}"
+                                RotationEnded="DurationWheel_OnRotationEnded"
+                                RotationStarted="DurationWheel_OnRotationStarted"/>
+            <Label Text="{Binding DurationText}"
+                   VerticalOptions="Center"
+                   HorizontalOptions="Center"
+                   TextColor="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"
+                   FontSize="24"
+                   InputTransparent="True"/>
+        </Grid>
+        <HorizontalStackLayout HorizontalOptions="End">
+            <Button Text="Cancel"
+                    Command="{Binding Path=CancelCommand}"
+                    Margin="0,0,16,0"/>
+            <Button Text="OK"
+                    Command="{Binding Path=SaveCommand}"/>
+        </HorizontalStackLayout>
+    </VerticalStackLayout>
+    
+</toolkit:Popup>

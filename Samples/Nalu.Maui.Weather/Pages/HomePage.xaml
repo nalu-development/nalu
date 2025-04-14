@@ -7,18 +7,17 @@
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Weather.PageModels"
              xmlns:models="clr-namespace:Nalu.Maui.Weather.Models"
-             xmlns:ff="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
              xmlns:views="clr-namespace:Nalu.Maui.Weather.Views"
              Title="{x:Static r:Texts.HomePage}"
              x:DataType="pageModels:HomePageModel"
              x:Class="Nalu.Maui.Weather.Pages.HomePage">
     <ScrollView x:Name="ScrollableArea">
         <VerticalStackLayout>
-            <ff:CachedImage x:Name="BannerImage"
-                            Aspect="AspectFill"
-                            HeightRequest="232"
-                            Source="{Binding Path=WeatherState.TodayWeather.WeatherCode,
-                                             Converter={StaticResource WeatherImageConverter}}" />
+            <Image x:Name="BannerImage"
+                   Aspect="AspectFill"
+                   HeightRequest="232"
+                   Source="{Binding Path=WeatherState.TodayWeather.WeatherCode,
+                                    Converter={StaticResource WeatherImageConverter}}" />
 
             <views:TodayBanner BindingContext="{Binding WeatherState}" />
 

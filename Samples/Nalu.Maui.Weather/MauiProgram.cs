@@ -1,12 +1,17 @@
 using CommunityToolkit.Maui;
-using FFImageLoading.Maui;
+using Nalu.Maui.Weather.Popups;
 using Nalu.Maui.Weather.Services;
 using Nalu.Maui.Weather.ViewModels;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace Nalu.Maui.Weather;
 
 #if DEBUG
 using Microsoft.Extensions.Logging;
+#endif
+
+#if !(IOS || ANDROID || WINDOWS || MACCATALYST)
+#pragma warning disable CA1416
 #endif
 
 public static class MauiProgram
@@ -25,10 +30,11 @@ public static class MauiProgram
                        .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                        .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
+            .UseSkiaSharp()
             .UseNaluLayouts()
+            .UseNaluControls()
             .UseMauiCommunityToolkit()
             .UseOpenMeteo()
-            .UseFFImageLoading()
             .ConfigureFonts(
                 fonts =>
                 {
@@ -41,10 +47,13 @@ public static class MauiProgram
         builder.Services
                .AddSingleton<TimeProvider>(TimeProvider.System)
                .AddSingleton<IGeolocation>(Geolocation.Default)
+               .AddSingleton<IPreferences>(Preferences.Default)
                .AddSingleton<IWeatherService, WeatherService>();
 
         builder.Services
                .AddSingleton<WeatherState>();
+        
+        builder.Services.AddTransientPopup<DurationEditPopup, DurationEdit>();
 
 #if DEBUG
         builder.Logging.AddDebug();
