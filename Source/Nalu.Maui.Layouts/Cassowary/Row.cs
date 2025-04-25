@@ -1,11 +1,12 @@
-﻿using Nalu.Cassowary.Extensions;
+﻿namespace Nalu.Cassowary;
 
-namespace Nalu.Cassowary;
-
-internal record Row(Dictionary<Symbol, double> Cells, double Constant)
+internal record Row(RowData Cells, double Constant)
 {
     public Row(double constant)
         : this([], constant) { }
+
+    public Row(int capacity, double constant)
+        : this(new RowData(capacity), constant) { }
 
     public double Constant { get; private set; } = Constant;
 
@@ -16,23 +17,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
         return Constant;
     }
 
-    public void Add(Symbol symbol, double coefficient)
-    {
-        if (Cells.TryGetValue(symbol, out var entry))
-        {
-            entry += coefficient;
-            Cells[symbol] = entry;
-
-            if (entry.IsNearZero())
-            {
-                Cells.Remove(symbol);
-            }
-        }
-        else if (!coefficient.IsNearZero())
-        {
-            Cells.Add(symbol, coefficient);
-        }
-    }
+    public void Add(Symbol symbol, double coefficient) => Cells.Add(symbol, coefficient);
 
     public bool Add(Row other, double coefficient)
     {
@@ -41,7 +26,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
 
         foreach (var (symbol, value) in other.Cells)
         {
-            Add(symbol, value * coefficient);
+            Cells.Add(symbol, value * coefficient);
         }
 
         return diff != 0;
@@ -52,11 +37,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
     public void ReverseSign()
     {
         Constant = -Constant;
-
-        foreach (var (symbol, value) in Cells)
-        {
-            Cells[symbol] = -value;
-        }
+        Cells.Multiply(-1);
     }
 
     public void SolveForSymbol(Symbol symbol)
@@ -65,11 +46,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
         var coefficient = -1 / symbolValue;
 
         Constant *= coefficient;
-
-        foreach (var (key, value) in Cells)
-        {
-            Cells[key] = value * coefficient;
-        }
+        Cells.Multiply(coefficient);
     }
 
     public void SolveForSymbols(Symbol lhs, Symbol rhs)
