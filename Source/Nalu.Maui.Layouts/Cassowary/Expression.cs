@@ -68,7 +68,14 @@ public readonly struct Expression : IEquatable<Expression>
     {
         unchecked
         {
-            return Constant.GetHashCode() + Terms.Aggregate(19, (h, i) => (h * 19) + i.GetHashCode());
+            var hashCode = Constant.GetHashCode();
+            var termsLength = Terms.Length;
+            for (var i = 0; i < termsLength; i++)
+            {
+                hashCode = (hashCode * 19) ^ Terms[i].GetHashCode();
+            }
+
+            return hashCode;
         }
     }
 

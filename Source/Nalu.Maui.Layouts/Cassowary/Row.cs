@@ -1,32 +1,84 @@
-﻿namespace Nalu.Cassowary;
+﻿using System.Runtime.InteropServices;
+using Nalu.Cassowary.Extensions;
 
-internal record Row(RowData Cells, double Constant)
+namespace Nalu.Cassowary;
+
+internal record Row(Dictionary<Symbol, double> Cells, double Constant)
 {
     public Row(double constant)
-        : this([], constant) { }
-
+        : this([], constant)
+    {
+    }
+    
     public Row(int capacity, double constant)
-        : this(new RowData(capacity), constant) { }
+        : this(new Dictionary<Symbol, double>(capacity), constant)
+    {
+    }
 
     public double Constant { get; private set; } = Constant;
 
     public double Add(double value)
     {
         Constant += value;
-
         return Constant;
     }
 
-    public void Add(Symbol symbol, double coefficient) => Cells.Add(symbol, coefficient);
+    public void Add(Symbol symbol, double coefficient)
+    {
+        if (coefficient == 0)
+        {
+            return;
+        }
+
+        if (!coefficient.IsNearZero())
+        {
+            QuickAdd(symbol, coefficient);
+            return;
+        }
+
+        if (Cells.TryGetValue(symbol, out var entry))
+        {
+            entry += coefficient;
+            Cells[symbol] = entry;
+            if (entry.IsNearZero())
+            {
+                Cells.Remove(symbol);
+            }
+        }
+    }
+
+    private void QuickAdd(Symbol symbol, double coefficient)
+    {
+        ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(Cells, symbol, out var exists);
+
+        if (exists)
+        {
+            entry += coefficient;
+
+            if (entry.IsNearZero())
+            {
+                Cells.Remove(symbol);
+            }
+        }
+        else
+        {
+            entry = coefficient;
+        }
+    }
 
     public bool Add(Row other, double coefficient)
     {
+        if (coefficient == 0)
+        {
+            return false;
+        }
+
         var diff = other.Constant * coefficient;
         Constant += diff;
 
         foreach (var (symbol, value) in other.Cells)
         {
-            Cells.Add(symbol, value * coefficient);
+            Add(symbol, value * coefficient);
         }
 
         return diff != 0;
@@ -37,16 +89,22 @@ internal record Row(RowData Cells, double Constant)
     public void ReverseSign()
     {
         Constant = -Constant;
-        Cells.Multiply(-1);
+        foreach (var (symbol, value) in Cells)
+        {
+            Cells[symbol] = -value;
+        }
     }
 
     public void SolveForSymbol(Symbol symbol)
     {
-        Cells.Remove(symbol, out var symbolValue);
-        var coefficient = -1 / symbolValue;
+        Cells.Remove(symbol, out var symbolCoefficient);
+        var coefficient = -1 / symbolCoefficient;
 
         Constant *= coefficient;
-        Cells.Multiply(coefficient);
+        foreach (var (key, value) in Cells)
+        {
+            Cells[key] = value * coefficient;
+        }
     }
 
     public void SolveForSymbols(Symbol lhs, Symbol rhs)

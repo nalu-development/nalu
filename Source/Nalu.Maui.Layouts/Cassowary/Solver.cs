@@ -80,9 +80,9 @@ public class Solver
         // then its possible those variables will linger in the var map.
         // Since its likely that those variables will be used in other
         // constraints and since exceptional conditions are uncommon,
-        // i'm not too worried about aggressive cleanup of the var map.
+        // I'm not too worried about aggressive cleanup of the var map.
         var (row, tag) = CreateRow(constraint);
-        var subject = ChooseSubject(row, tag);
+        var subject = ChooseSubject(row, tag, out var allDummies);
 
         // If chooseSubject could find a valid entering symbol, one
         // last option is available if the entire row is composed of
@@ -90,7 +90,7 @@ public class Solver
         // this represents redundant constraints and the new dummy
         // marker can enter the basis. If the constant is non-zero,
         // then it represents an unsatisfiable constraint.
-        if (subject.Type == SymbolType.Invalid && AllDummies(row))
+        if (subject.Type == SymbolType.Invalid && allDummies)
         {
             if (!row.Constant.IsNearZero())
             {
@@ -418,8 +418,8 @@ public class Solver
         // Create and add the artificial variable to the tableau
         var art = new Symbol(_idTick, SymbolType.Slack);
         _idTick++;
-        _rows.Add(art, row with { Cells = new RowData(row.Cells) });
-        _artificial = row with { Cells = new RowData(row.Cells) };
+        _rows.Add(art, row with { Cells = new(row.Cells) });
+        _artificial = row with { Cells = new(row.Cells) };
 
         // Optimize the artificial objective. This is successful
         // only if the artificial objective is optimized to zero.
@@ -887,6 +887,7 @@ public class Solver
     /// </summary>
     /// <param name="row"></param>
     /// <param name="tag"></param>
+    /// <param name="allDummies"></param>
     /// <remarks>
     ///     <para>
     ///     This method will choose the best subject for using as the solve
@@ -906,10 +907,17 @@ public class Solver
     ///     If a subject cannot be found, an invalid symbol will be returned.
     ///     </para>
     /// </remarks>
-    private static Symbol ChooseSubject(Row row, Tag tag)
+    private static Symbol ChooseSubject(Row row, Tag tag, out bool allDummies)
     {
+        allDummies = true;
+
         foreach (var symbol in row.Cells.Keys)
         {
+            if (allDummies && symbol.Type != SymbolType.Dummy)
+            {
+                allDummies = false;
+            }
+
             if (symbol.Type == SymbolType.External)
             {
                 return symbol;
@@ -928,13 +936,6 @@ public class Solver
 
         return Symbol.Invalid;
     }
-
-    /// <summary>
-    /// Test whether a row is composed of all dummy variables.
-    /// </summary>
-    /// <param name="row"></param>
-    private static bool AllDummies(Row row)
-        => row.Cells.Keys.All(s => s.Type == SymbolType.Dummy);
 
     /// <summary>
     /// Compute the entering variable for a pivot operation.
