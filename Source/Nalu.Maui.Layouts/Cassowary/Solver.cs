@@ -261,7 +261,7 @@ public class Solver
     /// This method should be used after an edit variable has been added to
     /// the solver in order to suggest the value for that variable.
     /// </remarks>
-    public void SuggestValue(Variable variable, float value)
+    public void SuggestValue(Variable variable, double value)
     {
         var delta = value - _edits[variable].Constant;
         var info = _edits[variable] = _edits[variable] with { Constant = value };

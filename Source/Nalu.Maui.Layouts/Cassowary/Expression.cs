@@ -11,7 +11,7 @@ public readonly struct Expression : IEquatable<Expression>
     /// <summary>
     /// Gets the terms of the expression.
     /// </summary>
-    public ImmutableArray<Term> Terms { get; init; }
+    public ImmutableArray<Term> Terms { get; init; } = [];
 
     /// <summary>
     /// Gets the constant value of the expression.
@@ -34,7 +34,6 @@ public readonly struct Expression : IEquatable<Expression>
     /// </summary>
     public Expression()
     {
-        Terms = [];
     }
 
     /// <summary>
@@ -50,7 +49,20 @@ public readonly struct Expression : IEquatable<Expression>
 
     /// <inheritdoc />
     // ReSharper disable once CompareOfFloatsByEqualityOperator
-    public bool Equals(Expression other) => other.Constant == Constant && Terms.SequenceEqual(other.Terms);
+    public bool Equals(Expression other)
+    {
+        if (other.Constant != Constant)
+        {
+            return false;
+        }
+
+        if (Terms.IsDefaultOrEmpty && other.Terms.IsDefaultOrEmpty)
+        {
+            return true;
+        }
+
+        return Terms.SequenceEqual(other.Terms);
+    }
 
     /// <inheritdoc />
     public override bool Equals(object? obj)

@@ -143,17 +143,3 @@ public class CassowaryTests
     }
 }
 
-static file class SolverExtensions
-{
-    public static void ShouldHaveVariables(
-        this Solver solver,
-        params (Variable Variable, double Value)[] expected)
-    {
-        solver.FetchChanges();
-        foreach (var (variable, value) in expected)
-        {
-            var actual = variable.CurrentValue;
-            Math.Abs(actual - value).Should().BeLessOrEqualTo(0.1, $"Variable {variable.Name} should be {value} but was {actual}");
-        }
-    }
-}
