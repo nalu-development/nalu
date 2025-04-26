@@ -6,20 +6,17 @@ namespace Nalu.Cassowary;
 internal record Row(Dictionary<Symbol, double> Cells, double Constant)
 {
     public Row(double constant)
-        : this([], constant)
-    {
-    }
-    
+        : this([], constant) { }
+
     public Row(int capacity, double constant)
-        : this(new Dictionary<Symbol, double>(capacity), constant)
-    {
-    }
+        : this(new Dictionary<Symbol, double>(capacity), constant) { }
 
     public double Constant { get; private set; } = Constant;
 
     public double Add(double value)
     {
         Constant += value;
+
         return Constant;
     }
 
@@ -33,6 +30,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
         if (!coefficient.IsNearZero())
         {
             QuickAdd(symbol, coefficient);
+
             return;
         }
 
@@ -40,6 +38,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
         {
             entry += coefficient;
             Cells[symbol] = entry;
+
             if (entry.IsNearZero())
             {
                 Cells.Remove(symbol);
@@ -89,6 +88,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
     public void ReverseSign()
     {
         Constant = -Constant;
+
         foreach (var (symbol, value) in Cells)
         {
             Cells[symbol] = -value;
@@ -101,6 +101,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
         var coefficient = -1 / symbolCoefficient;
 
         Constant *= coefficient;
+
         foreach (var (key, value) in Cells)
         {
             Cells[key] = value * coefficient;

@@ -16,12 +16,13 @@ public class HorizontalGuideline : GuidelineBase, IVerticalPoles
 
         if (fractionalPosition != 0)
         {
-            var top = Position + stage.Top + (stage.Bottom - stage.Top) * fractionalPosition;
+            var top = Position + stage.Top + ((stage.Bottom - stage.Top) * fractionalPosition);
+
             yield return Top | Eq(Required) | top;
         }
         else
         {
-            yield return stage.Top + Position | Eq(Required) | Top;
+            yield return (stage.Top + Position) | Eq(Required) | Top;
         }
     }
 

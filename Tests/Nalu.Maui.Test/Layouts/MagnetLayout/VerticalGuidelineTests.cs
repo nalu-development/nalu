@@ -5,37 +5,36 @@ using static Nalu.Cassowary.WeightedRelation;
 
 namespace Nalu.Maui.Test.Layouts.MagnetLayout;
 
-public class HorizontalGuidelineTests
+public class VerticalGuidelineTests
 {
     [Fact]
-    public void TestHorizontalGuideline()
+    public void TestVerticalGuideline()
     {
         var solver = new Solver();
         var stage = Substitute.For<IMagnetStage>();
-        var stageTop = new Variable();
-        var stageBottom = new Variable();
-        stage.Top.Returns(stageTop);
-        stage.Bottom.Returns(stageBottom);
+        var stageStart = new Variable();
+        var stageEnd = new Variable();
+        stage.Left.Returns(stageStart);
+        stage.Right.Returns(stageEnd);
         stage.When(s => s.AddConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.AddConstraint(call.Arg<Constraint>()));
         stage.When(s => s.RemoveConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.RemoveConstraint(call.Arg<Constraint>()));
-        solver.AddConstraint(stageTop | Eq(Required) | 40);
-        solver.AddConstraint(stageBottom | Eq(Required) | 100);
+        solver.AddConstraint(stageStart | Eq(Required) | 0);
+        solver.AddConstraint(stageEnd | Eq(Required) | 100);
         
-        var guideline = new HorizontalGuideline
+        var guideline = new VerticalGuideline
                      {
-                         Id = "guideline",
-                         FractionalPosition = 0.5,
-                         Position = -10,
+                         FractionalPosition = 0.6,
+                         Position = 5,
                      };
         
         guideline.SetStage(stage);
         guideline.ApplyConstraints();
 
         solver.ShouldHaveVariables(
-            (guideline.Top, 60),
-            (guideline.Bottom, 60)
+            (guideline.Left, 65),
+            (guideline.Right, 65)
         );
     }
 }

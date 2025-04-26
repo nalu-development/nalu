@@ -16,31 +16,32 @@ public class VerticalGuideline : GuidelineBase, IHorizontalPoles
 
         if (fractionalPosition != 0)
         {
-            var start = Position + stage.Start + (stage.End - stage.Start) * fractionalPosition;
-            yield return Start | Eq(Required) | start;
+            var start = Position + stage.Left + ((stage.Right - stage.Left) * fractionalPosition);
+
+            yield return Left | Eq(Required) | start;
         }
         else
         {
-            yield return stage.Start + Position | Eq(Required) | Start;
+            yield return (stage.Left + Position) | Eq(Required) | Left;
         }
     }
 
     /// <inheritdoc />
     protected override IEnumerable<Constraint> GetIdentityConstraint(IMagnetStage stage)
     {
-        yield return End | Eq(Required) | Start;
+        yield return Right | Eq(Required) | Left;
     }
 
     /// <inheritdoc />
     protected override void SetVariableNames(string id)
     {
-        Start.SetName($"{id}.Start");
-        End.SetName($"{id}.End");
+        Left.SetName($"{id}.Left");
+        Right.SetName($"{id}.Right");
     }
 
     /// <inheritdoc />
-    public Variable Start { get; } = new();
+    public Variable Left { get; } = new();
 
     /// <inheritdoc />
-    public Variable End { get; } = new();
+    public Variable Right { get; } = new();
 }

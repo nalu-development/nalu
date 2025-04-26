@@ -10,10 +10,10 @@ public interface IHorizontalPoles
     /// <summary>
     /// Start pole of the element.
     /// </summary>
-    Variable Start { get; }
+    Variable Left { get; }
 
     /// <summary>
     /// End pole of the element.
     /// </summary>
-    Variable End { get; }
+    Variable Right { get; }
 }

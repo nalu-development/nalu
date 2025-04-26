@@ -32,9 +32,7 @@ public readonly struct Expression : IEquatable<Expression>
     /// <summary>
     /// Initializes a new instance of the <see cref="Expression" /> struct.
     /// </summary>
-    public Expression()
-    {
-    }
+    public Expression() { }
 
     /// <summary>
     /// Deconstructs the expression into terms and constant.
@@ -82,6 +80,7 @@ public readonly struct Expression : IEquatable<Expression>
         {
             var hashCode = Constant.GetHashCode();
             var termsLength = Terms.Length;
+
             for (var i = 0; i < termsLength; i++)
             {
                 hashCode = (hashCode * 19) ^ Terms[i].GetHashCode();

@@ -1,58 +1,110 @@
 namespace Nalu.MagnetLayout;
 
 /// <summary>
-/// Defines the size mode for a <see cref="SizeValue"/>.
-/// </summary>
-public enum SizeMode
-{
-    /// <summary>
-    /// The dimension is specified as a fixed value in layout units.
-    /// </summary>
-    Fixed,
-
-    /// <summary>
-    /// The dimension is specified as a percentage (0.0 to 1.0) of the container size.
-    /// </summary>
-    Percentage
-}
-
-/// <summary>
 /// Represents a fixed or percentage size value.
 /// </summary>
-/// <param name="Value"></param>
-/// <param name="Mode"></param>
-public readonly record struct SizeValue(double Value, SizeMode Mode = SizeMode.Fixed)
+public readonly record struct SizeValue(double Value, SizeUnit Unit = SizeUnit.Measured, SizeBehavior Behavior = SizeBehavior.Required)
 {
     /// <summary>
-    /// Gets a zero-size.
+    /// Matches the measured size.
     /// </summary>
-    public static readonly SizeValue Zero = new(0);
+    public static readonly SizeValue Default = new(1);
 
     /// <summary>
-    /// Implicitly converts a double to a <see cref="SizeValue"/> with the fixed mode.
+    /// Matches the measured size, but can shrink if needed.
     /// </summary>
-    public static SizeValue Fixed(double value) => new SizeValue(value, SizeMode.Fixed);
+    public static readonly SizeValue Shrink = new(1, Behavior: SizeBehavior.Shrink);
 
     /// <summary>
-    /// Implicitly converts a double to a <see cref="SizeValue"/> with the percentage mode.
+    /// Implicitly converts a <see cref="SizeUnit.Measured" /> coefficient <see cref="SizeValue" />.
     /// </summary>
-    /// <param name="value"></param>
-    /// <returns></returns>
-    public static SizeValue Percentage(double value) => new SizeValue(value, SizeMode.Percentage);
+    public static SizeValue Measured(double value, SizeBehavior behavior = SizeBehavior.Required) => new(value, SizeUnit.Measured, behavior);
 
     /// <summary>
-    /// Implicitly converts a string representation (e.g., "100" or "50%") into a SizeValue.
+    /// Implicitly converts a <see cref="SizeUnit.Stage" /> percentage to a <see cref="SizeValue" /> coefficient.
+    /// </summary>
+    public static SizeValue StagePercent(double percent, SizeBehavior behavior = SizeBehavior.Required) => new(percent / 100, SizeUnit.Stage, behavior);
+
+    /// <summary>
+    /// Implicitly converts a <see cref="SizeUnit.Constraint" /> coefficient to a <see cref="SizeValue" />.
+    /// </summary>
+    public static SizeValue Constraint(double value, SizeBehavior behavior = SizeBehavior.Required) => new(value, SizeUnit.Constraint, behavior);
+
+    /// <summary>
+    /// Implicitly converts a <see cref="SizeUnit.Ratio" /> coefficient to a <see cref="SizeValue" />.
+    /// </summary>
+    public static SizeValue Ratio(double value, SizeBehavior behavior = SizeBehavior.Required) => new(value, SizeUnit.Ratio, behavior);
+
+    /// <summary>
+    /// Implicitly converts a string representation (e.g., "50%" or "*" or "1-") into a <see cref="SizeValue"/>.
     /// </summary>
     public static implicit operator SizeValue(string inputString)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(inputString);
-
-        var percentageIndex = inputString.Length - 1;
-        if (inputString[percentageIndex] == '%')
+        if (string.IsNullOrEmpty(inputString))
         {
-            return new SizeValue(double.Parse(inputString[..percentageIndex]) / 100.0, SizeMode.Percentage);
+            return Default;
         }
-        
-        return new SizeValue(double.Parse(inputString));
+
+        var inputChars = inputString.AsSpan();
+        var behavior = SizeBehavior.Required;
+
+        if (inputChars[^1] == '~')
+        {
+            inputChars = inputChars[..^1];
+            behavior = SizeBehavior.Shrink;
+        }
+
+        var unitIndex = inputChars.Length - 1;
+
+        if (unitIndex < 0)
+        {
+            return behavior == SizeBehavior.Shrink ? Shrink : Default;
+        }
+
+        switch (inputChars[unitIndex])
+        {
+            case '%':
+                var percentage = unitIndex == 0 ? 100.0 : double.Parse(inputChars[..unitIndex]);
+                percentage /= 100;
+                return new SizeValue(percentage, SizeUnit.Stage, behavior);
+            case '*':
+                var constraintRatio = unitIndex == 0 ? 1.0 : double.Parse(inputChars[..unitIndex]);
+                return new SizeValue(constraintRatio, SizeUnit.Constraint, behavior);
+            case 'r':
+                var axisRatio = unitIndex == 0 ? 1.0 : double.Parse(inputChars[..unitIndex]);
+                return new SizeValue(axisRatio, SizeUnit.Ratio, behavior);
+            case 'M':
+            case 'm':
+                var measuredRatio = unitIndex == 0 ? 1.0 : double.Parse(inputChars[..unitIndex]);
+                return new SizeValue(measuredRatio, SizeUnit.Measured, behavior);
+            default:
+                var ratio = double.Parse(inputChars);
+                return new SizeValue(ratio, SizeUnit.Measured, behavior);
+        }
+    }
+
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        if (Behavior == SizeBehavior.Shrink)
+        {
+            return Unit switch
+            {
+                SizeUnit.Measured => $"{Value}~",
+                SizeUnit.Stage => $"{Value * 100}%~",
+                SizeUnit.Constraint => $"{Value}*~",
+                SizeUnit.Ratio => $"{Value}r~",
+                _ => throw new FormatException($"Invalid size value: {Value}")
+            };
+        }
+
+        return Unit switch
+        {
+            SizeUnit.Measured => $"{Value}",
+            SizeUnit.Stage => $"{Value * 100}%",
+            SizeUnit.Constraint => $"{Value}*",
+            SizeUnit.Ratio => $"{Value}r",
+            _ => throw new FormatException($"Invalid size value: {Value}")
+        };
     }
 }

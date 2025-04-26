@@ -23,4 +23,3 @@ internal readonly struct Symbol : IEquatable<Symbol>
     public static bool operator ==(Symbol left, Symbol right) => left.Id == right.Id;
     public static bool operator !=(Symbol left, Symbol right) => left.Id != right.Id;
 }
-

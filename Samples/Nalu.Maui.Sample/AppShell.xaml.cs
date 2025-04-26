@@ -7,7 +7,7 @@ namespace Nalu.Maui.Sample;
 public partial class AppShell : NaluShell
 {
     public AppShell(INavigationService navigationService)
-        : base(navigationService, typeof(OnePage))
+        : base(navigationService, typeof(MagnetDemoPage))
     {
         InitializeComponent();
         NavigationEvent += OnNavigationEvent;

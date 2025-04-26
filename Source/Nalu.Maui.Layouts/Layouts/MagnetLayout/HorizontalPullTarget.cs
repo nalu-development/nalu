@@ -5,7 +5,8 @@ namespace Nalu.MagnetLayout;
 /// </summary>
 /// <param name="Id">The magnet element identifier.</param>
 /// <param name="Pole">The traction pole.</param>
-public readonly record struct HorizontalPullTarget(string Id, HorizontalPole Pole)
+/// <param name="Traction">The traction level.</param>
+public readonly record struct HorizontalPullTarget(string Id, HorizontalPoles Pole, Traction Traction = Traction.Default)
 {
     /// <summary>
     /// Implicitly converts a string representation (e.g., "elementId.PoleName") into a HorizontalPullTarget.
@@ -17,7 +18,18 @@ public readonly record struct HorizontalPullTarget(string Id, HorizontalPole Pol
             throw new ArgumentException("Input string cannot be null or whitespace for HorizontalPullTarget.", nameof(inputString));
         }
 
-        var parts = inputString.Split('.');
+        string[] parts;
+        Traction traction;
+        if (inputString[^1] == '!') // Traction is not supported yet
+        {
+            traction = Traction.Strong;
+            parts = inputString[..^1].Split('.');
+        }
+        else
+        {
+            traction = Traction.Default;
+            parts = inputString.Split('.');
+        }
 
         if (parts.Length != 2)
         {
@@ -32,12 +44,12 @@ public readonly record struct HorizontalPullTarget(string Id, HorizontalPole Pol
             throw new ArgumentException($"Element ID cannot be empty in HorizontalPullTarget string '{inputString}'.", nameof(inputString));
         }
 
-        if (!Enum.TryParse<HorizontalPole>(poleName, true, out var horizontalPole))
+        if (!Enum.TryParse<HorizontalPoles>(poleName, true, out var horizontalPole))
         {
             throw new ArgumentException($"Invalid HorizontalPole name '{poleName}' in string '{inputString}'.", nameof(inputString));
         }
 
-        return new HorizontalPullTarget(elementId, horizontalPole);
+        return new HorizontalPullTarget(elementId, horizontalPole, traction);
     }
 
     /// <inheritdoc />

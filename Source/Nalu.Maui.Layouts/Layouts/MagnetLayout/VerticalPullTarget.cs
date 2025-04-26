@@ -5,7 +5,8 @@ namespace Nalu.MagnetLayout;
 /// </summary>
 /// <param name="Id">The magnet element identifier.</param>
 /// <param name="Pole">The traction pole.</param>
-public readonly record struct VerticalPullTarget(string Id, VerticalPole Pole)
+/// <param name="Traction">The traction level.</param>
+public readonly record struct VerticalPullTarget(string Id, VerticalPoles Pole, Traction Traction = Traction.Default)
 {
     /// <summary>
     /// Implicitly converts a string representation (e.g., "elementId.PoleName") into a VerticalPullTarget.
@@ -17,7 +18,18 @@ public readonly record struct VerticalPullTarget(string Id, VerticalPole Pole)
             throw new ArgumentException("Input string cannot be null or whitespace for VerticalPullTarget.", nameof(inputString));
         }
 
-        var parts = inputString.Split('.');
+        string[] parts;
+        Traction traction;
+        if (inputString[^1] == '!') // Traction is not supported yet
+        {
+            traction = Traction.Strong;
+            parts = inputString[..^1].Split('.');
+        }
+        else
+        {
+            traction = Traction.Default;
+            parts = inputString.Split('.');
+        }
 
         if (parts.Length != 2)
         {
@@ -32,12 +44,12 @@ public readonly record struct VerticalPullTarget(string Id, VerticalPole Pole)
             throw new ArgumentException($"Element ID cannot be empty in VerticalPullTarget string '{inputString}'.", nameof(inputString));
         }
 
-        if (!Enum.TryParse<VerticalPole>(poleName, true, out var horizontalPole))
+        if (!Enum.TryParse<VerticalPoles>(poleName, true, out var horizontalPole))
         {
             throw new ArgumentException($"Invalid VerticalPole name '{poleName}' in string '{inputString}'.", nameof(inputString));
         }
 
-        return new VerticalPullTarget(elementId, horizontalPole);
+        return new VerticalPullTarget(elementId, horizontalPole, traction);
     }
 
     /// <inheritdoc />

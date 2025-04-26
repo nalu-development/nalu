@@ -17,8 +17,7 @@ public static class NaluLayoutsMauiAppBuilderExtensions
     {
         _ = new NaluXamlLayoutsInitializer();
 
-        builder.ConfigureMauiHandlers(
-            handlers =>
+        builder.ConfigureMauiHandlers(handlers =>
             {
                 handlers.AddHandler<IViewBox, ViewBoxHandler>();
             }

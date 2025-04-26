@@ -6,10 +6,12 @@ namespace Nalu;
 /// <summary>
 /// <see cref="ViewBoxBase" /> is a base class a <see cref="IViewBox" /> that is used to display a single view.
 /// </summary>
-public abstract class ViewBoxBase : View, IViewBox
+public abstract class ViewBoxBase : View, IViewBox, ISafeAreaView
 {
     private ILayoutManager? _layoutManager;
     private ILayoutManager LayoutManager => _layoutManager ??= CreateLayoutManager();
+
+    bool ISafeAreaView.IgnoreSafeArea => false;
 
     /// <summary>
     /// Bindable property for <see cref="Padding" /> property.

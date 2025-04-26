@@ -72,7 +72,7 @@ public enum ExpanderAnimationBehavior
     /// <summary>
     /// When appearing for the first time and when <see cref="BindableObject.BindingContext" /> changes, the view box will animate.
     /// </summary>
-    Always,
+    Always
 }
 
 /// <summary>

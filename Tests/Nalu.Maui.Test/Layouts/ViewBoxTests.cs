@@ -122,7 +122,7 @@ public class ViewBoxTests
         var component = new ViewBox { IsPlatformEnabled = true };
         var newPadding = new Thickness(10);
         var measureInvalidated = false;
-        component.MeasureInvalidated += (s, e) => measureInvalidated = true;
+        component.MeasureInvalidated += (_, _) => measureInvalidated = true;
 
         // Act
         component.Padding = newPadding;

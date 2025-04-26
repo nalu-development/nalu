@@ -4,7 +4,7 @@ using System.Globalization;
 namespace Nalu.MagnetLayout;
 
 /// <summary>
-/// Type converter for <see cref="SizeValue"/>.
+/// Type converter for <see cref="SizeValue" />.
 /// </summary>
 public class SizeValueTypeConverter : TypeConverter
 {
@@ -16,10 +16,9 @@ public class SizeValueTypeConverter : TypeConverter
     {
         if (value is string strValue)
         {
-            return (SizeValue)strValue;
+            return (SizeValue) strValue;
         }
 
         return null;
     }
 }
-

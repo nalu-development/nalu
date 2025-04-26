@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:magnet="clr-namespace:Nalu.MagnetLayout;assembly=Nalu.Maui.Layouts"
              x:Class="Nalu.Maui.Sample.Pages.FivePage"
              x:DataType="pageModels:FivePageModel"
              Title="Page Five"

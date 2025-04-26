@@ -1,5 +1,6 @@
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using Nalu.Cassowary;
+using Nalu.Internals;
 
 namespace Nalu.MagnetLayout;
 
@@ -8,26 +9,39 @@ namespace Nalu.MagnetLayout;
 /// </summary>
 public delegate IEnumerable<Constraint> ConstraintsFactory(IMagnetStage stage);
 
+static file class MagnetElementIds
+{
+    public static int IdCounter;
+}
+
 /// <summary>
 /// Base class for elements that can be part of a magnet layout stage.
 /// </summary>
 /// <typeparam name="TConstraintType">Enum type defining all the possible constraints applied by the element.</typeparam>
 public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagnetElement
-    where TConstraintType : notnull
+    where TConstraintType : struct, Enum
 {
+    private class StoredConstraintsFactory
+    {
+        public bool IsSet { get; set; }
+        public ConstraintsFactory? CreateConstraints { get; set; }
+    }
+    
     /// <summary>
-    /// Bindable property for <see cref="Id"/>.
+    /// Bindable property for <see cref="Id" />.
     /// </summary>
     public static readonly BindableProperty IdProperty = BindableProperty.Create(
         nameof(Id),
         typeof(string),
         typeof(MagnetElementBase<TConstraintType>),
-        defaultValue: null,
+        defaultValueCreator: bindable => $"{bindable.GetType().Name}-{++MagnetElementIds.IdCounter}",
         defaultBindingMode: BindingMode.OneTime,
-        propertyChanged: OnIdPropertyChanged);
+        propertyChanged: OnIdPropertyChanged
+    );
 
-    private readonly Dictionary<TConstraintType, ConstraintsFactory> _constraintsFactories = [];
-    private readonly Dictionary<TConstraintType, List<Constraint>> _constraints = [];
+    private readonly SealedEnumDictionary<TConstraintType, StoredConstraintsFactory> _constraintsFactories = new(_ => new StoredConstraintsFactory());
+    private readonly SealedEnumDictionary<TConstraintType, List<Constraint>?> _constraints = new();
+    private bool _applyConstraintsImmediately;
     private IMagnetStage? _stage;
 
     /// <summary>
@@ -35,7 +49,7 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
     /// </summary>
     public string Id
     {
-        get => (string?)GetValue(IdProperty) ?? throw new NullReferenceException("Id cannot be null");
+        get => (string?) GetValue(IdProperty) ?? throw new NullReferenceException("Id cannot be null");
         set => SetValue(IdProperty, value ?? throw new ArgumentNullException(nameof(value), "Id cannot be null"));
     }
 
@@ -44,68 +58,163 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
     {
         if (_stage != null)
         {
-            RemoveConstraints();
+            foreach (var (type, storedFactory) in _constraintsFactories)
+            {
+                if (!storedFactory.IsSet)
+                {
+                    continue;
+                }
+
+                storedFactory.IsSet = false;
+
+                if (_constraints[type] is { } constraints)
+                {
+                    foreach (var constraint in constraints)
+                    {
+                        _stage.RemoveConstraint(constraint);
+                    }
+                }
+            }
+
+            foreach (var (variable, _) in GetEditableVariables())
+            {
+                _stage.RemoveEditVariable(variable);
+            }
         }
 
         _stage = stage;
 
-        if (_stage != null)
+        if (_stage is not null)
         {
-            AddConstraints();
+            foreach (var (variable, strength) in GetEditableVariables())
+            {
+                _stage.AddEditVariable(variable, strength);
+            }
         }
     }
 
     /// <summary>
-    /// Sets the <paramref name="constraintsFactory"/> for the specified <paramref name="constraintType"/>
-    /// only if the <see cref="ConstraintsFactory"/> on the <paramref name="constraintType"/> is not already set.
+    /// Sets the <paramref name="constraintsFactory" /> for the specified <paramref name="constraintType" /> and invalidates the stage
+    /// only if the <see cref="ConstraintsFactory" /> on the <paramref name="constraintType" /> is not already set to the same value.
     /// </summary>
-    protected void TryAddConstraints(TConstraintType constraintType, ConstraintsFactory constraintsFactory)
+    protected void EnsureConstraintsFactory(TConstraintType constraintType, ConstraintsFactory constraintsFactory)
     {
-        if (_constraintsFactories.TryAdd(constraintType, constraintsFactory))
+        var factory = _constraintsFactories[constraintType];
+
+        if (factory.CreateConstraints is null || factory.CreateConstraints != constraintsFactory)
+        {
+            factory.CreateConstraints = constraintsFactory;
+            factory.IsSet = false;
+            _stage?.Invalidate();
+        }
+    }
+
+    /// <summary>
+    /// Sets the <paramref name="constraintsFactory" /> for the specified <paramref name="constraintType" /> and invalidates the stage.
+    /// </summary>
+    protected void UpdateConstraints(TConstraintType constraintType, ConstraintsFactory? constraintsFactory)
+    {
+        var storedFactory = _constraintsFactories[constraintType];
+
+        if (constraintsFactory is null && storedFactory.CreateConstraints is null)
+        {
+            // Both are null, no need to invalidate the stage or do anything
+            return;
+        }
+
+        storedFactory.CreateConstraints = constraintsFactory;
+
+        if (_applyConstraintsImmediately)
         {
             ApplyConstraints(constraintType, constraintsFactory);
+            storedFactory.IsSet = true;
+        }
+        else
+        {
+            storedFactory.IsSet = false;
+            _stage?.Invalidate();
+        }
+    }
+
+    /// <inheritdoc />
+    public void ApplyConstraints() => ApplyConstraints(_stage ?? throw new InvalidOperationException("Stage is not set"));
+
+    /// <inheritdoc />
+    public void FinalizeConstraints()
+    {
+        _applyConstraintsImmediately = true;
+        FinalizeConstraints(_stage ?? throw new InvalidOperationException("Stage is not set"));
+        _applyConstraintsImmediately = false;
+    }
+
+    /// <inheritdoc cref="IMagnetElement.FinalizeConstraints"/>
+    protected virtual void FinalizeConstraints(IMagnetStage stage)
+    {
+    }
+
+    /// <summary>
+    /// Gets the editable variables for the element.
+    /// </summary>
+    /// <returns></returns>
+    protected virtual (Variable Variable, double Strength)[] GetEditableVariables() => [];
+
+    /// <summary>
+    /// Applies the constraints for the element.
+    /// </summary>
+    protected virtual void ApplyConstraints(IMagnetStage stage) => ApplyChangedConstraints();
+
+    private void ApplyChangedConstraints()
+    {
+        foreach (var (type, storedFactory) in _constraintsFactories)
+        {
+            if (storedFactory.IsSet)
+            {
+                continue;
+            }
+
+            ApplyConstraints(type, storedFactory.CreateConstraints);
+            storedFactory.IsSet = true;
         }
     }
 
     /// <summary>
-    /// Sets the <paramref name="constraintsFactory"/> for the specified <paramref name="constraintType"/>.
+    /// Invalidates the stage (if any).
     /// </summary>
-    /// <remarks>
-    /// Removes the existing constraints of the same type if they exist.
-    /// Immediately applies the new constraints to the stage if it is already set.
-    /// </remarks>
-    protected void SetConstraints(TConstraintType constraintType, ConstraintsFactory constraintsFactory)
-    {
-        _constraintsFactories[constraintType] = constraintsFactory;
+    protected void InvalidateStage() => _stage?.Invalidate();
 
-        ApplyConstraints(constraintType, constraintsFactory);
-    }
-
-    private void ApplyConstraints(TConstraintType constraintType, ConstraintsFactory constraintsFactory)
+    private void ApplyConstraints(TConstraintType constraintType, ConstraintsFactory? constraintsFactory)
     {
-        if (_stage is null)
+        var stage = _stage ?? throw new InvalidOperationException("Stage is not set");
+
+        var appliedConstraints = _constraints[constraintType];
+        if (appliedConstraints is not null)
+        {
+            foreach (var appliedConstraint in appliedConstraints)
+            {
+                stage.RemoveConstraint(appliedConstraint);
+            }
+        }
+
+        if (constraintsFactory is null)
         {
             return;
         }
-        
-        ref var appliedConstraints = ref CollectionsMarshal.GetValueRefOrAddDefault(_constraints, constraintType, out var exists);
 
-        if (exists)
+        if (appliedConstraints is null)
         {
-            foreach (var appliedConstraint in appliedConstraints!)
-            {
-                _stage.RemoveConstraint(appliedConstraint);
-            }
+            appliedConstraints = [..constraintsFactory(stage)];
+            _constraints[constraintType] = appliedConstraints;
         }
-        
-        appliedConstraints = [..constraintsFactory(_stage)];
+        else
+        {
+            appliedConstraints.Clear();
+            appliedConstraints.AddRange(constraintsFactory(stage));
+        }
 
         foreach (var constraint in appliedConstraints)
         {
-            _stage.AddConstraint(constraint);
+            stage.AddConstraint(constraint);
         }
-
-        _stage.Invalidate();
     }
 
     /// <summary>
@@ -118,40 +227,24 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
     /// </summary>
     protected void RemoveConstraints(TConstraintType constraintType)
     {
-        _constraintsFactories.Remove(constraintType);
-
-        if (_stage is not null && _constraints.Remove(constraintType, out var constraints))
+        var storedFactory = _constraintsFactories[constraintType];
+        if (storedFactory.CreateConstraints is null)
         {
-            foreach (var constraint in constraints)
-            {
-                _stage.RemoveConstraint(constraint);
-            }
-        }
-    }
-
-    private void AddConstraints()
-    {
-        var stage = _stage!;
-        foreach (var (constraintType, constraintFactory) in _constraintsFactories)
-        {
-            List<Constraint> constraints = [..constraintFactory(stage)];
-            _constraints[constraintType] = constraints;
-
-            foreach (var constraint in constraints)
-            {
-                stage.AddConstraint(constraint);
-            }
-        }
-    }
-
-    private void RemoveConstraints()
-    {
-        foreach (var constraint in _constraints.Values.SelectMany(c => c))
-        {
-            _stage!.RemoveConstraint(constraint);
+            return;
         }
 
-        _constraints.Clear();
+        storedFactory.CreateConstraints = null;
+
+        if (_applyConstraintsImmediately)
+        {
+            ApplyConstraints(constraintType, null);
+            storedFactory.IsSet = true;
+        }
+        else
+        {
+            storedFactory.IsSet = false;
+            _stage?.Invalidate();
+        }
     }
 
     private static void OnIdPropertyChanged(BindableObject bindable, object oldValue, object newValue)
@@ -161,14 +254,17 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
             throw new ArgumentNullException(nameof(newValue), "Id cannot be null");
         }
 
-        if (oldValue != null)
-        {
-            throw new InvalidOperationException("Id cannot be changed once it has been set.");
-        }
-
         if (bindable is MagnetElementBase<TConstraintType> magnetElement)
         {
-            magnetElement.SetVariableNames((string)newValue);
+            if (magnetElement._stage != null)
+            {
+                throw new InvalidOperationException("Id cannot be changed once the element is added to a stage");
+            }
+
+            if (Debugger.IsAttached)
+            {
+                magnetElement.SetVariableNames((string) newValue);
+            }
         }
     }
 }

@@ -3,7 +3,7 @@ namespace Nalu.MagnetLayout;
 /// <summary>
 /// The horizontal pole of a magnet element.
 /// </summary>
-public enum HorizontalPole
+public enum HorizontalPoles : byte
 {
     /// <summary>
     /// The start pole of the element.
@@ -11,7 +11,7 @@ public enum HorizontalPole
     /// <remarks>
     /// This is the left pole in a left-to-right layout and the right pole in a right-to-left layout.
     /// </remarks>
-    Start,
+    Left = 1,
 
     /// <summary>
     /// The end pole of the element.
@@ -19,5 +19,5 @@ public enum HorizontalPole
     /// <remarks>
     /// This is the right pole in a left-to-right layout and the left pole in a right-to-left layout.
     /// </remarks>
-    End
+    Right = 2
 }

@@ -1,5 +1,4 @@
 using Microsoft.Maui.Handlers;
-
 #if ANDROID
 using Android.Content;
 using ARect = Android.Graphics.Rect;
@@ -18,7 +17,6 @@ using OriginalPlatformView = Microsoft.Maui.Platform.ContentPanel;
 namespace Nalu;
 
 #if WINDOWS
-
 #if NET9_0_OR_GREATER
 internal partial class ViewBoxPanel : OriginalPlatformView
 #else
@@ -41,7 +39,6 @@ internal partial class ViewBoxPanel : OriginalPlatformView
 #endif
 
 #if ANDROID
-
 internal class ClippableContentViewGroup : OriginalPlatformView
 {
     private readonly ARect _clipRect = new();
@@ -128,6 +125,7 @@ public class ViewBoxHandler() : ContentViewHandler(Mapper)
     {
         if (handler.PlatformView is not { } platformView)
         {
+            // This should never happen, but just in case
             return;
         }
 
