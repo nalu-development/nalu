@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:magnet="clr-namespace:Nalu.MagnetLayout;assembly=Nalu.Maui.Layouts"
+             x:Class="Nalu.Maui.Sample.Pages.MagnetDemoPage"
+             Title="Magnet Demo">
+    <ContentPage.Resources>
+        <magnet:MagnetStage x:Key="CardMagnetStage">
+            <magnet:MagnetView Id="CardImage"
+                               Margin="4"
+                               TopTo="Stage.Top" 
+                               BottomTo="Stage.Bottom"
+                               LeftTo="Stage.Left!" />
+            <magnet:MagnetView Id="CardName"
+                               TopTo="Stage.Top"
+                               BottomTo="CardDetail.Top!"
+                               Margin="8,0,0,0"
+                               Width="1~"
+                               HorizontalBias="0" 
+                               LeftTo="CardImage.Right"
+                               RightTo="Starred.Left!"/>
+            <magnet:MagnetView Id="Starred"
+                               LeftTo="CardName.Right!"
+                               RightTo="Money.Left"
+                               TopTo="CardName.Top"
+                               Margin="0,0,8,0"
+                               BottomTo="CardName.Bottom"/>
+            <magnet:MagnetView Id="CardDetail"
+                               TopTo="CardName.Bottom!" 
+                               BottomTo="Stage.Bottom"
+                               LeftTo="CardName.Left"/>
+            <magnet:MagnetView Id="Money"
+                               Height="*"
+                               TopTo="Stage.Top" 
+                               BottomTo="Stage.Bottom"
+                               RightTo="Stage.Right!"/>
+        </magnet:MagnetStage>
+    </ContentPage.Resources>
+
+    <nalu:ViewBox>
+        <Border Margin="8"
+                VerticalOptions="Center"
+                StrokeThickness="0"
+                StrokeShape="RoundRectangle 8"
+                Style="{StaticResource CardStyle}">
+            <nalu:Magnet Stage="{StaticResource CardMagnetStage}">
+                <Border nalu:Magnet.StageId="CardImage"
+                        HeightRequest="48"
+                        WidthRequest="60"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 8">
+                    <Image Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
+                           Aspect="AspectFill"/>
+                </Border>
+                <Label nalu:Magnet.StageId="CardName"
+                       FontSize="16"
+                       FontFamily="OpenSansSemibold"
+                       MaxLines="1"
+                       LineBreakMode="TailTruncation"
+                       Text="Regular card with long name" />
+                <Label nalu:Magnet.StageId="CardDetail"
+                       FontSize="12"
+                       Text="Mastercard · 08/25" />
+                <Label nalu:Magnet.StageId="Money"
+                       FontSize="18"
+                       Background="{StaticResource Secondary}"
+                       TextColor="{StaticResource PrimaryDark}"
+                       FontFamily="OpenSansSemibold"
+                       Padding="8"
+                       VerticalTextAlignment="Center"
+                       Text="$1,200.50" />
+                <Image nalu:Magnet.StageId="Starred"
+                       Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
+            </nalu:Magnet>
+        </Border>
+    </nalu:ViewBox>
+</ContentPage>

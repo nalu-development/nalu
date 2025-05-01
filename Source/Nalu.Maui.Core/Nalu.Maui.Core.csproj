@@ -4,6 +4,8 @@
     <Description>.NET MAUI developer utilities</Description>
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">
@@ -29,6 +31,9 @@
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Nalu.Maui.Navigation</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Nalu.Maui.Layouts</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>

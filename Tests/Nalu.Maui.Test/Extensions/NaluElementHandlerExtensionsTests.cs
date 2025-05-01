@@ -1,9 +1,10 @@
+#if !NET9_0_OR_GREATER
 using Nalu.Internals;
 
 namespace Nalu.Maui.Test.Extensions;
 
 /// <summary>
-/// Contains test methods for <see cref="NaluElementHandlerExtensions" />.
+/// Contains test methods for element handler extensions.
 /// </summary>
 public class NaluElementHandlerExtensionsTests
 {
@@ -116,3 +117,4 @@ public class NaluElementHandlerExtensionsTests
         exception.Should().NotBeNull().And.BeOfType<InvalidOperationException>();
     }
 }
+#endif

@@ -45,7 +45,7 @@ public class ExpanderViewBoxLayoutManager(IExpanderViewBox expander) : ILayoutMa
         measuredWidth += paddingHorizontalThickness;
 
         IView layoutView = expander;
-        
+
         var isExpanded = expander.IsExpanded;
         var arrangeWidth = isExpanded || expanderWidthConstraint < 0 ? measuredWidth : Math.Min(expanderWidthConstraint, measuredWidth);
         var arrangeHeight = isExpanded || expanderHeightConstraint < 0 ? measuredHeight : Math.Min(expanderHeightConstraint, measuredHeight);

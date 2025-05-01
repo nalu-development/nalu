@@ -27,4 +27,7 @@
     <ShellContent nalu:Navigation.PageType="pages:FivePage"
                   Title="Page Five"
                   Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}" />
+    <ShellContent nalu:Navigation.PageType="pages:MagnetDemoPage"
+                  Title="Magnet Demo"
+                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88c;', Color='Black', Size=24}" />
 </nalu:NaluShell>
