@@ -158,3 +158,14 @@ private void ScrollToMe(object? sender, EventArgs e)
     </CollectionView.ItemTemplate>
 </CollectionView>
 ```
+
+### Magnet
+
+`Magnet` is a powerful **constraint-based** layout that allows you to create complex layouts with ease by defining constraints.
+
+![Magnet](assets/images/magnet.png)
+
+The documentation is not yet available here, but you can [look at this presentation](https://docs.google.com/presentation/d/1VkKodflxRsIWdPN8ZgwiQKUBybEszTV3gXBW4cIiEqs/edit?usp=sharing).
+
+Keep in mind this layout is in **alpha/preview** state so its API may be subject to change.
+  

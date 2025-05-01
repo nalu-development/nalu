@@ -95,6 +95,10 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
   `ExpanderViewBox` have you covered, even when you need it inside a `CollectionView`.
   ![Expander demo](docs/assets/images/expander.gif)
 
+- What about a powerful **constraint-based** layout?
+  `Magnet` is here to help you with that, now in alpha preview, [see the presentation](https://docs.google.com/presentation/d/1VkKodflxRsIWdPN8ZgwiQKUBybEszTV3gXBW4cIiEqs/edit?usp=sharing).
+  ![Magnet](docs/assets/images/magnet.png)
+
 **Find out more at [Nalu Website](https://nalu-development.github.io/nalu/layouts.html).**
 
 ### Controls [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
