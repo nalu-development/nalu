@@ -7,14 +7,21 @@ namespace Nalu.Cassowary;
 /// A constraint, consisting of an equation governed by an expression and a relational operator,
 /// and an associated strength.
 /// </summary>
-/// <summary>
-/// Initializes a new instance of the <see cref="Constraint" /> struct.
-/// </summary>
-/// <param name="Expression">The <see cref="Cassowary.Expression" />.</param>
-/// <param name="Operator">The <see cref="RelationalOperator" />.</param>
-/// <param name="Strength">The strength.</param>
-public readonly record struct Constraint(Expression Expression, RelationalOperator Operator, double Strength)
+public class Constraint
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Constraint" /> struct.
+    /// </summary>
+    /// <param name="expression">The <see cref="Cassowary.Expression" />.</param>
+    /// <param name="operator">The <see cref="RelationalOperator" />.</param>
+    /// <param name="strength">The strength.</param>
+    public Constraint(Expression expression, RelationalOperator @operator, double strength)
+    {
+        Expression = expression;
+        Operator = @operator;
+        Strength = strength;
+    }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="Constraint" /> struct.
     /// </summary>
@@ -22,6 +29,15 @@ public readonly record struct Constraint(Expression Expression, RelationalOperat
     /// <param name="relation">The <see cref="WeightedRelation" />.</param>
     public Constraint(Expression expression, WeightedRelation relation)
         : this(expression, relation.Operator, relation.Strength) { }
+
+    /// <summary>The <see cref="Cassowary.Expression" />.</summary>
+    public Expression Expression { get; }
+
+    /// <summary>The <see cref="RelationalOperator" />.</summary>
+    public RelationalOperator Operator { get; }
+
+    /// <summary>The strength.</summary>
+    public double Strength { get; }
 
     /// <inheritdoc />
     public override string ToString()

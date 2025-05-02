@@ -59,9 +59,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     }
 
     private Constraint _stageStartConstraint;
-    private Constraint _stageEndConstraint;
     private Constraint _stageTopConstraint;
-    private Constraint _stageBottomConstraint;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MagnetStage"/> class.
@@ -74,11 +72,14 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         Bottom.SetName("Stage.Bottom");
 
         _stageStartConstraint = Left | WeightedRelation.Eq(Strength.Required) | 0;
-        _stageEndConstraint = Right | WeightedRelation.Eq(Strength.Required) | 0;
         _stageTopConstraint = Top | WeightedRelation.Eq(Strength.Required) | 0;
-        _stageBottomConstraint = Bottom | WeightedRelation.Eq(Strength.Required) | 0;
         
-        _solver.AddConstraints(_stageStartConstraint, _stageEndConstraint, _stageTopConstraint, _stageBottomConstraint);
+        _solver.AddEditVariable(Right, Strength.Required - 1);
+        _solver.AddEditVariable(Bottom, Strength.Required - 1);
+        _solver.SuggestValue(Right, 0);
+        _solver.SuggestValue(Bottom, 0);
+        
+        _solver.AddConstraints(_stageStartConstraint, _stageTopConstraint);
     }
 
     /// <inheritdoc />
@@ -182,49 +183,40 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     /// <inheritdoc />
     public void SuggestValue(Variable variable, double value) => _solver.SuggestValue(variable, value);
     
-    private void SetBounds(double start, double top, double end, double bottom, bool forMeasure)
+    private void SetBounds(double width, double height, bool forMeasure)
     {
+        _ = forMeasure;
         // TODO: we having positiveInfinity we have to use LessOrEq
-        var endWeightedRelation = forMeasure ? WeightedRelation.LessOrEq(Strength.Required) : WeightedRelation.Eq(Strength.Required);
-        var leftConstraint = Left | WeightedRelation.Eq(Strength.Required) | start;
-        var rightConstraint = Right | endWeightedRelation | end;
-        var topConstraint = Top | WeightedRelation.Eq(Strength.Required) | top;
-        var bottomConstraint = Bottom | endWeightedRelation | bottom;
-
-        if (_stageStartConstraint != leftConstraint)
-        {
-            _solver.RemoveConstraint(_stageStartConstraint);
-            _solver.AddConstraint(_stageStartConstraint = leftConstraint);
-            Left.CurrentValue = start;
-        }
+        // var endWeightedRelation = forMeasure ? WeightedRelation.LessOrEq(Strength.Required) : WeightedRelation.Eq(Strength.Required);
+        // var leftConstraint = Left | WeightedRelation.Eq(Strength.Required) | start;
+        // var rightConstraint = Right | endWeightedRelation | end;
+        // var topConstraint = Top | WeightedRelation.Eq(Strength.Required) | top;
+        // var bottomConstraint = Bottom | endWeightedRelation | bottom;
         
-        if (_stageEndConstraint != rightConstraint)
-        {
-            _solver.RemoveConstraint(_stageEndConstraint);
-            _solver.AddConstraint(_stageEndConstraint = rightConstraint);
-            Right.CurrentValue = end;
-        }
-        
-        if (_stageTopConstraint != topConstraint)
-        {
-            _solver.RemoveConstraint(_stageTopConstraint);
-            _solver.AddConstraint(_stageTopConstraint = topConstraint);
-            Top.CurrentValue = top;
-        }
-        
-        if (_stageBottomConstraint != bottomConstraint)
-        {
-            _solver.RemoveConstraint(_stageBottomConstraint);
-            _solver.AddConstraint(_stageBottomConstraint = bottomConstraint);
-            Bottom.CurrentValue = bottom;
-        }
+        Right.CurrentValue = width;
+        Bottom.CurrentValue = height;
+        _solver.SuggestValue(Right, width);
+        _solver.SuggestValue(Bottom, height);
+        // if (_stageTopConstraint != topConstraint)
+        // {
+        //     _solver.RemoveConstraint(_stageTopConstraint);
+        //     _solver.AddConstraint(_stageTopConstraint = topConstraint);
+        //     Top.CurrentValue = top;
+        // }
+        //
+        // if (_stageBottomConstraint != bottomConstraint)
+        // {
+        //     _solver.RemoveConstraint(_stageBottomConstraint);
+        //     _solver.AddConstraint(_stageBottomConstraint = bottomConstraint);
+        //     Bottom.CurrentValue = bottom;
+        // }
     }
 
     /// <inheritdoc />
-    public void PrepareForMeasure(double start, double top, double end, double bottom)
+    public void PrepareForMeasure(double width, double height)
     {
         // TODO: optimize depending on Fill or not: when fill we can simply do arrange mode
-        SetBounds(start, top, end, bottom, true);
+        SetBounds(width, height, true);
 
         foreach (var element in _elements)
         {
@@ -242,9 +234,9 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     }
 
     /// <inheritdoc />
-    public void PrepareForArrange(double start, double top, double end, double bottom)
+    public void PrepareForArrange(double width, double height)
     {
-        SetBounds(start, top, end, bottom, false);
+        SetBounds(width, height, false);
 
         foreach (var element in _elements)
         {

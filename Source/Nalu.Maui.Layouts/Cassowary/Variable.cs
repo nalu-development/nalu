@@ -9,8 +9,11 @@
 /// Each new variable is unique in the view of the solver, but copying or cloning the variable produces
 /// a copy of the same variable.
 /// </summary>
-public class Variable : IEquatable<Variable>
+public class Variable
 {
+    private static long _idTick;
+    private readonly long _id;
+
     /// <summary>
     /// Gets the name for this variable.
     /// </summary>
@@ -23,24 +26,12 @@ public class Variable : IEquatable<Variable>
     public double CurrentValue { get; set; }
 
     /// <summary>
-    /// Gets the variable identifier.
-    /// </summary>
-    public Guid Id { get; }
-
-    /// <summary>
     /// Initializes a new instance of the <see cref="Variable" /> class.
     /// </summary>
     /// <returns>New instance <see cref="Variable" />.</returns>
     public Variable()
-        : this(Guid.NewGuid()) { }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="Variable" /> class with specified identifier.
-    /// </summary>
-    /// <param name="id"></param>
-    public Variable(Guid id)
     {
-        Id = id;
+        _id = ++_idTick;
     }
 
     /// <summary>
@@ -50,16 +41,7 @@ public class Variable : IEquatable<Variable>
     public void SetName(string name) => Name = name;
 
     /// <inheritdoc />
-    public bool Equals(Variable? other) => Id.Equals(other?.Id);
-
-    /// <inheritdoc />
-    public override bool Equals(object? obj) => obj is Variable variable && Id.Equals(variable.Id);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => Id.GetHashCode();
-
-    /// <inheritdoc />
-    public override string ToString() => Name ?? Id.ToString();
+    public override string ToString() => $"{Name ?? "v" + _id}: {CurrentValue}";
 
     #region operator +
 
@@ -279,26 +261,6 @@ public class Variable : IEquatable<Variable>
     /// <returns>New <see cref="Term" />.</returns>
     public static Term operator /(Variable variable, double value)
         => new(variable, 1 / value);
-
-    #endregion
-
-    #region operator ==
-
-    /// <summary>
-    /// Compare <paramref name="left" /> and <paramref name="right" /> for equality.
-    /// </summary>
-    /// <param name="left"></param>
-    /// <param name="right"></param>
-    /// <returns>True if variables ids match.</returns>
-    public static bool operator ==(Variable left, Variable right) => left.Equals(right);
-
-    /// <summary>
-    /// Compare <paramref name="left" /> and <paramref name="right" /> for equality.
-    /// </summary>
-    /// <param name="left"></param>
-    /// <param name="right"></param>
-    /// <returns>False if variables ids match.</returns>
-    public static bool operator !=(Variable left, Variable right) => !(left == right);
 
     #endregion
 }

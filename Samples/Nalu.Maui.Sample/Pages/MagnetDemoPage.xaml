@@ -45,8 +45,10 @@
                 StrokeThickness="0"
                 StrokeShape="RoundRectangle 8"
                 Style="{StaticResource CardStyle}">
-            <nalu:Magnet Stage="{StaticResource CardMagnetStage}">
+            <Grid RowDefinitions="*,0.85*" ColumnDefinitions="Auto,Auto,*,Auto">
                 <Border nalu:Magnet.StageId="CardImage"
+                        Grid.RowSpan="2"
+                        Margin="4,4,8,4"
                         HeightRequest="48"
                         WidthRequest="60"
                         StrokeThickness="0"
@@ -55,15 +57,23 @@
                            Aspect="AspectFill"/>
                 </Border>
                 <Label nalu:Magnet.StageId="CardName"
+                       Grid.Column="1"
+                       VerticalOptions="End"
                        FontSize="16"
                        FontFamily="OpenSansSemibold"
                        MaxLines="1"
                        LineBreakMode="TailTruncation"
-                       Text="Regular card with long name" />
+                       Text="Regular card" />
                 <Label nalu:Magnet.StageId="CardDetail"
+                       Grid.Column="1"
+                       Grid.ColumnSpan="2"
+                       Grid.Row="1"
+                       VerticalOptions="Start"
                        FontSize="12"
                        Text="Mastercard · 08/25" />
                 <Label nalu:Magnet.StageId="Money"
+                       Grid.RowSpan="2"
+                       Grid.Column="3"
                        FontSize="18"
                        Background="{StaticResource Secondary}"
                        TextColor="{StaticResource PrimaryDark}"
@@ -72,8 +82,12 @@
                        VerticalTextAlignment="Center"
                        Text="$1,200.50" />
                 <Image nalu:Magnet.StageId="Starred"
+                       Grid.Column="2"
+                       HorizontalOptions="Start"
+                       VerticalOptions="End"
+                       Margin="4,0,0,4"
                        Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
-            </nalu:Magnet>
+            </Grid>
         </Border>
     </nalu:ViewBox>
 </ContentPage>

@@ -332,7 +332,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
                 var heightConstraint = stage.Bottom.CurrentValue - stage.Top.CurrentValue;
                 var size = view.Measure(widthConstraint, heightConstraint);
 
-                UpdateMeasureConstraints(size);
+                UpdateMeasureConstraints(stage, size);
             }
         }
 
@@ -367,28 +367,23 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (needsMeasure)
         {
             var size = view.Measure(widthConstraint, heightConstraint);
-            UpdateMeasureConstraints(size);
+            UpdateMeasureConstraints(stage, size);
         }
     }
 
-    private void UpdateMeasureConstraints(Size size)
+    /// <inheritdoc />
+    protected override (Variable Variable, double Strength)[] GetEditableVariables() => [(_measuredWidth, Required - 1), (_measuredHeight, Required - 1)];
+
+    private void UpdateMeasureConstraints(IMagnetStage stage, Size size)
     {
-        if (Width.Unit is SizeUnit.Measured)
+        if (_measuredWidth.CurrentValue != size.Width)
         {
-            UpdateConstraints(ConstraintTypes.MeasuredWidth, _ => [_measuredWidth | Eq(Required) | size.Width]);
-        }
-        else
-        {
-            RemoveConstraints(ConstraintTypes.MeasuredWidth);
+            stage.SuggestValue(_measuredWidth, size.Width);
         }
 
-        if (Height.Unit is SizeUnit.Measured)
+        if (_measuredHeight.CurrentValue != size.Height)
         {
-            UpdateConstraints(ConstraintTypes.MeasuredHeight, _ => [_measuredHeight | Eq(Required) | size.Height]);
-        }
-        else
-        {
-            RemoveConstraints(ConstraintTypes.MeasuredHeight);
+            stage.SuggestValue(_measuredHeight, size.Height);
         }
     }
 

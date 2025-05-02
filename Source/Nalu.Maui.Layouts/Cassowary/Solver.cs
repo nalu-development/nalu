@@ -175,8 +175,14 @@ public class Solver
 
                 if (_varData.TryGetValue(term.Variable, out var data))
                 {
-                    data.Item3--;
-                    _varData[term.Variable] = data;
+                    if (--data.Item3 == 0)
+                    {
+                        shouldRemove = true;
+                    }
+                    else
+                    {
+                        _varData[term.Variable] = data;
+                    }
                 }
 
                 if (shouldRemove)
@@ -192,7 +198,7 @@ public class Solver
     /// Test whether a constraint has been added to the solver.
     /// </summary>
     /// <param name="constraint">The <see cref="Constraint" />.</param>
-    /// <returns>True is has the <paramref name="constraint" />; otherwise it return false.</returns>
+    /// <returns>True if it has the <paramref name="constraint" />; otherwise it returns false.</returns>
     public bool HasConstraint(Constraint constraint)
         => _cns.ContainsKey(constraint);
 
@@ -746,8 +752,9 @@ public class Solver
             var symbol = new Symbol(_idTick++, SymbolType.External);
             _varForSymbol.Add(symbol, variable);
 
-            data = (float.NaN, symbol, 0);
+            data = (float.NaN, symbol, 1);
             _varData.Add(variable, data);
+            return symbol;
         }
 
         _varData[variable] = (data.Item1, data.Item2, data.Item3 + 1);
