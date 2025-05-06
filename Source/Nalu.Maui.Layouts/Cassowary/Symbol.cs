@@ -4,8 +4,8 @@ internal readonly struct Symbol : IEquatable<Symbol>
 {
     public static readonly Symbol Invalid = new(0, SymbolType.Invalid);
 
-    public int Id { get; }
-    public SymbolType Type { get; }
+    public readonly int Id;
+    public readonly SymbolType Type;
 
     public Symbol(int id, SymbolType type)
     {

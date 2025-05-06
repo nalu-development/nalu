@@ -168,4 +168,22 @@ private void ScrollToMe(object? sender, EventArgs e)
 The documentation is not yet available here, but you can [look at this presentation](https://docs.google.com/presentation/d/1VkKodflxRsIWdPN8ZgwiQKUBybEszTV3gXBW4cIiEqs/edit?usp=sharing).
 
 Keep in mind this layout is in **alpha/preview** state so its API may be subject to change.
+
+Here's a performance comparison between `GridLayout` and `MagnetLayout` considering two scenarios:
+1. **Dynamic measure**: All the views keep chaining their size on each measure pass (rare case)
+2. **Constant measure**: The views always return the same size (very common)
+
+| Method                          | Mean      | Error     | StdDev    | Gen0     | Allocated |
+|-------------------------------- |----------:|----------:|----------:|---------:|----------:|
+| GridLayoutPerf                  |  4.705 ms | 0.0644 ms | 0.0603 ms | 400.0000 |   3.57 MB |                                                                                                                                                                                                                                                                                   
+| MagnetLayoutPerf                | 19.718 ms | 0.1535 ms | 0.1436 ms | 600.0000 |   5.15 MB |
+| GridLayoutConstantMeasurePerf   |  2.912 ms | 0.0562 ms | 0.0730 ms | 300.0000 |   2.66 MB |
+| MagnetLayoutConstantMeasurePerf |  7.790 ms | 0.0884 ms | 0.0784 ms | 500.0000 |   4.26 MB |
   
+As we can see `Magnet` is about 4 times slower than `Grid` but it provides a lot of flexibility and power.
+So it's up to you to decide whether to use `Magnet` or the standard MAUI layouts.
+
+On a common page with a few views, the performance impact is negligible while the flexibility gain is huge in comparison.
+
+Inside a `CollectionView` template is probably better to use MAUI layouts, but that still needs to be verified with real data
+considering that you may be forced to use nested layouts to achieve the same result and that also comes with a non-negligible performance cost.

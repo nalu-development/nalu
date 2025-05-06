@@ -1,11 +1,10 @@
 ﻿using BenchmarkDotNet.Running;
-using Nalu.Maui.Benchmarks;
 
-namespace Microsoft.Maui.Handlers.Benchmarks;
+namespace Nalu.Maui.Benchmarks;
 
 public class Program
 {
 #pragma warning disable IDE0060
-    public static void Main(string[] args) => BenchmarkRunner.Run<SolverBenchmarks>();
+    public static void Main(string[] args) => BenchmarkRunner.Run(typeof(MagnetBenchmarks).Assembly);
 #pragma warning restore IDE0060
 }
