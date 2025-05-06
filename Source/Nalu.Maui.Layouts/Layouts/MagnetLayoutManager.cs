@@ -37,10 +37,10 @@ internal class MagnetLayoutManager : LayoutManager
         var padding = Magnet.Padding;
         var horizontalPadding = padding.HorizontalThickness;
         var verticalPadding = padding.VerticalThickness;
-        var right = widthConstraint - horizontalPadding;
-        var bottom = heightConstraint - verticalPadding;
+        var width = widthConstraint - horizontalPadding;
+        var height = heightConstraint - verticalPadding;
 
-        stage.PrepareForMeasure(0, 0, right, bottom);
+        stage.PrepareForMeasure(width, height);
 
         var measured = MeasureStage(widthConstraint, heightConstraint, stage);
 
@@ -65,15 +65,17 @@ internal class MagnetLayoutManager : LayoutManager
         var padding = Magnet.Padding;
         var horizontalPadding = padding.HorizontalThickness;
         var verticalPadding = padding.VerticalThickness;
-        var right = bounds.Width - horizontalPadding;
-        var bottom = bounds.Height - verticalPadding;
+        var width = bounds.Width - horizontalPadding;
+        var height = bounds.Height - verticalPadding;
+        var left = bounds.X + padding.Left;
+        var top = bounds.Y + padding.Top;
 
-        stage.PrepareForArrange(0, 0, right, bottom);
+        stage.PrepareForArrange(width, height);
 
         var measured = MeasureStage(bounds.Width, bounds.Height, stage,
                                     (view, frame) =>
                                     {
-                                        frame = frame.Offset(padding.Left, padding.Top);
+                                        frame = frame.Offset(left, top);
                                         return view.Arrange(frame);
                                     });
 
