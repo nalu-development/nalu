@@ -323,7 +323,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         // TODO: Skip this on ArrangePhase
         UpdatePolesConstraintsIfNeeded(stage);
 
-        if (View is { } view)
+        if (View is { } view && view.Visibility != Visibility.Collapsed)
         {
             // We have to measure the view when either the width or height is set to auto.
             if (Height.Unit is SizeUnit.Measured || Width.Unit is SizeUnit.Measured)
@@ -342,7 +342,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     /// <inheritdoc />
     protected override void FinalizeConstraints(IMagnetStage stage)
     {
-        if (View is not { } view)
+        if (View is not { } view || view.Visibility == Visibility.Collapsed)
         {
             return;
         }
