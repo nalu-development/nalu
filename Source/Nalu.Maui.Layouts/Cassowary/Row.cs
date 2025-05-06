@@ -1,15 +1,14 @@
-﻿using System.Runtime.InteropServices;
-using Nalu.Cassowary.Extensions;
+﻿using Nalu.Cassowary.Extensions;
 
 namespace Nalu.Cassowary;
 
-internal record Row(Dictionary<Symbol, double> Cells, double Constant)
+internal record Row(RowData Cells, double Constant)
 {
     public Row(double constant)
-        : this([], constant) { }
+        : this(0, constant) { }
 
     public Row(int capacity, double constant)
-        : this(new Dictionary<Symbol, double>(capacity), constant) { }
+        : this(new RowData(capacity), constant) { }
 
     public double Constant { get; private set; } = Constant;
 
@@ -48,7 +47,7 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
 
     private void QuickAdd(Symbol symbol, double coefficient)
     {
-        ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(Cells, symbol, out var exists);
+        ref var entry = ref Cells.GetValueOrAddRef(symbol, out var exists);
 
         if (exists)
         {
@@ -114,7 +113,8 @@ internal record Row(Dictionary<Symbol, double> Cells, double Constant)
         SolveForSymbol(rhs);
     }
 
-    public double CoefficientFor(Symbol symbol) => Cells.GetValueOrDefault(symbol);
+    // ReSharper disable once CanSimplifyDictionaryTryGetValueWithGetValueOrDefault
+    public double CoefficientFor(Symbol symbol) => Cells.TryGetValue(symbol, out var entry) ? entry : 0;
 
     public bool Substitute(Symbol symbol, Row row)
     {

@@ -5,6 +5,6 @@ namespace Nalu.Maui.Benchmarks;
 public class Program
 {
 #pragma warning disable IDE0060
-    public static void Main(string[] args) => BenchmarkRunner.Run(typeof(SolverBenchmarks).Assembly);
+    public static void Main(string[] args) => BenchmarkRunner.Run<MagnetBenchmarks>();
 #pragma warning restore IDE0060
 }

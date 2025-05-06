@@ -277,7 +277,7 @@ public class Solver
         // tag.marker and tag.other are never external symbols
 
         // The nice version of the following code runs into non-lexical borrow issues.
-        // Ideally the `if row...` code would be in the body of the if. Pretend that it is.
+        // Ideally the `if row...` code would be in the body of the if block. Pretend that it is.
         if (_rows.TryGetValue(infoTagMarker, out var row) && row.Add(-delta) < 0)
         {
             _infeasibleRows.Add(infoTagMarker);
@@ -424,8 +424,8 @@ public class Solver
         // Create and add the artificial variable to the tableau
         var art = new Symbol(_idTick, SymbolType.Slack);
         _idTick++;
-        _rows.Add(art, row with { Cells = new Dictionary<Symbol, double>(row.Cells) });
-        _artificial = row with { Cells = new Dictionary<Symbol, double>(row.Cells) };
+        _rows.Add(art, row with { Cells = new RowData(row.Cells) });
+        _artificial = row with { Cells = new RowData(row.Cells) };
 
         // Optimize the artificial objective. This is successful
         // only if the artificial objective is optimized to zero.
