@@ -34,7 +34,7 @@ public class CassowaryTests
         var bias = 0.5;
         solver.AddConstraint(new Constraint(new Term(ax1, 0.5) + new Term(ax2, 0.5) - (px1 * bias) - (px2 * bias), RelationalOperator.Equal, 1));
 
-        var changes = solver.FetchChanges();
+        solver.FetchChanges();
     }
 
     [Fact(DisplayName = "Test cassowary chain")]

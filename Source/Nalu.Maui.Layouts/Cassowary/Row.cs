@@ -1,128 +1,211 @@
-﻿using System.Runtime.InteropServices;
-using Nalu.Cassowary.Extensions;
-
 namespace Nalu.Cassowary;
 
-internal record Row(Dictionary<Symbol, double> Cells, double Constant)
+/// <summary>
+/// An internal row class used by the solver.
+/// </summary>
+internal class Row
 {
-    public Row(double constant)
-        : this([], constant) { }
+    private readonly Dictionary<Symbol, double> _cells = new();
+    private double _constant;
 
-    public Row(int capacity, double constant)
-        : this(new Dictionary<Symbol, double>(capacity), constant) { }
-
-    public double Constant { get; private set; } = Constant;
-
-    public double Add(double value)
+    /// <summary>
+    /// Construct a new Row.
+    /// </summary>
+    internal Row(double constant = 0.0)
     {
-        Constant += value;
-
-        return Constant;
+        _constant = constant;
     }
 
-    public void Add(Symbol symbol, double coefficient)
+    /// <summary>
+    /// Returns the mapping of symbols to coefficients.
+    /// </summary>
+    public IReadOnlyDictionary<Symbol, double> Cells => _cells;
+
+    /// <summary>
+    /// Returns the constant for the row.
+    /// </summary>
+    public double Constant() => _constant;
+
+    /// <summary>
+    /// Returns true if the row is a constant value.
+    /// </summary>
+    public bool IsConstant() => _cells.Count == 0;
+
+    /// <summary>
+    /// Returns true if the Row has all dummy symbols.
+    /// </summary>
+    public bool AllDummies()
     {
-        if (coefficient == 0)
+        foreach (var pair in _cells)
         {
-            return;
-        }
-
-        if (!coefficient.IsNearZero())
-        {
-            QuickAdd(symbol, coefficient);
-
-            return;
-        }
-
-        if (Cells.TryGetValue(symbol, out var entry))
-        {
-            entry += coefficient;
-            Cells[symbol] = entry;
-
-            if (entry.IsNearZero())
+            if (pair.Key.Type != SymbolType.Dummy)
             {
-                Cells.Remove(symbol);
+                return false;
             }
         }
+        return true;
     }
 
-    private void QuickAdd(Symbol symbol, double coefficient)
+    /// <summary>
+    /// Create a copy of the row.
+    /// </summary>
+    public Row Copy()
     {
-        ref var entry = ref CollectionsMarshal.GetValueRefOrAddDefault(Cells, symbol, out var exists);
-
-        if (exists)
+        var theCopy = new Row(_constant);
+        foreach (var pair in _cells)
         {
-            entry += coefficient;
+            theCopy._cells.Add(pair.Key, pair.Value);
+        }
+        return theCopy;
+    }
 
-            if (entry.IsNearZero())
+    /// <summary>
+    /// Add a constant value to the row constant.
+    ///
+    /// Returns the new value of the constant.
+    /// </summary>
+    public double Add(double value) => _constant += value;
+
+    /// <summary>
+    /// Insert the symbol into the row with the given coefficient.
+    ///
+    /// If the symbol already exists in the row, the coefficient
+    /// will be added to the existing coefficient. If the resulting
+    /// coefficient is zero, the symbol will be removed from the row.
+    /// </summary>
+    public void InsertSymbol(Symbol symbol, double coefficient = 1.0)
+    {
+        if (_cells.TryGetValue(symbol, out var existingCoeff))
+        {
+            var newCoeff = existingCoeff + coefficient;
+            if (NearZero(newCoeff))
             {
-                Cells.Remove(symbol);
+                _cells.Remove(symbol);
+            }
+            else
+            {
+                _cells[symbol] = newCoeff;
             }
         }
-        else
+        else if (!NearZero(coefficient))
         {
-            entry = coefficient;
+            _cells.Add(symbol, coefficient);
         }
     }
 
-    public bool Add(Row other, double coefficient)
+    /// <summary>
+    /// Insert a row into this row with a given coefficient.
+    ///
+    /// The constant and the cells of the other row will be
+    /// multiplied by the coefficient and added to this row. Any
+    /// cell with a resulting coefficient of zero will be removed
+    /// from the row.
+    /// </summary>
+    public void InsertRow(Row other, double coefficient = 1.0)
     {
-        if (coefficient == 0)
+        _constant += other._constant * coefficient;
+        foreach (var pair in other._cells)
         {
-            return false;
+            InsertSymbol(pair.Key, pair.Value * coefficient);
         }
-
-        var diff = other.Constant * coefficient;
-        Constant += diff;
-
-        foreach (var (symbol, value) in other.Cells)
-        {
-            Add(symbol, value * coefficient);
-        }
-
-        return diff != 0;
     }
 
-    public void Remove(Symbol symbol) => Cells.Remove(symbol);
+    /// <summary>
+    /// Remove a symbol from the row.
+    /// </summary>
+    public void RemoveSymbol(Symbol symbol) => _cells.Remove(symbol);
 
+    /// <summary>
+    /// Reverse the sign of the constant and cells in the row.
+    /// </summary>
     public void ReverseSign()
     {
-        Constant = -Constant;
-
-        foreach (var (symbol, value) in Cells)
+        _constant = -_constant;
+        var symbols = _cells.Keys.ToList(); // Avoid modifying collection while iterating
+        foreach (var symbol in symbols)
         {
-            Cells[symbol] = -value;
+            _cells[symbol] = -_cells[symbol];
         }
     }
 
-    public void SolveForSymbol(Symbol symbol)
+    /// <summary>
+    /// Solve the row for the given symbol.
+    ///
+    /// This method assumes the row is of the form
+    /// a * x + b * y + c = 0 and (assuming solve for x) will modify
+    /// the row to represent the right hand side of
+    /// x = -b/a * y - c / a. The target symbol will be removed from
+    /// the row, and the constant and other cells will be multiplied
+    /// by the negative inverse of the target coefficient.
+    ///
+    /// The given symbol *must* exist in the row.
+    /// </summary>
+    public void SolveFor(Symbol symbol)
     {
-        Cells.Remove(symbol, out var symbolCoefficient);
-        var coefficient = -1 / symbolCoefficient;
-
-        Constant *= coefficient;
-
-        foreach (var (key, value) in Cells)
+        if (!_cells.TryGetValue(symbol, out var coefficient))
         {
-            Cells[key] = value * coefficient;
+            // This should not happen if the algorithm is correct
+            throw new InvalidOperationException($"Symbol {symbol} not found in row for solving.");
+        }
+
+        _cells.Remove(symbol);
+        var inverseCoeff = -1.0 / coefficient;
+        _constant *= inverseCoeff;
+
+        var symbols = _cells.Keys.ToList(); // Avoid modifying collection while iterating
+        foreach (var sym in symbols)
+        {
+            _cells[sym] *= inverseCoeff;
         }
     }
 
-    public void SolveForSymbols(Symbol lhs, Symbol rhs)
+    /// <summary>
+    /// Solve the row for the given symbols.
+    ///
+    /// This method assumes the row is of the form
+    /// x = b * y + c and will solve the row such that
+    /// y = x / b - c / b. The rhs symbol will be removed from the
+    /// row, the lhs added, and the result divided by the negative
+    /// inverse of the rhs coefficient.
+    ///
+    /// The lhs symbol *must not* exist in the row, and the rhs
+    /// symbol must* exist in the row.
+    /// </summary>
+    public void SolveForEx(Symbol lhs, Symbol rhs)
     {
-        Add(lhs, -1);
-        SolveForSymbol(rhs);
+        InsertSymbol(lhs, -1.0);
+        SolveFor(rhs);
     }
 
-    public double CoefficientFor(Symbol symbol) => Cells.GetValueOrDefault(symbol);
+    /// <summary>
+    /// Returns the coefficient for the given symbol.
+    /// </summary>
+    public double CoefficientFor(Symbol symbol) => _cells.TryGetValue(symbol, out var coefficient) ? coefficient : 0.0;
 
-    public bool Substitute(Symbol symbol, Row row)
+    /// <summary>
+    /// Substitute a symbol with the data from another row.
+    ///
+    /// Given a row of the form a * x + b and a substitution of the
+    /// form x = 3 * y + c the row will be updated to reflect the
+    /// expression 3 * a * y + a * c + b.
+    ///
+    /// If the symbol does not exist in the row, this is a no-op.
+    /// </summary>
+    public void Substitute(Symbol symbol, Row row)
     {
-        if (Cells.Remove(symbol, out var coefficient))
+        if (_cells.TryGetValue(symbol, out var coefficient))
         {
-            return Add(row, coefficient);
+            _cells.Remove(symbol);
+            InsertRow(row, coefficient);
         }
+    }
 
-        return false;
+    /// <summary>
+    /// Test whether a value is approximately zero.
+    /// </summary>
+    private static bool NearZero(double value)
+    {
+        const double eps = 1.0e-8;
+        return value < 0.0 ? -value < eps : value < eps;
     }
 }
