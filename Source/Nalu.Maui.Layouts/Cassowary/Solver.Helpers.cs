@@ -224,5 +224,5 @@ public partial class Solver
     /// <summary>
     /// Returns a new Symbol of the given type.
     /// </summary>
-    private Symbol MakeSymbol(SymbolType type) => new(type, _symbolIdTick++);
+    private Symbol MakeSymbol(SymbolType type) => new(type, ++_symbolIdTick);
 }

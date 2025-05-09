@@ -29,7 +29,7 @@ internal struct Symbol : IEquatable<Symbol>
     /// <summary>
     /// A static invalid symbol
     /// </summary>
-    public static readonly Symbol InvalidSymbol = new(SymbolType.Invalid, -1);
+    public static readonly Symbol InvalidSymbol = new(SymbolType.Invalid, 0);
     
     /// <inheritdoc />
     public override string ToString() => $"{Type}:{Id}";
