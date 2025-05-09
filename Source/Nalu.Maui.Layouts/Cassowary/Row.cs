@@ -1,3 +1,5 @@
+using Nalu.Internals;
+
 namespace Nalu.Cassowary;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Nalu.Cassowary;
 /// </summary>
 internal class Row
 {
-    private readonly Dictionary<Symbol, double> _cells = new();
+    private readonly RefDictionary<Symbol, double> _cells = new();
     private double _constant;
 
     /// <summary>
@@ -19,7 +21,7 @@ internal class Row
     /// <summary>
     /// Returns the mapping of symbols to coefficients.
     /// </summary>
-    public IReadOnlyDictionary<Symbol, double> Cells => _cells;
+    public RefDictionary<Symbol, double> Cells => _cells;
 
     /// <summary>
     /// Returns the constant for the row.
@@ -36,9 +38,9 @@ internal class Row
     /// </summary>
     public bool AllDummies()
     {
-        foreach (var pair in _cells)
+        foreach (ref var pair in _cells)
         {
-            if (pair.Key.Type != SymbolType.Dummy)
+            if (pair.Key.Type is not SymbolType.Dummy)
             {
                 return false;
             }
@@ -75,21 +77,11 @@ internal class Row
     /// </summary>
     public void InsertSymbol(Symbol symbol, double coefficient = 1.0)
     {
-        if (_cells.TryGetValue(symbol, out var existingCoeff))
+        ref var value = ref _cells.GetOrAddDefaultRef(symbol, out _);
+        value += coefficient;
+        if (NearZero(value))
         {
-            var newCoeff = existingCoeff + coefficient;
-            if (NearZero(newCoeff))
-            {
-                _cells.Remove(symbol);
-            }
-            else
-            {
-                _cells[symbol] = newCoeff;
-            }
-        }
-        else if (!NearZero(coefficient))
-        {
-            _cells.Add(symbol, coefficient);
+            _cells.Remove(symbol);
         }
     }
 
@@ -104,7 +96,7 @@ internal class Row
     public void InsertRow(Row other, double coefficient = 1.0)
     {
         _constant += other._constant * coefficient;
-        foreach (var pair in other._cells)
+        foreach (ref var pair in other._cells)
         {
             InsertSymbol(pair.Key, pair.Value * coefficient);
         }
@@ -121,10 +113,10 @@ internal class Row
     public void ReverseSign()
     {
         _constant = -_constant;
-        var symbols = _cells.Keys.ToList(); // Avoid modifying collection while iterating
-        foreach (var symbol in symbols)
+
+        foreach (ref var entry in _cells)
         {
-            _cells[symbol] = -_cells[symbol];
+            entry.Value *= -1;
         }
     }
 
@@ -142,20 +134,18 @@ internal class Row
     /// </summary>
     public void SolveFor(Symbol symbol)
     {
-        if (!_cells.TryGetValue(symbol, out var coefficient))
+        if (!_cells.Remove(symbol, out var coefficient))
         {
             // This should not happen if the algorithm is correct
             throw new InvalidOperationException($"Symbol {symbol} not found in row for solving.");
         }
 
-        _cells.Remove(symbol);
         var inverseCoeff = -1.0 / coefficient;
         _constant *= inverseCoeff;
 
-        var symbols = _cells.Keys.ToList(); // Avoid modifying collection while iterating
-        foreach (var sym in symbols)
+        foreach (ref var entry in _cells)
         {
-            _cells[sym] *= inverseCoeff;
+            entry.Value *= inverseCoeff;
         }
     }
 
@@ -193,9 +183,8 @@ internal class Row
     /// </summary>
     public void Substitute(Symbol symbol, Row row)
     {
-        if (_cells.TryGetValue(symbol, out var coefficient))
+        if (_cells.Remove(symbol, out var coefficient))
         {
-            _cells.Remove(symbol);
             InsertRow(row, coefficient);
         }
     }
