@@ -194,6 +194,15 @@ public class MagnetBenchmarks
         }
     }
 
+    public void MagnetLayoutPerfDirect(int iterations)
+    {
+        for (var i = 0; i < iterations; i++)
+        {
+            var result = _layoutManager!.Measure(500, 500);
+            _layoutManager.ArrangeChildren(new Rect(Point.Zero, result));
+        }
+    }
+
     [Benchmark]
     public void GridLayoutConstantMeasurePerf()
     {
