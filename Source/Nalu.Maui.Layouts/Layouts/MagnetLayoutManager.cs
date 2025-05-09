@@ -42,9 +42,9 @@ internal class MagnetLayoutManager : LayoutManager
 
         stage.PrepareForMeasure(width, height);
 
-        var measured = MeasureStage(widthConstraint, heightConstraint, stage);
+        var measured = new Size(stage.Right.CurrentValue + horizontalPadding, stage.Bottom.CurrentValue + verticalPadding);
 
-        return new Size(measured.Width + horizontalPadding, measured.Height + verticalPadding);
+        return measured;
     }
 
     public override Size ArrangeChildren(Rect bounds)
@@ -72,61 +72,43 @@ internal class MagnetLayoutManager : LayoutManager
 
         stage.PrepareForArrange(width, height);
 
-        var measured = MeasureStage(bounds.Width, bounds.Height, stage,
-                                    (view, frame) =>
-                                    {
-                                        frame = frame.Offset(left, top);
-                                        return view.Arrange(frame);
-                                    });
+        ArrangeStage(
+            stage,
+            (view, frame) =>
+            {
+                frame = frame.Offset(left, top);
 
-        var size = new Size(measured.Width + horizontalPadding, measured.Height + verticalPadding);
-        return size.AdjustForFill(bounds, Magnet);
+                return view.Arrange(frame);
+            }
+        );
+
+        return bounds.Size;
     }
 
-    private Size MeasureStage(double widthConstraint, double heightConstraint, IMagnetStage stage, Func<IView, Rect, Size>? arrange = null)
+    private void ArrangeStage(IMagnetStage stage, Func<IView, Rect, Size>? arrange = null)
     {
         if (Layout.Count == 0)
         {
-            return Size.Zero;
+            return;
         }
-
-        var minLeft = widthConstraint;
-        var maxRight = 0.0;
-        var minTop = heightConstraint;
-        var maxBottom = 0.0;
         
         foreach (var child in Layout)
         {
+            if (child.Visibility is Visibility.Collapsed)
+            {
+                continue;
+            }
+
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
-                var viewMargin = magnetView.GetEffectiveMargin();
-                var viewLeft = magnetView.Left - viewMargin.Left;
-                var viewTop = magnetView.Top - viewMargin.Top;
-                var viewRight = magnetView.Right + viewMargin.Right;
-                var viewBottom = magnetView.Bottom + viewMargin.Bottom;
-                minLeft = Math.Min(viewLeft, minLeft);
-                maxRight = Math.Max(viewRight, maxRight);
-                minTop = Math.Min(viewTop, minTop);
-                maxBottom = Math.Max(viewBottom, maxBottom);
-
                 arrange?.Invoke(child, magnetView.GetFrame());
             }
             else
             {
                 var size = child.DesiredSize;
-
-                minLeft = Math.Min(0, minLeft);
-                minTop = Math.Min(0, minTop);
-                maxRight = Math.Max(size.Width, maxRight);
-                maxBottom = Math.Max(size.Height, maxBottom);
-
                 arrange?.Invoke(child, new Rect(Point.Zero, size));
             }
         }
-
-        var measuredWidth = maxRight - minLeft;
-        var measuredHeight = maxBottom - minTop;
-        return new Size(measuredWidth, measuredHeight);
     }
 
     private Size NoStageMeasure(double widthConstraint, double heightConstraint)

@@ -73,7 +73,7 @@ public partial class Solver
     {
         if (!_cnMap.Remove(constraint, out var cnPair))
         {
-            throw new InvalidOperationException("unknown constraint");
+            return;
         }
 
         // Remove the error effects from the objective function
@@ -186,6 +186,12 @@ public partial class Solver
         var rows = _rowMap;
         var info = editPair;
         var delta = value - info.Constant;
+
+        if (delta == 0)
+        {
+            return;
+        }
+
         info.Constant = value;
 
         // Check first if the positive error variable is basic.

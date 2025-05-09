@@ -328,11 +328,11 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             // We have to measure the view when either the width or height is set to auto.
             if (Height.Unit is SizeUnit.Measured || Width.Unit is SizeUnit.Measured)
             {
-                var widthConstraint = stage.Right.CurrentValue - stage.Left.CurrentValue;
-                var heightConstraint = stage.Bottom.CurrentValue - stage.Top.CurrentValue;
+                var widthConstraint = stage.WidthRequest;
+                var heightConstraint = stage.HeightRequest;
                 var size = view.Measure(widthConstraint, heightConstraint);
 
-                UpdateMeasureConstraints(size);
+                UpdateMeasureConstraints(stage, size);
             }
         }
 
@@ -349,8 +349,8 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
 
         // If the allocated space is less than the desired size, we need to re-measure the view
         var needsMeasure = false;
-        var widthConstraint = stage.Right.CurrentValue - stage.Left.CurrentValue;
-        var heightConstraint = stage.Bottom.CurrentValue - stage.Top.CurrentValue;
+        var widthConstraint = stage.WidthRequest;
+        var heightConstraint = stage.HeightRequest;
 
         if (Height.Unit is SizeUnit.Measured && view.DesiredSize.Width > Right - Left)
         {
@@ -367,28 +367,23 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (needsMeasure)
         {
             var size = view.Measure(widthConstraint, heightConstraint);
-            UpdateMeasureConstraints(size);
+            UpdateMeasureConstraints(stage, size);
         }
     }
 
-    private void UpdateMeasureConstraints(Size size)
+    /// <inheritdoc />
+    protected override (Variable Variable, double Strength)[] GetEditableVariables() => [(_measuredWidth, Required - 1), (_measuredHeight, Required - 1)];
+
+    private void UpdateMeasureConstraints(IMagnetStage stage, Size size)
     {
-        if (Width.Unit is SizeUnit.Measured)
+        if (Width.Unit is SizeUnit.Measured && _measuredWidth.CurrentValue != size.Width)
         {
-            UpdateConstraints(ConstraintTypes.MeasuredWidth, _ => [_measuredWidth | Eq(Required) | size.Width]);
-        }
-        else
-        {
-            RemoveConstraints(ConstraintTypes.MeasuredWidth);
+            stage.SuggestValue(_measuredWidth, size.Width);
         }
 
-        if (Height.Unit is SizeUnit.Measured)
+        if (Height.Unit is SizeUnit.Measured && _measuredHeight.CurrentValue != size.Height)
         {
-            UpdateConstraints(ConstraintTypes.MeasuredHeight, _ => [_measuredHeight | Eq(Required) | size.Height]);
-        }
-        else
-        {
-            RemoveConstraints(ConstraintTypes.MeasuredHeight);
+            stage.SuggestValue(_measuredHeight, size.Height);
         }
     }
 

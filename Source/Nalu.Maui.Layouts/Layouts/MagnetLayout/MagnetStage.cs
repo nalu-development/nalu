@@ -137,6 +137,12 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     }
 
     /// <inheritdoc />
+    public double WidthRequest { get; private set; }
+    
+    /// <inheritdoc />
+    public double HeightRequest { get; private set; }
+
+    /// <inheritdoc />
     public void Invalidate()
     {
         // No-op for now
@@ -182,15 +188,17 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     
     private void SetBounds(double width, double height, bool forMeasure)
     {
-        var rel = forMeasure ? WeightedRelation.LessOrEq(Strength.Required) : WeightedRelation.Eq(Strength.Required);
+        WidthRequest = width;
+        HeightRequest = height;
 
         _solver.RemoveConstraint(_stageRightConstraint);
-        _solver.AddConstraint(_stageRightConstraint = Right | rel | width);
-        Right.CurrentValue = width;
-        
         _solver.RemoveConstraint(_stageBottomConstraint);
-        _solver.AddConstraint(_stageBottomConstraint = Bottom | rel | height);
-        Bottom.CurrentValue = height;
+
+        if (!forMeasure)
+        {
+            _solver.AddConstraint(_stageRightConstraint = Right | WeightedRelation.Eq(Strength.Required) | width);
+            _solver.AddConstraint(_stageBottomConstraint = Bottom | WeightedRelation.Eq(Strength.Required) | height);
+        }
     }
 
     /// <inheritdoc />

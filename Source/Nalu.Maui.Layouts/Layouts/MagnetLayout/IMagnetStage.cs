@@ -14,6 +14,16 @@ public interface IMagnetStage : IVerticalPoles, IHorizontalPoles, IMagnetElement
     const string StageId = "Stage";
 
     /// <summary>
+    /// The requested stage width.
+    /// </summary>
+    double WidthRequest { get; }
+
+    /// <summary>
+    /// The requested stage height.
+    /// </summary>
+    double HeightRequest { get; }
+
+    /// <summary>
     /// Invalidates the scene due to changed constraints.
     /// </summary>
     void Invalidate();
