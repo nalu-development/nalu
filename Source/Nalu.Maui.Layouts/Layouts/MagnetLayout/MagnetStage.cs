@@ -197,8 +197,15 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
 
         if (!forMeasure)
         {
-            _solver.AddConstraint(_stageRightConstraint = Right | WeightedRelation.Eq(Strength.Required) | width);
-            _solver.AddConstraint(_stageBottomConstraint = Bottom | WeightedRelation.Eq(Strength.Required) | height);
+            if (!double.IsPositiveInfinity(width))
+            {
+                _solver.AddConstraint(_stageRightConstraint = Right | WeightedRelation.Eq(Strength.Required) | width);
+            }
+
+            if (!double.IsPositiveInfinity(height))
+            {
+                _solver.AddConstraint(_stageBottomConstraint = Bottom | WeightedRelation.Eq(Strength.Required) | height);
+            }
         }
     }
 

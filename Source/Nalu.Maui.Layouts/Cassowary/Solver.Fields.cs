@@ -8,7 +8,7 @@ namespace Nalu.Cassowary;
 public partial class Solver
 {
     private readonly RefDictionary<Constraint, Tag> _cnMap = new();
-    private readonly RefDictionary<Symbol, Row> _rowMap = new();
+    private readonly RefDictionary<Symbol, Row> _rowMap = new(SymbolDictionaryComparer.Instance);
     private readonly RefDictionary<Variable, Symbol> _varMap = new();
     private readonly RefDictionary<Variable, EditInfo> _editMap = new();
     private readonly List<Symbol> _infeasibleRows = new();

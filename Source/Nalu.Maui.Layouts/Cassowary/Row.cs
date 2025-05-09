@@ -7,7 +7,7 @@ namespace Nalu.Cassowary;
 /// </summary>
 internal class Row
 {
-    private readonly RefDictionary<Symbol, double> _cells = new();
+    private readonly RefDictionary<Symbol, double> _cells = new(SymbolDictionaryComparer.Instance);
     private double _constant;
 
     /// <summary>
