@@ -85,23 +85,21 @@ public partial class Solver
     {
         // This method will substitute all instances of the parametric symbol
         // in the tableau and the objective function with the given row.
-
-        // Need to iterate over a copy of the keys to avoid modifying the collection during iteration
-        var rowKeys = _rowMap.Keys.ToList();
-        foreach (var basicSymbol in rowKeys)
+        foreach (ref var entry in _rowMap)
         {
-            var basicRow = _rowMap[basicSymbol];
+            var basicRow = entry.Value;
+            var rowSymbol = entry.Key;
+
             basicRow.Substitute(symbol, row);
-            if (basicRow.Constant() < 0.0 && basicSymbol.Type != SymbolType.External)
+
+            if (basicRow.Constant() < 0.0 && rowSymbol.Type != SymbolType.External)
             {
-                _infeasibleRows.Add(basicSymbol);
+                _infeasibleRows.Add(rowSymbol);
             }
         }
+
         _objective.Substitute(symbol, row);
-        if (_artificial != null)
-        {
-            _artificial.Substitute(symbol, row);
-        }
+        _artificial?.Substitute(symbol, row);
     }
 
     /// <summary>
@@ -119,7 +117,7 @@ public partial class Solver
         // the criteria, it means the objective function is at a minimum, and an
         // invalid symbol is returned.
 
-        foreach (var pair in objective.Cells)
+        foreach (ref var pair in objective.Cells)
         {
             var symbol = pair.Key;
             if (pair.Value < 0.0 && symbol.Type != SymbolType.Dummy)
@@ -150,7 +148,7 @@ public partial class Solver
         var ratio = double.MaxValue;
         var entering = Symbol.InvalidSymbol;
 
-        foreach (var pair in row.Cells)
+        foreach (ref var pair in row.Cells)
         {
             var symbol = pair.Key;
             var c = pair.Value;
@@ -186,7 +184,7 @@ public partial class Solver
         var ratio = double.MaxValue;
         var found = Symbol.InvalidSymbol;
 
-        foreach (var pair in _rowMap)
+        foreach (ref var pair in _rowMap)
         {
             var symbol = pair.Key;
             if (symbol.Type != SymbolType.External)
@@ -252,7 +250,7 @@ public partial class Solver
         var second = invalid;
         var third = invalid;
 
-        foreach (var pair in _rowMap)
+        foreach (ref var pair in _rowMap)
         {
             var row = pair.Value;
             var c = row.CoefficientFor(marker);

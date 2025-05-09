@@ -126,11 +126,14 @@ public partial class Solver
         {
             throw new InvalidOperationException("duplicate edit variable");
         }
+
         strength = Strength.Clip(strength);
+
         if (strength == Strength.Required)
         {
             throw new InvalidOperationException("bad required strength");
         }
+
         // Create a constraint for the edit variable: variable == 0 with the given strength
         // Note: The TS version creates a Constraint with rhs as undefined, which its constructor handles.
         // We need to create the equivalent Constraint object using your API.
@@ -140,7 +143,7 @@ public partial class Solver
         AddConstraint(cn); // Add the constraint to the solver
 
         // Find the tag associated with the newly added constraint
-        // This assumes AddConstraint successfully added the constraint and it exists in _cnMap
+        // This assumes AddConstraint successfully added the constraint, and it exists in _cnMap
         if (!_cnMap.TryGetValue(cn, out var tag))
         {
              // This should not happen if AddConstraint was successful
@@ -220,19 +223,20 @@ public partial class Solver
 
         // Otherwise update each row where the error variables exist.
         // Need to iterate over a copy of the keys to avoid modifying the collection during iteration
-        var rowKeys = rows.Keys.ToList();
-        foreach (var rowSymbol in rowKeys)
+        foreach (ref var entry in rows)
         {
-            var basicRow = rows[rowSymbol];
+            var basicRow = entry.Value;
+            var symbol = entry.Key;
             var coeff = basicRow.CoefficientFor(marker);
             if (!NearZero(coeff))
             {
-                if (basicRow.Add(delta * coeff) < 0.0 && rowSymbol.Type != SymbolType.External)
+                if (basicRow.Add(delta * coeff) < 0.0 && symbol.Type != SymbolType.External)
                 {
-                    _infeasibleRows.Add(rowSymbol);
+                    _infeasibleRows.Add(symbol);
                 }
             }
         }
+
         DualOptimize();
     }
 
@@ -241,20 +245,18 @@ public partial class Solver
     /// </summary>
     public void UpdateVariables()
     {
-        // Need to iterate over a copy of the keys to avoid modifying the collection during iteration
-        var varKeys = _varMap.Keys.ToList();
-        foreach (var variable in varKeys)
+        foreach (ref var variableEntry in _varMap)
         {
-            if (_varMap.TryGetValue(variable, out var symbol))
+            var variable = variableEntry.Key;
+            var symbol = variableEntry.Value;
+
+            if (_rowMap.TryGetValue(symbol, out var row))
             {
-                if (_rowMap.TryGetValue(symbol, out var row))
-                {
-                    variable.CurrentValue = row.Constant();
-                }
-                else
-                {
-                    variable.CurrentValue = 0.0;
-                }
+                variable.CurrentValue = row.Constant();
+            }
+            else
+            {
+                variable.CurrentValue = 0.0;
             }
         }
     }

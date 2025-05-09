@@ -17,7 +17,22 @@ internal class RefDictionary<TKey, TValue>
     private IEqualityComparer<TKey>? _comparer;
     private const int _startOfFreeList = -3;
 
-    public Entry[] Entries => _entries ?? [];
+    public IEnumerable<TKey> Keys 
+    {
+        get
+        {
+            if (_entries != null)
+            {
+                for (var i = 0; i < _count; i++)
+                {
+                    if (_entries[i].Next >= -1)
+                    {
+                        yield return _entries[i].Key;
+                    }
+                }
+            }
+        }
+    }
 
     public RefDictionary()
         : this(0, null) { }

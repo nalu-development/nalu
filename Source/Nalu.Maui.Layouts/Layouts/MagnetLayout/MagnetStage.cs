@@ -58,8 +58,8 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         }
     }
 
-    private Constraint _stageBottomConstraint;
-    private Constraint _stageRightConstraint;
+    private Constraint? _stageBottomConstraint;
+    private Constraint? _stageRightConstraint;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MagnetStage"/> class.
@@ -73,10 +73,8 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
 
         var stageLeftConstraint = Left | WeightedRelation.Eq(Strength.Required) | 0;
         var stageTopConstraint = Top | WeightedRelation.Eq(Strength.Required) | 0;
-        _stageBottomConstraint = Bottom | WeightedRelation.Eq(Strength.Required) | 0;
-        _stageRightConstraint = Right | WeightedRelation.Eq(Strength.Required) | 0;
         
-        _solver.AddConstraints(stageLeftConstraint, stageTopConstraint, _stageBottomConstraint, _stageRightConstraint);
+        _solver.AddConstraints(stageLeftConstraint, stageTopConstraint);
     }
 
     /// <inheritdoc />
@@ -191,8 +189,11 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         WidthRequest = width;
         HeightRequest = height;
 
-        _solver.RemoveConstraint(_stageRightConstraint);
-        _solver.RemoveConstraint(_stageBottomConstraint);
+        if (_stageBottomConstraint is not null)
+        {
+            _solver.RemoveConstraint(_stageRightConstraint!);
+            _solver.RemoveConstraint(_stageBottomConstraint!);
+        }
 
         if (!forMeasure)
         {

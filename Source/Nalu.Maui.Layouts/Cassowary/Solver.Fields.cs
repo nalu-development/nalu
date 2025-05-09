@@ -1,3 +1,5 @@
+using Nalu.Internals;
+
 namespace Nalu.Cassowary;
 
 /// <summary>
@@ -5,14 +7,14 @@ namespace Nalu.Cassowary;
 /// </summary>
 public partial class Solver
 {
-    private readonly Dictionary<Constraint, Tag> _cnMap = new();
-    private readonly Dictionary<Symbol, Row> _rowMap = new();
-    private readonly Dictionary<Variable, Symbol> _varMap = new();
-    private readonly Dictionary<Variable, EditInfo> _editMap = new();
+    private readonly RefDictionary<Constraint, Tag> _cnMap = new();
+    private readonly RefDictionary<Symbol, Row> _rowMap = new();
+    private readonly RefDictionary<Variable, Symbol> _varMap = new();
+    private readonly RefDictionary<Variable, EditInfo> _editMap = new();
     private readonly List<Symbol> _infeasibleRows = new();
     private readonly Row _objective = new();
-    private Row? _artificial = null;
-    private int _symbolIdTick = 0;
+    private Row? _artificial;
+    private int _symbolIdTick;
 
     /// <summary>
     /// The max number of solver iterations before an error
