@@ -14,7 +14,7 @@ internal class RefDictionary<TKey, TValue>
     private int _count;
     private int _freeList;
     private int _freeCount;
-    private IEqualityComparer<TKey>? _comparer;
+    private readonly IEqualityComparer<TKey>? _comparer;
     private const int _startOfFreeList = -3;
 
     public IEnumerable<TKey> Keys 
@@ -90,6 +90,7 @@ internal class RefDictionary<TKey, TValue>
         _count = dictionary._count;
         _freeList = dictionary._freeList;
         _freeCount = dictionary._freeCount;
+        _fastModMultiplier = dictionary._fastModMultiplier;
     }
 
     public IEqualityComparer<TKey> Comparer => _comparer ?? EqualityComparer<TKey>.Default;

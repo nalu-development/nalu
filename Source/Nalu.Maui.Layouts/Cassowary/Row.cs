@@ -7,7 +7,7 @@ namespace Nalu.Cassowary;
 /// </summary>
 internal class Row
 {
-    private readonly RefDictionary<Symbol, double> _cells = new(SymbolDictionaryComparer.Instance);
+    private readonly RefDictionary<Symbol, double> _cells;
     private double _constant;
 
     /// <summary>
@@ -16,6 +16,19 @@ internal class Row
     internal Row(double constant = 0.0)
     {
         _constant = constant;
+        _cells = new RefDictionary<Symbol, double>(SymbolDictionaryComparer.Instance);
+    }
+
+    /// <summary>
+    /// Construct a new Row with the given cells and constant.
+    /// </summary>
+    /// <remarks>
+    /// Cells will be cloned.
+    /// </remarks>
+    private Row(RefDictionary<Symbol, double> cells, double constant = 0.0)
+    {
+        _constant = constant;
+        _cells = new RefDictionary<Symbol, double>(cells);
     }
 
     /// <summary>
@@ -51,15 +64,7 @@ internal class Row
     /// <summary>
     /// Create a copy of the row.
     /// </summary>
-    public Row Copy()
-    {
-        var theCopy = new Row(_constant);
-        foreach (var pair in _cells)
-        {
-            theCopy._cells.Add(pair.Key, pair.Value);
-        }
-        return theCopy;
-    }
+    public Row Copy() => new(_cells, _constant);
 
     /// <summary>
     /// Add a constant value to the row constant.
@@ -195,6 +200,7 @@ internal class Row
     private static bool NearZero(double value)
     {
         const double eps = 1.0e-8;
-        return value < 0.0 ? -value < eps : value < eps;
+        const double neps = 1.0e-8;
+        return value < 0.0 ? value > neps : value < eps;
     }
 }

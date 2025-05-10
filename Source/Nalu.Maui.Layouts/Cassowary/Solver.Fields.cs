@@ -37,6 +37,7 @@ public partial class Solver
     private static bool NearZero(double value)
     {
         const double eps = 1.0e-8;
-        return value < 0.0 ? -value < eps : value < eps;
+        const double neps = 1.0e-8;
+        return value < 0.0 ? value > neps : value < eps;
     }
 }
