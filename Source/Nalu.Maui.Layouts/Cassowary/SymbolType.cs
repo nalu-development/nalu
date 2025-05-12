@@ -9,5 +9,5 @@ internal enum SymbolType
     External,
     Slack,
     Error,
-    Dummy,
+    Dummy
 }

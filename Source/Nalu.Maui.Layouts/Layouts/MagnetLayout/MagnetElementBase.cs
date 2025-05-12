@@ -26,7 +26,7 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
         public bool IsSet { get; set; }
         public ConstraintsFactory? CreateConstraints { get; set; }
     }
-    
+
     /// <summary>
     /// Bindable property for <see cref="Id" />.
     /// </summary>
@@ -156,10 +156,8 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
         _applyConstraintsImmediately = false;
     }
 
-    /// <inheritdoc cref="IMagnetElement.FinalizeConstraints"/>
-    protected virtual void FinalizeConstraints(IMagnetStage stage)
-    {
-    }
+    /// <inheritdoc cref="IMagnetElement.FinalizeConstraints" />
+    protected virtual void FinalizeConstraints(IMagnetStage stage) { }
 
     /// <summary>
     /// Gets the editable variables for the element.
@@ -196,6 +194,7 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
         var stage = _stage ?? throw new InvalidOperationException("Stage is not set");
 
         var appliedConstraints = _constraints[constraintType];
+
         if (appliedConstraints is not null)
         {
             foreach (var appliedConstraint in appliedConstraints)
@@ -237,6 +236,7 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
     protected void RemoveConstraints(TConstraintType constraintType)
     {
         var storedFactory = _constraintsFactories[constraintType];
+
         if (storedFactory.CreateConstraints is null)
         {
             return;

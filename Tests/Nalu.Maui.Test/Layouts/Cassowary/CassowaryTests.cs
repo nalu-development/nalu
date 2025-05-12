@@ -139,7 +139,7 @@ public class CassowaryTests
             (bx1, 40),
             (bx2, 70),
             (cx1, 70),
-            (cx2, 100));
+            (cx2, 100)
+        );
     }
 }
-

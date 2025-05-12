@@ -27,7 +27,8 @@ internal partial class TouchListener
     {
         var p = e.GetCurrentPoint(sender as UIElement);
 
-        if (p is null) {
+        if (p is null)
+        {
             return;
         }
 
@@ -44,7 +45,8 @@ internal partial class TouchListener
     {
         var p = e.GetCurrentPoint(sender as UIElement);
 
-        if (p is null) {
+        if (p is null)
+        {
             return;
         }
 
@@ -61,7 +63,8 @@ internal partial class TouchListener
     {
         var p = e.GetCurrentPoint(sender as UIElement);
 
-        if (p is null) {
+        if (p is null)
+        {
             return;
         }
 

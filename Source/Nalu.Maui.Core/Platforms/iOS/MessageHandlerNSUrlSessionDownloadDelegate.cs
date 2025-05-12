@@ -131,8 +131,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         var weakTask = new WeakReference<NSUrlSessionTask>(task);
 
-        var cancellationTokenRegistration = cancellationToken.Register(
-            () =>
+        var cancellationTokenRegistration = cancellationToken.Register(() =>
             {
                 if (weakTask.TryGetTarget(out var t) && t?.State is NSUrlSessionTaskState.Running or NSUrlSessionTaskState.Suspended)
                 {

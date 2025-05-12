@@ -26,7 +26,7 @@
     <Style TargetType="Span" x:Key="SecondarySpan">
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray200}}" />
     </Style>
-    
+
     <Style TargetType="Button" x:Key="TextButton">
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}" />
         <Setter Property="BackgroundColor" Value="Transparent" />

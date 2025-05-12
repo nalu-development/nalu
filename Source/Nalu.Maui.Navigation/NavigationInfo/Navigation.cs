@@ -217,24 +217,25 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
         }
 
 #pragma warning disable IDE0053
-        shellContent.ContentTemplate = new DataTemplate(
-            () =>
+        shellContent.ContentTemplate = new DataTemplate(() =>
 #pragma warning restore IDE0053
-            {
-                var shell = (NaluShell?) shellContent.Parent?.Parent?.Parent ??
-                            throw new InvalidOperationException("Cannot create ShellContent Page while detached from NaluShell.");
+                                                        {
+                                                            var shell = (NaluShell?) shellContent.Parent?.Parent?.Parent ??
+                                                                        throw new InvalidOperationException("Cannot create ShellContent Page while detached from NaluShell.");
 
-                var navigationService = shell.NavigationService;
-                var serviceProvider = navigationService.ServiceProvider;
+                                                            var navigationService = shell.NavigationService;
+                                                            var serviceProvider = navigationService.ServiceProvider;
 
-                var navigationConfiguration = serviceProvider.GetService<INavigationConfiguration>() ??
-                                              throw new InvalidOperationException("MauiAppBuilder must be configured with UseNaluNavigation().");
+                                                            var navigationConfiguration = serviceProvider.GetService<INavigationConfiguration>() ??
+                                                                                          throw new InvalidOperationException(
+                                                                                              "MauiAppBuilder must be configured with UseNaluNavigation()."
+                                                                                          );
 
-                var pageType = NavigationHelper.GetPageType(type, navigationConfiguration);
-                var page = navigationService.CreatePage(pageType, null);
+                                                            var pageType = NavigationHelper.GetPageType(type, navigationConfiguration);
+                                                            var page = navigationService.CreatePage(pageType, null);
 
-                return page;
-            }
+                                                            return page;
+                                                        }
         );
     }
 }

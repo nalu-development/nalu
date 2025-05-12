@@ -176,8 +176,7 @@ public class TemplateBoxTests
 
     [Fact(DisplayName = "ContentTemplate can project content")]
     public Task ContentTemplateCanProjectContent()
-        => DispatcherTest.RunWithDispatcherStub(
-            () =>
+        => DispatcherTest.RunWithDispatcherStub(() =>
             {
                 // Arrange
                 var templatedComponent = new TemplateBox();
@@ -205,8 +204,7 @@ public class TemplateBoxTests
 
     private class StaticRefTemplateSelector : DataTemplateSelector
     {
-        private static readonly DataTemplate _template = new(
-            () =>
+        private static readonly DataTemplate _template = new(() =>
             {
                 var label = new Label();
                 label.SetBinding(Label.TextProperty, new Binding("."));

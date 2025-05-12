@@ -9,7 +9,7 @@ public class HorizontalBarrierTests
 {
     [Theory]
     [InlineData(VerticalPoles.Top, 10)] // Expect barrier at the minimum Top (10)
-    [InlineData(VerticalPoles.Bottom, 90)]   // Expect barrier at the maximum Bottom (90)
+    [InlineData(VerticalPoles.Bottom, 90)] // Expect barrier at the maximum Bottom (90)
     public void TestHorizontalBarrierPosition(VerticalPoles pole, double expectedPosition)
     {
         // Arrange
@@ -21,8 +21,8 @@ public class HorizontalBarrierTests
         var element1Bottom = new Variable();
         element1.Id.Returns("element1");
         stage.GetElement("element1").Returns(element1); // Mock the stage to return the element
-        ((IVerticalPoles)element1).Top.Returns(element1Top); // Use interface property
-        ((IVerticalPoles)element1).Bottom.Returns(element1Bottom);     // Use interface property
+        ((IVerticalPoles) element1).Top.Returns(element1Top); // Use interface property
+        ((IVerticalPoles) element1).Bottom.Returns(element1Bottom); // Use interface property
         solver.AddConstraint(element1Top | Eq(Required) | 10);
         solver.AddConstraint(element1Bottom | Eq(Required) | 40);
 
@@ -31,17 +31,17 @@ public class HorizontalBarrierTests
         var element2Bottom = new Variable();
         element2.Id.Returns("element2");
         stage.GetElement("element2").Returns(element2); // Mock the GetElement method
-        ((IVerticalPoles)element2).Top.Returns(element2Top); // Use interface property
-        ((IVerticalPoles)element2).Bottom.Returns(element2Bottom);     // Use interface property
+        ((IVerticalPoles) element2).Top.Returns(element2Top); // Use interface property
+        ((IVerticalPoles) element2).Bottom.Returns(element2Bottom); // Use interface property
         solver.AddConstraint(element2Top | Eq(Required) | 60);
         solver.AddConstraint(element2Bottom | Eq(Required) | 90);
 
         // Create Barrier
         var barrier = new HorizontalBarrier
-        {
-            Pole = pole, // Use the theory parameter
-            Elements = ["element1", "element2"] // Provide the mocked elements
-        };
+                      {
+                          Pole = pole, // Use the theory parameter
+                          Elements = ["element1", "element2"] // Provide the mocked elements
+                      };
 
         // Act
         barrier.SetStage(stage); // This adds the barrier's constraints to the solver via the mocked stage
@@ -71,8 +71,10 @@ public class HorizontalBarrierTests
         var stageBottom = new Variable();
         stage.Top.Returns(stageTop);
         stage.Bottom.Returns(stageBottom);
+
         stage.When(s => s.AddConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.AddConstraint(call.Arg<Constraint>()));
+
         stage.When(s => s.RemoveConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.RemoveConstraint(call.Arg<Constraint>()));
 
@@ -86,8 +88,8 @@ public class HorizontalBarrierTests
         var element1Bottom = new Variable();
         element1.Id.Returns("element1");
         stage.GetElement("element1").Returns(element1); // Mock the stage to return the element
-        ((IVerticalPoles)element1).Top.Returns(element1Top); // Use interface property
-        ((IVerticalPoles)element1).Bottom.Returns(element1Bottom);     // Use interface property
+        ((IVerticalPoles) element1).Top.Returns(element1Top); // Use interface property
+        ((IVerticalPoles) element1).Bottom.Returns(element1Bottom); // Use interface property
         solver.AddConstraint(element1Top | Eq(Required) | 10);
         solver.AddConstraint(element1Bottom | Eq(Required) | 40);
 
@@ -96,18 +98,18 @@ public class HorizontalBarrierTests
         var element2Bottom = new Variable();
         element2.Id.Returns("element2");
         stage.GetElement("element2").Returns(element2); // Mock the GetElement method
-        ((IVerticalPoles)element2).Top.Returns(element2Top); // Use interface property
-        ((IVerticalPoles)element2).Bottom.Returns(element2Bottom);     // Use interface property
+        ((IVerticalPoles) element2).Top.Returns(element2Top); // Use interface property
+        ((IVerticalPoles) element2).Bottom.Returns(element2Bottom); // Use interface property
         solver.AddConstraint(element2Top | Eq(Required) | 60);
         solver.AddConstraint(element2Bottom | Eq(Required) | 90);
 
         // Create Barrier
         var barrier = new HorizontalBarrier
-        {
-            Pole = pole, // Use the theory parameter
-            Elements = ["element1", "element2"], // Provide the mocked elements
-            Margin = margin
-        };
+                      {
+                          Pole = pole, // Use the theory parameter
+                          Elements = ["element1", "element2"], // Provide the mocked elements
+                          Margin = margin
+                      };
 
         // Act
         barrier.SetStage(stage); // This adds the barrier's constraints to the solver via the mocked stage

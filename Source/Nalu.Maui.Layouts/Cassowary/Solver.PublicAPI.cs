@@ -34,10 +34,8 @@ public partial class Solver
             {
                 throw new InvalidOperationException("unsatisfiable constraint");
             }
-            else
-            {
-                subject = tag.Marker;
-            }
+
+            subject = tag.Marker;
         }
 
         // If an entering symbol still isn't found, then the row must
@@ -84,13 +82,16 @@ public partial class Solver
         // If the marker is basic, simply drop the row. Otherwise,
         // pivot the marker into the basis and then drop the row.
         var marker = cnPair.Marker;
+
         if (!_rowMap.Remove(marker, out var rowPair))
         {
             var leaving = GetMarkerLeavingSymbol(marker);
+
             if (leaving.Type == SymbolType.Invalid)
             {
                 throw new InvalidOperationException("failed to find leaving row");
             }
+
             _rowMap.Remove(leaving, out rowPair);
             rowPair!.SolveForEx(leaving, marker);
             Substitute(marker, rowPair);
@@ -146,8 +147,8 @@ public partial class Solver
         // This assumes AddConstraint successfully added the constraint, and it exists in _cnMap
         if (!_cnMap.TryGetValue(cn, out var tag))
         {
-             // This should not happen if AddConstraint was successful
-             throw new InvalidOperationException("Failed to find tag for newly added edit constraint.");
+            // This should not happen if AddConstraint was successful
+            throw new InvalidOperationException("Failed to find tag for newly added edit constraint.");
         }
 
         var info = new EditInfo(tag, cn, 0.0);
@@ -164,6 +165,7 @@ public partial class Solver
         {
             throw new InvalidOperationException("unknown edit variable");
         }
+
         RemoveConstraint(editPair.Constraint);
     }
 
@@ -205,19 +207,24 @@ public partial class Solver
             {
                 _infeasibleRows.Add(marker);
             }
+
             DualOptimize();
+
             return;
         }
 
         // Check next if the negative error variable is basic.
         var other = info.Tag.Other;
+
         if (rows.TryGetValue(other, out row))
         {
             if (row.Add(delta) < 0.0)
             {
                 _infeasibleRows.Add(other);
             }
+
             DualOptimize();
+
             return;
         }
 
@@ -228,6 +235,7 @@ public partial class Solver
             var basicRow = entry.Value;
             var symbol = entry.Key;
             var coeff = basicRow.CoefficientFor(marker);
+
             if (!NearZero(coeff))
             {
                 if (basicRow.Add(delta * coeff) < 0.0 && symbol.Type != SymbolType.External)

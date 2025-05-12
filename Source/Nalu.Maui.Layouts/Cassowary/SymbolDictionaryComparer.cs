@@ -6,7 +6,7 @@ namespace Nalu.Cassowary;
 internal class SymbolDictionaryComparer : IEqualityComparer<Symbol>
 {
     public static readonly SymbolDictionaryComparer Instance = new();
-    
+
     public bool Equals(Symbol x, Symbol y) => x.Id == y.Id;
 
     public int GetHashCode(Symbol obj) => obj.Id;

@@ -13,5 +13,5 @@ public enum SizeBehavior
     /// <summary>
     /// The desired size is preferred, and can eventually shrink.
     /// </summary>
-    Shrink,
+    Shrink
 }

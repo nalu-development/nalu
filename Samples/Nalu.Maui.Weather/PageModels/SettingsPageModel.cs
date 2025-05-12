@@ -18,21 +18,22 @@ public partial class SettingsPageModel(
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DurationText))]
     private TimeSpan _duration = TimeSpan.FromTicks(preferences.Get(Constants.PrefForecastDays, TimeSpan.FromDays(7).Ticks));
-    
+
     public string DurationText => $"{Math.Round(Duration.TotalDays, MidpointRounding.AwayFromZero)} days";
-    
+
     [RelayCommand]
     public async Task EditDurationAsync()
     {
-        var result = await popupService.ShowPopupAsync<DurationEdit>(onPresenting: durationEdit =>
-        {
-            durationEdit.Duration = Duration;
-            durationEdit.MaxDuration = TimeSpan.FromDays(14);
-            durationEdit.WholeDuration = TimeSpan.FromDays(7);
-            durationEdit.RoundToTicks = TimeSpan.FromDays(1).Ticks;
-            durationEdit.Format = "{0:d\\ }days";
-        });
-        
+        var result = await popupService.ShowPopupAsync<DurationEdit>(durationEdit =>
+            {
+                durationEdit.Duration = Duration;
+                durationEdit.MaxDuration = TimeSpan.FromDays(14);
+                durationEdit.WholeDuration = TimeSpan.FromDays(7);
+                durationEdit.RoundToTicks = TimeSpan.FromDays(1).Ticks;
+                durationEdit.Format = "{0:d\\ }days";
+            }
+        );
+
         if (result is TimeSpan newDuration)
         {
             Duration = newDuration;

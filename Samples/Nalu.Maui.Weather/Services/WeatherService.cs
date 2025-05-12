@@ -38,14 +38,13 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 
         var times = forecast!.Daily!.Time!;
 
-        return times.Select(
-                        (t, i) => new DailyWeatherModel
-                                  {
-                                      Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
-                                      TemperatureMin = forecast.Daily.Temperature_2m_min![i],
-                                      TemperatureMax = forecast.Daily.Temperature_2m_max![i],
-                                      WeatherCode = (int) forecast.Daily.Weathercode![i]
-                                  }
+        return times.Select((t, i) => new DailyWeatherModel
+                                      {
+                                          Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+                                          TemperatureMin = forecast.Daily.Temperature_2m_min![i],
+                                          TemperatureMax = forecast.Daily.Temperature_2m_max![i],
+                                          WeatherCode = (int) forecast.Daily.Weathercode![i]
+                                      }
                     )
                     .ToList();
     }
@@ -77,18 +76,17 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 
         var times = forecast!.Hourly!.Time!;
 
-        return times.Select(
-                        (t, i) => new HourlyWeatherModel
-                                  {
-                                      Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
-                                      Temperature = forecast.Hourly.Temperature_2m![i],
-                                      FeelsLike = forecast.Hourly.Apparent_temperature![i],
-                                      Humidity = forecast.Hourly.Relativehumidity_2m![i],
-                                      UvIndex = forecast.Hourly.Uv_index![i],
-                                      WindSpeed = forecast.Hourly.Windspeed_10m![i],
-                                      WindDirection = forecast.Hourly.Winddirection_10m![i],
-                                      WeatherCode = forecast.Hourly.Weathercode![i]
-                                  }
+        return times.Select((t, i) => new HourlyWeatherModel
+                                      {
+                                          Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+                                          Temperature = forecast.Hourly.Temperature_2m![i],
+                                          FeelsLike = forecast.Hourly.Apparent_temperature![i],
+                                          Humidity = forecast.Hourly.Relativehumidity_2m![i],
+                                          UvIndex = forecast.Hourly.Uv_index![i],
+                                          WindSpeed = forecast.Hourly.Windspeed_10m![i],
+                                          WindDirection = forecast.Hourly.Winddirection_10m![i],
+                                          WeatherCode = forecast.Hourly.Weathercode![i]
+                                      }
                     )
                     .ToList();
     }
@@ -117,15 +115,14 @@ public class WeatherService(OpenMeteoClient openMeteo) : IWeatherService
 
         var times = iq.Hourly!.Time!;
 
-        return times.Select(
-                        (t, i) => new HourlyAirQualityModel
-                                  {
-                                      Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
-                                      Pm25 = iq.Hourly.Pm2_5![i],
-                                      Pm10 = iq.Hourly.Pm10![i],
-                                      O3 = iq.Hourly.Ozone![i],
-                                      Co = iq.Hourly.Carbon_monoxide![i]
-                                  }
+        return times.Select((t, i) => new HourlyAirQualityModel
+                                      {
+                                          Time = DateTime.SpecifyKind(DateTime.Parse(t), DateTimeKind.Local),
+                                          Pm25 = iq.Hourly.Pm2_5![i],
+                                          Pm10 = iq.Hourly.Pm10![i],
+                                          O3 = iq.Hourly.Ozone![i],
+                                          Co = iq.Hourly.Carbon_monoxide![i]
+                                      }
                     )
                     .ToList();
     }

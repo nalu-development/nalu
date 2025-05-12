@@ -110,7 +110,7 @@ public partial class NavigationServiceTests
                 count = navigationStack.Count;
             }
 
-            while(count > 1)
+            while (count > 1)
             {
                 _navigationStacks.RemoveAt(_navigationStacks.Count - 1);
             }
@@ -283,8 +283,7 @@ public partial class NavigationServiceTests
         _shellProxy.ProposeNavigation(Arg.Any<INavigationInfo>()).Returns(true);
 
         _shellProxy.CommitNavigationAsync(Arg.Any<Action>())
-                   .Returns(
-                       callInfo =>
+                   .Returns(callInfo =>
                        {
                            callInfo.Arg<Action>()?.Invoke();
 
@@ -294,8 +293,7 @@ public partial class NavigationServiceTests
 
         _shellProxy
             .GetContent(Arg.Any<string>())
-            .Returns(
-                callInfo =>
+            .Returns(callInfo =>
                 {
                     var segmentName = callInfo.Arg<string>();
 
@@ -305,8 +303,7 @@ public partial class NavigationServiceTests
 
         _shellProxy
             .When(m => m.InitializeWithContent(Arg.Any<string>()))
-            .Do(
-                callInfo =>
+            .Do(callInfo =>
                 {
                     var segmentName = callInfo.Arg<string>();
                     var content = segmentToContent[segmentName];
@@ -320,8 +317,7 @@ public partial class NavigationServiceTests
 
         _shellProxy
             .SelectContentAsync(Arg.Any<string>())
-            .Returns(
-                callInfo =>
+            .Returns(callInfo =>
                 {
                     var segmentName = callInfo.Arg<string>();
                     var content = segmentToContent[segmentName];
@@ -337,8 +333,7 @@ public partial class NavigationServiceTests
 
         _shellProxy
             .PushAsync(Arg.Any<string>(), Arg.Any<Page>())
-            .Returns(
-                callInfo =>
+            .Returns(callInfo =>
                 {
                     var page = callInfo.Arg<Page>();
                     var section = (TestShellSectionProxy) _shellProxy.CurrentItem.CurrentSection;
@@ -350,10 +345,10 @@ public partial class NavigationServiceTests
 
         _shellProxy
             .PopAsync(Arg.Any<IShellSectionProxy>())
-            .Returns(
-                callInfo =>
+            .Returns(callInfo =>
                 {
                     var section = (TestShellSectionProxy) (callInfo.Arg<IShellSectionProxy>() ?? _shellProxy.CurrentItem.CurrentSection);
+
                     return section.PopAsync();
                 }
             );

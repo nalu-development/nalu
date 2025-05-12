@@ -9,7 +9,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual view
         var view = Substitute.For<IView>();
         view.Visibility.Returns(Visibility.Visible);
@@ -22,7 +22,7 @@ public class MagnetViewTests
                              View = view,
                              Margin = new Thickness(10),
                              LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
-                             TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                             TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                          };
 
         // Act
@@ -46,7 +46,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual view
         var view = Substitute.For<IView>();
         view.Visibility.Returns(Visibility.Visible);
@@ -63,7 +63,7 @@ public class MagnetViewTests
                              LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
                              RightTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Right),
                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
-                             BottomTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Bottom),
+                             BottomTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Bottom)
                          };
 
         // Act
@@ -84,7 +84,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual view
         var view = Substitute.For<IView>();
         view.Visibility.Returns(Visibility.Visible);
@@ -99,7 +99,7 @@ public class MagnetViewTests
                              Height = SizeValue.StagePercent(50),
                              Margin = new Thickness(10),
                              LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
-                             TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                             TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                          };
 
         // Act
@@ -124,7 +124,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual view
         var view = Substitute.For<IView>();
         view.Visibility.Returns(Visibility.Visible);
@@ -143,7 +143,7 @@ public class MagnetViewTests
                              LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
                              RightTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Right),
                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
-                             BottomTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Bottom),
+                             BottomTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Bottom)
                          };
 
         // Act
@@ -156,7 +156,7 @@ public class MagnetViewTests
 
         // Assert
         var frame = magnetView.GetFrame();
-        var expectedSize = (100 - margin * 2) / 2;
+        var expectedSize = (100 - (margin * 2)) / 2;
         frame.Should().Be(new Rect(expected, expected, expectedSize, expectedSize));
     }
 
@@ -167,7 +167,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual view
         var view = Substitute.For<IView>();
         view.Visibility.Returns(Visibility.Visible);
@@ -182,7 +182,7 @@ public class MagnetViewTests
                              Height = height,
                              Margin = new Thickness(10),
                              LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
-                             TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                             TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                          };
 
         // Act
@@ -202,7 +202,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual views
         var virtualView1 = Substitute.For<IView>();
         virtualView1.Visibility.Returns(Visibility.Visible);
@@ -223,7 +223,7 @@ public class MagnetViewTests
                               Margin = new Thickness(10),
                               LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
                               RightTo = new HorizontalPullTarget(view2, HorizontalPoles.Left),
-                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                           };
 
         var magnetView2 = new MagnetView
@@ -234,7 +234,7 @@ public class MagnetViewTests
                               Margin = new Thickness(10),
                               LeftTo = new HorizontalPullTarget(view1, HorizontalPoles.Right),
                               RightTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Right),
-                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                           };
 
         stage.GetElement(view1).Returns(magnetView1);
@@ -265,7 +265,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 92, 100);
-        
+
         // Mock the virtual views
         var virtualView1 = Substitute.For<IView>();
         virtualView1.Visibility.Returns(Visibility.Visible);
@@ -285,7 +285,7 @@ public class MagnetViewTests
                               Margin = new Thickness(10),
                               LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
                               RightTo = new HorizontalPullTarget(view2, HorizontalPoles.Left),
-                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                           };
 
         var magnetView2 = new MagnetView
@@ -295,7 +295,7 @@ public class MagnetViewTests
                               Margin = new Thickness(10),
                               LeftTo = new HorizontalPullTarget(view1, HorizontalPoles.Right),
                               RightTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Right),
-                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                           };
 
         stage.GetElement(view1).Returns(magnetView1);
@@ -326,7 +326,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 200, 200);
-        
+
         // Mock the virtual views
         var virtualView1 = Substitute.For<IView>();
         virtualView1.Visibility.Returns(Visibility.Visible);
@@ -347,7 +347,7 @@ public class MagnetViewTests
                               LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
                               RightTo = new HorizontalPullTarget(view2, HorizontalPoles.Left, Traction.Strong),
                               TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
-                              BottomTo = new VerticalPullTarget(view2, VerticalPoles.Top, Traction.Strong),
+                              BottomTo = new VerticalPullTarget(view2, VerticalPoles.Top, Traction.Strong)
                           };
 
         var magnetView2 = new MagnetView
@@ -358,7 +358,7 @@ public class MagnetViewTests
                               LeftTo = new HorizontalPullTarget(view1, HorizontalPoles.Right, Traction.Strong),
                               RightTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Right),
                               TopTo = new VerticalPullTarget(view1, VerticalPoles.Bottom, Traction.Strong),
-                              BottomTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Bottom),
+                              BottomTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Bottom)
                           };
 
         stage.GetElement(view1).Returns(magnetView1);
@@ -389,7 +389,7 @@ public class MagnetViewTests
     {
         // Arrange
         var stage = MagnetTestingStage.Create(out var solver, 100, 100);
-        
+
         // Mock the virtual views
         var virtualView1 = Substitute.For<IView>();
         virtualView1.Visibility.Returns(Visibility.Visible);
@@ -409,7 +409,7 @@ public class MagnetViewTests
                               Width = "~",
                               LeftTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Left),
                               RightTo = new HorizontalPullTarget(view2, HorizontalPoles.Left),
-                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                           };
 
         var magnetView2 = new MagnetView
@@ -418,7 +418,7 @@ public class MagnetViewTests
                               View = virtualView2,
                               LeftTo = new HorizontalPullTarget(view1, HorizontalPoles.Right, Traction.Strong),
                               RightTo = new HorizontalPullTarget(IMagnetStage.StageId, HorizontalPoles.Right),
-                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top),
+                              TopTo = new VerticalPullTarget(IMagnetStage.StageId, VerticalPoles.Top)
                           };
 
         stage.GetElement(view1).Returns(magnetView1);

@@ -15,7 +15,6 @@ public class Magnet : Layout, IStackLayout
         nameof(Stage),
         typeof(IMagnetStage),
         typeof(Magnet),
-        null,
         propertyChanged: OnScenePropertyChanged
     );
 

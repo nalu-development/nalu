@@ -16,19 +16,22 @@ public class VerticalGuidelineTests
         var stageEnd = new Variable();
         stage.Left.Returns(stageStart);
         stage.Right.Returns(stageEnd);
+
         stage.When(s => s.AddConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.AddConstraint(call.Arg<Constraint>()));
+
         stage.When(s => s.RemoveConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.RemoveConstraint(call.Arg<Constraint>()));
+
         solver.AddConstraint(stageStart | Eq(Required) | 0);
         solver.AddConstraint(stageEnd | Eq(Required) | 100);
-        
+
         var guideline = new VerticalGuideline
-                     {
-                         FractionalPosition = 0.6,
-                         Position = 5,
-                     };
-        
+                        {
+                            FractionalPosition = 0.6,
+                            Position = 5
+                        };
+
         guideline.SetStage(stage);
         guideline.ApplyConstraints();
 

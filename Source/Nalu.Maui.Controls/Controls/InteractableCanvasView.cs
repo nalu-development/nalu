@@ -2,10 +2,10 @@ using System.Diagnostics.CodeAnalysis;
 using Nalu.Internals;
 using SkiaSharp.Views.Maui.Controls;
 using SkiaSharp.Views.Maui.Handlers;
-
 #if MACCATALYST || IOS
 #if NET9_0_OR_GREATER || MACCATALYST
 using PlatformView = SkiaSharp.Views.iOS.SKCanvasView;
+
 #else
 using UIKit;
 using PlatformView = object;

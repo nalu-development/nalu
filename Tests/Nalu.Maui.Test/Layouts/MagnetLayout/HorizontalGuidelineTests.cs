@@ -16,20 +16,23 @@ public class HorizontalGuidelineTests
         var stageBottom = new Variable();
         stage.Top.Returns(stageTop);
         stage.Bottom.Returns(stageBottom);
+
         stage.When(s => s.AddConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.AddConstraint(call.Arg<Constraint>()));
+
         stage.When(s => s.RemoveConstraint(Arg.Any<Constraint>()))
              .Do(call => solver.RemoveConstraint(call.Arg<Constraint>()));
+
         solver.AddConstraint(stageTop | Eq(Required) | 40);
         solver.AddConstraint(stageBottom | Eq(Required) | 100);
-        
+
         var guideline = new HorizontalGuideline
-                     {
-                         Id = "guideline",
-                         FractionalPosition = 0.5,
-                         Position = -10,
-                     };
-        
+                        {
+                            Id = "guideline",
+                            FractionalPosition = 0.5,
+                            Position = -10
+                        };
+
         guideline.SetStage(stage);
         guideline.ApplyConstraints();
 

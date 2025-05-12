@@ -14,9 +14,7 @@ internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKe
 {
     private readonly TValue[] _values = new TValue[EnumKeys<TKey>.Length];
 
-    public SealedEnumDictionary()
-    {
-    }
+    public SealedEnumDictionary() { }
 
     public SealedEnumDictionary(Func<TKey, TValue> initializer)
     {
@@ -25,7 +23,7 @@ internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKe
             _values[Convert.ToInt32(key)] = initializer(key);
         }
     }
-    
+
     public TValue this[TKey key]
     {
         get => _values[Convert.ToInt32(key)];
@@ -39,6 +37,7 @@ internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKe
         foreach (var key in values)
         {
             var index = Convert.ToInt32(key);
+
             yield return new KeyValuePair<TKey, TValue>(key, _values[index]);
         }
     }

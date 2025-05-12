@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui;
+using Microsoft.Extensions.Logging;
 using Nalu.Maui.Weather.Popups;
 using Nalu.Maui.Weather.Services;
 using Nalu.Maui.Weather.ViewModels;
@@ -7,7 +8,7 @@ using SkiaSharp.Views.Maui.Controls.Hosting;
 namespace Nalu.Maui.Weather;
 
 #if DEBUG
-using Microsoft.Extensions.Logging;
+
 #endif
 
 #if !(IOS || ANDROID || WINDOWS || MACCATALYST)
@@ -24,19 +25,17 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
-            .UseNaluNavigation<App>(
-                nav => nav
-                       .AddPages()
-                       .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
-                       .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
+            .UseNaluNavigation<App>(nav => nav
+                                           .AddPages()
+                                           .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
+                                           .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()
             .UseMauiCommunityToolkit()
             .UseOpenMeteo()
-            .ConfigureFonts(
-                fonts =>
+            .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "Regular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "SemiBold");
@@ -52,7 +51,7 @@ public static class MauiProgram
 
         builder.Services
                .AddSingleton<WeatherState>();
-        
+
         builder.Services.AddTransientPopup<DurationEditPopup, DurationEdit>();
 
 #if DEBUG

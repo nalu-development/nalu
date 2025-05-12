@@ -36,7 +36,7 @@ public readonly record struct SizeValue(double Value, SizeUnit Unit = SizeUnit.M
     public static SizeValue Ratio(double value, SizeBehavior behavior = SizeBehavior.Required) => new(value, SizeUnit.Ratio, behavior);
 
     /// <summary>
-    /// Implicitly converts a string representation (e.g., "50%" or "*" or "1-") into a <see cref="SizeValue"/>.
+    /// Implicitly converts a string representation (e.g., "50%" or "*" or "1-") into a <see cref="SizeValue" />.
     /// </summary>
     public static implicit operator SizeValue(string inputString)
     {
@@ -66,19 +66,24 @@ public readonly record struct SizeValue(double Value, SizeUnit Unit = SizeUnit.M
             case '%':
                 var percentage = unitIndex == 0 ? 100.0 : double.Parse(inputChars[..unitIndex]);
                 percentage /= 100;
+
                 return new SizeValue(percentage, SizeUnit.Stage, behavior);
             case '*':
                 var constraintRatio = unitIndex == 0 ? 1.0 : double.Parse(inputChars[..unitIndex]);
+
                 return new SizeValue(constraintRatio, SizeUnit.Constraint, behavior);
             case 'r':
                 var axisRatio = unitIndex == 0 ? 1.0 : double.Parse(inputChars[..unitIndex]);
+
                 return new SizeValue(axisRatio, SizeUnit.Ratio, behavior);
             case 'M':
             case 'm':
                 var measuredRatio = unitIndex == 0 ? 1.0 : double.Parse(inputChars[..unitIndex]);
+
                 return new SizeValue(measuredRatio, SizeUnit.Measured, behavior);
             default:
                 var ratio = double.Parse(inputChars);
+
                 return new SizeValue(ratio, SizeUnit.Measured, behavior);
         }
     }

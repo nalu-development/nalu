@@ -23,7 +23,7 @@ public class MagnetIntegrationTests
             {
                 finalWidth = widthConstraint;
             }
-            
+
             if (height == -1 || heightConstraint < finalHeight)
             {
                 finalHeight = heightConstraint;
@@ -67,7 +67,7 @@ public class MagnetIntegrationTests
     private static IView CreateTestView(string id, double width, double height)
     {
         var view = new TestView(width, height);
-        Magnet.SetStageId((BindableObject)view, id);
+        Magnet.SetStageId((BindableObject) view, id);
 
         return view;
     }
@@ -75,60 +75,60 @@ public class MagnetIntegrationTests
     public MagnetIntegrationTests()
     {
         _magnet = new Magnet
-                     {
-                         Stage = new MagnetStage
-                                 {
-                                     new MagnetView
-                                     {
-                                         Id = "CardImage",
-                                         Margin = 4,
-                                         TopTo = "Stage.Top",
-                                         BottomTo = "Stage.Bottom",
-                                         LeftTo = "Stage.Left!",
-                                     },
-                                     new MagnetView
-                                     {
-                                         Id = "CardName",
-                                         TopTo = "Stage.Top",
-                                         BottomTo = "CardDetail.Top!",
-                                         Margin = new Thickness(8, 0, 0, 0),
-                                         Width = "1~",
-                                         HorizontalBias = 0,
-                                         LeftTo = "CardImage.Right",
-                                         RightTo = "Starred.Left!",
-                                     },
-                                     new MagnetView
-                                     {
-                                         Id = "Starred",
-                                         LeftTo = "CardName.Right!",
-                                         RightTo = "Money.Left",
-                                         TopTo = "CardName.Top",
-                                         BottomTo = "CardName.Bottom",
-                                         Margin = new Thickness(0, 0, 8, 0),
-                                     },
-                                     new MagnetView
-                                     {
-                                         Id = "CardDetail",
-                                         TopTo = "CardName.Bottom!",
-                                         BottomTo = "Stage.Bottom",
-                                         LeftTo = "CardName.Left",
-                                     },
-                                     new MagnetView
-                                     {
-                                         Id = "Money",
-                                         Height = "*",
-                                         TopTo = "Stage.Top",
-                                         BottomTo = "Stage.Bottom",
-                                         RightTo = "Stage.Right!"
-                                     }
-                                 }
-                     };
+                  {
+                      Stage = new MagnetStage
+                              {
+                                  new MagnetView
+                                  {
+                                      Id = "CardImage",
+                                      Margin = 4,
+                                      TopTo = "Stage.Top",
+                                      BottomTo = "Stage.Bottom",
+                                      LeftTo = "Stage.Left!"
+                                  },
+                                  new MagnetView
+                                  {
+                                      Id = "CardName",
+                                      TopTo = "Stage.Top",
+                                      BottomTo = "CardDetail.Top!",
+                                      Margin = new Thickness(8, 0, 0, 0),
+                                      Width = "1~",
+                                      HorizontalBias = 0,
+                                      LeftTo = "CardImage.Right",
+                                      RightTo = "Starred.Left!"
+                                  },
+                                  new MagnetView
+                                  {
+                                      Id = "Starred",
+                                      LeftTo = "CardName.Right!",
+                                      RightTo = "Money.Left",
+                                      TopTo = "CardName.Top",
+                                      BottomTo = "CardName.Bottom",
+                                      Margin = new Thickness(0, 0, 8, 0)
+                                  },
+                                  new MagnetView
+                                  {
+                                      Id = "CardDetail",
+                                      TopTo = "CardName.Bottom!",
+                                      BottomTo = "Stage.Bottom",
+                                      LeftTo = "CardName.Left"
+                                  },
+                                  new MagnetView
+                                  {
+                                      Id = "Money",
+                                      Height = "*",
+                                      TopTo = "Stage.Top",
+                                      BottomTo = "Stage.Bottom",
+                                      RightTo = "Stage.Right!"
+                                  }
+                              }
+                  };
 
         BasicSetup(_magnet);
-        
+
         _layoutManager = GetLayoutManager(_magnet);
     }
-    
+
     [Fact]
     public void ComplexLayoutWithShrinking()
     {
@@ -136,14 +136,15 @@ public class MagnetIntegrationTests
         _layoutManager.ArrangeChildren(new Rect(Point.Zero, result));
 
         var outputFrames = _magnet.Children.Select(c => (Id: Magnet.GetStageId(c)!, c.Frame)).ToList();
+
         var expectedFrames = new Dictionary<string, Rect>
-        {
-            { "CardImage", new Rect(4, 4, 60, 48)},
-            { "CardName", new Rect(72, 9, 165, 22)},
-            { "CardDetail", new Rect(72, 31, 105, 16)},
-            { "Money", new Rect(261, 0, 98, 56)},
-            { "Starred", new Rect(237, 12, 16, 16)}
-        };
+                             {
+                                 { "CardImage", new Rect(4, 4, 60, 48) },
+                                 { "CardName", new Rect(72, 9, 165, 22) },
+                                 { "CardDetail", new Rect(72, 31, 105, 16) },
+                                 { "Money", new Rect(261, 0, 98, 56) },
+                                 { "Starred", new Rect(237, 12, 16, 16) }
+                             };
 
         foreach (var (id, frame) in outputFrames)
         {
@@ -154,7 +155,7 @@ public class MagnetIntegrationTests
             frame.Height.Should().Be(expectedFrame.Height);
         }
     }
-    
+
     [Fact]
     public void ComplexLayoutWhichFits()
     {
@@ -162,13 +163,14 @@ public class MagnetIntegrationTests
         _layoutManager.ArrangeChildren(new Rect(Point.Zero, result));
 
         var outputFrames = _magnet.Children.Select(c => (Id: Magnet.GetStageId(c)!, c.Frame)).ToList();
+
         var expectedFrames = new Dictionary<string, Rect>
                              {
-                                 { "CardImage", new Rect(4, 4, 60, 48)},
-                                 { "CardName", new Rect(72, 9, 221, 22)},
-                                 { "CardDetail", new Rect(72, 31, 105, 16)},
-                                 { "Money", new Rect(610, 0, 98, 56)},
-                                 { "Starred", new Rect(293, 12, 16, 16)}
+                                 { "CardImage", new Rect(4, 4, 60, 48) },
+                                 { "CardName", new Rect(72, 9, 221, 22) },
+                                 { "CardDetail", new Rect(72, 31, 105, 16) },
+                                 { "Money", new Rect(610, 0, 98, 56) },
+                                 { "Starred", new Rect(293, 12, 16, 16) }
                              };
 
         foreach (var (id, frame) in outputFrames)

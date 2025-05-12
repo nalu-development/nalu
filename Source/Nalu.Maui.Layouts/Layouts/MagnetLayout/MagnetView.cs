@@ -3,7 +3,9 @@ using Nalu.Cassowary;
 using Nalu.Internals;
 using static Nalu.Cassowary.Strength;
 using static Nalu.Cassowary.WeightedRelation;
-using PoleConnection = (Nalu.Cassowary.Expression Pole, Nalu.MagnetLayout.Traction Traction, Nalu.Cassowary.WeightedRelation Relation, Nalu.Cassowary.Expression ToPole, Nalu.MagnetLayout.MagnetView? ChainedView);
+using PoleConnection =
+    (Nalu.Cassowary.Expression Pole, Nalu.MagnetLayout.Traction Traction, Nalu.Cassowary.WeightedRelation Relation, Nalu.Cassowary.Expression ToPole, Nalu.MagnetLayout.MagnetView?
+    ChainedView);
 
 namespace Nalu.MagnetLayout;
 
@@ -195,7 +197,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     );
 
     /// <summary>
-    /// Gets or sets the view margins when the pull target has <see cref="Visibility"/> set to <see cref="Visibility.Collapsed"/>.
+    /// Gets or sets the view margins when the pull target has <see cref="Visibility" /> set to <see cref="Visibility.Collapsed" />.
     /// </summary>
     public Thickness CollapsedMargin
     {
@@ -208,34 +210,42 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
 
     /// <inheritdoc />
     Variable IHorizontalPoles.Left => _left;
+
     private readonly Variable _left = new();
 
     /// <inheritdoc />
     Variable IHorizontalPoles.Right => _right;
+
     private readonly Variable _right = new();
 
     /// <inheritdoc />
     Variable IVerticalPoles.Top => _top;
+
     private readonly Variable _top = new();
 
     /// <inheritdoc />
     Variable IVerticalPoles.Bottom => _bottom;
+
     private readonly Variable _bottom = new();
 
     /// <inheritdoc />
     Variable IHorizontalChainPoles.ChainLeft => _chainLeft;
+
     private readonly Variable _chainLeft = new();
 
     /// <inheritdoc />
     Variable IHorizontalChainPoles.ChainRight => _chainRight;
+
     private readonly Variable _chainRight = new();
 
     /// <inheritdoc />
     Variable IVerticalChainPoles.ChainTop => _chainTop;
+
     private readonly Variable _chainTop = new();
 
     /// <inheritdoc />
     Variable IVerticalChainPoles.ChainBottom => _chainBottom;
+
     private readonly Variable _chainBottom = new();
 
     /// <summary>
@@ -247,7 +257,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     /// Gets the bottom position of the view.
     /// </summary>
     public double Bottom => _bottom.CurrentValue;
-    
+
     /// <summary>
     /// Gets the left position of the view.
     /// </summary>
@@ -269,6 +279,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             if (value == null)
             {
                 _viewRef = null;
+
                 return;
             }
 
@@ -341,17 +352,17 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             {
                 chainLeft._horizontalChainChanged = true;
             }
-            
+
             if (GetRightConnection(stage) is { ChainedView: { } chainRight })
             {
                 chainRight._horizontalChainChanged = true;
             }
-            
+
             if (GetTopConnection(stage) is { ChainedView: { } chainTop })
             {
                 chainTop._verticalChainChanged = true;
             }
-            
+
             if (GetBottomConnection(stage) is { ChainedView: { } chainBottom })
             {
                 chainBottom._verticalChainChanged = true;
@@ -372,7 +383,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         {
             UpdateConstraints(ConstraintTypes.HorizontalPosition, GetHorizontalConstraints);
         }
-        
+
         if (_verticalChainChanged)
         {
             UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
@@ -473,7 +484,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         needsHorizontalConstraintsUpdate = EnsureEffectiveRightMargin(stage, collapsedMargin, margin) || needsHorizontalConstraintsUpdate;
         var needsVerticalConstraintsUpdate = EnsureEffectiveTopMargin(stage, collapsedMargin, margin);
         needsVerticalConstraintsUpdate = EnsureEffectiveBottomMargin(stage, collapsedMargin, margin) || needsVerticalConstraintsUpdate;
-        
+
         if (needsHorizontalConstraintsUpdate)
         {
             UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
@@ -492,10 +503,11 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (BottomTo is { } bottomTo)
         {
             var bottomMargin = bottomTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Bottom : margin.Bottom;
+
             if (_marginBottom != bottomMargin)
             {
                 _marginBottom = bottomMargin;
-                
+
                 return true;
             }
         }
@@ -512,6 +524,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (TopTo is { } topTo)
         {
             var topMargin = topTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Top : margin.Top;
+
             if (_marginTop != topMargin)
             {
                 _marginTop = topMargin;
@@ -523,7 +536,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         {
             _marginTop = 0;
         }
-        
+
         return false;
     }
 
@@ -532,10 +545,11 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (RightTo is { } rightTo)
         {
             var rightMargin = rightTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Right : margin.Right;
+
             if (_marginRight != rightMargin)
             {
                 _marginRight = rightMargin;
-                
+
                 return true;
             }
         }
@@ -543,7 +557,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         {
             _marginRight = 0;
         }
-        
+
         return false;
     }
 
@@ -552,10 +566,11 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (LeftTo is { } leftTo)
         {
             var leftMargin = leftTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Left : margin.Left;
+
             if (_marginLeft != leftMargin)
             {
                 _marginLeft = leftMargin;
-                
+
                 return true;
             }
         }
@@ -563,7 +578,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         {
             _marginLeft = 0;
         }
-        
+
         return false;
     }
 
@@ -583,7 +598,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (maybeLeftConnection is { } lc)
         {
             yield return lc.Pole | lc.Relation | lc.ToPole;
-            
+
             if (lc.ChainedView is not null)
             {
                 yield return GetChainLeftConstraints();
@@ -593,7 +608,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (maybeRightConnection is { } rc)
         {
             yield return rc.Pole | rc.Relation | rc.ToPole;
-            
+
             if (rc.ChainedView is not null)
             {
                 yield return GetChainRightConstraints();
@@ -625,13 +640,14 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
                 else
                 {
                     // We're the pack-chain tail, so it's finally time to compute the space from me to the right target
-                    yield return _horizontalTailSpace | Eq(Required) | rightConnection.ToPole - rightConnection.Pole;
+                    yield return _horizontalTailSpace | Eq(Required) | (rightConnection.ToPole - rightConnection.Pole);
                 }
             }
             else if (rightConnection.Traction == Traction.Strong && leftConnection.Traction == Traction.Default && rightConnection.ChainedView is { } nextChainedView)
             {
                 // We're the pack-chain head, so we need to apply the bias to the entire chain
-                yield return (nextChainedView._horizontalTailSpace + (leftConnection.Pole - leftConnection.ToPole)) * HorizontalBias | Eq(Required) | (leftConnection.Pole - leftConnection.ToPole);
+                yield return ((nextChainedView._horizontalTailSpace + (leftConnection.Pole - leftConnection.ToPole)) * HorizontalBias) | Eq(Required) |
+                             (leftConnection.Pole - leftConnection.ToPole);
             }
 
             if (leftConnection.Traction == Traction.Default && rightConnection.Traction == Traction.Default)
@@ -659,7 +675,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (maybeBottomConnection is { } bc)
         {
             yield return bc.Pole | bc.Relation | bc.ToPole;
-            
+
             if (bc.ChainedView is not null)
             {
                 yield return GetChainBottomConstraints();
@@ -691,13 +707,14 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
                 else
                 {
                     // We're the pack-chain tail, so it's finally time to compute the space from me to the bottom target
-                    yield return _verticalTailSpace | Eq(Required) | bottomConnection.ToPole - bottomConnection.Pole;
+                    yield return _verticalTailSpace | Eq(Required) | (bottomConnection.ToPole - bottomConnection.Pole);
                 }
             }
             else if (bottomConnection.Traction == Traction.Strong && topConnection.Traction == Traction.Default && bottomConnection.ChainedView is { } nextChainedView)
             {
                 // We're the pack-chain head, so we need to apply the bias to the entire chain
-                yield return (nextChainedView._verticalTailSpace + (topConnection.Pole - topConnection.ToPole)) * VerticalBias | Eq(Required) | (topConnection.Pole - topConnection.ToPole);
+                yield return ((nextChainedView._verticalTailSpace + (topConnection.Pole - topConnection.ToPole)) * VerticalBias) | Eq(Required) |
+                             (topConnection.Pole - topConnection.ToPole);
             }
 
             if (topConnection.Traction == Traction.Default && bottomConnection.Traction == Traction.Default)
@@ -710,6 +727,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private PoleConnection? GetLeftConnection(IMagnetStage stage)
     {
         PoleConnection? connection = null;
+
         if (LeftTo is { } leftTo)
         {
             var target = leftTo.GetElement(stage);
@@ -726,6 +744,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private PoleConnection? GetRightConnection(IMagnetStage stage)
     {
         PoleConnection? connection = null;
+
         if (RightTo is { } rightTo)
         {
             var target = rightTo.GetElement(stage);
@@ -742,6 +761,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private PoleConnection? GetTopConnection(IMagnetStage stage)
     {
         PoleConnection? connection = null;
+
         if (TopTo is { } topTo)
         {
             var target = topTo.GetElement(stage);
@@ -758,6 +778,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private PoleConnection? GetBottomConnection(IMagnetStage stage)
     {
         PoleConnection? connection = null;
+
         if (BottomTo is { } bottomTo)
         {
             var target = bottomTo.GetElement(stage);
@@ -771,10 +792,10 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         return connection;
     }
 
-    private Constraint GetChainTopConstraints() => _chainTop | Eq(Required) | _top - _marginTop;
-    private Constraint GetChainBottomConstraints() => _chainBottom | Eq(Required) | _bottom + _marginBottom;
-    private Constraint GetChainLeftConstraints() => _chainLeft | Eq(Required) | _left - _marginLeft;
-    private Constraint GetChainRightConstraints() => _chainRight | Eq(Required) | _right + _marginRight;
+    private Constraint GetChainTopConstraints() => _chainTop | Eq(Required) | (_top - _marginTop);
+    private Constraint GetChainBottomConstraints() => _chainBottom | Eq(Required) | (_bottom + _marginBottom);
+    private Constraint GetChainLeftConstraints() => _chainLeft | Eq(Required) | (_left - _marginLeft);
+    private Constraint GetChainRightConstraints() => _chainRight | Eq(Required) | (_right + _marginRight);
 
     private void OnWidthChanged(SizeValue oldValue, SizeValue newValue)
     {
@@ -789,7 +810,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private void OnHeightChanged(SizeValue oldValue, SizeValue newValue)
     {
         UpdateConstraints(ConstraintTypes.Height, GetHeightConstraints);
-        
+
         if (oldValue.Unit != newValue.Unit)
         {
             OnVerticalPropertyChanged();
@@ -813,10 +834,12 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (leftElement is MagnetView { RightTo: { Pole: HorizontalPoles.Left } rightToMe } maybeChainedView && rightToMe.Id == Id)
         {
             chainedView = maybeChainedView;
+
             return true;
         }
 
         chainedView = null;
+
         return false;
     }
 
@@ -825,10 +848,12 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (rightElement is MagnetView { LeftTo: { Pole: HorizontalPoles.Right } leftToMe } maybeChainedView && leftToMe.Id == Id)
         {
             chainedView = maybeChainedView;
+
             return true;
         }
-        
+
         chainedView = null;
+
         return false;
     }
 
@@ -837,10 +862,12 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (topElement is MagnetView { BottomTo: { Pole: VerticalPoles.Top } bottomToMe } maybeChainedView && bottomToMe.Id == Id)
         {
             chainedView = maybeChainedView;
+
             return true;
         }
 
         chainedView = null;
+
         return false;
     }
 
@@ -849,16 +876,17 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         if (rightElement is MagnetView { TopTo: { Pole: VerticalPoles.Bottom } topToMe } maybeChainedView && topToMe.Id == Id)
         {
             chainedView = maybeChainedView;
+
             return true;
         }
-        
+
         chainedView = null;
+
         return false;
     }
 
     private void OnHorizontalBiasChanged(double oldValue, double newValue)
         => OnHorizontalPropertyChanged();
-
 
     private void OnVerticalBiasChanged(double oldValue, double newValue)
         => OnVerticalPropertyChanged();
@@ -884,21 +912,25 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             case SizeUnit.Measured:
                 yield return desired | Eq(Strong) | (measured * multiplier);
                 yield return (right - left) | relation | desired;
+
                 break;
 
             case SizeUnit.Constraint:
                 yield return (right - left) | relation | (constraintSize * multiplier);
                 yield return (right - left) | Eq(Medium) | (sceneRight - sceneLeft);
+
                 break;
 
             case SizeUnit.Stage:
                 yield return (right - left) | relation | ((sceneRight - sceneLeft) * multiplier);
                 yield return (right - left) | Eq(Medium) | (sceneRight - sceneLeft);
+
                 break;
 
             case SizeUnit.Ratio:
                 yield return desired | Eq(Strong) | (otherAxisSize * multiplier);
                 yield return (right - left) | relation | desired;
+
                 break;
 
             default:

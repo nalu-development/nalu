@@ -18,7 +18,7 @@
             <Label Grid.Row="0"
                    VerticalOptions="Center"
                    Text="Sync forecast data for:" />
-            <Button Grid.Row="0" 
+            <Button Grid.Row="0"
                     Grid.Column="1"
                     Style="{StaticResource TextButton}"
                     VerticalOptions="Center"

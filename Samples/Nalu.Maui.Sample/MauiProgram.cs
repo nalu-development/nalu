@@ -22,16 +22,13 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
-            .ConfigureLifecycleEvents(
-                events =>
+            .ConfigureLifecycleEvents(events =>
                 {
 #if WINDOWS
-                    events.AddWindows(
-                        windowsLifecycleBuilder =>
+                    events.AddWindows(windowsLifecycleBuilder =>
                         {
                             // See https://github.com/dotnet/maui/issues/20976 and
-                            windowsLifecycleBuilder.OnWindowCreated(
-                                window =>
+                            windowsLifecycleBuilder.OnWindowCreated(window =>
                                 {
                                     var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
                                     var id = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(handle);
@@ -49,18 +46,16 @@ public static class MauiProgram
 #endif
                 }
             )
-            .UseNaluNavigation<App>(
-                nav => nav
-                       .AddPages()
-                       .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
-                       .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
+            .UseNaluNavigation<App>(nav => nav
+                                           .AddPages()
+                                           .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
+                                           .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()
             .UseMauiCommunityToolkit()
-            .ConfigureMauiHandlers(
-                handlers =>
+            .ConfigureMauiHandlers(handlers =>
                 {
 #if ANDROID
                     // Fix for https://github.com/dotnet/maui/issues/7045
@@ -68,8 +63,7 @@ public static class MauiProgram
 #endif
                 }
             )
-            .ConfigureFonts(
-                fonts =>
+            .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");

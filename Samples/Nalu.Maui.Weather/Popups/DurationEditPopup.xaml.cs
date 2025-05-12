@@ -22,7 +22,7 @@ public partial class DurationEdit(IPopupService popupService) : ObservableObject
     private TimeSpan _wholeDuration = TimeSpan.FromMinutes(1);
 
     public long? RoundToTicks { get; set; }
-    
+
     public string DurationText
     {
         get
@@ -34,7 +34,7 @@ public partial class DurationEdit(IPopupService popupService) : ObservableObject
 
             if (RoundToTicks is not null)
             {
-                duration = TimeSpan.FromTicks((long)Math.Round(duration.Ticks / (double)RoundToTicks.Value, MidpointRounding.AwayFromZero) * RoundToTicks.Value);
+                duration = TimeSpan.FromTicks((long) Math.Round(duration.Ticks / (double) RoundToTicks.Value, MidpointRounding.AwayFromZero) * RoundToTicks.Value);
             }
 
             return string.Format(Format, duration);
@@ -42,7 +42,7 @@ public partial class DurationEdit(IPopupService popupService) : ObservableObject
     }
 
     public bool CanSave => Duration is not null;
-    
+
     [RelayCommand]
     public async Task SaveAsync()
     {
@@ -69,15 +69,15 @@ public partial class DurationEditPopup : Popup
         BindingContext = _model = model;
         Content.WidthRequest = Application.Current!.Windows[0].Width - 30;
     }
-    
+
     private void DurationWheel_OnRotationEnded(object? sender, EventArgs e)
     {
         if (DurationWheel.Duration is not { } duration || _model.RoundToTicks is null)
         {
             return;
         }
-        
-        var normalizedTicks = (long)Math.Round(duration.Ticks / (double)_model.RoundToTicks.Value, MidpointRounding.AwayFromZero) * _model.RoundToTicks.Value;
+
+        var normalizedTicks = (long) Math.Round(duration.Ticks / (double) _model.RoundToTicks.Value, MidpointRounding.AwayFromZero) * _model.RoundToTicks.Value;
         DurationWheel.Animate(_normalizeDurationAnimationKey, v => DurationWheel.Duration = TimeSpan.FromTicks((long) v), duration.Ticks, normalizedTicks);
     }
 
@@ -86,5 +86,3 @@ public partial class DurationEditPopup : Popup
         DurationWheel.AbortAnimation(_normalizeDurationAnimationKey);
     }
 }
-
-

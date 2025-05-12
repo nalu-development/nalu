@@ -10,7 +10,8 @@ internal class MagnetLayoutManager : LayoutManager
     // TODO: create an interface so we can unit test this layout manager the right way
     public Magnet Magnet { get; }
 
-    public MagnetLayoutManager(Magnet magnet) : base(magnet)
+    public MagnetLayoutManager(Magnet magnet)
+        : base(magnet)
     {
         Magnet = magnet;
     }
@@ -66,7 +67,7 @@ internal class MagnetLayoutManager : LayoutManager
         {
             return NoStageArrange(bounds);
         }
-        
+
         foreach (var child in Layout)
         {
             if (TryGetMagnetView(stage, child, out var magnetView))
@@ -74,7 +75,7 @@ internal class MagnetLayoutManager : LayoutManager
                 magnetView.View = child;
             }
         }
-        
+
         var padding = Magnet.Padding;
         var horizontalPadding = padding.HorizontalThickness;
         var verticalPadding = padding.VerticalThickness;
@@ -167,10 +168,12 @@ internal class MagnetLayoutManager : LayoutManager
         if (Magnet.GetStageId(child) is { } stageId && stage.TryGetElement(stageId, out var element) && element is MagnetView view)
         {
             magnetView = view;
+
             return true;
         }
 
         magnetView = null;
+
         return false;
     }
 }

@@ -17,7 +17,7 @@ internal class RefDictionary<TKey, TValue>
     private readonly IEqualityComparer<TKey>? _comparer;
     private const int _startOfFreeList = -3;
 
-    public IEnumerable<TKey> Keys 
+    public IEnumerable<TKey> Keys
     {
         get
         {
@@ -211,7 +211,7 @@ internal class RefDictionary<TKey, TValue>
 
         var comparer = _comparer;
         Debug.Assert(comparer is not null || typeof(TKey).IsValueType);
-        var hashCode = (uint) ((typeof(TKey).IsValueType && comparer == null) ? key.GetHashCode() : comparer!.GetHashCode(key));
+        var hashCode = (uint) (typeof(TKey).IsValueType && comparer == null ? key.GetHashCode() : comparer!.GetHashCode(key));
 
         uint collisionCount = 0;
         ref var bucket = ref GetBucket(hashCode);
@@ -226,6 +226,7 @@ internal class RefDictionary<TKey, TValue>
                 if (entries[i].HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entries[i].Key, key))
                 {
                     exists = true;
+
                     return ref entries[i].Value;
                 }
 
@@ -250,6 +251,7 @@ internal class RefDictionary<TKey, TValue>
                 if (entries[i].HashCode == hashCode && comparer.Equals(entries[i].Key, key))
                 {
                     exists = true;
+
                     return ref entries[i].Value;
                 }
 
@@ -271,7 +273,7 @@ internal class RefDictionary<TKey, TValue>
         if (_freeCount > 0)
         {
             index = _freeList;
-            Debug.Assert((_startOfFreeList - entries[_freeList].Next) >= -1, "shouldn't overflow because `next` cannot underflow");
+            Debug.Assert(_startOfFreeList - entries[_freeList].Next >= -1, "shouldn't overflow because `next` cannot underflow");
             _freeList = _startOfFreeList - entries[_freeList].Next;
             _freeCount--;
         }
@@ -298,6 +300,7 @@ internal class RefDictionary<TKey, TValue>
         bucket = index + 1; // Value in _buckets is 1-based
 
         exists = false;
+
         return ref entry.Value;
     }
 
@@ -434,7 +437,7 @@ internal class RefDictionary<TKey, TValue>
 
         var comparer = _comparer;
         Debug.Assert(comparer is not null || typeof(TKey).IsValueType);
-        var hashCode = (uint) ((typeof(TKey).IsValueType && comparer == null) ? key.GetHashCode() : comparer!.GetHashCode(key));
+        var hashCode = (uint) (typeof(TKey).IsValueType && comparer == null ? key.GetHashCode() : comparer!.GetHashCode(key));
 
         uint collisionCount = 0;
         ref var bucket = ref GetBucket(hashCode);
@@ -516,7 +519,7 @@ internal class RefDictionary<TKey, TValue>
         if (_freeCount > 0)
         {
             index = _freeList;
-            Debug.Assert((_startOfFreeList - entries[_freeList].Next) >= -1, "shouldn't overflow because `next` cannot underflow");
+            Debug.Assert(_startOfFreeList - entries[_freeList].Next >= -1, "shouldn't overflow because `next` cannot underflow");
             _freeList = _startOfFreeList - entries[_freeList].Next;
             _freeCount--;
         }
@@ -614,7 +617,7 @@ internal class RefDictionary<TKey, TValue>
                     }
 
                     Debug.Assert(
-                        (_startOfFreeList - _freeList) < 0,
+                        _startOfFreeList - _freeList < 0,
                         "shouldn't underflow because max hashtable length is MaxPrimeArrayLength = 0x7FEFFFFD(2146435069) _freelist underflow threshold 2147483646"
                     );
 
@@ -694,7 +697,7 @@ internal class RefDictionary<TKey, TValue>
                     value = entry.Value;
 
                     Debug.Assert(
-                        (_startOfFreeList - _freeList) < 0,
+                        _startOfFreeList - _freeList < 0,
                         "shouldn't underflow because max hashtable length is MaxPrimeArrayLength = 0x7FEFFFFD(2146435069) _freelist underflow threshold 2147483646"
                     );
 
@@ -788,9 +791,7 @@ internal class RefDictionary<TKey, TValue>
     /// <remarks>
     /// This method can be used to minimize the memory overhead
     /// once it is known that no new elements will be added.
-    ///
     /// To allocate minimum size storage array, execute the following statements:
-    ///
     /// dictionary.Clear();
     /// dictionary.TrimExcess();
     /// </remarks>
@@ -866,7 +867,7 @@ internal class RefDictionary<TKey, TValue>
     {
         private Entry[] _entries;
         private int _index;
-        private int _count;
+        private readonly int _count;
 
         public EntryEnumerator(Entry[] entries, int count)
         {
@@ -948,7 +949,7 @@ internal static class HashHelpers
 
             for (var divisor = 3; divisor <= limit; divisor += 2)
             {
-                if ((candidate % divisor) == 0)
+                if (candidate % divisor == 0)
                 {
                     return false;
                 }
@@ -976,9 +977,9 @@ internal static class HashHelpers
         }
 
         // Outside of our predefined table. Compute the hard way.
-        for (var i = (min | 1); i < int.MaxValue; i += 2)
+        for (var i = min | 1; i < int.MaxValue; i += 2)
         {
-            if (IsPrime(i) && ((i - 1) % HashPrime != 0))
+            if (IsPrime(i) && (i - 1) % HashPrime != 0)
             {
                 return i;
             }
@@ -1007,9 +1008,9 @@ internal static class HashHelpers
     /// <summary>Returns approximate reciprocal of the divisor: ceil(2**64 / divisor).</summary>
     /// <remarks>This should only be used on 64-bit.</remarks>
     public static ulong GetFastModMultiplier(uint divisor) =>
-        ulong.MaxValue / divisor + 1;
+        (ulong.MaxValue / divisor) + 1;
 
-    /// <summary>Performs a mod operation using the multiplier pre-computed with <see cref="GetFastModMultiplier"/>.</summary>
+    /// <summary>Performs a mod operation using the multiplier pre-computed with <see cref="GetFastModMultiplier" />.</summary>
     /// <remarks>This should only be used on 64-bit.</remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint FastMod(uint value, uint divisor, ulong multiplier)

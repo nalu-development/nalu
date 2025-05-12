@@ -3,6 +3,7 @@
     "path": "Nalu.sln",
     "projects": [
       "Source\\Nalu.Maui.Core\\Nalu.Maui.Core.csproj",
+      "Source\\Nalu.Maui.Core\\Nalu.Maui.Controls.csproj",
       "Source\\Nalu.Maui.Layouts\\Nalu.Maui.Layouts.csproj",
       "Source\\Nalu.Maui.Navigation\\Nalu.Maui.Navigation.csproj",
       "Source\\Nalu.Maui\\Nalu.Maui.csproj",

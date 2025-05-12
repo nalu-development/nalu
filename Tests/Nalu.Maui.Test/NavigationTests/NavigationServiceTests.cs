@@ -1,4 +1,3 @@
-
 namespace Nalu.Maui.Test.NavigationTests;
 
 #pragma warning disable CA2012,CS4014,VSTHRD110
@@ -21,8 +20,7 @@ public partial class NavigationServiceTests
         var page = _shellProxy.GetContent(segmentName).Page!;
         var model = (IPage1Model) page.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model.OnEnteringAsync();
                 model.OnAppearingAsync();
@@ -45,8 +43,7 @@ public partial class NavigationServiceTests
         var page = _shellProxy.GetContent(segmentName).Page!;
         var model = (IPage1Model) page.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model.OnEnteringAsync(intent);
                 model.OnAppearingAsync(intent);
@@ -84,8 +81,7 @@ public partial class NavigationServiceTests
         var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
         var model2 = (IPage2Model) page2.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model1.OnDisappearingAsync();
                 model2.OnEnteringAsync();
@@ -116,8 +112,7 @@ public partial class NavigationServiceTests
         var page2 = content1.Parent.GetNavigationStack().ElementAt(1).Page;
         var model2 = (IPage2Model) page2.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model1.OnDisappearingAsync();
                 model2.OnEnteringAsync(intent);
@@ -190,8 +185,7 @@ public partial class NavigationServiceTests
 
         await _navigationService.GoToAsync(Navigation.Relative().Pop());
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -224,8 +218,7 @@ public partial class NavigationServiceTests
         var intent = new OddIntent();
         await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(intent));
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -286,8 +279,7 @@ public partial class NavigationServiceTests
 
         await _navigationService.GoToAsync(Navigation.Relative().Pop().Pop());
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model3.OnDisappearingAsync();
                 model3.OnLeavingAsync();
@@ -357,8 +349,7 @@ public partial class NavigationServiceTests
 
         navigatedToTarget.Should().BeTrue();
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.CanLeaveAsync();
                 model2.OnDisappearingAsync();
@@ -396,8 +387,7 @@ public partial class NavigationServiceTests
 
         navigatedToTarget.Should().BeTrue();
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model3.OnDisappearingAsync();
                 model3.OnLeavingAsync();
@@ -435,8 +425,7 @@ public partial class NavigationServiceTests
 
         await _navigationService.GoToAsync(Navigation.Absolute().Root<IPage1Model>().Add<IPage9Model>());
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnEnteringAsync();
                 _shellProxy.PushAsync(nameof(Page9), page2);
@@ -478,8 +467,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -519,8 +507,7 @@ public partial class NavigationServiceTests
         var page4 = navigationStackPages5[1].Page;
         var model4 = (IPage4Model) page4.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -559,8 +546,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model5.OnEnteringAsync();
@@ -602,8 +588,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -645,8 +630,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -695,8 +679,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model4.OnDisappearingAsync();
                 model4.OnLeavingAsync();
@@ -739,8 +722,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model5.OnEnteringAsync();
@@ -783,8 +765,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.OnDisappearingAsync();
                 model2.OnLeavingAsync();
@@ -826,8 +807,7 @@ public partial class NavigationServiceTests
         var page5 = shellContent5.Page!;
         var model5 = (IPage5Model) page5.BindingContext;
 
-        Received.InOrder(
-            () =>
+        Received.InOrder(() =>
             {
                 model2.CanLeaveAsync();
                 model2.OnDisappearingAsync();

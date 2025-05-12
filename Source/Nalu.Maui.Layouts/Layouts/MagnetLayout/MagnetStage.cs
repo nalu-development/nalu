@@ -18,7 +18,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
 
     /// <inheritdoc />
     public string Id => IMagnetStage.StageId;
-    
+
     /// <inheritdoc />
     public Variable Top { get; } = new();
 
@@ -63,7 +63,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     private readonly Variable _lowRight = new();
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="MagnetStage"/> class.
+    /// Initializes a new instance of the <see cref="MagnetStage" /> class.
     /// </summary>
     public MagnetStage()
     {
@@ -83,6 +83,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
             Right | WeightedRelation.Eq(Strength.Required) | _lowRight,
             Bottom | WeightedRelation.Eq(Strength.Required) | _lowBottom
         );
+
         _solver.AddEditVariable(Bottom, Strength.Weak);
         _solver.AddEditVariable(Right, Strength.Weak);
         _solver.AddEditVariable(_lowBottom, Strength.Weak);
@@ -148,7 +149,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
 
     /// <inheritdoc />
     public double WidthRequest { get; private set; }
-    
+
     /// <inheritdoc />
     public double HeightRequest { get; private set; }
 
@@ -181,6 +182,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         if (identifier == Id)
         {
             element = this;
+
             return true;
         }
 
@@ -195,7 +197,7 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
 
     /// <inheritdoc />
     public void SuggestValue(Variable variable, double value) => _solver.SuggestValue(variable, value);
-    
+
     private void SetBounds(double width, double height, bool forMeasure)
     {
         WidthRequest = width;
@@ -205,12 +207,12 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         {
             width = 100_000;
         }
-        
+
         if (double.IsPositiveInfinity(height))
         {
             height = 100_000;
         }
-        
+
         _solver.SuggestValue(Right, width);
         _solver.SuggestValue(Bottom, height);
 
@@ -270,5 +272,6 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private IReadOnlyDictionary<string, IMagnetElementBase> GetElementsById() => _elementById ??= _elements.Cast<IMagnetElementBase>().ToFrozenDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, IMagnetElementBase> GetElementsById()
+        => _elementById ??= _elements.Cast<IMagnetElementBase>().ToFrozenDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
 }

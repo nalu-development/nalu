@@ -4,9 +4,11 @@ public static class SolverTestingExtensions
 {
     public static void ShouldHaveVariables(
         this Solver solver,
-        params (Variable Variable, double Value)[] expected)
+        params (Variable Variable, double Value)[] expected
+    )
     {
         solver.FetchChanges();
+
         foreach (var (variable, value) in expected)
         {
             var actual = variable.CurrentValue;

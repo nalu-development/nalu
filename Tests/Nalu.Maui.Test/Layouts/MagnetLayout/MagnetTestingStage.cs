@@ -29,18 +29,22 @@ public static class MagnetTestingStage
         stage.WidthRequest.Returns(width);
         stage.HeightRequest.Returns(height);
         stage.GetElement(IMagnetStage.StageId).Returns(stage); // Mock the GetElement method
+
         stage.When(s => s.AddConstraint(Arg.Any<Constraint>()))
              .Do(call => solverInstance.AddConstraint(call.Arg<Constraint>()));
+
         stage.When(s => s.RemoveConstraint(Arg.Any<Constraint>()))
              .Do(call => solverInstance.RemoveConstraint(call.Arg<Constraint>()));
 
         // Mock variable management
         stage.When(s => s.AddEditVariable(Arg.Any<Variable>(), Arg.Any<double>()))
-                .Do(call => solverInstance.AddEditVariable(call.Arg<Variable>(), call.Arg<double>()));
+             .Do(call => solverInstance.AddEditVariable(call.Arg<Variable>(), call.Arg<double>()));
+
         stage.When(s => s.RemoveEditVariable(Arg.Any<Variable>()))
-                .Do(call => solverInstance.RemoveEditVariable(call.Arg<Variable>()));
+             .Do(call => solverInstance.RemoveEditVariable(call.Arg<Variable>()));
+
         stage.When(s => s.SuggestValue(Arg.Any<Variable>(), Arg.Any<double>()))
-                .Do(call => solverInstance.SuggestValue(call.Arg<Variable>(), call.Arg<double>()));
+             .Do(call => solverInstance.SuggestValue(call.Arg<Variable>(), call.Arg<double>()));
 
         // Define stage boundaries and update its variables
         solverInstance.AddConstraint(stageStart | Eq(Required) | 0);

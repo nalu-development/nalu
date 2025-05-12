@@ -11,7 +11,7 @@
     <VerticalStackLayout Padding="16">
         <Label Text="Turn the wheel"
                FontSize="24"
-               HorizontalOptions="Center"/>
+               HorizontalOptions="Center" />
         <Grid Margin="0,16,0,24">
             <nalu:DurationWheel x:Name="DurationWheel"
                                 ValueWidth="16"
@@ -24,21 +24,21 @@
                                 WholeDuration="{Binding WholeDuration}"
                                 MaximumDuration="{Binding MaxDuration}"
                                 RotationEnded="DurationWheel_OnRotationEnded"
-                                RotationStarted="DurationWheel_OnRotationStarted"/>
+                                RotationStarted="DurationWheel_OnRotationStarted" />
             <Label Text="{Binding DurationText}"
                    VerticalOptions="Center"
                    HorizontalOptions="Center"
                    TextColor="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"
                    FontSize="24"
-                   InputTransparent="True"/>
+                   InputTransparent="True" />
         </Grid>
         <HorizontalStackLayout HorizontalOptions="End">
             <Button Text="Cancel"
                     Command="{Binding Path=CancelCommand}"
-                    Margin="0,0,16,0"/>
+                    Margin="0,0,16,0" />
             <Button Text="OK"
-                    Command="{Binding Path=SaveCommand}"/>
+                    Command="{Binding Path=SaveCommand}" />
         </HorizontalStackLayout>
     </VerticalStackLayout>
-    
+
 </toolkit:Popup>

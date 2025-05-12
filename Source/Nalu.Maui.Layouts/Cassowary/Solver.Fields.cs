@@ -38,6 +38,7 @@ public partial class Solver
     {
         const double eps = 1.0e-8;
         const double neps = 1.0e-8;
+
         return value < 0.0 ? value > neps : value < eps;
     }
 }

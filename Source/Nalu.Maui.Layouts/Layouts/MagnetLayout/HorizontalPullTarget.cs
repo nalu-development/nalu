@@ -20,6 +20,7 @@ public record HorizontalPullTarget(string Id, HorizontalPoles Pole, Traction Tra
 
         string[] parts;
         Traction traction;
+
         if (inputString[^1] == '!') // Traction is not supported yet
         {
             traction = Traction.Strong;

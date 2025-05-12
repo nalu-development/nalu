@@ -35,7 +35,7 @@ public enum NavigationBehavior
     /// </summary>
     /// <remarks>
     /// Using this flag alone will not pop pages when switching to a different <see cref="ShellItem" />,
-    /// evaluate using <see cref="DefaultIgnoreGuards"/> instead.
+    /// evaluate using <see cref="DefaultIgnoreGuards" /> instead.
     /// </remarks>
     IgnoreGuards = 0x04,
 
@@ -45,7 +45,7 @@ public enum NavigationBehavior
     /// <remarks>
     /// Default behavior is to wait 60 milliseconds before navigating to the target page to let touch be displayed.
     /// Using this flag alone will not pop pages when switching to a different <see cref="ShellItem" />,
-    /// evaluate using <see cref="DefaultImmediate"/> instead.
+    /// evaluate using <see cref="DefaultImmediate" /> instead.
     /// </remarks>
     Immediate = 0x08,
 
@@ -62,5 +62,5 @@ public enum NavigationBehavior
     /// <summary>
     /// Combines <see cref="Immediate" /> and <see cref="IgnoreGuards" /> with the default <see cref="PopAllPagesOnItemChange" /> behavior.
     /// </summary>
-    DefaultImmediateIgnoreGuards = Immediate | IgnoreGuards | PopAllPagesOnItemChange,
+    DefaultImmediateIgnoreGuards = Immediate | IgnoreGuards | PopAllPagesOnItemChange
 }

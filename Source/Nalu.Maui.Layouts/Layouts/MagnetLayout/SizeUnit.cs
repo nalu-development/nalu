@@ -11,7 +11,7 @@ public enum SizeUnit
     Measured,
 
     /// <summary>
-    /// Size matches the size of the <see cref="IMagnetStage"/>.
+    /// Size matches the size of the <see cref="IMagnetStage" />.
     /// </summary>
     Stage,
 

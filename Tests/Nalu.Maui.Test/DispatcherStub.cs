@@ -98,14 +98,13 @@ public class DispatcherTimerStub : IDispatcherTimer
 
 public sealed class DispatcherProviderStub : IDispatcherProvider, IDisposable
 {
-    ThreadLocal<IDispatcher?> s_dispatcherInstance = new(
-        () =>
-            DispatcherProviderStubOptions.SkipDispatcherCreation
-                ? null
-                : new DispatcherStub(
-                    DispatcherProviderStubOptions.IsInvokeRequired,
-                    DispatcherProviderStubOptions.InvokeOnMainThread
-                )
+    ThreadLocal<IDispatcher?> s_dispatcherInstance = new(() =>
+                                                             DispatcherProviderStubOptions.SkipDispatcherCreation
+                                                                 ? null
+                                                                 : new DispatcherStub(
+                                                                     DispatcherProviderStubOptions.IsInvokeRequired,
+                                                                     DispatcherProviderStubOptions.InvokeOnMainThread
+                                                                 )
     );
 
     public void Dispose() =>
@@ -139,8 +138,7 @@ public class DispatcherProviderStubOptions
 public static class DispatcherTest
 {
     public static Task Run(Action testAction) =>
-        Run(
-            () =>
+        Run(() =>
             {
                 testAction();
 
@@ -149,8 +147,7 @@ public static class DispatcherTest
         );
 
     public static Task RunWithDispatcherStub(Action testAction) =>
-        Run(
-            () =>
+        Run(() =>
             {
                 DispatcherProvider.SetCurrent(new DispatcherProviderStub());
                 testAction();
@@ -163,8 +160,7 @@ public static class DispatcherTest
     {
         var tcs = new TaskCompletionSource();
 
-        var thread = new Thread(
-            async () =>
+        var thread = new Thread(async () =>
             {
                 try
                 {
@@ -185,8 +181,7 @@ public static class DispatcherTest
     }
 
     public static Task RunWithDispatcherStub(Func<Task> testAction) =>
-        Run(
-            () =>
+        Run(() =>
             {
                 DispatcherProvider.SetCurrent(new DispatcherProviderStub());
 

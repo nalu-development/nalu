@@ -4,43 +4,48 @@ public partial class Solver
 {
     /// <summary>
     /// Optimize the system for the given objective function.
-    ///
     /// This method performs iterations of Phase 2 of the simplex method
     /// until the objective function reaches a minimum.
     /// </summary>
     private void Optimize(Row objective)
     {
         var iterations = 0;
+
         while (iterations < MaxIterations)
         {
             var entering = GetEnteringSymbol(objective);
+
             if (entering.Type == SymbolType.Invalid)
             {
                 return;
             }
+
             var leaving = GetLeavingSymbol(entering);
+
             if (leaving.Type == SymbolType.Invalid)
             {
                 throw new InvalidOperationException("the objective is unbounded");
             }
+
             // pivot the entering symbol into the basis
             if (!_rowMap.Remove(leaving, out var row))
             {
-                 // This should not happen if _getLeavingSymbol returned a valid symbol
-                 throw new InvalidOperationException("Failed to remove leaving row.");
+                // This should not happen if _getLeavingSymbol returned a valid symbol
+                throw new InvalidOperationException("Failed to remove leaving row.");
             }
+
             row.SolveForEx(leaving, entering);
             Substitute(entering, row);
             _rowMap[entering] = row;
 
             iterations++;
         }
+
         throw new InvalidOperationException("solver iterations exceeded");
     }
 
     /// <summary>
     /// Optimize the system using the dual of the simplex method.
-    ///
     /// The current state of the system should be such that the objective
     /// function is optimal, but not feasible. This method will perform
     /// an iteration of the dual simplex method to make the solution both
@@ -54,6 +59,7 @@ public partial class Solver
         // optimal and feasible.
 
         var infeasible = _infeasibleRows;
+
         while (infeasible.Count != 0)
         {
             var leaving = infeasible.Last(); // Use Last() to match pop() behavior
@@ -62,10 +68,12 @@ public partial class Solver
             if (_rowMap.TryGetValue(leaving, out var row) && row.Constant() < 0.0)
             {
                 var entering = GetDualEnteringSymbol(row);
+
                 if (entering.Type == SymbolType.Invalid)
                 {
                     throw new InvalidOperationException("dual optimize failed");
                 }
+
                 // pivot the entering symbol into the basis
                 _rowMap.Remove(leaving);
                 row.SolveForEx(leaving, entering);
@@ -77,7 +85,6 @@ public partial class Solver
 
     /// <summary>
     /// Substitute the parametric symbol with the given row.
-    ///
     /// This method will substitute all instances of the parametric symbol
     /// in the tableau and the objective function with the given row.
     /// </summary>
@@ -104,7 +111,6 @@ public partial class Solver
 
     /// <summary>
     /// Compute the entering variable for a pivot operation.
-    ///
     /// This method will return first symbol in the objective function which
     /// is non-dummy and has a coefficient less than zero. If no symbol meets
     /// the criteria, it means the objective function is at a minimum, and an
@@ -120,17 +126,18 @@ public partial class Solver
         foreach (ref var pair in objective.Cells)
         {
             var symbol = pair.Key;
+
             if (pair.Value < 0.0 && symbol.Type != SymbolType.Dummy)
             {
                 return symbol;
             }
         }
+
         return Symbol.InvalidSymbol;
     }
 
     /// <summary>
     /// Compute the entering symbol for the dual optimize operation.
-    ///
     /// This method will return the symbol in the row which has a positive
     /// coefficient and yields the minimum ratio for its respective symbol
     /// in the objective function. The provided row *must* be infeasible.
@@ -152,10 +159,12 @@ public partial class Solver
         {
             var symbol = pair.Key;
             var c = pair.Value;
+
             if (c > 0.0 && symbol.Type != SymbolType.Dummy)
             {
                 var coeff = _objective.CoefficientFor(symbol);
                 var r = coeff / c;
+
                 if (r < ratio)
                 {
                     ratio = r;
@@ -163,12 +172,12 @@ public partial class Solver
                 }
             }
         }
+
         return entering;
     }
 
     /// <summary>
     /// Compute the symbol for pivot exit row.
-    ///
     /// This method will return the symbol for the exit row in the row
     /// map. If no appropriate exit symbol is found, an invalid symbol
     /// will be returned. This indicates that the objective function is
@@ -187,13 +196,16 @@ public partial class Solver
         foreach (ref var pair in _rowMap)
         {
             var symbol = pair.Key;
+
             if (symbol.Type != SymbolType.External)
             {
                 var row = pair.Value;
                 var temp = row.CoefficientFor(entering);
+
                 if (temp < 0.0)
                 {
                     var tempRatio = -row.Constant() / temp;
+
                     if (tempRatio < ratio)
                     {
                         ratio = tempRatio;
@@ -202,24 +214,20 @@ public partial class Solver
                 }
             }
         }
+
         return found;
     }
 
     /// <summary>
     /// Compute the leaving symbol for a marker variable.
-    ///
     /// This method will return a symbol corresponding to a basic row
     /// which holds the given marker variable. The row will be chosen
     /// according to the following precedence:
-    ///
     /// 1) The row with a restricted basic varible and a negative coefficient
-    ///    for the marker with the smallest ratio of -constant / coefficient.
-    ///
+    /// for the marker with the smallest ratio of -constant / coefficient.
     /// 2) The row with a restricted basic variable and the smallest ratio
-    ///    of constant / coefficient.
-    ///
+    /// of constant / coefficient.
     /// 3) The last unrestricted row which contains the marker.
-    ///
     /// If the marker does not exist in any row, an invalid symbol will be
     /// returned. This indicates an internal solver error since the marker
     /// *should* exist somewhere in the tableau.
@@ -254,11 +262,14 @@ public partial class Solver
         {
             var row = pair.Value;
             var c = row.CoefficientFor(marker);
+
             if (NearZero(c))
             {
                 continue;
             }
+
             var symbol = pair.Key;
+
             if (symbol.Type == SymbolType.External)
             {
                 third = symbol;
@@ -266,6 +277,7 @@ public partial class Solver
             else if (c < 0.0)
             {
                 var r = -row.Constant() / c;
+
                 if (r < r1)
                 {
                     r1 = r;
@@ -275,6 +287,7 @@ public partial class Solver
             else
             {
                 var r = row.Constant() / c;
+
                 if (r < r2)
                 {
                     r2 = r;
@@ -282,14 +295,17 @@ public partial class Solver
                 }
             }
         }
+
         if (first != invalid)
         {
             return first;
         }
+
         if (second != invalid)
         {
             return second;
         }
+
         return third;
     }
 
@@ -302,6 +318,7 @@ public partial class Solver
         {
             RemoveMarkerEffects(tag.Marker, cn.Strength);
         }
+
         if (tag.Other.Type == SymbolType.Error)
         {
             RemoveMarkerEffects(tag.Other, cn.Strength);

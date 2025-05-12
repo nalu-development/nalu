@@ -104,9 +104,8 @@ internal class LeakDetector : IDisposable
             var verb = leakedObjects.Count > 1 ? "are" : "is";
             var objectNames = string.Join(", ", leakedObjects.Select(o => o.GetType().Name));
 
-            page.Dispatcher.Dispatch(
-                () =>
-                    _ = page.DisplayAlert("Leak detected", $"{objectNames} {verb} still alive", "OK")
+            page.Dispatcher.Dispatch(() =>
+                                         _ = page.DisplayAlert("Leak detected", $"{objectNames} {verb} still alive", "OK")
             );
         }
     }

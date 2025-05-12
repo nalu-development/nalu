@@ -54,7 +54,7 @@ public class MagnetBenchmarks
     private static IView CreateTestView(string id, double width, double height, bool constant)
     {
         var view = new TestView(width, height, constant);
-        Magnet.SetStageId((BindableObject)view, id);
+        Magnet.SetStageId((BindableObject) view, id);
 
         return view;
     }
@@ -94,6 +94,7 @@ public class MagnetBenchmarks
                            new ColumnDefinition(GridLength.Auto)
                        )
                    };
+
         return grid;
     }
 
@@ -103,7 +104,7 @@ public class MagnetBenchmarks
         var magnet = CreateMagnet();
 
         BasicSetup(magnet, false);
-        
+
         _layoutManager = GetLayoutManager(magnet);
     }
 
@@ -113,7 +114,7 @@ public class MagnetBenchmarks
         var magnet = CreateMagnet();
 
         BasicSetup(magnet);
-        
+
         _layoutManager = GetLayoutManager(magnet);
     }
 
@@ -129,7 +130,7 @@ public class MagnetBenchmarks
                                          Margin = 4,
                                          TopTo = "Stage.Top",
                                          BottomTo = "Stage.Bottom",
-                                         LeftTo = "Stage.Left",
+                                         LeftTo = "Stage.Left"
                                      },
                                      new MagnetView
                                      {
@@ -140,7 +141,7 @@ public class MagnetBenchmarks
                                          Width = "1~",
                                          HorizontalBias = 0,
                                          LeftTo = "CardImage.Right",
-                                         RightTo = "Starred.Left!",
+                                         RightTo = "Starred.Left!"
                                      },
                                      new MagnetView
                                      {
@@ -149,14 +150,14 @@ public class MagnetBenchmarks
                                          RightTo = "Money.Left",
                                          TopTo = "CardName.Top",
                                          BottomTo = "CardName.Bottom",
-                                         Margin = new Thickness(0, 0, 8, 0),
+                                         Margin = new Thickness(0, 0, 8, 0)
                                      },
                                      new MagnetView
                                      {
                                          Id = "CardDetail",
                                          TopTo = "CardName.Bottom!",
                                          BottomTo = "Stage.Bottom",
-                                         LeftTo = "CardImage.Left",
+                                         LeftTo = "CardImage.Left"
                                      },
                                      new MagnetView
                                      {
@@ -168,6 +169,7 @@ public class MagnetBenchmarks
                                      }
                                  }
                      };
+
         return magnet;
     }
 

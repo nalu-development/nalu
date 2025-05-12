@@ -15,6 +15,7 @@ public class Program
             var magnetBenchmarks = new MagnetBenchmarks();
             magnetBenchmarks.MagnetSetup();
             magnetBenchmarks.MagnetLayoutPerfDirect(100_000);
+
             return;
         }
 

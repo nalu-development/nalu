@@ -13,5 +13,5 @@ public enum Traction
     /// <summary>
     /// Implies the pull traction is so strong that the target will be pulled to be in contact with the element.
     /// </summary>
-    Strong,
+    Strong
 }

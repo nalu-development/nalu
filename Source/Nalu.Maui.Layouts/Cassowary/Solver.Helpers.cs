@@ -4,7 +4,6 @@ public partial class Solver
 {
     /// <summary>
     /// Get the symbol for the given variable.
-    ///
     /// If a symbol does not exist for the variable, one will be created.
     /// </summary>
     private Symbol GetVarSymbol(Variable variable)
@@ -13,28 +12,24 @@ public partial class Solver
         {
             return symbol;
         }
-        else
-        {
-            var newSymbol = MakeSymbol(SymbolType.External);
-            _varMap[variable] = newSymbol;
-            return newSymbol;
-        }
+
+        var newSymbol = MakeSymbol(SymbolType.External);
+        _varMap[variable] = newSymbol;
+
+        return newSymbol;
     }
 
     /// <summary>
     /// Create a new Row object for the given constraint.
-    ///
     /// The terms in the constraint will be converted to cells in the row.
     /// Any term in the constraint with a coefficient of zero is ignored.
     /// This method uses the `_getVarSymbol` method to get the symbol for
     /// the variables added to the row. If the symbol for a given cell
     /// variable is basic, the cell variable will be substituted with the
     /// basic row.
-    ///
     /// The necessary slack and error variables will be added to the row.
     /// If the constant for the row is negative, the sign for the row
     /// will be inverted so the constant becomes positive.
-    ///
     /// Returns the created Row and the tag for tracking the constraint.
     /// </summary>
     private (Row row, Tag tag) CreateRow(Constraint constraint)
@@ -44,11 +39,13 @@ public partial class Solver
 
         // Substitute the current basic variables into the row.
         var terms = expr.Terms;
+
         foreach (var term in terms)
         {
             if (!NearZero(term.Coefficient))
             {
                 var symbol = GetVarSymbol(term.Variable);
+
                 if (_rowMap.TryGetValue(symbol, out var basicRow))
                 {
                     row.InsertRow(basicRow, term.Coefficient);
@@ -74,6 +71,7 @@ public partial class Solver
                 var slack = MakeSymbol(SymbolType.Slack);
                 tag = new Tag(slack, Symbol.InvalidSymbol); // Update tag with marker
                 row.InsertSymbol(slack, coeff);
+
                 if (strength < Strength.Required)
                 {
                     var error = MakeSymbol(SymbolType.Error);
@@ -81,6 +79,7 @@ public partial class Solver
                     row.InsertSymbol(error, -coeff);
                     objective.InsertSymbol(error, strength);
                 }
+
                 break;
             }
             case RelationalOperator.Equal:
@@ -91,7 +90,7 @@ public partial class Solver
                     var errminus = MakeSymbol(SymbolType.Error);
                     tag = new Tag(errplus, errminus); // Update tag with marker and other
                     row.InsertSymbol(errplus, -1.0); // v = eplus - eminus
-                    row.InsertSymbol(errminus, 1.0); // v - eplus + eminus = 0
+                    row.InsertSymbol(errminus); // v - eplus + eminus = 0
                     objective.InsertSymbol(errplus, strength);
                     objective.InsertSymbol(errminus, strength);
                 }
@@ -101,6 +100,7 @@ public partial class Solver
                     tag = new Tag(dummy, Symbol.InvalidSymbol); // Update tag with marker
                     row.InsertSymbol(dummy);
                 }
+
                 break;
             }
         }
@@ -116,16 +116,12 @@ public partial class Solver
 
     /// <summary>
     /// Choose the subject for solving for the row.
-    ///
     /// This method will choose the best subject for using as the solve
     /// target for the row. An invalid symbol will be returned if there
     /// is no valid target.
-    ///
     /// The symbols are chosen according to the following precedence:
-    ///
     /// 1) The first symbol representing an external variable.
     /// 2) A negative slack or error tag variable.
-    ///
     /// If a subject cannot be found, an invalid symbol will be returned.
     /// </summary>
     private Symbol ChooseSubject(Row row, Tag tag)
@@ -158,7 +154,6 @@ public partial class Solver
 
     /// <summary>
     /// Add the row to the tableau using an artificial variable.
-    ///
     /// This will return false if the constraint cannot be satisfied.
     /// </summary>
     private bool AddWithArtificialVariable(Row row)
@@ -182,11 +177,14 @@ public partial class Solver
             {
                 return success;
             }
+
             var entering = AnyPivotableSymbol(basicRow);
+
             if (entering.Type == SymbolType.Invalid)
             {
                 return false; // unsatisfiable (will this ever happen?)
             }
+
             basicRow.SolveForEx(art, entering);
             Substitute(entering, basicRow);
             _rowMap[entering] = basicRow;
@@ -195,17 +193,19 @@ public partial class Solver
         // Remove the artificial variable from the tableau.
         // Need to iterate over a copy of the keys to avoid modifying the collection during iteration
         var rowKeys = _rowMap.Keys.ToList();
+
         foreach (var rowSymbol in rowKeys)
         {
             _rowMap[rowSymbol].RemoveSymbol(art);
         }
+
         _objective.RemoveSymbol(art);
+
         return success;
     }
 
     /// <summary>
     /// Get the first Slack or Error symbol in the row.
-    ///
     /// If no such symbol is present, an invalid symbol will be returned.
     /// </summary>
     private Symbol AnyPivotableSymbol(Row row)
@@ -213,11 +213,13 @@ public partial class Solver
         foreach (var pair in row.Cells)
         {
             var type = pair.Key.Type;
+
             if (type is SymbolType.Slack or SymbolType.Error)
             {
                 return pair.Key;
             }
         }
+
         return Symbol.InvalidSymbol;
     }
 

@@ -56,12 +56,13 @@ public class Constraint
         {
             sb.Append('0');
         }
-        
+
         sb.Append(' ');
         sb.Append(operatorString);
         sb.Append(' ');
 
         var hasRightTerms = AppendTerms(sb, false);
+
         if (!hasRightTerms && Expression.Constant == 0)
         {
             sb.Append('0');
@@ -82,7 +83,7 @@ public class Constraint
         }
 
         sb.Append($" [{GetStrength()}]");
-        
+
         return sb.ToString();
     }
 
@@ -98,9 +99,10 @@ public class Constraint
     private bool AppendTerms(StringBuilder sb, bool left)
     {
         var firstTerm = true;
+
         foreach (var term in Expression.Terms)
         {
-            if (left && term.Coefficient > 0 || !left && term.Coefficient < 0)
+            if ((left && term.Coefficient > 0) || (!left && term.Coefficient < 0))
             {
                 if (!firstTerm)
                 {

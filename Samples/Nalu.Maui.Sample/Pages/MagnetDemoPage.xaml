@@ -5,12 +5,12 @@
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              xmlns:magnet="clr-namespace:Nalu.MagnetLayout;assembly=Nalu.Maui.Layouts"
              x:Class="Nalu.Maui.Sample.Pages.MagnetDemoPage"
-             Title="Magnet Demo"> 
+             Title="Magnet Demo">
     <ContentPage.Resources>
         <magnet:MagnetStage x:Key="CardMagnetStage">
             <magnet:MagnetView Id="CardImage"
                                Margin="4"
-                               TopTo="Stage.Top" 
+                               TopTo="Stage.Top"
                                BottomTo="Stage.Bottom"
                                LeftTo="Stage.Left!" />
             <magnet:MagnetView Id="CardName"
@@ -18,24 +18,24 @@
                                BottomTo="CardDetail.Top!"
                                Margin="8,0,0,0"
                                Width="1~"
-                               HorizontalBias="0" 
+                               HorizontalBias="0"
                                LeftTo="CardImage.Right"
-                               RightTo="Starred.Left!"/>
+                               RightTo="Starred.Left!" />
             <magnet:MagnetView Id="Starred"
                                LeftTo="CardName.Right!"
                                RightTo="Money.Left"
                                TopTo="CardName.Top"
                                Margin="0,0,8,0"
-                               BottomTo="CardName.Bottom"/>
+                               BottomTo="CardName.Bottom" />
             <magnet:MagnetView Id="CardDetail"
-                               TopTo="CardName.Bottom!" 
+                               TopTo="CardName.Bottom!"
                                BottomTo="Stage.Bottom"
-                               LeftTo="CardName.Left"/>
+                               LeftTo="CardName.Left" />
             <magnet:MagnetView Id="Money"
                                Height="*"
-                               TopTo="Stage.Top" 
+                               TopTo="Stage.Top"
                                BottomTo="Stage.Bottom"
-                               RightTo="Stage.Right!"/>
+                               RightTo="Stage.Right!" />
         </magnet:MagnetStage>
     </ContentPage.Resources>
 
@@ -51,8 +51,9 @@
                         WidthRequest="60"
                         StrokeThickness="0"
                         StrokeShape="RoundRectangle 8">
-                    <Image Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
-                           Aspect="AspectFill"/>
+                    <Image
+                        Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
+                        Aspect="AspectFill" />
                     <Border.GestureRecognizers>
                         <TapGestureRecognizer Tapped="ToggleCardDetail" />
                     </Border.GestureRecognizers>

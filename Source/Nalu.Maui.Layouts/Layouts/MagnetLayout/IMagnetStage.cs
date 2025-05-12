@@ -52,7 +52,7 @@ public interface IMagnetStage : IVerticalPoles, IHorizontalPoles, IMagnetElement
     /// Adds an editable variable to the stage.
     /// </summary>
     /// <param name="variable">The editable variable.</param>
-    /// <param name="strength">The strength, defaults to <see cref="Strength.Strong"/></param>
+    /// <param name="strength">The strength, defaults to <see cref="Strength.Strong" /></param>
     void AddEditVariable(Variable variable, double strength);
 
     /// <summary>

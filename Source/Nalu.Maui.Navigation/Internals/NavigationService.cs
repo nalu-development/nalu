@@ -153,8 +153,7 @@ internal class NavigationService : INavigationService, IDisposable
                     }
                     finally
                     {
-                        await shellProxy.CommitNavigationAsync(
-                                            () =>
+                        await shellProxy.CommitNavigationAsync(() =>
                                             {
                                                 foreach (var toDispose in disposeBag)
                                                 {
@@ -583,6 +582,7 @@ internal class NavigationService : INavigationService, IDisposable
         await _semaphore.WaitAsync().ConfigureAwait(true);
 
         var currentLocation = shellProxy.Location;
+
         if (initialLocation != currentLocation)
         {
             var currentState = shellProxy.State;
@@ -683,7 +683,7 @@ internal class NavigationService : INavigationService, IDisposable
         }
         else
         {
-            var currentSegments = initialState.Split('/', StringSplitOptions.RemoveEmptyEntries).ToArray();
+            var currentSegments = initialState.Split('/', StringSplitOptions.RemoveEmptyEntries);
             var popCount = segments.Count(segment => segment == NavigationPop.PopRoute);
             var maintainedSegmentsCount = currentSegments.Length - popCount;
             var pushBase = maintainedSegmentsCount > 0 ? currentSegments.Take(maintainedSegmentsCount) : [];

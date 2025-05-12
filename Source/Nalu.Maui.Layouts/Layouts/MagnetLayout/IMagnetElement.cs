@@ -3,7 +3,8 @@ namespace Nalu.MagnetLayout;
 /// <summary>
 /// An base interface for elements that can be part of a magnet layout.
 /// </summary>
-public interface IMagnetElementBase {
+public interface IMagnetElementBase
+{
     /// <summary>
     /// Gets the unique identifier for this element.
     /// </summary>
