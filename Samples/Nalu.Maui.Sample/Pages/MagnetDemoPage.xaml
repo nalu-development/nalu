@@ -53,6 +53,9 @@
                         StrokeShape="RoundRectangle 8">
                     <Image Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
                            Aspect="AspectFill"/>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="ToggleCardDetail" />
+                    </Border.GestureRecognizers>
                 </Border>
                 <Label nalu:Magnet.StageId="CardName"
                        FontSize="16"
@@ -62,6 +65,7 @@
                        Text="Regular card with long name" />
                 <Label nalu:Magnet.StageId="CardDetail"
                        FontSize="12"
+                       x:Name="CardDetail"
                        Text="Mastercard · 08/25" />
                 <Label nalu:Magnet.StageId="Money"
                        FontSize="18"

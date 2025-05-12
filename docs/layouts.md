@@ -173,12 +173,12 @@ Here's a performance comparison between `GridLayout` and `MagnetLayout` consider
 1. **Dynamic measure**: All the views keep chaining their size on each measure pass (rare case)
 2. **Constant measure**: The views always return the same size (very common)
 
-| Method                          | Mean     | Error     | StdDev    | Median   | Allocated |
+| Method                          | Mean     | Error     | StdDev    | Gen0     | Allocated |
 |-------------------------------- |---------:|----------:|----------:|---------:|----------:|
-| GridLayoutPerf                  | 5.727 ms | 1.6198 ms | 4.6993 ms | 2.839 ms |   1.79 MB |
-| MagnetLayoutPerf                | 7.220 ms | 0.1395 ms | 0.1370 ms | 7.197 ms |    2.3 MB |
-| GridLayoutConstantMeasurePerf   | 1.585 ms | 0.1531 ms | 0.3979 ms | 1.459 ms |   1.33 MB |
-| MagnetLayoutConstantMeasurePerf | 2.925 ms | 0.0556 ms | 0.1110 ms | 2.901 ms |   1.85 MB |
+| GridLayoutPerf                  | 2.264 ms | 0.0216 ms | 0.0192 ms | 222.6563 |   1.78 MB |
+| MagnetLayoutPerf                | 6.694 ms | 0.0436 ms | 0.0408 ms | 273.4375 |   2.21 MB |
+| GridLayoutConstantMeasurePerf   | 1.395 ms | 0.0136 ms | 0.0114 ms | 166.0156 |   1.33 MB |
+| MagnetLayoutConstantMeasurePerf | 2.724 ms | 0.0387 ms | 0.0362 ms | 218.7500 |   1.75 MB |
   
 As we can see `Magnet` is about 2 times slower than `Grid` but it provides a lot of flexibility and power.
 So it's up to you to decide whether to use `Magnet` or the standard MAUI layouts.
@@ -187,4 +187,8 @@ On a common page with a few views, the performance impact is negligible while th
 
 Inside a `CollectionView` template is probably better to use MAUI layouts, but that still needs to be verified with real data
 considering that you may be forced to use nested layouts to achieve the same result and that also comes with a non-negligible performance cost.
-**Important:** in a `CollectionView` template, make sure your `Stage` property references a `MagnetStage` defined outside the template (aka `Resources`).
+
+**Important:**
+- in a `CollectionView` template, make sure your `Stage` property references a `MagnetStage` defined outside the template (aka `Resources`)
+- at the moment it is not supported to change the `MagnetStage` content at runtime
+

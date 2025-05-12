@@ -204,7 +204,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     }
 
     /// <inheritdoc />
-    public Visibility Visibility => View?.Visibility ?? Visibility.Collapsed;
+    public bool Collapsed { get; private set; }
 
     /// <inheritdoc />
     Variable IHorizontalPoles.Left => _left;
@@ -264,7 +264,23 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     internal IView? View
     {
         get => _viewRef?.TryGetTarget(out var view) is true ? view : null;
-        set => _viewRef = value == null ? null : new WeakReference<IView>(value);
+        set
+        {
+            if (value == null)
+            {
+                _viewRef = null;
+                return;
+            }
+
+            _viewRef = new WeakReference<IView>(value);
+            var collapsed = value.Visibility == Visibility.Collapsed;
+
+            if (collapsed != Collapsed)
+            {
+                Collapsed = collapsed;
+                _collapsedChanged = true;
+            }
+        }
     }
 
     private readonly Variable _measuredWidth = new();
@@ -279,6 +295,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private double _marginBottom = double.NaN;
     private double _marginLeft = double.NaN;
     private double _marginRight = double.NaN;
+    private bool _collapsedChanged = true;
     private WeakReference<IView>? _viewRef;
 
     /// <summary>
@@ -288,10 +305,6 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         UpdateConstraints(ConstraintTypes.Width, GetWidthConstraints);
         UpdateConstraints(ConstraintTypes.Height, GetHeightConstraints);
-        UpdateConstraints(ConstraintTypes.Consistency, _ => [
-            _right | GreaterOrEq(Weak) | _left,
-            _bottom | GreaterOrEq(Weak) | _top,
-        ]);
     }
 
     /// <inheritdoc />
@@ -323,10 +336,13 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     /// <inheritdoc />
     protected override void ApplyConstraints(IMagnetStage stage)
     {
-        // TODO: Skip this on ArrangePhase
-        UpdatePolesConstraintsIfNeeded(stage);
+        if (_collapsedChanged)
+        {
+            UpdateConstraints(ConstraintTypes.Consistency, GetConsistencyConstraints);
+            UpdatePolesConstraintsIfNeeded(stage);
+        }
 
-        if (View is { } view && view.Visibility != Visibility.Collapsed)
+        if (View is { } view && !Collapsed)
         {
             // We have to measure the view when either the width or height is set to auto.
             if (Height.Unit is SizeUnit.Measured || Width.Unit is SizeUnit.Measured)
@@ -338,6 +354,12 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
                 UpdateMeasureConstraints(stage, size);
             }
         }
+        else if (_collapsedChanged)
+        {
+            UpdateMeasureConstraints(stage, Size.Zero);
+        }
+
+        _collapsedChanged = false;
 
         base.ApplyConstraints(stage);
     }
@@ -345,7 +367,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     /// <inheritdoc />
     protected override void FinalizeConstraints(IMagnetStage stage)
     {
-        if (View is not { } view || view.Visibility == Visibility.Collapsed)
+        if (View is not { } view || Collapsed)
         {
             return;
         }
@@ -377,6 +399,20 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     /// <inheritdoc />
     protected override (Variable Variable, double Strength)[] GetEditableVariables() => [(_measuredWidth, Required - 1), (_measuredHeight, Required - 1)];
 
+    private IEnumerable<Constraint> GetConsistencyConstraints(IMagnetStage _)
+    {
+        if (Collapsed)
+        {
+            yield return _left | Eq(Required) | _right;
+            yield return _top | Eq(Required) | _bottom;
+        }
+        else
+        {
+            yield return _right | GreaterOrEq(Required) | _left;
+            yield return _bottom | GreaterOrEq(Required) | _top;
+        }
+    }
+
     private void UpdateMeasureConstraints(IMagnetStage stage, Size size)
     {
         if (Width.Unit is SizeUnit.Measured && _measuredWidth.CurrentValue != size.Width)
@@ -405,7 +441,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         if (BottomTo is { } bottomTo)
         {
-            var bottomMargin = bottomTo.GetElement(stage) is IMagnetView { Visibility: Visibility.Collapsed } ? collapsedMargin.Bottom : margin.Bottom;
+            var bottomMargin = bottomTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Bottom : margin.Bottom;
             if (_marginBottom != bottomMargin)
             {
                 _marginBottom = bottomMargin;
@@ -422,7 +458,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         if (TopTo is { } topTo)
         {
-            var topMargin = topTo.GetElement(stage) is IMagnetView { Visibility: Visibility.Collapsed } ? collapsedMargin.Top : margin.Top;
+            var topMargin = topTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Top : margin.Top;
             if (_marginTop != topMargin)
             {
                 _marginTop = topMargin;
@@ -439,7 +475,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         if (RightTo is { } rightTo)
         {
-            var rightMargin = rightTo.GetElement(stage) is IMagnetView { Visibility: Visibility.Collapsed } ? collapsedMargin.Right : margin.Right;
+            var rightMargin = rightTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Right : margin.Right;
             if (_marginRight != rightMargin)
             {
                 _marginRight = rightMargin;
@@ -456,7 +492,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         if (LeftTo is { } leftTo)
         {
-            var leftMargin = leftTo.GetElement(stage) is IMagnetView { Visibility: Visibility.Collapsed } ? collapsedMargin.Left : margin.Left;
+            var leftMargin = leftTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Left : margin.Left;
             if (_marginLeft != leftMargin)
             {
                 _marginLeft = leftMargin;

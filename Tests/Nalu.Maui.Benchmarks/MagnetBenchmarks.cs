@@ -8,7 +8,6 @@ namespace Nalu.Maui.Benchmarks;
 
 // ReSharper disable GenericEnumeratorNotDisposed
 [MemoryDiagnoser]
-[InvocationCount(1)]
 public class MagnetBenchmarks
 {
     private ILayoutManager? _layoutManager;

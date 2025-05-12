@@ -8,7 +8,7 @@ public interface IMagnetView : IMagnetElement
     /// <summary>
     /// Gets the visibility of the view.
     /// </summary>
-    Visibility Visibility { get; }
+    bool Collapsed { get; }
 
     /// <summary>
     /// Gets the top position of the view.

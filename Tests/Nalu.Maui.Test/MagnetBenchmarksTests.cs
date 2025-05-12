@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Maui.Layouts;
 using Nalu.MagnetLayout;
@@ -8,20 +9,36 @@ namespace Nalu.Maui.Test;
 public class MagnetBenchmarksTests
 {
     private ILayoutManager? _layoutManager;
+    private Magnet _magnet;
     private static readonly PropertyInfo _layoutManagerProperty = typeof(Layout).GetProperty("LayoutManager", BindingFlags.Instance | BindingFlags.NonPublic)!;
     private static ILayoutManager GetLayoutManager(Layout layout) => (ILayoutManager) _layoutManagerProperty.GetValue(layout)!;
 
     private class TestView(double width, double height) : View
     {
         protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
-            => new(width + Random.Shared.Next(0, 10), height + Random.Shared.Next(0, 10));
+        {
+            var finalWidth = width + Random.Shared.Next(0, 10);
+            var finalHeight = height + Random.Shared.Next(0, 10);
+
+            if (width == -1)
+            {
+                finalWidth = widthConstraint;
+            }
+            
+            if (height == -1)
+            {
+                finalHeight = heightConstraint;
+            }
+
+            return new Size(finalWidth, finalHeight);
+        }
     }
 
     private void BasicSetup(ILayout layout)
     {
         var cardImage = CreateTestView("CardImage", 60, 48);
         SetGridLocation(cardImage, rowSpan: 2);
-        var cardName = CreateTestView("CardName", 80, 20);
+        var cardName = CreateTestView("CardName", 100, 20);
         SetGridLocation(cardName, col: 1);
         var cardDetail = CreateTestView("CardDetail", 70, 16);
         SetGridLocation(cardDetail, col: 1, row: 1, colSpan: 2);
@@ -56,9 +73,9 @@ public class MagnetBenchmarksTests
         return view;
     }
 
-    private void MagnetSetup()
+    public MagnetBenchmarksTests()
     {
-        var magnet = new Magnet
+        _magnet = new Magnet
                      {
                          Stage = new MagnetStage
                                  {
@@ -68,7 +85,7 @@ public class MagnetBenchmarksTests
                                          Margin = 4,
                                          TopTo = "Stage.Top",
                                          BottomTo = "Stage.Bottom",
-                                         LeftTo = "Stage.Left",
+                                         LeftTo = "Stage.Left!",
                                      },
                                      new MagnetView
                                      {
@@ -95,7 +112,7 @@ public class MagnetBenchmarksTests
                                          Id = "CardDetail",
                                          TopTo = "CardName.Bottom!",
                                          BottomTo = "Stage.Bottom",
-                                         LeftTo = "CardImage.Left",
+                                         LeftTo = "CardName.Left",
                                      },
                                      new MagnetView
                                      {
@@ -108,23 +125,17 @@ public class MagnetBenchmarksTests
                                  }
                      };
 
-        BasicSetup(magnet);
+        BasicSetup(_magnet);
         
-        _layoutManager = GetLayoutManager(magnet);
-    }
-
-    public MagnetBenchmarksTests()
-    {
-        MagnetSetup();
+        _layoutManager = GetLayoutManager(_magnet);
     }
     
     [Fact]
     public void MagnetLayoutPerf()
     {
-        for (var i = 0; i < 100; i++)
-        {
-            var result = _layoutManager!.Measure(500, 500);
-            _layoutManager.ArrangeChildren(new Rect(Point.Zero, result));
-        }
+        var result = _layoutManager!.Measure(500, 500);
+        _layoutManager.ArrangeChildren(new Rect(Point.Zero, result));
+
+        var list = _magnet.Children.Select(c => (Magnet.GetStageId(c), c.Frame)).ToList();
     }
 }
