@@ -26,6 +26,11 @@ public interface IMagnetElement : IMagnetElementBase
     void SetStage(IMagnetStage? stage);
 
     /// <summary>
+    /// Detects eventual changes and notifies dependent elements.
+    /// </summary>
+    void DetectChanges();
+
+    /// <summary>
     /// Applies all the constraints to the solver.
     /// </summary>
     void ApplyConstraints();

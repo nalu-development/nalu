@@ -22,29 +22,42 @@ internal class MagnetLayoutManager : LayoutManager
             return NoStageMeasure(widthConstraint, heightConstraint);
         }
 
+        var maxWidth = 0.0;
+        var maxHeight = 0.0;
+        var hasMagnetViews = false;
+
         foreach (var child in Layout)
         {
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
+                hasMagnetViews = true;
                 magnetView.View = child;
             }
             else
             {
-                child.Measure(widthConstraint, heightConstraint);
+                var size = child.Measure(widthConstraint, heightConstraint);
+                maxWidth = Math.Max(size.Width, maxWidth);
+                maxHeight = Math.Max(size.Height, maxHeight);
             }
         }
 
         var padding = Magnet.Padding;
         var horizontalPadding = padding.HorizontalThickness;
         var verticalPadding = padding.VerticalThickness;
-        var right = widthConstraint - horizontalPadding;
-        var bottom = heightConstraint - verticalPadding;
+        var width = widthConstraint - horizontalPadding;
+        var height = heightConstraint - verticalPadding;
 
-        stage.PrepareForMeasure(0, 0, right, bottom);
+        if (hasMagnetViews)
+        {
+            stage.PrepareForMeasure(width, height);
 
-        var measured = MeasureStage(widthConstraint, heightConstraint, stage);
+            maxWidth = Math.Max(stage.Right.CurrentValue, maxWidth);
+            maxHeight = Math.Max(stage.Bottom.CurrentValue, maxHeight);
+        }
 
-        return new Size(measured.Width + horizontalPadding, measured.Height + verticalPadding);
+        var measured = new Size(maxWidth + horizontalPadding, maxHeight + verticalPadding);
+
+        return measured;
     }
 
     public override Size ArrangeChildren(Rect bounds)
@@ -65,66 +78,33 @@ internal class MagnetLayoutManager : LayoutManager
         var padding = Magnet.Padding;
         var horizontalPadding = padding.HorizontalThickness;
         var verticalPadding = padding.VerticalThickness;
-        var right = bounds.Width - horizontalPadding;
-        var bottom = bounds.Height - verticalPadding;
+        var width = bounds.Width - horizontalPadding;
+        var height = bounds.Height - verticalPadding;
+        var left = bounds.X + padding.Left;
+        var top = bounds.Y + padding.Top;
 
-        stage.PrepareForArrange(0, 0, right, bottom);
+        stage.PrepareForArrange(width, height);
 
-        var measured = MeasureStage(bounds.Width, bounds.Height, stage,
-                                    (view, frame) =>
-                                    {
-                                        frame = frame.Offset(padding.Left, padding.Top);
-                                        return view.Arrange(frame);
-                                    });
-
-        var size = new Size(measured.Width + horizontalPadding, measured.Height + verticalPadding);
-        return size.AdjustForFill(bounds, Magnet);
-    }
-
-    private Size MeasureStage(double widthConstraint, double heightConstraint, IMagnetStage stage, Func<IView, Rect, Size>? arrange = null)
-    {
-        if (Layout.Count == 0)
-        {
-            return Size.Zero;
-        }
-
-        var minLeft = widthConstraint;
-        var maxRight = 0.0;
-        var minTop = heightConstraint;
-        var maxBottom = 0.0;
-        
         foreach (var child in Layout)
         {
+            if (child.Visibility is Visibility.Collapsed)
+            {
+                continue;
+            }
+
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
-                var viewMargin = magnetView.GetEffectiveMargin();
-                var viewLeft = magnetView.Left - viewMargin.Left;
-                var viewTop = magnetView.Top - viewMargin.Top;
-                var viewRight = magnetView.Right + viewMargin.Right;
-                var viewBottom = magnetView.Bottom + viewMargin.Bottom;
-                minLeft = Math.Min(viewLeft, minLeft);
-                maxRight = Math.Max(viewRight, maxRight);
-                minTop = Math.Min(viewTop, minTop);
-                maxBottom = Math.Max(viewBottom, maxBottom);
-
-                arrange?.Invoke(child, magnetView.GetFrame());
+                var frame = magnetView.GetFrame().Offset(left, top);
+                child.Arrange(frame);
             }
             else
             {
-                var size = child.DesiredSize;
-
-                minLeft = Math.Min(0, minLeft);
-                minTop = Math.Min(0, minTop);
-                maxRight = Math.Max(size.Width, maxRight);
-                maxBottom = Math.Max(size.Height, maxBottom);
-
-                arrange?.Invoke(child, new Rect(Point.Zero, size));
+                var frame = new Rect(Point.Zero, child.DesiredSize).Offset(left, top);
+                child.Arrange(frame);
             }
         }
 
-        var measuredWidth = maxRight - minLeft;
-        var measuredHeight = maxBottom - minTop;
-        return new Size(measuredWidth, measuredHeight);
+        return bounds.Size;
     }
 
     private Size NoStageMeasure(double widthConstraint, double heightConstraint)

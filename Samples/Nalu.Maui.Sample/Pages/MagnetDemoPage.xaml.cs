@@ -10,9 +10,8 @@ public partial class MagnetDemoPage : ContentPage
         InitializeComponent();
     }
 
-    private void Button_OnClicked(object? sender, EventArgs e)
+    private void ToggleCardDetail(object? sender, TappedEventArgs e)
     {
-        var btn = (Button)sender;
-        btn.Text = btn.Text == "Short" ? "Very long text" : "Short";
+        CardDetail.IsVisible = !CardDetail.IsVisible;
     }
 }

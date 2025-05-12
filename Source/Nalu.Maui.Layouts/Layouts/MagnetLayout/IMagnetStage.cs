@@ -14,6 +14,16 @@ public interface IMagnetStage : IVerticalPoles, IHorizontalPoles, IMagnetElement
     const string StageId = "Stage";
 
     /// <summary>
+    /// The requested stage width.
+    /// </summary>
+    double WidthRequest { get; }
+
+    /// <summary>
+    /// The requested stage height.
+    /// </summary>
+    double HeightRequest { get; }
+
+    /// <summary>
     /// Invalidates the scene due to changed constraints.
     /// </summary>
     void Invalidate();
@@ -59,10 +69,10 @@ public interface IMagnetStage : IVerticalPoles, IHorizontalPoles, IMagnetElement
     /// <summary>
     /// Applies the constraints and solves the layout.
     /// </summary>
-    void PrepareForMeasure(double start, double top, double end, double bottom);
+    void PrepareForMeasure(double width, double height);
 
     /// <summary>
     /// Arranges the elements on the stage based on the solved layout.
     /// </summary>
-    void PrepareForArrange(double start, double top, double end, double bottom);
+    void PrepareForArrange(double width, double height);
 }

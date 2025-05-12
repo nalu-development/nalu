@@ -44,6 +44,7 @@ public static class Strength
     /// </summary>
     public const double Medium = 1_000;
 
+
     /// <summary>
     /// The weak strength.
     /// </summary>

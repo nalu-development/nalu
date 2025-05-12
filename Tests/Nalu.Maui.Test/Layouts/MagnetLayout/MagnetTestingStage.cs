@@ -26,6 +26,8 @@ public static class MagnetTestingStage
         stage.Right.Returns(stageEnd);
         stage.Top.Returns(stageTop);
         stage.Bottom.Returns(stageBottom);
+        stage.WidthRequest.Returns(width);
+        stage.HeightRequest.Returns(height);
         stage.GetElement(IMagnetStage.StageId).Returns(stage); // Mock the GetElement method
         stage.When(s => s.AddConstraint(Arg.Any<Constraint>()))
              .Do(call => solverInstance.AddConstraint(call.Arg<Constraint>()));
