@@ -93,6 +93,15 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
         }
     }
 
+    /// <inheritdoc />
+    public void DetectChanges() => DetectChanges(_stage ?? throw new InvalidOperationException("Stage is not set"));
+
+    /// <inheritdoc cref="IMagnetElement.DetectChanges" />
+    protected virtual void DetectChanges(IMagnetStage stage)
+    {
+        // No-op by default
+    }
+
     /// <summary>
     /// Sets the <paramref name="constraintsFactory" /> for the specified <paramref name="constraintType" /> and invalidates the stage
     /// only if the <see cref="ConstraintsFactory" /> on the <paramref name="constraintType" /> is not already set to the same value.

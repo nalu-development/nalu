@@ -59,8 +59,8 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         }
     }
 
-    private Variable _lowBottom = new();
-    private Variable _lowRight = new();
+    private readonly Variable _lowBottom = new();
+    private readonly Variable _lowRight = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MagnetStage"/> class.
@@ -229,6 +229,11 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     /// <inheritdoc />
     public void PrepareForMeasure(double width, double height)
     {
+        foreach (var element in _elements)
+        {
+            element.DetectChanges();
+        }
+
         SetBounds(width, height, true);
 
         foreach (var element in _elements)

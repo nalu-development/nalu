@@ -296,6 +296,8 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     private double _marginLeft = double.NaN;
     private double _marginRight = double.NaN;
     private bool _collapsedChanged = true;
+    private bool _horizontalChainChanged = true;
+    private bool _verticalChainChanged = true;
     private WeakReference<IView>? _viewRef;
 
     /// <summary>
@@ -328,10 +330,34 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         _verticalTailSpace.SetName($"{id}.VerticalTailSpace");
     }
 
-    /// <inheritdoc />
-    public Thickness GetEffectiveMargin() => new Thickness(_marginLeft, _marginTop, _marginRight, _marginBottom);
-
     private void OnMarginChanged(Thickness oldValue, Thickness newValue) => InvalidateStage();
+
+    /// <inheritdoc />
+    protected override void DetectChanges(IMagnetStage stage)
+    {
+        if (_collapsedChanged)
+        {
+            if (GetLeftConnection(stage) is { ChainedView: { } chainLeft })
+            {
+                chainLeft._horizontalChainChanged = true;
+            }
+            
+            if (GetRightConnection(stage) is { ChainedView: { } chainRight })
+            {
+                chainRight._horizontalChainChanged = true;
+            }
+            
+            if (GetTopConnection(stage) is { ChainedView: { } chainTop })
+            {
+                chainTop._verticalChainChanged = true;
+            }
+            
+            if (GetBottomConnection(stage) is { ChainedView: { } chainBottom })
+            {
+                chainBottom._verticalChainChanged = true;
+            }
+        }
+    }
 
     /// <inheritdoc />
     protected override void ApplyConstraints(IMagnetStage stage)
@@ -340,6 +366,16 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         {
             UpdateConstraints(ConstraintTypes.Consistency, GetConsistencyConstraints);
             UpdatePolesConstraintsIfNeeded(stage);
+        }
+
+        if (_horizontalChainChanged)
+        {
+            UpdateConstraints(ConstraintTypes.HorizontalPosition, GetHorizontalConstraints);
+        }
+        
+        if (_verticalChainChanged)
+        {
+            UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
         }
 
         if (View is { } view && !Collapsed)
@@ -360,6 +396,8 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         }
 
         _collapsedChanged = false;
+        _horizontalChainChanged = false;
+        _verticalChainChanged = false;
 
         base.ApplyConstraints(stage);
     }
@@ -431,13 +469,25 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
         var margin = Margin;
         var collapsedMargin = CollapsedMargin;
 
-        EnsureEffectiveLeftMargin(stage, collapsedMargin, margin);
-        EnsureEffectiveRightMargin(stage, collapsedMargin, margin);
-        EnsureEffectiveTopMargin(stage, collapsedMargin, margin);
-        EnsureEffectiveBottomMargin(stage, collapsedMargin, margin);
+        var needsHorizontalConstraintsUpdate = EnsureEffectiveLeftMargin(stage, collapsedMargin, margin);
+        needsHorizontalConstraintsUpdate = EnsureEffectiveRightMargin(stage, collapsedMargin, margin) || needsHorizontalConstraintsUpdate;
+        var needsVerticalConstraintsUpdate = EnsureEffectiveTopMargin(stage, collapsedMargin, margin);
+        needsVerticalConstraintsUpdate = EnsureEffectiveBottomMargin(stage, collapsedMargin, margin) || needsVerticalConstraintsUpdate;
+        
+        if (needsHorizontalConstraintsUpdate)
+        {
+            UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
+            _horizontalChainChanged = false;
+        }
+
+        if (needsVerticalConstraintsUpdate)
+        {
+            UpdateConstraints(ConstraintTypes.HorizontalPosition, GetHorizontalConstraints);
+            _verticalChainChanged = false;
+        }
     }
 
-    private void EnsureEffectiveBottomMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
+    private bool EnsureEffectiveBottomMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
     {
         if (BottomTo is { } bottomTo)
         {
@@ -445,16 +495,19 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             if (_marginBottom != bottomMargin)
             {
                 _marginBottom = bottomMargin;
-                OnVerticalPropertyChanged();
+                
+                return true;
             }
         }
         else
         {
             _marginBottom = 0;
         }
+
+        return false;
     }
 
-    private void EnsureEffectiveTopMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
+    private bool EnsureEffectiveTopMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
     {
         if (TopTo is { } topTo)
         {
@@ -462,16 +515,19 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             if (_marginTop != topMargin)
             {
                 _marginTop = topMargin;
-                OnVerticalPropertyChanged();
+
+                return true;
             }
         }
         else
         {
             _marginTop = 0;
         }
+        
+        return false;
     }
 
-    private void EnsureEffectiveRightMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
+    private bool EnsureEffectiveRightMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
     {
         if (RightTo is { } rightTo)
         {
@@ -479,16 +535,19 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             if (_marginRight != rightMargin)
             {
                 _marginRight = rightMargin;
-                OnHorizontalPropertyChanged();
+                
+                return true;
             }
         }
         else
         {
             _marginRight = 0;
         }
+        
+        return false;
     }
 
-    private void EnsureEffectiveLeftMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
+    private bool EnsureEffectiveLeftMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
     {
         if (LeftTo is { } leftTo)
         {
@@ -496,13 +555,16 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
             if (_marginLeft != leftMargin)
             {
                 _marginLeft = leftMargin;
-                OnHorizontalPropertyChanged();
+                
+                return true;
             }
         }
         else
         {
             _marginLeft = 0;
         }
+        
+        return false;
     }
 
     private void OnLeftToChanged(HorizontalPullTarget? oldValue, HorizontalPullTarget? newValue) => OnHorizontalPropertyChanged();

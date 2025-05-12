@@ -24,10 +24,13 @@ internal class MagnetLayoutManager : LayoutManager
 
         var maxWidth = 0.0;
         var maxHeight = 0.0;
+        var hasMagnetViews = false;
+
         foreach (var child in Layout)
         {
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
+                hasMagnetViews = true;
                 magnetView.View = child;
             }
             else
@@ -44,10 +47,14 @@ internal class MagnetLayoutManager : LayoutManager
         var width = widthConstraint - horizontalPadding;
         var height = heightConstraint - verticalPadding;
 
-        stage.PrepareForMeasure(width, height);
+        if (hasMagnetViews)
+        {
+            stage.PrepareForMeasure(width, height);
 
-        maxWidth = Math.Max(stage.Right.CurrentValue, maxWidth);
-        maxHeight = Math.Max(stage.Bottom.CurrentValue, maxHeight);
+            maxWidth = Math.Max(stage.Right.CurrentValue, maxWidth);
+            maxHeight = Math.Max(stage.Bottom.CurrentValue, maxHeight);
+        }
+
         var measured = new Size(maxWidth + horizontalPadding, maxHeight + verticalPadding);
 
         return measured;

@@ -173,12 +173,20 @@ Here's a performance comparison between `GridLayout` and `MagnetLayout` consider
 1. **Dynamic measure**: All the views keep chaining their size on each measure pass (rare case)
 2. **Constant measure**: The views always return the same size (very common)
 
+```
+for (var i = 0; i < _iterations; i++)
+{
+    var result = _layoutManager.Measure(500, 500);
+    _layoutManager.ArrangeChildren(new Rect(Point.Zero, result));
+}
+```
+
 | Method                          | Mean     | Error     | StdDev    | Gen0     | Allocated |
 |-------------------------------- |---------:|----------:|----------:|---------:|----------:|
-| GridLayoutPerf                  | 2.264 ms | 0.0216 ms | 0.0192 ms | 222.6563 |   1.78 MB |
-| MagnetLayoutPerf                | 6.694 ms | 0.0436 ms | 0.0408 ms | 273.4375 |   2.21 MB |
-| GridLayoutConstantMeasurePerf   | 1.395 ms | 0.0136 ms | 0.0114 ms | 166.0156 |   1.33 MB |
-| MagnetLayoutConstantMeasurePerf | 2.724 ms | 0.0387 ms | 0.0362 ms | 218.7500 |   1.75 MB |
+| GridLayoutPerf                  | 2.332 ms | 0.0206 ms | 0.0183 ms | 222.6563 |   1.78 MB |
+| MagnetLayoutPerf                | 6.747 ms | 0.0444 ms | 0.0393 ms | 273.4375 |   2.21 MB |
+| GridLayoutConstantMeasurePerf   | 1.388 ms | 0.0221 ms | 0.0207 ms | 166.0156 |   1.33 MB |
+| MagnetLayoutConstantMeasurePerf | 2.756 ms | 0.0211 ms | 0.0176 ms | 218.7500 |   1.75 MB |
   
 As we can see `Magnet` is about 2 times slower than `Grid` but it provides a lot of flexibility and power.
 So it's up to you to decide whether to use `Magnet` or the standard MAUI layouts.

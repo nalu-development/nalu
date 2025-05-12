@@ -6,7 +6,7 @@ namespace Nalu.MagnetLayout;
 /// <param name="Id">The magnet element identifier.</param>
 /// <param name="Pole">The traction pole.</param>
 /// <param name="Traction">The traction level.</param>
-public readonly record struct HorizontalPullTarget(string Id, HorizontalPoles Pole, Traction Traction = Traction.Default)
+public record HorizontalPullTarget(string Id, HorizontalPoles Pole, Traction Traction = Traction.Default)
 {
     /// <summary>
     /// Implicitly converts a string representation (e.g., "elementId.PoleName") into a HorizontalPullTarget.
