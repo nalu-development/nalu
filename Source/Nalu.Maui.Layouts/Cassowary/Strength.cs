@@ -40,11 +40,6 @@ public static class Strength
     public const double Strong = 1_000_000;
 
     /// <summary>
-    /// The half strong strength.
-    /// </summary>
-    public const double HalfStrong = 500_000;
-
-    /// <summary>
     /// The medium strength.
     /// </summary>
     public const double Medium = 1_000;

@@ -5,7 +5,7 @@
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              xmlns:magnet="clr-namespace:Nalu.MagnetLayout;assembly=Nalu.Maui.Layouts"
              x:Class="Nalu.Maui.Sample.Pages.MagnetDemoPage"
-             Title="Magnet Demo">
+             Title="Magnet Demo"> 
     <ContentPage.Resources>
         <magnet:MagnetStage x:Key="CardMagnetStage">
             <magnet:MagnetView Id="CardImage"
@@ -39,7 +39,7 @@
         </magnet:MagnetStage>
     </ContentPage.Resources>
 
-    <nalu:ViewBox>
+    <VerticalStackLayout>
         <Border Margin="8"
                 VerticalOptions="Center"
                 StrokeThickness="0"
@@ -79,5 +79,5 @@
                        Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
             </nalu:Magnet>
         </Border>
-    </nalu:ViewBox>
+    </VerticalStackLayout>
 </ContentPage>

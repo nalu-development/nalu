@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Frozen;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Nalu.Cassowary;
@@ -66,10 +67,15 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     /// </summary>
     public MagnetStage()
     {
-        Left.SetName("Stage.Left");
-        Right.SetName("Stage.Right");
-        Top.SetName("Stage.Top");
-        Bottom.SetName("Stage.Bottom");
+        if (Debugger.IsAttached)
+        {
+            Left.SetName("Stage.Left");
+            Right.SetName("Stage.Right");
+            Top.SetName("Stage.Top");
+            Bottom.SetName("Stage.Bottom");
+            _lowRight.SetName("Stage.LowRight");
+            _lowBottom.SetName("Stage.LowBottom");
+        }
 
         _solver.AddConstraints(
             Left | WeightedRelation.Eq(Strength.Required) | 0,

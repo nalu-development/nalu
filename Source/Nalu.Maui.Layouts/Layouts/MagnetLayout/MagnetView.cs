@@ -826,12 +826,12 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
 
             case SizeUnit.Constraint:
                 yield return (right - left) | relation | (constraintSize * multiplier);
-                yield return (right - left) | Eq(Weak) | (sceneRight - sceneLeft);
+                yield return (right - left) | Eq(Medium) | (sceneRight - sceneLeft);
                 break;
 
             case SizeUnit.Stage:
                 yield return (right - left) | relation | ((sceneRight - sceneLeft) * multiplier);
-                yield return (right - left) | Eq(Weak) | (sceneRight - sceneLeft);
+                yield return (right - left) | Eq(Medium) | (sceneRight - sceneLeft);
                 break;
 
             case SizeUnit.Ratio:
