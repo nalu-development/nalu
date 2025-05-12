@@ -15,8 +15,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
 #pragma warning disable CS1591
     public enum ConstraintTypes
     {
-        MeasuredWidth,
-        MeasuredHeight,
+        Consistency,
         Width,
         Height,
         HorizontalPosition,
@@ -289,6 +288,10 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         UpdateConstraints(ConstraintTypes.Width, GetWidthConstraints);
         UpdateConstraints(ConstraintTypes.Height, GetHeightConstraints);
+        UpdateConstraints(ConstraintTypes.Consistency, _ => [
+            _right | GreaterOrEq(Weak) | _left,
+            _bottom | GreaterOrEq(Weak) | _top,
+        ]);
     }
 
     /// <inheritdoc />
@@ -776,7 +779,7 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     {
         var multiplier = size.Value;
 
-        var relation = size.Behavior == SizeBehavior.Shrink ? LessOrEq(Weak) : Eq(Weak);
+        var relation = size.Behavior == SizeBehavior.Shrink ? Eq(Weak) : Eq(Strong);
 
         switch (size.Unit)
         {
@@ -787,10 +790,12 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
 
             case SizeUnit.Constraint:
                 yield return (right - left) | relation | (constraintSize * multiplier);
+                yield return (right - left) | Eq(Weak) | (sceneRight - sceneLeft);
                 break;
 
             case SizeUnit.Stage:
                 yield return (right - left) | relation | ((sceneRight - sceneLeft) * multiplier);
+                yield return (right - left) | Eq(Weak) | (sceneRight - sceneLeft);
                 break;
 
             case SizeUnit.Ratio:

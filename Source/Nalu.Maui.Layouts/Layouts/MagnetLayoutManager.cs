@@ -22,6 +22,8 @@ internal class MagnetLayoutManager : LayoutManager
             return NoStageMeasure(widthConstraint, heightConstraint);
         }
 
+        var maxWidth = 0.0;
+        var maxHeight = 0.0;
         foreach (var child in Layout)
         {
             if (TryGetMagnetView(stage, child, out var magnetView))
@@ -30,7 +32,9 @@ internal class MagnetLayoutManager : LayoutManager
             }
             else
             {
-                child.Measure(widthConstraint, heightConstraint);
+                var size = child.Measure(widthConstraint, heightConstraint);
+                maxWidth = Math.Max(size.Width, maxWidth);
+                maxHeight = Math.Max(size.Height, maxHeight);
             }
         }
 
@@ -42,7 +46,9 @@ internal class MagnetLayoutManager : LayoutManager
 
         stage.PrepareForMeasure(width, height);
 
-        var measured = new Size(stage.Right.CurrentValue + horizontalPadding, stage.Bottom.CurrentValue + verticalPadding);
+        maxWidth = Math.Max(stage.Right.CurrentValue, maxWidth);
+        maxHeight = Math.Max(stage.Bottom.CurrentValue, maxHeight);
+        var measured = new Size(maxWidth + horizontalPadding, maxHeight + verticalPadding);
 
         return measured;
     }
@@ -72,26 +78,6 @@ internal class MagnetLayoutManager : LayoutManager
 
         stage.PrepareForArrange(width, height);
 
-        ArrangeStage(
-            stage,
-            (view, frame) =>
-            {
-                frame = frame.Offset(left, top);
-
-                return view.Arrange(frame);
-            }
-        );
-
-        return bounds.Size;
-    }
-
-    private void ArrangeStage(IMagnetStage stage, Func<IView, Rect, Size>? arrange = null)
-    {
-        if (Layout.Count == 0)
-        {
-            return;
-        }
-        
         foreach (var child in Layout)
         {
             if (child.Visibility is Visibility.Collapsed)
@@ -101,14 +87,17 @@ internal class MagnetLayoutManager : LayoutManager
 
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
-                arrange?.Invoke(child, magnetView.GetFrame());
+                var frame = magnetView.GetFrame().Offset(left, top);
+                child.Arrange(frame);
             }
             else
             {
-                var size = child.DesiredSize;
-                arrange?.Invoke(child, new Rect(Point.Zero, size));
+                var frame = new Rect(Point.Zero, child.DesiredSize).Offset(left, top);
+                child.Arrange(frame);
             }
         }
+
+        return bounds.Size;
     }
 
     private Size NoStageMeasure(double widthConstraint, double heightConstraint)

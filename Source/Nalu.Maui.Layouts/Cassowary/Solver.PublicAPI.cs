@@ -181,13 +181,11 @@ public partial class Solver
     /// <param name="value">Suggested value</param>
     public void SuggestValue(Variable variable, double value)
     {
-        if (!_editMap.TryGetValue(variable, out var editPair))
+        if (!_editMap.TryGetValue(variable, out var info))
         {
             throw new InvalidOperationException("unknown edit variable");
         }
 
-        var rows = _rowMap;
-        var info = editPair;
         var delta = value - info.Constant;
 
         if (delta == 0)
@@ -198,7 +196,9 @@ public partial class Solver
         info.Constant = value;
 
         // Check first if the positive error variable is basic.
+        var rows = _rowMap;
         var marker = info.Tag.Marker;
+
         if (rows.TryGetValue(marker, out var row))
         {
             if (row.Add(-delta) < 0.0)

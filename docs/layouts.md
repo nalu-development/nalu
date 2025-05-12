@@ -173,17 +173,18 @@ Here's a performance comparison between `GridLayout` and `MagnetLayout` consider
 1. **Dynamic measure**: All the views keep chaining their size on each measure pass (rare case)
 2. **Constant measure**: The views always return the same size (very common)
 
-| Method                          | Mean      | Error     | StdDev    | Gen0     | Allocated |
-|-------------------------------- |----------:|----------:|----------:|---------:|----------:|
-| GridLayoutPerf                  |  4.705 ms | 0.0644 ms | 0.0603 ms | 400.0000 |   3.57 MB |                                                                                                                                                                                                                                                                                   
-| MagnetLayoutPerf                | 19.718 ms | 0.1535 ms | 0.1436 ms | 600.0000 |   5.15 MB |
-| GridLayoutConstantMeasurePerf   |  2.912 ms | 0.0562 ms | 0.0730 ms | 300.0000 |   2.66 MB |
-| MagnetLayoutConstantMeasurePerf |  7.790 ms | 0.0884 ms | 0.0784 ms | 500.0000 |   4.26 MB |
+| Method                          | Mean     | Error     | StdDev    | Median   | Allocated |
+|-------------------------------- |---------:|----------:|----------:|---------:|----------:|
+| GridLayoutPerf                  | 5.727 ms | 1.6198 ms | 4.6993 ms | 2.839 ms |   1.79 MB |
+| MagnetLayoutPerf                | 7.220 ms | 0.1395 ms | 0.1370 ms | 7.197 ms |    2.3 MB |
+| GridLayoutConstantMeasurePerf   | 1.585 ms | 0.1531 ms | 0.3979 ms | 1.459 ms |   1.33 MB |
+| MagnetLayoutConstantMeasurePerf | 2.925 ms | 0.0556 ms | 0.1110 ms | 2.901 ms |   1.85 MB |
   
-As we can see `Magnet` is about 4 times slower than `Grid` but it provides a lot of flexibility and power.
+As we can see `Magnet` is about 2 times slower than `Grid` but it provides a lot of flexibility and power.
 So it's up to you to decide whether to use `Magnet` or the standard MAUI layouts.
 
 On a common page with a few views, the performance impact is negligible while the flexibility gain is huge in comparison.
 
 Inside a `CollectionView` template is probably better to use MAUI layouts, but that still needs to be verified with real data
 considering that you may be forced to use nested layouts to achieve the same result and that also comes with a non-negligible performance cost.
+**Important:** in a `CollectionView` template, make sure your `Stage` property references a `MagnetStage` defined outside the template (aka `Resources`).

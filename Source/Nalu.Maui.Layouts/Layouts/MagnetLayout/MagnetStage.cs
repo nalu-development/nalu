@@ -58,23 +58,29 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         }
     }
 
-    private Constraint? _stageBottomConstraint;
-    private Constraint? _stageRightConstraint;
+    private Variable _lowBottom = new();
+    private Variable _lowRight = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MagnetStage"/> class.
     /// </summary>
     public MagnetStage()
     {
-        Left.SetName("Stage.Start");
-        Right.SetName("Stage.End");
+        Left.SetName("Stage.Left");
+        Right.SetName("Stage.Right");
         Top.SetName("Stage.Top");
         Bottom.SetName("Stage.Bottom");
 
-        var stageLeftConstraint = Left | WeightedRelation.Eq(Strength.Required) | 0;
-        var stageTopConstraint = Top | WeightedRelation.Eq(Strength.Required) | 0;
-        
-        _solver.AddConstraints(stageLeftConstraint, stageTopConstraint);
+        _solver.AddConstraints(
+            Left | WeightedRelation.Eq(Strength.Required) | 0,
+            Top | WeightedRelation.Eq(Strength.Required) | 0,
+            Right | WeightedRelation.Eq(Strength.Required) | _lowRight,
+            Bottom | WeightedRelation.Eq(Strength.Required) | _lowBottom
+        );
+        _solver.AddEditVariable(Bottom, Strength.Weak);
+        _solver.AddEditVariable(Right, Strength.Weak);
+        _solver.AddEditVariable(_lowBottom, Strength.Weak);
+        _solver.AddEditVariable(_lowRight, Strength.Weak);
     }
 
     /// <inheritdoc />
@@ -189,23 +195,28 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         WidthRequest = width;
         HeightRequest = height;
 
-        if (_stageBottomConstraint is not null)
+        if (double.IsPositiveInfinity(width))
         {
-            _solver.RemoveConstraint(_stageRightConstraint!);
-            _solver.RemoveConstraint(_stageBottomConstraint!);
+            width = 100_000;
         }
-
-        if (!forMeasure)
+        
+        if (double.IsPositiveInfinity(height))
         {
-            if (!double.IsPositiveInfinity(width))
-            {
-                _solver.AddConstraint(_stageRightConstraint = Right | WeightedRelation.Eq(Strength.Required) | width);
-            }
+            height = 100_000;
+        }
+        
+        _solver.SuggestValue(Right, width);
+        _solver.SuggestValue(Bottom, height);
 
-            if (!double.IsPositiveInfinity(height))
-            {
-                _solver.AddConstraint(_stageBottomConstraint = Bottom | WeightedRelation.Eq(Strength.Required) | height);
-            }
+        if (forMeasure)
+        {
+            _solver.SuggestValue(_lowRight, 0);
+            _solver.SuggestValue(_lowBottom, 0);
+        }
+        else
+        {
+            _solver.SuggestValue(_lowRight, width);
+            _solver.SuggestValue(_lowBottom, height);
         }
     }
 
