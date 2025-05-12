@@ -107,4 +107,4 @@ The controls library provides a set of cross-platform controls to simplify your 
 
 - A `InteractableCanvasView` which is a `SkiaSharp` `SKCanvasView` with touch-events support where you can choose to stop touch event propagation to avoid interaction with ancestors (like `ScrollView`)
 - A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel
-  See video here: https://github.com/user-attachments/assets/447449e7-62fb-45e2-b2b7-e8974f356e75
+  See video here: https://github.com/user-attachments/assets/921dc279-f5ee-4da5-87d5-8b947df29a16
