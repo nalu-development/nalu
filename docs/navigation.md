@@ -12,8 +12,6 @@ Navigation.Relative()
     .Push<ContactDetailPageModel>()
 ```
 
-![Push twice in a row](assets/images/push-push.png)
-
 There's also a "navigation guard" feature that allows you to prevent the navigation to happen if a condition is not met.
 You can leverage that to ask the user to confirm leaving the page.
 
@@ -25,8 +23,6 @@ Navigation.Absolute()
 // This is gonna trigger the navigation guard on ContactDetailPageModel
 ValueTask<bool> CanLeaveAsync() => { ... ask the user };
 ```
-
-![Absolute navigation to root page](assets/images/pop-pop-with-guard.png)
 
 ### Leak detection
 
