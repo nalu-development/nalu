@@ -209,12 +209,12 @@ internal class NavigationService : INavigationService, IDisposable
 
         if (backButtonImage is not null)
         {
-            backButtonBehavior.IconOverride = backButtonImage;
+            backButtonBehavior.IconOverride ??= backButtonImage;
         }
 
         if (!isRoot)
         {
-            backButtonBehavior.Command = _backCommand;
+            backButtonBehavior.Command ??= _backCommand;
         }
     }
 
