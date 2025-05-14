@@ -1,0 +1,10 @@
+- name: Home
+  href: index.md
+- name: Core
+  href: core.md
+- name: Layouts
+  href: layouts.md
+- name: Navigation
+  href: navigation.md
+- name: API
+  href: ../api/Nalu.yml

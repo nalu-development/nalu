@@ -357,3 +357,6 @@ MigrationBackup/
 .idea/
 
 Artefacts/
+_site/
+obj/docfx/
+api/

@@ -62,6 +62,19 @@ jobs:
       - name: "Dotnet Cake Pack"
         run: dotnet cake --target=Pack
         shell: pwsh
+
+      - name: Build Documentation Metadata
+        run: dotnet docfx metadata docfx.json
+        shell: pwsh
+      - name: Build Documentation
+        run: dotnet docfx build docfx.json
+        shell: pwsh
+      - name: Upload Documentation Site
+        uses: actions/upload-artifact@v4
+        with:
+          name: docfx-site
+          path: _site
+
       - name: "Publish Artefacts"
         uses: actions/upload-artifact@v4.6.2
         with:
@@ -72,28 +85,6 @@ jobs:
         with:
           name: ${{matrix.os}}-binlog
           path: "./Binlog"
-
-  push-github-packages:
-    name: "Push GitHub Packages"
-    needs: build
-    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
-    environment:
-      name: "GitHub Packages"
-      url: https://github.com/nalu-development/nalu/packages
-    permissions:
-      packages: write
-    runs-on: windows-latest
-    steps:
-      - name: "Download Artefact"
-        uses: actions/download-artifact@v4.3.0
-        with:
-          name: "windows-latest"
-      - name: "Dotnet NuGet Add Source"
-        run: dotnet nuget add source https://nuget.pkg.github.com/nalu-development/index.json --name GitHub --username albyrock87 --password ${{secrets.GITHUB_TOKEN}}
-        shell: pwsh
-      - name: "Dotnet NuGet Push"
-        run: dotnet nuget push .\*.nupkg --api-key ${{ github.token }} --source GitHub --skip-duplicate
-        shell: pwsh
 
   push-nuget:
     name: "Push NuGet Packages"
@@ -114,3 +105,37 @@ jobs:
           Where-Object { !$_.Name.Contains('preview') } |
           ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{secrets.NUGET_API_KEY}} }
         shell: pwsh
+
+  deploy-gh-pages:
+    name: Deploy GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Documentation Site
+        uses: actions/download-artifact@v4
+        with:
+          name: docfx-site
+          path: ./_site
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

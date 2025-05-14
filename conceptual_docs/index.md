@@ -1,6 +1,8 @@
-<h2 id="nalumaui"><a style="text-decoration:none;padding:8px 16px;color: #2C479D;border-radius:8px;box-shadow: 0 0 4px #2C479D;font-weight: 600;background: #f6fafe;float: right;font-size: 14px;margin-top: -4px;" target="_blank" href="https://buymeacoffee.com/albyrock87">🍕&nbsp;<span class="bmc-btn-text">Buy me a pizza</span></a>Nalu.Maui<span></span></h2>
+<h2 id="nalumaui">Nalu.Maui<span></span></h2>
 
 `Nalu.Maui` provides a set of classes to help you with everyday challenges encountered while working with .NET MAUI.
+
+If you use and like the work I've done, please consider contributing with a donation <a id="donate" target="_blank" href="https://buymeacoffee.com/albyrock87"><span>Buy me a pizza</span><span>🍕</span></a>
 
 ### Core [![Nalu.Maui.Core NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Core.svg)](https://www.nuget.org/packages/Nalu.Maui.Core/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Core)](https://www.nuget.org/packages/Nalu.Maui.Core/)
 
@@ -27,7 +29,7 @@ public virtual void HandleEventsForBackgroundUrl(UIApplication application, stri
     => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
 ```
 
-**Check out the [Core Wiki](core.html) for more information**.
+**Check out the [Core Wiki](/core.html) for more information**.
 
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 
@@ -61,7 +63,7 @@ ValueTask<bool> CanLeaveAsync() => { ... ask the user };
 
 There is an embedded **leak-detector** to help you identify memory leaks in your application.
 
-**See more on the [Navigation Wiki](navigation.html)**.
+**See more on the [Navigation Wiki](/navigation.html)**.
 
 ### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
 
@@ -86,4 +88,4 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
                       ContentBindingContext="{Binding CurrentAnimal}" />
   ```
 
-**Find out more on the [Layouts Wiki](layouts.html)**.
+**Find out more on the [Layouts Wiki](/layouts.html)**.

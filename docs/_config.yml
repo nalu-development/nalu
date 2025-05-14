@@ -1,6 +1,0 @@
-remote_theme: pages-themes/modernist@v0.2.0
-plugins:
-  - jekyll-remote-theme
-
-title: Nalu
-description: Provides .NET MAUI tools to help with everyday challenges.

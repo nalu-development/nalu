@@ -1,0 +1,40 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "./",
+          "files": [
+            "Source/Nalu.Maui.Core/Nalu.Maui.Core.csproj",
+            "Source/Nalu.Maui.Controls/Nalu.Maui.Controls.csproj",
+            "Source/Nalu.Maui.Layouts/Nalu.Maui.Layouts.csproj",
+            "Source/Nalu.Maui.Navigation/Nalu.Maui.Navigation.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "properties": {
+        "TargetFramework": "net9.0"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": ["*.yml"], "src": "api", "dest": "api" },
+      { "files": ["*.md", "toc.yml"], "src": "conceptual_docs" }
+    ],
+    "resource": [
+      { "files": ["assets/**"], "src": "conceptual_docs" },
+      { "files": ["Images/Banner.png"] }
+    ],
+    "output": "_site",
+    "globalMetadata": {
+      "_appTitle": "Nalu Documentation",
+      "_appFooter": "© Nalu Development - All rights reserved",
+      "_enableSearch": true,
+      "_appLogoPath": "Images/Banner.png"
+    },
+    "css": ["assets/css/custom.css"],
+    "template": ["default", "modern", "conceptual_docs"]
+  }
+}

@@ -1,0 +1,29 @@
+#logo {
+    height: 48px;
+    width: auto;
+}
+
+#donate
+{
+    display: inline-block;
+    text-decoration: none;
+    background: linear-gradient(0deg, #0172b3, #1284c4);
+    color: #fff;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+#donate::after {
+    display: none;
+}
+
+#donate span:first-child {
+    padding: 2px 12px;
+    display: inline-block;
+}
+
+#donate span:last-child {
+    display: inline-block;
+    scale: 2.4;
+    margin: 0 12px;
+}
