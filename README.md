@@ -6,9 +6,13 @@
 
 **For comprehensive documentation, guides, API references, and samples, please visit our dedicated documentation website:**
 
-If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance through a donation <a style="display: inline-block;text-decoration: none;background: linear-gradient(0deg, #0172b3, #1284c4);color: #fff;border-radius: 4px;font-size: 16px;" target="_blank" href="https://buymeacoffee.com/albyrock87"><span style="padding: 2px 12px;display: inline-block;">Buy me a pizza</span><span style="display: inline-block;scale: 2.2;margin: 0 12px;">🍕</span></a>
-
 ➡️ **[Nalu.Maui Documentation Website](https://nalu-development.github.io/nalu/)** ⬅️
+
+If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance through a donation:
+
+<a target="_blank" href="https://buymeacoffee.com/albyrock87">
+    <img src="conceptual_docs/assets/images/donate.png" height="40">
+</a>
 
 ### Key Modules:
 
