@@ -2,6 +2,8 @@
   href: index.md
 - name: Core
   href: core.md
+- name: Controls
+  href: controls.md
 - name: Layouts
   href: layouts.md
 - name: Navigation

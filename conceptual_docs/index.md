@@ -2,7 +2,7 @@
 
 `Nalu.Maui` provides a set of classes to help you with everyday challenges encountered while working with .NET MAUI.
 
-If you use and like the work I've done, please consider contributing with a donation <a id="donate" target="_blank" href="https://buymeacoffee.com/albyrock87"><span>Buy me a pizza</span><span>🍕</span></a>
+If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance through a donation <a id="donate" target="_blank" href="https://buymeacoffee.com/albyrock87"><span>Buy me a pizza</span><span>🍕</span></a>
 
 ### Core [![Nalu.Maui.Core NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Core.svg)](https://www.nuget.org/packages/Nalu.Maui.Core/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Core)](https://www.nuget.org/packages/Nalu.Maui.Core/)
 
@@ -29,7 +29,16 @@ public virtual void HandleEventsForBackgroundUrl(UIApplication application, stri
     => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
 ```
 
-**Check out the [Core Wiki](/core.html) for more information**.
+**Check out the [Core Wiki](core.md) for more information**.
+
+### Controls [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
+
+The controls library provides a set of cross-platform controls to simplify your development.
+
+- A `InteractableCanvasView` which is a `SkiaSharp` `SKCanvasView` with touch-events support where you can choose to stop touch event propagation to avoid interaction with ancestors (like `ScrollView`)
+- A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel!!
+
+**Find out more on the [Controls Wiki](controls.md)**.
 
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 
@@ -63,7 +72,7 @@ ValueTask<bool> CanLeaveAsync() => { ... ask the user };
 
 There is an embedded **leak-detector** to help you identify memory leaks in your application.
 
-**See more on the [Navigation Wiki](/navigation.html)**.
+**See more on the [Navigation Wiki](navigation.md)**.
 
 ### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
 
@@ -88,4 +97,4 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
                       ContentBindingContext="{Binding CurrentAnimal}" />
   ```
 
-**Find out more on the [Layouts Wiki](/layouts.html)**.
+**Find out more on the [Layouts Wiki](layouts.md)**.

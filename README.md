@@ -2,109 +2,23 @@
 
 ## Nalu [![GitHub Actions Status](https://github.com/nalu-development/nalu/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/nalu-development/nalu/actions/workflows/build.yml)
 
-<a style="float:right;text-decoration:none;margin-top:-66px;padding:8px 16px;color: #2C479D;border-radius:8px;box-shadow: 0 0 4px #2C479D;font-weight: 600;background: #f6fafe;" target="_blank" href="https://buymeacoffee.com/albyrock87">🍕&nbsp;<span class="bmc-btn-text">Buy me a pizza</span></a>
+`Nalu.Maui` provides a set of libraries designed to simplify and accelerate your .NET MAUI application development by addressing common challenges.
 
-`Nalu.Maui` provides a set of classes to help you with everyday challenges encountered while working with .NET MAUI.
+**For comprehensive documentation, guides, API references, and samples, please visit our dedicated documentation website:**
 
-### Core [![Nalu.Maui.Core NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Core.svg)](https://www.nuget.org/packages/Nalu.Maui.Core/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Core)](https://www.nuget.org/packages/Nalu.Maui.Core/)
+If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance through a donation <a style="display: inline-block;text-decoration: none;background: linear-gradient(0deg, #0172b3, #1284c4);color: #fff;border-radius: 4px;font-size: 16px;" target="_blank" href="https://buymeacoffee.com/albyrock87"><span style="padding: 2px 12px;display: inline-block;">Buy me a pizza</span><span style="display: inline-block;scale: 2.2;margin: 0 12px;">🍕</span></a>
 
-The core library is intended to provide a set of common use utilities.
+➡️ **[Nalu.Maui Documentation Website](https://nalu-development.github.io/nalu/)** ⬅️
 
-Have you ever noticed that when the user backgrounds the app on iOS, the app is suspended, and the network requests will fail due to `The network connection was lost`?
+### Key Modules:
 
-This is really annoying: it forces us to implement complex retry logic, especially considering that the request may have already hit the server.
+*   **Core** [![Nalu.Maui.Core NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Core.svg)](https://www.nuget.org/packages/Nalu.Maui.Core/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Core)](https://www.nuget.org/packages/Nalu.Maui.Core/)
+    *   Provides common utilities, including an `NSUrlBackgroundSessionHttpMessageHandler` for robust background HTTP requests on iOS.
+*   **Navigation** [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
+    *   Offers a fluent, type-safe MVVM navigation service built on `Shell`, supporting relative/absolute navigation, guards, and parameter passing. Includes a leak detector.
+*   **Layouts** [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
+    *   Simplifies XAML development with template controls (`ToggleTemplate`, `TemplateBox`), lightweight `ContentView` replacement with clipping support (`ViewBox`), animated expanders (`ExpanderViewBox`), and a **constraint-based layout system** (`Magnet`).
+*   **Controls** [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
+    *   Includes useful cross-platform controls like `InteractableCanvasView` (a `SKCanvasView` with enhanced touch support) and `DurationWheel` (a `TimeSpan?` editor).
 
-To solve this issue, we provide a `NSUrlBackgroundSessionHttpMessageHandler` to be used in your `HttpClient` to allow http request to continue even when the app is in the background.
-
-```csharp
-#if IOS
-    HttpClient client = DeviceInfo.DeviceType == DeviceType.Virtual
-        ? new() // iOS Simulator doesn't support background sessions
-        : new(new NSUrlBackgroundSessionHttpMessageHandler());
-#else
-    HttpClient client = new();
-#endif
-```
-
-To make this work, you need to change your `AppDelegate` as follows:
-```csharp
-[Export("application:handleEventsForBackgroundURLSession:completionHandler:")]
-public virtual void HandleEventsForBackgroundUrl(UIApplication application, string sessionIdentifier, Action completionHandler)
-    => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
-```
-
-**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/core.html).**
-
-### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
-
-The MVVM navigation service offers a straightforward and robust method for navigating between pages and passing parameters.
-
-The navigation system utilizes `Shell` under the hood, allowing you to easily define the flyout menu, tabs, and root pages.
-
-We use a **fluent API** instead of strings to define navigations, supporting both `Relative` and `Absolute` navigation, including navigation guards to prompt the user before leaving a page.
-
-```csharp
-// Push the page registered with the DetailPageModel
-await _navigationService.GoToAsync(Navigation.Relative().Push<DetailPageModel>());
-// Navigate to the `SettingsPageModel` root page
-await _navigationService.GoToAsync(Navigation.Absolute().Root<SettingsPageModel>());
-```
-
-Passing parameters is simple and type-safe.
-
-```csharp
-// Pop the page and pass a parameter to the previous page model
-await _navigationService.GoToAsync(Navigation.Relative().Pop().WithIntent(new MyPopIntent()));
-// which should implement `IAppearingAware<MyPopIntent>`
-Task OnAppearingAsync(MyPopIntent intent) { ... }
-```
-
-You can also define navigation guards to prevent navigation from occurring.
-
-```csharp
-ValueTask<bool> CanLeaveAsync() => { ... ask the user };
-```
-
-There is an embedded **leak-detector** to help you identify memory leaks in your application.
-
-**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/navigation.html).**
-
-### Layouts [![Nalu.Maui.Layouts NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Layouts.svg)](https://www.nuget.org/packages/Nalu.Maui.Layouts/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Layouts)](https://www.nuget.org/packages/Nalu.Maui.Layouts/)
-
-Cross-platform layouts and utilities for MAUI applications simplify dealing with templates and `BindinginContext` in XAML.
-
-- Have you ever dreamed of having an `if` statement in XAML?
-  ```csharp
-    <nalu:ToggleTemplate Value="{Binding HasPermission}"
-                         WhenTrue="{StaticResource AdminFormTemplate}"
-                         WhenFalse="{StaticResource PermissionRequestTemplate}" />
-  ```
-- Do you want to scope the binding context of a content?
-  ```csharp
-    <nalu:ViewBox ContentBindingContext="{Binding SelectedAnimal}"
-                  IsVisible="{Binding IsSelected}">
-        <views:AnimalView x:DataType="models:Animal" />
-    </nalu:ViewBox>
-  ```
-- And what about rendering a `TemplateSelector` directly like we do on a `CollectionView`?
-  ```csharp
-    <nalu:TemplateBox ContentTemplateSelector="{StaticResource AnimalTemplateSelector}"
-                      ContentBindingContext="{Binding CurrentAnimal}" />
-  ```
-- Need to animate size changes or implement an accordion control?
-  `ExpanderViewBox` have you covered, even when you need it inside a `CollectionView`.
-  ![Expander demo](docs/assets/images/expander.gif)
-
-- What about a powerful **constraint-based** layout?
-  `Magnet` is here to help you with that, now in alpha preview, [see the presentation](https://docs.google.com/presentation/d/1VkKodflxRsIWdPN8ZgwiQKUBybEszTV3gXBW4cIiEqs/edit?usp=sharing).
-  ![Magnet](docs/assets/images/magnet.png)
-
-**Find out more at [Nalu Website](https://nalu-development.github.io/nalu/layouts.html).**
-
-### Controls [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
-
-The controls library provides a set of cross-platform controls to simplify your development.
-
-- A `InteractableCanvasView` which is a `SkiaSharp` `SKCanvasView` with touch-events support where you can choose to stop touch event propagation to avoid interaction with ancestors (like `ScrollView`)
-- A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel
-  See video here: https://github.com/user-attachments/assets/921dc279-f5ee-4da5-87d5-8b947df29a16
+We encourage you to explore the [full documentation](https://nalu-development.github.io/nalu/) for detailed information on how to integrate and utilize these features in your projects.

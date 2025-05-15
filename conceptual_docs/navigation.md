@@ -268,7 +268,7 @@ Sometimes you want to protect a page from being popped from the navigation stack
 You can do that by implementing the `ILeavingGuard` interface which defines a `ValueTask<bool> CanLeaveAsync()` method from which you can eventually display a prompt to ask the user if they want to leave the page.
 
 ```csharp
-public class ViewModel :  ILeavingGuard
+public class ViewModel : ILeavingGuard
 {
     public async ValueTask<bool> CanLeaveAsync()
     {
