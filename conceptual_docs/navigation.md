@@ -9,7 +9,7 @@ The navigation system awaits every navigation lifecycle event, so you can safely
 ```csharp
 Navigation.Relative()
     .Push<ContactsPageModel>()
-    .Push<ContactDetailPageModel>()
+    .Push<ContactDetailPageModel>();
 ```
 
 There's also a "navigation guard" feature that allows you to prevent the navigation to happen if a condition is not met.
@@ -17,11 +17,9 @@ You can leverage that to ask the user to confirm leaving the page.
 
 ```csharp
 // Starting from: RootPageModel > ContactsPageModel > ContactDetailPageModel
-Navigation.Absolute()
-    .Root<RootPageModel>()
-
-// This is gonna trigger the navigation guard on ContactDetailPageModel
-ValueTask<bool> CanLeaveAsync() => { ... ask the user };
+// Someone triggers => Navigation.Absolute().Root<RootPageModel>();
+// This is gonna invoke the navigation guard on ContactDetailPageModel
+ValueTask<bool> CanLeaveAsync() => { /* ... ask the user */ };
 ```
 
 ### Leak detection
@@ -36,7 +34,7 @@ Leak detection can be enabled in `MauiProgram.cs`:
 ```csharp
 .UseNaluNavigation<App>(nav => nav
     .AddPages()
-    .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
+    .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger);
 )
 ```
 
@@ -59,7 +57,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
-            .UseNaluNavigation<App>()
+            .UseNaluNavigation<App>();
 ```
 
 This method will scan the `<App>` assembly for pages and view models by naming convention `MainPage` => `MainPageModel`.
@@ -68,7 +66,7 @@ You can specify a custom naming convention by passing a function that returns th
 ```csharp
 builder
     .UseMauiApp<App>()
-    .UseNaluNavigation<App>(nav => nav.AddPages((pageType) => pageType.Name.Replace("Page", "ViewModel")))
+    .UseNaluNavigation<App>(nav => nav.AddPages((pageType) => pageType.Name.Replace("Page", "ViewModel")));
 ```
 
 **Important notes**:
@@ -91,7 +89,7 @@ Eventually you can specify the pages and view models manually:
 ```csharp
 builder
     .UseMauiApp<App>()
-    .UseNaluNavigation<App>(nav => nav.AddPage<MainPageModel, MainPage>())
+    .UseNaluNavigation<App>(nav => nav.AddPage<MainPageModel, MainPage>());
 ```
 
 To help with testability you can also register the page model as an interface:
@@ -99,7 +97,7 @@ To help with testability you can also register the page model as an interface:
 ```csharp
 builder
     .UseMauiApp<App>()
-    .UseNaluNavigation<App>(nav => nav.AddPage<IMainPageModel, MainPageModel, MainPage>())
+    .UseNaluNavigation<App>(nav => nav.AddPage<IMainPageModel, MainPageModel, MainPage>());
 ```
 
 Note: the automatic registration by naming convention automatically considers the page model as an interface.
@@ -124,7 +122,7 @@ builder
     .UseMauiApp<App>()
     .UseNaluNavigation<App>(nav => nav.AddPages()
         .WithMenuIcon(ImageSource.FromFile("menu.png"))
-        .WithBackIcon(ImageSource.FromFile("back.png")))
+        .WithBackIcon(ImageSource.FromFile("back.png")));
 ```
 
 #### Shell definition
