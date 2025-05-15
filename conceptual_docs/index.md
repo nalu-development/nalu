@@ -39,17 +39,6 @@ public virtual void HandleEventsForBackgroundUrl(UIApplication application, stri
 
 ---
 
-### Controls [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
-
-The controls library provides a set of cross-platform controls to simplify your development.
-
-- A `InteractableCanvasView` which is a `SkiaSharp` `SKCanvasView` with touch-events support where you can choose to stop touch event propagation to avoid interaction with ancestors (like `ScrollView`)
-- A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel!!
-
-**Find out more on the [Controls Wiki](controls.md)**.
-
----
-
 ### Navigation [![Nalu.Maui.Navigation NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Navigation.svg)](https://www.nuget.org/packages/Nalu.Maui.Navigation/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Navigation)](https://www.nuget.org/packages/Nalu.Maui.Navigation/)
 
 The MVVM navigation service offers a straightforward and robust method for navigating between pages and passing parameters.
@@ -110,3 +99,14 @@ Cross-platform layouts and utilities for MAUI applications simplify dealing with
   ```
 
 **Find out more on the [Layouts Wiki](layouts.md)**.
+
+---
+
+### Controls [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
+
+The controls library provides a set of cross-platform controls to simplify your development.
+
+- A `InteractableCanvasView` which is a `SkiaSharp` `SKCanvasView` with touch-events support where you can choose to stop touch event propagation to avoid interaction with ancestors (like `ScrollView`)
+- A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel!!
+
+**Find out more on the [Controls Wiki](controls.md)**.

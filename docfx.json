@@ -34,7 +34,6 @@
       "_enableSearch": true,
       "_appLogoPath": "Images/Banner.png"
     },
-    "css": ["assets/css/custom.css"],
     "template": ["default", "modern", "conceptual_docs"]
   }
 }

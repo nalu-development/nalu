@@ -11,7 +11,7 @@
 If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance through a donation:
 
 <a target="_blank" href="https://buymeacoffee.com/albyrock87">
-    <img src="conceptual_docs/assets/images/donate.png" height="40">
+    <img src="conceptual_docs/assets/images/donate.png" height="44">
 </a>
 
 ### Key Modules:
