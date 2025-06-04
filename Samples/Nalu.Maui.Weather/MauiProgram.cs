@@ -1,15 +1,14 @@
 using CommunityToolkit.Maui;
-using Microsoft.Extensions.Logging;
 using Nalu.Maui.Weather.Popups;
 using Nalu.Maui.Weather.Services;
 using Nalu.Maui.Weather.ViewModels;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
-namespace Nalu.Maui.Weather;
-
 #if DEBUG
-
+using Microsoft.Extensions.Logging;
 #endif
+
+namespace Nalu.Maui.Weather;
 
 #if !(IOS || ANDROID || WINDOWS || MACCATALYST)
 #pragma warning disable CA1416

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.RegularExpressions;
 using CoreFoundation;
 using Foundation;
@@ -244,6 +245,32 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
     }
 
+    private static string ToSafeUnixFileName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
+        // Normalize Unicode to decompose accents, etc.
+        var normalized = input.Normalize(NormalizationForm.FormD);
+
+        // Remove invalid characters (anything that's not safe for Unix file names)
+        // Safe characters: a-zA-Z0-9._-
+        var cleaned = InvalidUnixFileNameChars().Replace(normalized, "_");
+
+        // Trim underscores or dots from start and end
+        cleaned = cleaned.Trim('_', '.');
+
+        // Ensure it's not empty
+        if (string.IsNullOrEmpty(cleaned))
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
+        return cleaned;
+    }
+
     /// <inheritdoc />
     public override void DidFinishDownloading(NSUrlSession session, NSUrlSessionDownloadTask task, NSUrl location)
     {
@@ -265,6 +292,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             _pendingRequests[requestIdentifier] = handle;
         }
 
+        if (handle.ResponseCompletionSource.Task.IsCompleted)
+        {
+            Logger.LogDebug("Response task for {RequestIdentifier} already completed, ignoring", requestIdentifier);
+
+            return;
+        }
+
         if (_processingInBackgroundCompletionHandler is not null)
         {
             var added = _processingInBackgroundHandles.TryAdd(requestIdentifier, handle);
@@ -284,15 +318,18 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         // Because the file is temporary, you must either open the file for reading or move it to a permanent location in your app’s sandbox container directory before returning from this delegate method.
         // We should be good with a temporary file path considering we're going to read it right away.
         var locationPath = location.Path;
-        handle.ResponseContentFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".nsresponse");
+        handle.ResponseContentFile = Path.Combine(Path.GetTempPath(), ToSafeUnixFileName(requestIdentifier) + ".nsresponse");
 
         try
         {
-            File.Move(locationPath!, handle.ResponseContentFile, true);
+            if (!File.Exists(handle.ResponseContentFile))
+            {
+                File.Move(locationPath!, handle.ResponseContentFile, true);
+            }
         }
         catch (Exception ex)
         {
-            handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Temporary response file is gone", ex));
+            handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Temporary response file is not found on `location`", ex));
 
             return;
         }
@@ -569,4 +606,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     [GeneratedRegex("(.+?): (.+)")]
     private static partial Regex HeaderValueRegex();
+
+    [GeneratedRegex(@"[^a-zA-Z0-9_\.\-]+")]
+    private static partial Regex InvalidUnixFileNameChars();
 }
