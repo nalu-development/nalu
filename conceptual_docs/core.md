@@ -2,6 +2,29 @@
 
 The core library is intended to provide a set of common use utilities.
 
+### Soft keyboard handling
+
+An alternative soft keyboard management for iOS and Android mobile platforms in order to standardize the UX.
+
+This can be enabled via `builder.UseNaluSoftKeyboardManager(defaultAdjustMode: SoftKeyboardAdjustMode.Resize)`.
+
+You can then customize the keyboard behavior depending on where the text entry lives.
+
+```xml
+<ContentPage>
+    <Grid>
+        <VerticalStackLayout naluCore:SoftKeyboardManager.SoftKeyboardAdjustMode="Pan">
+            <Entry />
+```
+
+When the keyboard is about to be shown, the system will loop through ancestors and seek for the first specified keyboard adjust mode.
+If not found, it will fall back to what specified in `UseNaluSoftKeyboardManager`.
+
+`SoftKeyboardManager` also provides a `State` observable object which provides keyboard state information.
+This can be useful if you want to bind the visibility of an element to the visibility of the keyboard (very useful when you want to hide some areas in `Resize` mode when the keyboard is visible.
+
+This is less flexible than the MAUI's iOS `KeyboardAutoManagerScroll` but it is more consistent and probably convenient thanks to the keyboard-state bindable properties.
+
 ### Background iOS HttpClient requests
 
 Have you ever noticed that when the user backgrounds the app on iOS, the app is suspended, and the network requests fails due to `The network connection was lost` exception?

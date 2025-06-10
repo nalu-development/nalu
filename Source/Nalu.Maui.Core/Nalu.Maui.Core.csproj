@@ -50,7 +50,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Platforms\Android\" />
     <Folder Include="Platforms\MacCatalyst\" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' != '' and $(TargetFramework.EndsWith('-android')) ">
+    <AndroidResource Include="Platforms\Android\Resources\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Platforms\Android\SoftKeyboardManager.Android.cs">
+      <ExcludeFromCurrentConfiguration>true</ExcludeFromCurrentConfiguration>
+    </Compile>
   </ItemGroup>
 </Project>
