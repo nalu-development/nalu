@@ -30,4 +30,7 @@
     <ShellContent nalu:Navigation.PageType="pages:MagnetDemoPage"
                   Title="Magnet Demo"
                   Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88c;', Color='Black', Size=24}" />
+    <ShellContent nalu:Navigation.PageType="pages:SoftKeyboardManagerPage"
+                  Title="Soft Keyboard Manager"
+                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe312;', Color='Black', Size=24}" />
 </nalu:NaluShell>
