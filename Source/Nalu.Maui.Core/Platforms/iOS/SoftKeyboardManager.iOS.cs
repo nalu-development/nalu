@@ -400,6 +400,7 @@ public static partial class SoftKeyboardManager
             }
 
             _adjustMode = DefaultAdjustMode;
+            State.AdjustMode = _adjustMode;
         }
     }
 
