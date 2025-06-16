@@ -14,6 +14,29 @@ If `Nalu.Maui` is valuable to your work, consider supporting its continued devel
 
 The core library is intended to provide a set of common use utilities.
 
+#### Do you have issues with the soft keyboard?
+
+Nalu offers an alternative soft-keyboard manager that allows consistent behavior across Android and iOS, enabling the Resize/Pan mode on iOS too in a very convenient way.
+
+```xml
+<ContentPage>
+    <Grid>
+        <!-- Every input field inside this layout will use the Pan screen adjust mode -->
+        <VerticalStackLayout naluCore:SoftKeyboardManager.SoftKeyboardAdjustMode="Pan">
+            <Entry />
+```
+
+You can also easily bind the visibility of an element to the visibility of the keyboard using the `SoftKeyboardManager.State` observable object.
+
+```xml
+<VerticalStackLayout.IsVisible>
+    <!-- example to show an area only when the keyboard is hidden -->
+    <Binding Path="IsHidden" Source="{x:Static nalu:SoftKeyboardManager.State}" x:DataType="nalu:SoftKeyboardState" />
+</VerticalStackLayout.IsVisible>
+```
+
+#### Have you noticed failed network requests when the app is backgrounded on iOS?
+
 Have you ever noticed that when the user backgrounds the app on iOS, the app is suspended, and the network requests will fail due to `The network connection was lost`?
 
 This is really annoying: it forces us to implement complex retry logic, especially considering that the request may have already hit the server.
@@ -26,13 +49,6 @@ To solve this issue, we provide a `NSUrlBackgroundSessionHttpMessageHandler` to 
 #else
     var client = new HttpClient();
 #endif
-```
-
-To make this work, you need to change your `AppDelegate` as follows:
-```csharp
-[Export("application:handleEventsForBackgroundURLSession:completionHandler:")]
-public virtual void HandleEventsForBackgroundUrl(UIApplication application, string sessionIdentifier, Action completionHandler)
-    => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
 ```
 
 **Check out the [Core Wiki](core.md) for more information**.
