@@ -43,10 +43,12 @@ public static partial class SoftKeyboardManager
     private static CGRect _keyboardFrame;
     private static double _screenWidth;
     private static bool _adjusted;
+    private static bool _orientationJustChanged;
+    private static bool _startupOrientationTriggered;
 
     private static bool MauiKeyboardScrollManagerHandlingFlag {
         get => _isKeyboardAutoScrollHandlingField?.GetValue(null) as bool? ?? false;
-        set => _ = value; // _isKeyboardAutoScrollHandlingField?.SetValue(null, value);
+        set => _isKeyboardAutoScrollHandlingField?.SetValue(null, value);
     }
 
     internal static void Configure(MauiAppBuilder builder)
@@ -89,6 +91,14 @@ public static partial class SoftKeyboardManager
         };
         
         _screenWidth = width;
+
+        if (!_startupOrientationTriggered)
+        {
+            _startupOrientationTriggered = true;
+            return;
+        }
+
+        _orientationJustChanged = true;
     }
 
     private static void DidUITextViewEndEditing(NSNotification notification)
@@ -137,6 +147,12 @@ public static partial class SoftKeyboardManager
 
     private static void AdjustOrReset(NSDictionary userInfo, bool hiding = false)
     {
+        if (_orientationJustChanged)
+        {
+            _orientationJustChanged = false;
+            return;
+        }
+
         userInfo.SetAnimationDuration();
 
         var startFrameSize = userInfo.GetValueOrDefault("UIKeyboardFrameBeginUserInfoKey");
@@ -165,7 +181,7 @@ public static partial class SoftKeyboardManager
             var newEndFrameSizeRect = CGRect.Intersect(endFrameSizeRect, window.Frame);
 
             // When rotating the device from landscape left to landscape right, we get a non-final notification which we should skip
-            if (endFrameSizeRect.Height != 0 && newEndFrameSizeRect.Height == 0)
+            if (!hiding && endFrameSizeRect.Height != 0 && newEndFrameSizeRect.Height == 0)
             {
                 return;
             }

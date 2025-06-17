@@ -39,7 +39,13 @@ public static partial class SoftKeyboardManager
 
                     _unsubscribe = () =>
                     {
-                        treeObserver.RemoveOnGlobalFocusChangeListener(softKeyboardAdjustModeFocusListener);
+                        var currentRootView = window.DecorView.RootView;
+                        var currentTreeObserver = currentRootView?.ViewTreeObserver;
+                        if (currentTreeObserver?.IsAlive == true)
+                        {
+                            currentTreeObserver.RemoveOnGlobalFocusChangeListener(softKeyboardAdjustModeFocusListener);
+                        }
+
                         ViewCompat.SetOnApplyWindowInsetsListener(rootView, null);
                     };
                 }
