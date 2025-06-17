@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using CoreAnimation;
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.LifecycleEvents;
@@ -28,6 +29,7 @@ public static partial class SoftKeyboardManager
     private static NSObject? _textFieldEndToken;
     private static NSObject? _textViewToken;
     private static NSObject? _textViewEndToken;
+    private static NSObject? _orientationChangeToken;
     private static NSObject? _didChangeFrameToken;
     private static IDisposable? _textChanged;
     private static UIView? _textView;
@@ -39,7 +41,8 @@ public static partial class SoftKeyboardManager
     private static SoftKeyboardAdjustMode _adjustMode = SoftKeyboardAdjustMode.Resize;
     private static double _animationDuration = 0.25;
     private static CGRect _keyboardFrame;
-    private static bool _willHide;
+    private static double _screenWidth;
+    private static bool _adjusted;
 
     private static bool MauiKeyboardScrollManagerHandlingFlag {
         get => _isKeyboardAutoScrollHandlingField?.GetValue(null) as bool? ?? false;
@@ -70,6 +73,22 @@ public static partial class SoftKeyboardManager
         _willShowToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.WillShowNotification, WillKeyboardShow);
         _willHideToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.WillHideNotification, WillHideKeyboard);
         _didChangeFrameToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.DidChangeFrameNotification, DidChangeFrame);
+        _orientationChangeToken = NSNotificationCenter.DefaultCenter.AddObserver(UIDevice.OrientationDidChangeNotification, OrientationChanged);
+    }
+
+    private static void OrientationChanged(NSNotification obj)
+    {
+        var screenSize = UIScreen.MainScreen.Bounds.Size;
+        var orientation = UIDevice.CurrentDevice.Orientation;
+
+        var width = orientation switch
+        {
+            UIDeviceOrientation.LandscapeLeft or UIDeviceOrientation.LandscapeRight => Math.Max(screenSize.Height, screenSize.Width),
+            UIDeviceOrientation.Portrait or UIDeviceOrientation.PortraitUpsideDown => Math.Min(screenSize.Height, screenSize.Width),
+            _ => screenSize.Width
+        };
+        
+        _screenWidth = width;
     }
 
     private static void DidUITextViewEndEditing(NSNotification notification)
@@ -79,10 +98,25 @@ public static partial class SoftKeyboardManager
             _textChanged.Dispose();
             _textChanged = null;
         }
+    }
 
-        if (_willHide)
+    private static void WillKeyboardShow(NSNotification notification)
+    {
+        var userInfo = notification.UserInfo;
+
+        if (userInfo is not null)
         {
-            Reset();
+            AdjustOrReset(userInfo);
+        }
+    }
+
+    private static void WillHideKeyboard(NSNotification notification)
+    {
+        var userInfo = notification.UserInfo;
+
+        if (userInfo is not null)
+        {
+            AdjustOrReset(userInfo, true);
         }
     }
 
@@ -92,17 +126,91 @@ public static partial class SoftKeyboardManager
         {
             MauiKeyboardScrollManagerHandlingFlag = false;
         }
+
+        if (!_adjusted && notification.UserInfo is { } userInfo)
+        {
+            AdjustOrReset(userInfo);
+        }
+        
+        _adjusted = false;
     }
 
-    private static void WillHideKeyboard(NSNotification notification)
+    private static void AdjustOrReset(NSDictionary userInfo, bool hiding = false)
     {
-        var userInfo = notification.UserInfo;
-        userInfo?.SetAnimationDuration();
-        _willHide = true;
+        userInfo.SetAnimationDuration();
+
+        var startFrameSize = userInfo.GetValueOrDefault("UIKeyboardFrameBeginUserInfoKey");
+        var endFrameSize = userInfo.GetValueOrDefault("UIKeyboardFrameEndUserInfoKey");
+
+        // We need keyboard frames to be able to adjust the view.
+        if (DescriptionToCGRect(startFrameSize?.Description) is not { } startFrameSizeRect ||
+            DescriptionToCGRect(endFrameSize?.Description) is not { } endFrameSizeRect)
+        {
+            // If the start frame size is null, we can't adjust, so we just return
+            return;
+        }
+        
+        // If the keyboard frame is not the full width of the screen,
+        // it means the device is being rotated, so we can't trust this keyboard notification,
+        // so skip and wait for the next one.
+        if (endFrameSizeRect.Width != _screenWidth)
+        {
+            return;
+        }
+
+        // To properly evaluate the keyboard height, we need to intersect the keyboard frame with the window frame.
+        if (_textView?.Window is { } window)
+        {
+            var newStartFrameSizeRect = CGRect.Intersect(startFrameSizeRect, window.Frame);
+            var newEndFrameSizeRect = CGRect.Intersect(endFrameSizeRect, window.Frame);
+
+            // When rotating the device from landscape left to landscape right, we get a non-final notification which we should skip
+            if (endFrameSizeRect.Height != 0 && newEndFrameSizeRect.Height == 0)
+            {
+                return;
+            }
+
+            startFrameSizeRect = newStartFrameSizeRect;
+            endFrameSizeRect = newEndFrameSizeRect;
+        }
+
+        // Sometimes `WillHideKeyboard` is called even when the keyboard will not hide, but simply change its frame.
+        // The only way to determine if the keyboard is actually hiding is to check if the start and end frames are the same size.
+        var willHide = hiding &&
+                startFrameSizeRect.Height == endFrameSizeRect.Height &&
+                startFrameSizeRect.Width == endFrameSizeRect.Width;
+
+        if (willHide && !hiding)
+        {
+            // Sometimes `WillHideKeyboard` is called even when the keyboard will change to a different frame
+            // so if the frame change is not matching the hiding behavior, we skip this notification.
+            return;
+        }
+
+        // If the keyboard height is very small (quick type bar) or if we are hiding the keyboard for real
+        if (endFrameSizeRect.Height <= 80 || willHide)
+        {
+            Reset();
+            _adjusted = true;
+
+            return;
+        }
+
+        _keyboardFrame = endFrameSizeRect;
+        State.Height = _keyboardFrame.Height;
+        State.IsVisible = true;
+
+        Adjust();
+        _adjusted = true;
     }
 
     private static void Reset()
     {
+        if (!State.IsVisible)
+        {
+            return;
+        }
+
         State.IsVisible = false;
 
         if (_containerView != null &&
@@ -122,7 +230,7 @@ public static partial class SoftKeyboardManager
         _containerView = null;
         _rootView = null;
         _textView = null;
-        _adjustMode = SoftKeyboardAdjustMode.Resize;
+        _adjustMode = DefaultAdjustMode;
     }
 
     private static void RestoreRootView()
@@ -156,34 +264,6 @@ public static partial class SoftKeyboardManager
             _resizeDelta = null;
             _containerViewWidth = null;
         }
-    }
-
-    private static void WillKeyboardShow(NSNotification notification)
-    {
-        _willHide = false;
-        State.IsVisible = true;
-
-        var userInfo = notification.UserInfo;
-
-        if (userInfo is not null)
-        {
-            var frameSize = userInfo.GetValueOrDefault("UIKeyboardFrameEndUserInfoKey");
-            var frameSizeRect = DescriptionToCGRect(frameSize?.Description);
-            if (frameSizeRect is not null)
-            {
-                _keyboardFrame = frameSizeRect.Value;
-                State.Height = _keyboardFrame.Height;
-            }
-
-            userInfo.SetAnimationDuration();
-        }
-        else
-        {
-            _keyboardFrame = CGRect.Empty;
-            State.Height = 0;
-        }
-
-        Adjust();
     }
 
     private static void Adjust()
@@ -362,14 +442,10 @@ public static partial class SoftKeyboardManager
         {
             _textView = view;
 
-            if (_textView is UITextView)
+            if (_textView is UITextView textView)
             {
                 // Only Layer is observable for UITextView.Frame changes
-                _textChanged = _textView.Layer.AddObserver("bounds", NSKeyValueObservingOptions.New,
-                                                      _ =>
-                                                      {
-                                                          Adjust();
-                                                      });
+                _textChanged = UITextViewBoundsObserver.Attach(textView);
             }
             
             var parent = view;
@@ -543,5 +619,54 @@ public static partial class SoftKeyboardManager
             }
         }
         return null;
+    }
+
+    [Register("NaluUITextViewBoundsObserver")]
+    private class UITextViewBoundsObserver : NSObject
+    {
+        private static readonly NSString _boundsKey = new("bounds");
+
+        private readonly WeakReference<CALayer> _layerReference;
+        private bool _disposed;
+
+        public static UITextViewBoundsObserver Attach(UITextView textView)
+        {
+            var layer = textView.Layer;
+            _ = layer ?? throw new ArgumentNullException(nameof(layer));
+
+            var observer = new UITextViewBoundsObserver(layer);
+            layer.AddObserver(observer, _boundsKey, NSKeyValueObservingOptions.New, observer.Handle);
+            return observer;
+        }
+
+        private UITextViewBoundsObserver(CALayer layer)
+        {
+            _layerReference = new WeakReference<CALayer>(layer);
+            IsDirectBinding = false;
+        }
+
+        [Microsoft.Maui.Controls.Internals.Preserve(Conditional = true)]
+        public override void ObserveValue(NSString keyPath, NSObject ofObject, NSDictionary change, IntPtr context)
+        {
+            if (!_disposed && keyPath == _boundsKey && context == Handle && _layerReference.TryGetTarget(out _))
+            {
+                Adjust();
+            }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+
+                if (_layerReference.TryGetTarget(out var layer))
+                {
+                    layer?.RemoveObserver(this, _boundsKey);
+                }
+            }
+
+            base.Dispose(disposing);
+        }
     }
 }
