@@ -282,7 +282,7 @@ public static partial class SoftKeyboardManager
         }
     }
 
-    private static void Adjust()
+    internal static void Adjust()
     {
         if (_textView is null ||
             _keyboardFrame == CGRect.Empty ||
@@ -636,53 +636,53 @@ public static partial class SoftKeyboardManager
         }
         return null;
     }
+}
 
-    [Register("NaluUITextViewBoundsObserver")]
-    private class UITextViewBoundsObserver : NSObject
+[Register("NaluUITextViewBoundsObserver")]
+internal class UITextViewBoundsObserver : NSObject
+{
+    private static readonly NSString _boundsKey = new("bounds");
+
+    private readonly WeakReference<CALayer> _layerReference;
+    private bool _disposed;
+
+    public static UITextViewBoundsObserver Attach(UITextView textView)
     {
-        private static readonly NSString _boundsKey = new("bounds");
+        var layer = textView.Layer;
+        _ = layer ?? throw new ArgumentNullException(nameof(layer));
 
-        private readonly WeakReference<CALayer> _layerReference;
-        private bool _disposed;
+        var observer = new UITextViewBoundsObserver(layer);
+        layer.AddObserver(observer, _boundsKey, NSKeyValueObservingOptions.New, observer.Handle);
+        return observer;
+    }
 
-        public static UITextViewBoundsObserver Attach(UITextView textView)
+    private UITextViewBoundsObserver(CALayer layer)
+    {
+        _layerReference = new WeakReference<CALayer>(layer);
+        IsDirectBinding = false;
+    }
+
+    [Microsoft.Maui.Controls.Internals.Preserve(Conditional = true)]
+    public override void ObserveValue(NSString keyPath, NSObject ofObject, NSDictionary change, IntPtr context)
+    {
+        if (!_disposed && keyPath == _boundsKey && context == Handle && _layerReference.TryGetTarget(out _))
         {
-            var layer = textView.Layer;
-            _ = layer ?? throw new ArgumentNullException(nameof(layer));
-
-            var observer = new UITextViewBoundsObserver(layer);
-            layer.AddObserver(observer, _boundsKey, NSKeyValueObservingOptions.New, observer.Handle);
-            return observer;
+            SoftKeyboardManager.Adjust();
         }
+    }
 
-        private UITextViewBoundsObserver(CALayer layer)
+    protected override void Dispose(bool disposing)
+    {
+        if (!_disposed)
         {
-            _layerReference = new WeakReference<CALayer>(layer);
-            IsDirectBinding = false;
-        }
+            _disposed = true;
 
-        [Microsoft.Maui.Controls.Internals.Preserve(Conditional = true)]
-        public override void ObserveValue(NSString keyPath, NSObject ofObject, NSDictionary change, IntPtr context)
-        {
-            if (!_disposed && keyPath == _boundsKey && context == Handle && _layerReference.TryGetTarget(out _))
+            if (_layerReference.TryGetTarget(out var layer))
             {
-                Adjust();
+                layer?.RemoveObserver(this, _boundsKey);
             }
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                _disposed = true;
-
-                if (_layerReference.TryGetTarget(out var layer))
-                {
-                    layer?.RemoveObserver(this, _boundsKey);
-                }
-            }
-
-            base.Dispose(disposing);
-        }
+        base.Dispose(disposing);
     }
 }
