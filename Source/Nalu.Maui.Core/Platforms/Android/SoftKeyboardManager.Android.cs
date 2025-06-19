@@ -58,7 +58,7 @@ public static partial class SoftKeyboardManager
         private static async void ScrollToFocusedField(View focusedView)
 #pragma warning restore VSTHRD100
         {
-            await Task.Delay(10); // Allow time for the layout to adjust
+            await Task.Delay(50); // Allow time for the layout to adjust
 
             (int Y1, int Y2) cursorCoordinates = (0, focusedView.Height);
 
