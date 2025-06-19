@@ -1,4 +1,5 @@
 using Android.Views;
+using Android.Widget;
 using AndroidX.Core.View;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
@@ -58,7 +59,34 @@ public static partial class SoftKeyboardManager
 #pragma warning restore VSTHRD100
         {
             await Task.Delay(10); // Allow time for the layout to adjust
-            focusedView.RequestRectangleOnScreen(new Rect(0, 0, focusedView.Width, focusedView.Height), false);
+
+            (int Y1, int Y2) cursorCoordinates = (0, focusedView.Height);
+
+            if (focusedView is EditText editText)
+            {
+                cursorCoordinates = GetSelectionCoordinates(editText);
+            }
+            
+            var marginBottom = (int)focusedView.Context.ToPixels(20);
+            focusedView.RequestRectangleOnScreen(new Rect(0, cursorCoordinates.Y1, focusedView.Width, cursorCoordinates.Y2 + marginBottom), false);
+        }
+        
+        private static (int Y1, int Y2) GetSelectionCoordinates(EditText editText) {
+            var start = editText.SelectionStart;
+            var end = editText.SelectionEnd;
+            var layout = editText.Layout;
+            if (layout == null)
+            {
+                return (0, editText.Height);
+            }
+
+            var startLine = layout.GetLineForOffset(start);
+            var y1 = layout.GetLineBaseline(startLine) + (int) layout.Paint.Ascent();
+            
+            var endLine = layout.GetLineForOffset(end);
+            var y2 = layout.GetLineBaseline(endLine) + (int) layout.Paint.Descent();
+
+            return (y1, y2);
         }
 
         private static void SetAdjustMode(View textView)
@@ -93,7 +121,8 @@ public static partial class SoftKeyboardManager
         {
             // ReSharper disable once MergeAndPattern
             // ReSharper disable once ConvertTypeCheckPatternToNullCheck
-            var tag = textView.GetTag(Resource.Id.nalu_soft_keyboard_adjust_mode_tag_key);
+            var key = AppIds.GetId("nalu_soft_keyboard_adjust_mode_tag_key", textView);
+            var tag = textView.GetTag(key);
 
             if (tag is Java.Lang.Integer integer)
             {
