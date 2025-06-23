@@ -20,7 +20,7 @@ public static partial class SoftKeyboardManager
 {
     private static Window? _window;
     private static Action? _unsubscribe;
-    private static WeakReference<View>? _focusedView;
+    private static WeakReference<TextView>? _focusedView;
 
     internal static void Configure(MauiAppBuilder builder)
         => builder.ConfigureLifecycleEvents(events => events.AddAndroid(Configure));
@@ -57,7 +57,7 @@ public static partial class SoftKeyboardManager
         );
 
 #pragma warning disable VSTHRD100
-    private static async void ScrollToFocusedField(View focusedView)
+    private static async void ScrollToFocusedField(TextView focusedView)
 #pragma warning restore VSTHRD100
     {
         await Task.Delay(50); // Allow time for the layout to adjust
@@ -93,7 +93,7 @@ public static partial class SoftKeyboardManager
         return (y1, y2);
     }
 
-    private static void SetAdjustMode(View textView)
+    private static void SetAdjustMode(TextView textView)
     {
         // ReSharper disable once MergeAndPattern
         // ReSharper disable once ConvertTypeCheckPatternToNullCheck
@@ -166,7 +166,6 @@ public static partial class SoftKeyboardManager
 
             if (!wasVisible && isVisible && _focusedView?.TryGetTarget(out var focusedView) is true)
             {
-                SetAdjustMode(focusedView);
                 ScrollToFocusedField(focusedView);
             }
 
@@ -183,13 +182,22 @@ public static partial class SoftKeyboardManager
     {
         public void OnGlobalFocusChanged(View? oldFocus, View? newFocus)
         {
-            _focusedView = newFocus != null ? new WeakReference<View>(newFocus) : null;
-
-            if (State.IsVisible && newFocus is not null)
+            if (newFocus is TextView textView)
             {
-                SetAdjustMode(newFocus);
-                ScrollToFocusedField(newFocus);
+                _focusedView = new WeakReference<TextView>(textView);
+
+                SetAdjustMode(textView);
+
+                if (State.IsVisible)
+                {
+                    ScrollToFocusedField(textView);
+                }
             }
+            else
+            {
+                _focusedView = null;
+            }
+
         }
     }
 }
