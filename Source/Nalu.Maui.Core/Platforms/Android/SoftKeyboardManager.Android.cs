@@ -1,5 +1,6 @@
 using Android.Views;
 using Android.Widget;
+using Android.Util;
 using AndroidX.Core.View;
 using Java.Lang;
 using Microsoft.Maui.LifecycleEvents;
@@ -21,6 +22,16 @@ public static partial class SoftKeyboardManager
     private static Window? _window;
     private static Action? _unsubscribe;
     private static WeakReference<TextView>? _focusedView;
+
+    private static readonly bool _isDebugLoggingEnabled = Log.IsLoggable("SoftKeyboardManager", LogPriority.Debug);
+
+    private static void LogDebug(string message)
+    {
+        if (_isDebugLoggingEnabled)
+        {
+            Log.Debug("SoftKeyboardManager", message);
+        }
+    }
 
     internal static void Configure(MauiAppBuilder builder)
         => builder.ConfigureLifecycleEvents(events => events.AddAndroid(Configure));
@@ -100,6 +111,7 @@ public static partial class SoftKeyboardManager
         if (TryGetAdjustMode(textView, out var adjustMode))
         {
             SetWindowSoftInputMode(adjustMode);
+            LogDebug("Adjust mode set at field level: " + adjustMode);
 
             return;
         }
@@ -111,6 +123,7 @@ public static partial class SoftKeyboardManager
             if (parent is View parentView &&
                 TryGetAdjustMode(parentView, out var parentAdjustMode))
             {
+                LogDebug("Found adjust mode in parent: " + parentAdjustMode);
                 SetWindowSoftInputMode(parentAdjustMode);
 
                 return;
@@ -119,15 +132,18 @@ public static partial class SoftKeyboardManager
             parent = parent.Parent;
         }
 
+        LogDebug("No adjust mode found, using default: " + DefaultAdjustMode);
         SetWindowSoftInputMode(DefaultAdjustMode);
     }
 
-    private static bool TryGetAdjustMode(View textView, out SoftKeyboardAdjustMode adjustMode)
+    private static bool TryGetAdjustMode(View view, out SoftKeyboardAdjustMode adjustMode)
     {
         // ReSharper disable once MergeAndPattern
         // ReSharper disable once ConvertTypeCheckPatternToNullCheck
-        var key = AppIds.GetId("nalu_soft_keyboard_adjust_mode_tag_key", textView);
-        var tag = textView.GetTag(key);
+        var key = AppIds.GetId("nalu_soft_keyboard_adjust_mode_tag_key", view);
+
+        var tag = view.GetTag(key);
+        LogDebug("Trying to get adjust mode with key: " + key + ", got tag: " + tag);
 
         if (tag is Integer integer)
         {
@@ -186,15 +202,18 @@ public static partial class SoftKeyboardManager
             {
                 _focusedView = new WeakReference<TextView>(textView);
 
+                LogDebug("Focused view changed to: " + textView.GetType().Name);
                 SetAdjustMode(textView);
 
                 if (State.IsVisible)
                 {
+                    LogDebug("Soft keyboard is visible, scrolling to focused field.");
                     ScrollToFocusedField(textView);
                 }
             }
             else
             {
+                LogDebug("Focused view changed to null or non-TextView: " + (newFocus?.GetType().Name ?? "null"));
                 _focusedView = null;
             }
 

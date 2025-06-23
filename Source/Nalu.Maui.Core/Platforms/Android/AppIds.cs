@@ -14,6 +14,13 @@ internal static class AppIds
         var context = view.Context!;
         var id = context.Resources!.GetIdentifier(fieldName, "id", context.PackageName);
 
+        if (id == 0)
+        {
+            Android.Util.Log.Error("SoftKeyboardManager", "Failed to find values.xml identifier for field: " + fieldName);
+
+            return id;
+        }
+
         _idCache[fieldName] = id;
 
         return id;
