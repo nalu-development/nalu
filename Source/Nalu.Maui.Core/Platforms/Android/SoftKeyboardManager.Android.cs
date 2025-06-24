@@ -161,14 +161,22 @@ public static partial class SoftKeyboardManager
     {
         State.AdjustMode = adjustMode;
 
-        _window?.SetSoftInputMode(
-            adjustMode switch
-            {
-                SoftKeyboardAdjustMode.Pan => SoftInput.AdjustPan,
-                SoftKeyboardAdjustMode.Resize => SoftInput.AdjustResize,
-                _ => SoftInput.AdjustNothing
-            }
-        );
+        if (_window is not null)
+        {
+            // Get the current flags
+            var currentFlags = _window.Attributes?.SoftInputMode ?? SoftInput.AdjustUnspecified;
+            // Clear only the adjustment part
+            var newFlags = currentFlags & ~SoftInput.MaskAdjust;
+
+            _window.SetSoftInputMode(newFlags |
+                adjustMode switch
+                {
+                    SoftKeyboardAdjustMode.Pan => SoftInput.AdjustPan,
+                    SoftKeyboardAdjustMode.Resize => SoftInput.AdjustResize,
+                    _ => SoftInput.AdjustNothing
+                }
+            );
+        }
     }
 
     private class OnApplyWindowInsetsListener : Object, IOnApplyWindowInsetsListener
@@ -190,7 +198,7 @@ public static partial class SoftKeyboardManager
 
             State.IsVisible = isVisible;
 
-            return insets;
+            return ViewCompat.OnApplyWindowInsets(v, insets);
         }
     }
 
