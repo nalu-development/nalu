@@ -1,7 +1,6 @@
-// ReSharper disable once CheckNamespace
-
 using Nalu;
 
+// ReSharper disable once CheckNamespace
 namespace Microsoft.Maui;
 
 /// <summary>
@@ -24,6 +23,10 @@ public static class NaluMauiAppBuilderExtensions
 
         var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
         configure(configurator);
+        
+        #if IOS || ANDROID
+        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Shell, NaluShellRenderer>());
+        #endif
 
         return builder;
     }
