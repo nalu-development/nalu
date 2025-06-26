@@ -609,7 +609,7 @@ public static partial class SoftKeyboardManager
 
         while (tempController is not null)
         {
-            tempController = tempController.View?.FindPlatformResponder<T>();
+            tempController = tempController.FindPlatformResponder<T>();
 
             if (tempController is not null)
             {
@@ -620,13 +620,42 @@ public static partial class SoftKeyboardManager
         return bestController;
     }
     
+    internal static T? FindPlatformResponder<T>(this UIViewController controller) where T : UIViewController
+    {
+        var nextResponder = controller.View as UIResponder;
+
+        while (nextResponder is not null)
+        {
+            // We check for Window to avoid scenarios where an invalidate might propagate up the tree
+            // To a SuperView that's been disposed which will cause a crash when trying to access it
+            if (nextResponder is UIView { Window: null })
+            {
+                return null;
+            }
+
+            nextResponder = nextResponder.NextResponder;
+
+            if (nextResponder is T responder && !ReferenceEquals(responder, controller))
+            {
+                return responder;
+            }
+        }
+        return null;
+    }
+    
     private static T? FindPlatformResponder<T>(this UIView view) where T : UIResponder
     {
         var nextResponder = view as UIResponder;
 
-        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         while (nextResponder is not null)
         {
+            // We check for Window to avoid scenarios where an invalidate might propagate up the tree
+            // To a SuperView that's been disposed which will cause a crash when trying to access it
+            if (nextResponder is UIView { Window: null })
+            {
+                return null;
+            }
+
             nextResponder = nextResponder.NextResponder;
 
             if (nextResponder is T responder)
@@ -634,6 +663,7 @@ public static partial class SoftKeyboardManager
                 return responder;
             }
         }
+
         return null;
     }
 }
