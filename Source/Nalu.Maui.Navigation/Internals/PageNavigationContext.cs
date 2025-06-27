@@ -1,8 +1,15 @@
 namespace Nalu;
 
-internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDisposable
+internal sealed class PageNavigationContext : IDisposable
 {
-    public IServiceScope ServiceScope => serviceScope;
+    private IServiceScope? _serviceScope;
+
+    public PageNavigationContext(IServiceScope serviceScope)
+    {
+        _serviceScope = serviceScope;
+    }
+
+    public IServiceScope ServiceScope => _serviceScope ?? throw new ObjectDisposedException(nameof(PageNavigationContext));
     public bool Entered { get; set; }
     public bool Appeared { get; set; }
 
@@ -37,5 +44,12 @@ internal sealed class PageNavigationContext(IServiceScope serviceScope) : IDispo
         page.ClearValue(_navigationContextProperty);
     }
 
-    public void Dispose() => serviceScope.Dispose();
+    public void Dispose()
+    {
+        if (_serviceScope is not null)
+        {
+            _serviceScope.Dispose();
+            _serviceScope = null;
+        }
+    }
 }
