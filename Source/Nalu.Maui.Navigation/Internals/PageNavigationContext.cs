@@ -41,7 +41,7 @@ internal sealed class PageNavigationContext : IDisposable
     {
         var context = Get(page);
         context.Dispose();
-        page.ClearValue(_navigationContextProperty);
+        Set(page, null);
     }
 
     public void Dispose()
