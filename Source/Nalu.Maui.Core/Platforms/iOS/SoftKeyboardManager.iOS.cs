@@ -147,6 +147,14 @@ public static partial class SoftKeyboardManager
 
     private static void AdjustOrReset(NSDictionary userInfo, bool hiding = false)
     {
+        var isLocalKeyboard = ((NSNumber?)userInfo.GetValueOrDefault("UIKeyboardIsLocalUserInfoKey"))?.Int32Value;
+
+        if (isLocalKeyboard == 0)
+        {
+            // If the keyboard is not local, we don't have to react to the keyboard event.
+            return;
+        }
+
         if (_orientationJustChanged)
         {
             _orientationJustChanged = false;
