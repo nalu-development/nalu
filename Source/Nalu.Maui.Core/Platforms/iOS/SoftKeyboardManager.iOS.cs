@@ -42,6 +42,7 @@ public static partial class SoftKeyboardManager
     private static double _animationDuration = 0.25;
     private static CGRect _keyboardFrame;
     private static double _screenWidth;
+    private static bool _adjusted;
     private static bool _orientationJustChanged;
     private static bool _startupOrientationTriggered;
 
@@ -141,10 +142,12 @@ public static partial class SoftKeyboardManager
             MauiKeyboardScrollManagerHandlingFlag = false;
         }
 
-        if (notification.UserInfo is { } userInfo)
+        if (!_adjusted && notification.UserInfo is { } userInfo)
         {
             AdjustOrReset(userInfo);
         }
+
+        _adjusted = false;
     }
 
     private static UIWindow? GetApplicationWindow()
@@ -221,6 +224,7 @@ public static partial class SoftKeyboardManager
         if (endFrameSizeRect.Height <= 80 || willHide)
         {
             Reset();
+            _adjusted = true;
 
             return;
         }
@@ -230,6 +234,7 @@ public static partial class SoftKeyboardManager
         State.IsVisible = true;
 
         Adjust();
+        _adjusted = true;
     }
 
     private static void Reset()
