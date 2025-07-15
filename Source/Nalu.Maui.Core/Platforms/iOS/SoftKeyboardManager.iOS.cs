@@ -79,40 +79,8 @@ public static partial class SoftKeyboardManager
         _orientationChangeToken = NSNotificationCenter.DefaultCenter.AddObserver(UIDevice.OrientationDidChangeNotification, OrientationChanged);
     }
 
-    private static void DumpNotification(NSNotification notification)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine($"KeyboardNotification: {notification.Name}");
-
-        if (notification.UserInfo is { } userInfo)
-        {
-            foreach (var (key, value) in userInfo)
-            {
-                if (value is null)
-                {
-                    builder.AppendLine($"  {key}: null");
-                }
-                else if (value is NSString strValue)
-                {
-                    builder.AppendLine($"  {key}: {strValue}");
-                }
-                else if (value is NSNumber numValue)
-                {
-                    builder.AppendLine($"  {key}: {numValue}");
-                }
-                else
-                {
-                    builder.AppendLine($"  {key}: {value.GetType().Name} - {value}");
-                }
-            }
-        }
-
-        Console.WriteLine(builder.ToString());
-    }
-
     private static void OrientationChanged(NSNotification obj)
     {
-        DumpNotification(obj);
         var screenSize = UIScreen.MainScreen.Bounds.Size;
         var orientation = UIDevice.CurrentDevice.Orientation;
 
@@ -140,7 +108,6 @@ public static partial class SoftKeyboardManager
 
     private static void DidUITextViewEndEditing(NSNotification notification)
     {
-        DumpNotification(notification);
         if (_textChanged is not null)
         {
             _textChanged.Dispose();
@@ -150,7 +117,6 @@ public static partial class SoftKeyboardManager
 
     private static void WillKeyboardShow(NSNotification notification)
     {
-        DumpNotification(notification);
         var userInfo = notification.UserInfo;
 
         if (userInfo is not null)
@@ -161,7 +127,6 @@ public static partial class SoftKeyboardManager
 
     private static void WillHideKeyboard(NSNotification notification)
     {
-        DumpNotification(notification);
         var userInfo = notification.UserInfo;
 
         if (userInfo is not null)
@@ -172,7 +137,6 @@ public static partial class SoftKeyboardManager
 
     private static void DidChangeFrame(NSNotification notification)
     {
-        DumpNotification(notification);
         if (_textView is null)
         {
             MauiKeyboardScrollManagerHandlingFlag = false;
@@ -543,7 +507,6 @@ public static partial class SoftKeyboardManager
 
     private static void DidUITextBeginEditing(NSNotification notification)
     {
-        DumpNotification(notification);
         if (notification.Object is UIView view)
         {
             _textView = view;
