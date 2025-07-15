@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text;
-using CoreAnimation;
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.LifecycleEvents;
@@ -31,7 +30,7 @@ public static partial class SoftKeyboardManager
     private static NSObject? _textViewEndToken;
     private static NSObject? _orientationChangeToken;
     private static NSObject? _didChangeFrameToken;
-    private static IDisposable? _textChanged;
+    private static nfloat _textViewHeight;
     private static UIView? _textView;
     private static UIView? _rootView;
     private static UIView? _containerView;
@@ -108,11 +107,7 @@ public static partial class SoftKeyboardManager
 
     private static void DidUITextViewEndEditing(NSNotification notification)
     {
-        if (_textChanged is not null)
-        {
-            _textChanged.Dispose();
-            _textChanged = null;
-        }
+
     }
 
     private static void WillKeyboardShow(NSNotification notification)
@@ -308,7 +303,7 @@ public static partial class SoftKeyboardManager
 
     internal static void Adjust()
     {
-        if (_textView is null ||
+        if (_textView?.Window is null ||
             _keyboardFrame == CGRect.Empty ||
             _containerView is not { Window: { } window } ||
             _rootView is null)
@@ -455,8 +450,13 @@ public static partial class SoftKeyboardManager
 
         void ScrollToField()
         {
+            if (_textView?.Window is null)
+            {
+                return;
+            }
+
             // Ensure that - if the text view is *inside* a UIScrollView - the cursor is fully visible
-            var parentScrollView = FindParentVerticalScroll(_textView!.FindPlatformResponder<UIScrollView>());
+            var parentScrollView = FindParentVerticalScroll(_textView.FindPlatformResponder<UIScrollView>());
 
             if (parentScrollView is not null)
             {
@@ -467,7 +467,7 @@ public static partial class SoftKeyboardManager
                 if (cursorBottom > _keyboardFrame.Y)
                 {
                     cursorPosition = FindLocalCursorPosition() ?? CGRect.Empty;
-                    var cursorRect = _textView!.ConvertRectToView(cursorPosition, parentScrollView);
+                    var cursorRect = _textView.ConvertRectToView(cursorPosition, parentScrollView);
                     cursorRect = new CGRect(cursorRect.X, cursorRect.Y, cursorRect.Width, cursorRect.Height + _textViewDistanceFromBottom);
                     MauiKeyboardScrollManagerHandlingFlag = false;
                     parentScrollView.ScrollRectToVisible(cursorRect, true);
@@ -510,12 +510,7 @@ public static partial class SoftKeyboardManager
         if (notification.Object is UIView view)
         {
             _textView = view;
-
-            if (_textView is UITextView textView)
-            {
-                // Only Layer is observable for UITextView.Frame changes
-                _textChanged = UITextViewBoundsObserver.Attach(textView);
-            }
+            _textViewHeight = view.Frame.Height;
 
             var parent = view;
             var containerView = view.GetContainerPlatformView();
@@ -729,55 +724,5 @@ public static partial class SoftKeyboardManager
         }
 
         return null;
-    }
-}
-
-[Register("NaluUITextViewBoundsObserver")]
-internal class UITextViewBoundsObserver : NSObject
-{
-    private static readonly NSString _boundsKey = new("bounds");
-
-    private readonly WeakReference<CALayer> _layerReference;
-    private bool _disposed;
-
-    private UITextViewBoundsObserver(CALayer layer)
-    {
-        _layerReference = new WeakReference<CALayer>(layer);
-        IsDirectBinding = false;
-    }
-
-    public static UITextViewBoundsObserver Attach(UITextView textView)
-    {
-        var layer = textView.Layer;
-        _ = layer ?? throw new ArgumentNullException(nameof(layer));
-
-        var observer = new UITextViewBoundsObserver(layer);
-        layer.AddObserver(observer, _boundsKey, NSKeyValueObservingOptions.New, observer.Handle);
-
-        return observer;
-    }
-
-    [Microsoft.Maui.Controls.Internals.Preserve(Conditional = true)]
-    public override void ObserveValue(NSString keyPath, NSObject ofObject, NSDictionary change, IntPtr context)
-    {
-        if (!_disposed && keyPath == _boundsKey && context == Handle && _layerReference.TryGetTarget(out _))
-        {
-            SoftKeyboardManager.Adjust();
-        }
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (!_disposed)
-        {
-            _disposed = true;
-
-            if (_layerReference.TryGetTarget(out var layer))
-            {
-                layer?.RemoveObserver(this, _boundsKey);
-            }
-        }
-
-        base.Dispose(disposing);
     }
 }
