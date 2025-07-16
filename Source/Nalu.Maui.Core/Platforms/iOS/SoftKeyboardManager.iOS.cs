@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using CoreFoundation;
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.LifecycleEvents;
@@ -30,6 +31,8 @@ public static partial class SoftKeyboardManager
     private static NSObject? _textViewEndToken;
     private static NSObject? _orientationChangeToken;
     private static NSObject? _didChangeFrameToken;
+    private static DispatchSource.Timer? _textViewResizedTimer;
+    private static bool _textViewResizedTimerRunning;
     private static nfloat _textViewHeight;
     private static UIView? _textView;
     private static UIView? _rootView;
@@ -76,6 +79,18 @@ public static partial class SoftKeyboardManager
         _willHideToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.WillHideNotification, WillHideKeyboard);
         _didChangeFrameToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.DidChangeFrameNotification, DidChangeFrame);
         _orientationChangeToken = NSNotificationCenter.DefaultCenter.AddObserver(UIDevice.OrientationDidChangeNotification, OrientationChanged);
+        _textViewResizedTimer = new DispatchSource.Timer(DispatchQueue.MainQueue);
+        _textViewResizedTimer.SetTimer(DispatchTime.Now, 300_000, 0);
+        _textViewResizedTimer.SetEventHandler(CheckTextViewResized);
+    }
+
+    private static void CheckTextViewResized()
+    {
+        if (_textView is not null && _textViewHeight != _textView.Frame.Height)
+        {
+            _textViewHeight = _textView.Frame.Height;
+            Adjust();
+        }
     }
 
     private static void OrientationChanged(NSNotification obj)
@@ -240,6 +255,12 @@ public static partial class SoftKeyboardManager
         }
 
         State.IsVisible = false;
+        
+        if (_textViewResizedTimerRunning)
+        {
+            _textViewResizedTimer!.Suspend();
+            _textViewResizedTimerRunning = false;
+        }
 
         if (_containerView != null &&
             _rootView != null)
@@ -500,6 +521,12 @@ public static partial class SoftKeyboardManager
         {
             _textView = view;
             _textViewHeight = view.Frame.Height;
+
+            if (!_textViewResizedTimerRunning)
+            {
+                _textViewResizedTimer!.Resume();
+                _textViewResizedTimerRunning = true;
+            }
 
             var parent = view;
             var containerView = view.GetContainerPlatformView();
