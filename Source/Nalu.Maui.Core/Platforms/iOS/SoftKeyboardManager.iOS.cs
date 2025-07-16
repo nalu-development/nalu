@@ -34,7 +34,7 @@ public static partial class SoftKeyboardManager
     private static UIView? _textView;
     private static UIView? _rootView;
     private static UIView? _containerView;
-    private static double? _containerViewWidth;
+    private static CGRect? _originalContainerViewFrame;
     private static double? _resizeDelta;
     private static double? _panDelta;
     private static SoftKeyboardAdjustMode _adjustMode = SoftKeyboardAdjustMode.Resize;
@@ -259,7 +259,7 @@ public static partial class SoftKeyboardManager
 
         _panDelta = null;
         _resizeDelta = null;
-        _containerViewWidth = null;
+        _originalContainerViewFrame = null;
         _containerView = null;
         _rootView = null;
         _textView = null;
@@ -287,17 +287,10 @@ public static partial class SoftKeyboardManager
     {
         if (_resizeDelta.HasValue && _containerView is not null)
         {
-            var frame = _containerView.Frame;
-
-            _containerView.Frame = new CGRect(
-                frame.X,
-                frame.Y,
-                frame.Width,
-                frame.Height - (nfloat) _resizeDelta.Value
-            );
+            _containerView.Frame = _originalContainerViewFrame!.Value;
 
             _resizeDelta = null;
-            _containerViewWidth = null;
+            _originalContainerViewFrame = null;
         }
     }
 
@@ -350,16 +343,12 @@ public static partial class SoftKeyboardManager
         var containerViewFrame = _containerView.Frame;
 
         // ReSharper disable once CompareOfFloatsByEqualityOperator
-        var originalContainerViewFrame = _containerViewWidth == containerViewFrame.Width && _resizeDelta.HasValue
-            ? new CGRect(
-                containerViewFrame.X,
-                containerViewFrame.Y,
-                containerViewFrame.Width,
-                containerViewFrame.Height - (nfloat) _resizeDelta.Value
-            )
+        var storedOriginalContainerViewFrame = _originalContainerViewFrame ?? containerViewFrame;
+        var originalContainerViewFrame = storedOriginalContainerViewFrame.Width == containerViewFrame.Width && _resizeDelta.HasValue
+            ? storedOriginalContainerViewFrame
             : containerViewFrame;
 
-        _containerViewWidth = containerViewFrame.Width;
+        _originalContainerViewFrame = originalContainerViewFrame;
 
         var rootViewFrame = _rootView.Frame;
 
@@ -523,6 +512,7 @@ public static partial class SoftKeyboardManager
             }
 
             _containerView = containerView;
+            _originalContainerViewFrame ??= _containerView?.Frame;
             _rootView ??= _containerView?.Window.RootViewController?.View;
 
             // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
