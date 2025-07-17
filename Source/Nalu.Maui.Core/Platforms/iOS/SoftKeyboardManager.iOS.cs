@@ -93,6 +93,16 @@ public static partial class SoftKeyboardManager
         }
     }
 
+    private static void DumpInfo(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        Console.WriteLine($"KeyboardNotification: {message}");
+    }
+
     private static void DumpNotification(NSNotification notification)
     {
         var builder = new StringBuilder();
@@ -206,13 +216,14 @@ public static partial class SoftKeyboardManager
         if (isLocalKeyboard == 0)
         {
             // If the keyboard is not local, we don't have to react to the keyboard event.
+            DumpInfo("Keyboard is not local, skipping adjustment.");
             return;
         }
 
         if (_orientationJustChanged)
         {
             _orientationJustChanged = false;
-
+            DumpInfo("Orientation just changed, skipping adjustment.");
             return;
         }
 
@@ -226,6 +237,7 @@ public static partial class SoftKeyboardManager
             DescriptionToCGRect(endFrameSize?.Description) is not { } endFrameSizeRect)
         {
             // If the start frame size is null, we can't adjust, so we just return
+            DumpInfo("Keyboard frame size is null, skipping adjustment.");
             return;
         }
 
@@ -234,6 +246,7 @@ public static partial class SoftKeyboardManager
         // so skip and wait for the next one.
         if (endFrameSizeRect.Width != _screenWidth)
         {
+            DumpInfo("Keyboard frame width does not match screen width, skipping adjustment.");
             return;
         }
 
@@ -246,6 +259,7 @@ public static partial class SoftKeyboardManager
             // When rotating the device from landscape left to landscape right, we get a non-final notification which we should skip
             if (!hiding && endFrameSizeRect.Height != 0 && newEndFrameSizeRect.Height == 0)
             {
+                DumpInfo("Not hiding when keyboard frame height is zero, skipping adjustment.");
                 return;
             }
 
@@ -263,6 +277,7 @@ public static partial class SoftKeyboardManager
         {
             // Sometimes `WillHideKeyboard` is called even when the keyboard will change to a different frame
             // so if the frame change is not matching the hiding behavior, we skip this notification.
+            DumpInfo("Will hide keyboard, but the frames do not prove it, skipping adjustment.");
             return;
         }
 
@@ -270,6 +285,7 @@ public static partial class SoftKeyboardManager
         if (endFrameSizeRect.Height <= 80 || willHide)
         {
             Reset();
+            DumpInfo($"Keyboard height is small {endFrameSizeRect.Height} or hiding {willHide}, resetting adjustments.");
             _adjusted = true;
 
             return;
@@ -278,6 +294,8 @@ public static partial class SoftKeyboardManager
         _keyboardFrame = endFrameSizeRect;
         State.Height = _keyboardFrame.Height;
         State.IsVisible = true;
+        
+        DumpInfo($"Keyboard frame adjusted: {endFrameSizeRect} (visible: {State.IsVisible}, height: {State.Height})");
 
         Adjust();
         _adjusted = true;
@@ -287,6 +305,7 @@ public static partial class SoftKeyboardManager
     {
         if (!State.IsVisible)
         {
+            DumpInfo("Keyboard is not visible, no need to reset adjustments.");
             return;
         }
 
@@ -325,6 +344,8 @@ public static partial class SoftKeyboardManager
 
     private static void RestoreRootView()
     {
+        DumpInfo($"Restoring root view {_rootView} frame from pan {_panDelta}.");
+        
         if (_panDelta.HasValue && _rootView is not null)
         {
             var frame = _rootView.Frame;
@@ -342,6 +363,8 @@ public static partial class SoftKeyboardManager
 
     private static void RestoreContainerView()
     {
+        DumpInfo($"Restoring container view {_containerView} frame from resize {_resizeDelta}.");
+        
         if (_resizeDelta.HasValue && _containerView is not null)
         {
             _containerView.Frame = _originalContainerViewFrame!.Value;
