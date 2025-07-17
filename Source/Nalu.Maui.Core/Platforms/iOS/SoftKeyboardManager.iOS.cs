@@ -45,8 +45,8 @@ public static partial class SoftKeyboardManager
     private static CGRect _keyboardFrame;
     private static double _screenWidth;
     private static bool _adjusted;
-    private static bool _orientationJustChanged;
-    private static bool _startupOrientationTriggered;
+    private static bool _editing;
+    private static bool _shown;
 
     private static bool MauiKeyboardScrollManagerHandlingFlag
     {
@@ -84,6 +84,10 @@ public static partial class SoftKeyboardManager
         _textViewResizedTimer.SetEventHandler(CheckTextViewResized);
     }
 
+    static partial void DumpInfo(string message);
+
+    static partial void DumpNotification(NSNotification notification);
+
     private static void CheckTextViewResized()
     {
         if (_textView is not null && _textViewHeight != _textView.Frame.Height)
@@ -91,47 +95,6 @@ public static partial class SoftKeyboardManager
             _textViewHeight = _textView.Frame.Height;
             Adjust();
         }
-    }
-
-    private static void DumpInfo(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return;
-        }
-
-        Console.WriteLine($"KeyboardNotification: {message}");
-    }
-
-    private static void DumpNotification(NSNotification notification)
-    {
-        var builder = new StringBuilder();
-        builder.AppendLine($"KeyboardNotification: {notification.Name}");
-
-        if (notification.UserInfo is { } userInfo)
-        {
-            foreach (var (key, value) in userInfo)
-            {
-                if (value is null)
-                {
-                    builder.AppendLine($"  {key}: null");
-                }
-                else if (value is NSString strValue)
-                {
-                    builder.AppendLine($"  {key}: {strValue}");
-                }
-                else if (value is NSNumber numValue)
-                {
-                    builder.AppendLine($"  {key}: {numValue}");
-                }
-                else
-                {
-                    builder.AppendLine($"  {key}: {value.GetType().Name} - {value}");
-                }
-            }
-        }
-
-        Console.WriteLine(builder.ToString());
     }
 
     private static void OrientationChanged(NSNotification obj)
@@ -144,33 +107,77 @@ public static partial class SoftKeyboardManager
         {
             UIDeviceOrientation.LandscapeLeft or UIDeviceOrientation.LandscapeRight => Math.Max(screenSize.Height, screenSize.Width),
             UIDeviceOrientation.Portrait or UIDeviceOrientation.PortraitUpsideDown => Math.Min(screenSize.Height, screenSize.Width),
-            _ => screenSize.Width
+            _ => _screenWidth
         };
 
         _screenWidth = width;
+    }
 
-        if (!_startupOrientationTriggered)
+    private static void DidUITextBeginEditing(NSNotification notification)
+    {
+        DumpNotification(notification);
+        _editing = true;
+
+        if (notification.Object is UIView view)
         {
-            _startupOrientationTriggered = true;
+            _textView = view;
+            _textViewHeight = view.Frame.Height;
 
-            return;
-        }
+            if (!_textViewResizedTimerRunning)
+            {
+                _textViewResizedTimer!.Resume();
+                _textViewResizedTimerRunning = true;
+            }
 
-        if (State.IsVisible)
-        {
-            _orientationJustChanged = true;
+            var parent = view;
+            var containerView = view.GetContainerPlatformView();
+
+            // When switching to a new container view with the keyboard already visible and the adjust mode was Resize,
+            // we need to restore the previous container view's frame.
+            if (_adjustMode == SoftKeyboardAdjustMode.Resize && !ReferenceEquals(containerView, _containerView))
+            {
+                RestoreContainerView();
+            }
+
+            _containerView = containerView;
+            _originalContainerViewFrame ??= _containerView?.Frame;
+            _rootView ??= _containerView?.Window.RootViewController?.View;
+
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+            while (parent != null)
+            {
+                if (_adjustRuleViews.TryGetValue(parent, out var adjustModeBox))
+                {
+                    _adjustMode = adjustModeBox.Value;
+                    State.AdjustMode = _adjustMode;
+
+                    return;
+                }
+
+                parent = parent.Superview;
+            }
+
+            _adjustMode = DefaultAdjustMode;
+            State.AdjustMode = _adjustMode;
         }
     }
 
     private static void DidUITextViewEndEditing(NSNotification notification)
     {
         DumpNotification(notification);
-        _ = 5;
+        _editing = false;
+
+        if (!_shown)
+        {
+            ResetTextViewData();
+        }
     }
 
     private static void WillKeyboardShow(NSNotification notification)
     {
         DumpNotification(notification);
+        _shown = true;
+
         var userInfo = notification.UserInfo;
 
         if (userInfo is not null)
@@ -182,6 +189,8 @@ public static partial class SoftKeyboardManager
     private static void WillHideKeyboard(NSNotification notification)
     {
         DumpNotification(notification);
+        _shown = false;
+
         var userInfo = notification.UserInfo;
 
         if (userInfo is not null)
@@ -193,16 +202,14 @@ public static partial class SoftKeyboardManager
     private static void DidChangeFrame(NSNotification notification)
     {
         DumpNotification(notification);
-        if (_textView is null)
-        {
-            MauiKeyboardScrollManagerHandlingFlag = false;
-        }
 
         if (!_adjusted && notification.UserInfo is { } userInfo)
         {
+            DumpInfo("ChangeFrame AdjustOrReset");
             AdjustOrReset(userInfo);
         }
 
+        DumpInfo("ChangeFrame Skip");
         _adjusted = false;
     }
 
@@ -220,12 +227,6 @@ public static partial class SoftKeyboardManager
             return;
         }
 
-        if (_orientationJustChanged)
-        {
-            _orientationJustChanged = false;
-            DumpInfo("Orientation just changed, skipping adjustment.");
-            return;
-        }
 
         userInfo.SetAnimationDuration();
 
@@ -310,16 +311,29 @@ public static partial class SoftKeyboardManager
         }
 
         State.IsVisible = false;
-        
-        if (_textViewResizedTimerRunning)
-        {
-            _textViewResizedTimer!.Suspend();
-            _textViewResizedTimerRunning = false;
-        }
 
         if (_containerView != null &&
             _rootView != null)
         {
+            double offsetY = 0;
+            var parentScrollView = FindParentVerticalScroll(_textView?.FindPlatformResponder<UIScrollView>());
+            if (_adjustMode == SoftKeyboardAdjustMode.Resize &&
+                parentScrollView is not null)
+            {
+                offsetY = parentScrollView.ContentOffset.Y;
+            }
+
+            void RestoreScrollView()
+            {
+                parentScrollView?.SetContentOffset(
+                    new CGPoint(
+                        parentScrollView.ContentOffset.X,
+                        offsetY
+                    ),
+                    true
+                );
+            }
+
             UIView.Animate(
                 _animationDuration,
                 0,
@@ -328,13 +342,31 @@ public static partial class SoftKeyboardManager
                 {
                     RestoreRootView();
                     RestoreContainerView();
+                    RestoreScrollView();
                 },
-                () => { }
+                RestoreScrollView
             );
         }
 
         _panDelta = null;
         _resizeDelta = null;
+
+        if (!_editing)
+        {
+            ResetTextViewData();
+        }
+    }
+
+    private static void ResetTextViewData()
+    {
+        if (_textViewResizedTimerRunning)
+        {
+            _textViewResizedTimer!.Suspend();
+            _textViewResizedTimerRunning = false;
+        }
+
+        MauiKeyboardScrollManagerHandlingFlag = false;
+
         _originalContainerViewFrame = null;
         _containerView = null;
         _rootView = null;
@@ -573,53 +605,6 @@ public static partial class SoftKeyboardManager
     //         }
     //     }
     // }
-
-    private static void DidUITextBeginEditing(NSNotification notification)
-    {
-        DumpNotification(notification);
-        if (notification.Object is UIView view)
-        {
-            _textView = view;
-            _textViewHeight = view.Frame.Height;
-
-            if (!_textViewResizedTimerRunning)
-            {
-                _textViewResizedTimer!.Resume();
-                _textViewResizedTimerRunning = true;
-            }
-
-            var parent = view;
-            var containerView = view.GetContainerPlatformView();
-
-            // When switching to a new container view with the keyboard already visible and the adjust mode was Resize,
-            // we need to restore the previous container view's frame.
-            if (_adjustMode == SoftKeyboardAdjustMode.Resize && !ReferenceEquals(containerView, _containerView))
-            {
-                RestoreContainerView();
-            }
-
-            _containerView = containerView;
-            _originalContainerViewFrame ??= _containerView?.Frame;
-            _rootView ??= _containerView?.Window.RootViewController?.View;
-
-            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-            while (parent != null)
-            {
-                if (_adjustRuleViews.TryGetValue(parent, out var adjustModeBox))
-                {
-                    _adjustMode = adjustModeBox.Value;
-                    State.AdjustMode = _adjustMode;
-
-                    return;
-                }
-
-                parent = parent.Superview;
-            }
-
-            _adjustMode = DefaultAdjustMode;
-            State.AdjustMode = _adjustMode;
-        }
-    }
 
     // Used to get the numeric values from the UserInfo dictionary's NSObject value to CGRect.
     // Doing manually since CGRectFromString is not yet bound
