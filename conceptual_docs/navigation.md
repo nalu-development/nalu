@@ -383,6 +383,8 @@ public class PersonDetailsPageModel(INavigationServiceProvider navigationService
 }
 ```
 
+On top of that, `INavigationServiceProvider` provides a `ContextPage` property that can be used to get the reference of the `Page` representing the DI scoped context.
+
 #### How to unit test navigation
 
 Here's an example of how to unit test navigation using `NSubstitute`:
