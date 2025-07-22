@@ -8,6 +8,7 @@ using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
 using UIKit;
 using ContentView = Microsoft.Maui.Platform.ContentView;
+// ReSharper disable NotAccessedField.Local
 
 // ReSharper disable InconsistentNaming
 
@@ -23,6 +24,7 @@ public static partial class SoftKeyboardManager
     private static readonly FieldInfo? _isKeyboardAutoScrollHandlingField
         = typeof(KeyboardAutoManagerScroll).GetField("IsKeyboardAutoScrollHandling", BindingFlags.NonPublic);
 
+    private static UIInterfaceOrientationMask _supportedOrientations = GetSupportedOrientations();
     private static NSObject? _willShowToken;
     private static NSObject? _willHideToken;
     private static NSObject? _textFieldToken;
@@ -37,7 +39,7 @@ public static partial class SoftKeyboardManager
     private static UIView? _textView;
     private static UIView? _rootView;
     private static UIView? _containerView;
-    private static CGRect? _originalContainerViewFrame;
+    private static NSLayoutConstraint[]? _containerViewConstraints;
     private static double? _resizeDelta;
     private static double? _panDelta;
     private static SoftKeyboardAdjustMode _adjustMode = SoftKeyboardAdjustMode.Resize;
@@ -100,18 +102,65 @@ public static partial class SoftKeyboardManager
     private static void OrientationChanged(NSNotification obj)
     {
         DumpNotification(obj);
-        var screenSize = UIScreen.MainScreen.Bounds.Size;
+        var nativeSize = UIScreen.MainScreen.Bounds.Size;
         var orientation = UIDevice.CurrentDevice.Orientation;
+
+        if (_screenWidth == 0)
+        {
+            _screenWidth = nativeSize.Width;
+            return;
+        }
+
+        if (orientation == UIDeviceOrientation.Portrait && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.Portrait) ||
+            orientation == UIDeviceOrientation.PortraitUpsideDown && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.PortraitUpsideDown) ||
+            orientation == UIDeviceOrientation.LandscapeLeft && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.LandscapeLeft) ||
+            orientation == UIDeviceOrientation.LandscapeRight && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.LandscapeRight))
+        {
+            return;
+        }
+        
 
         var width = orientation switch
         {
-            UIDeviceOrientation.LandscapeLeft or UIDeviceOrientation.LandscapeRight => Math.Max(screenSize.Height, screenSize.Width),
-            UIDeviceOrientation.Portrait or UIDeviceOrientation.PortraitUpsideDown => Math.Min(screenSize.Height, screenSize.Width),
+            UIDeviceOrientation.LandscapeLeft or UIDeviceOrientation.LandscapeRight => Math.Max(nativeSize.Height, nativeSize.Width),
+            UIDeviceOrientation.Portrait or UIDeviceOrientation.PortraitUpsideDown => Math.Min(nativeSize.Height, nativeSize.Width),
             _ => _screenWidth
         };
 
         _screenWidth = width;
     }
+    
+    private static UIInterfaceOrientationMask GetSupportedOrientations()
+    {
+        if (NSBundle.MainBundle.InfoDictionary["UISupportedInterfaceOrientations"] is not NSArray orientations)
+        {
+            return UIInterfaceOrientationMask.All;
+        }
+
+        var mask = (UIInterfaceOrientationMask)0;
+
+        foreach (var item in orientations)
+        {
+            switch (item.ToString())
+            {
+                case "UIInterfaceOrientationPortrait":
+                    mask |= UIInterfaceOrientationMask.Portrait;
+                    break;
+                case "UIInterfaceOrientationPortraitUpsideDown":
+                    mask |= UIInterfaceOrientationMask.PortraitUpsideDown;
+                    break;
+                case "UIInterfaceOrientationLandscapeLeft":
+                    mask |= UIInterfaceOrientationMask.LandscapeLeft;
+                    break;
+                case "UIInterfaceOrientationLandscapeRight":
+                    mask |= UIInterfaceOrientationMask.LandscapeRight;
+                    break;
+            }
+        }
+
+        return mask;
+    }
+
 
     private static void DidUITextBeginEditing(NSNotification notification)
     {
@@ -134,13 +183,36 @@ public static partial class SoftKeyboardManager
 
             // When switching to a new container view with the keyboard already visible and the adjust mode was Resize,
             // we need to restore the previous container view's frame.
-            if (_adjustMode == SoftKeyboardAdjustMode.Resize && !ReferenceEquals(containerView, _containerView))
+            if (_adjustMode == SoftKeyboardAdjustMode.Resize &&
+                _containerViewConstraints is not null &&
+                _containerView is not null &&
+                !ReferenceEquals(containerView, _containerView))
             {
                 RestoreContainerView();
+                NSLayoutConstraint.DeactivateConstraints(_containerViewConstraints);
+                _containerView.TranslatesAutoresizingMaskIntoConstraints = true;
+                _containerViewConstraints = null;
+                _containerView = null;
             }
 
-            _containerView = containerView;
-            _originalContainerViewFrame ??= _containerView?.Frame;
+            if (_containerView is null && containerView is not null)
+            {
+                _containerView = containerView;
+
+                var containerViewSuperview = _containerView.Superview;
+                _containerView.TranslatesAutoresizingMaskIntoConstraints = false;
+                _containerViewConstraints = [
+                    _containerView.BottomAnchor.ConstraintEqualTo(containerViewSuperview.BottomAnchor),
+                    _containerView.TopAnchor.ConstraintEqualTo(containerViewSuperview.TopAnchor),
+                    _containerView.LeadingAnchor.ConstraintEqualTo(containerViewSuperview.LeadingAnchor),
+                    _containerView.TrailingAnchor.ConstraintEqualTo(containerViewSuperview.TrailingAnchor)
+                ];
+
+                NSLayoutConstraint.ActivateConstraints(
+                    _containerViewConstraints
+                );
+            }
+
             _rootView ??= _containerView?.Window.RootViewController?.View;
 
             // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
@@ -367,7 +439,13 @@ public static partial class SoftKeyboardManager
 
         MauiKeyboardScrollManagerHandlingFlag = false;
 
-        _originalContainerViewFrame = null;
+        if (_containerView is not null && _containerViewConstraints is not null)
+        {
+            _containerView.TranslatesAutoresizingMaskIntoConstraints = true;
+            NSLayoutConstraint.DeactivateConstraints(_containerViewConstraints);
+            _containerViewConstraints = null;
+        }
+
         _containerView = null;
         _rootView = null;
         _textView = null;
@@ -397,19 +475,19 @@ public static partial class SoftKeyboardManager
     {
         DumpInfo($"Restoring container view {_containerView} frame from resize {_resizeDelta}.");
         
-        if (_resizeDelta.HasValue && _containerView is not null)
+        if (_containerViewConstraints is not null && _containerView is not null)
         {
-            _containerView.Frame = _originalContainerViewFrame!.Value;
-
+            _containerViewConstraints[0].Constant = 0;
+            _containerView.Superview.SetNeedsLayout();
             _resizeDelta = null;
-            _originalContainerViewFrame = null;
-        }
+        } 
     }
 
     internal static void Adjust()
     {
         if (_textView?.Window is null ||
             _keyboardFrame == CGRect.Empty ||
+            _containerViewConstraints is null ||
             _containerView is not { Window: { } window } ||
             _rootView is null)
         {
@@ -452,16 +530,6 @@ public static partial class SoftKeyboardManager
             return;
         }
 
-        var containerViewFrame = _containerView.Frame;
-
-        // ReSharper disable once CompareOfFloatsByEqualityOperator
-        var storedOriginalContainerViewFrame = _originalContainerViewFrame ?? containerViewFrame;
-        var originalContainerViewFrame = storedOriginalContainerViewFrame.Width == containerViewFrame.Width && _resizeDelta.HasValue
-            ? storedOriginalContainerViewFrame
-            : containerViewFrame;
-
-        _originalContainerViewFrame = originalContainerViewFrame;
-
         var rootViewFrame = _rootView.Frame;
 
         var originalRootViewFrame = _panDelta.HasValue
@@ -475,19 +543,13 @@ public static partial class SoftKeyboardManager
 
         CGRect newFrame;
 
+        var originalContainerViewFrame = new CGRect(_containerView.Frame.X, _containerView.Frame.Y, _containerView.Frame.Width, _containerView.Frame.Height - (_resizeDelta ?? 0));
         var keyboardFrameInWindow = CGRect.Intersect(_keyboardFrame, window.Frame);
         var originalContainerViewFrameInWindow = _containerView.ConvertRectToView(originalContainerViewFrame, null);
         var keyboardIntersection = CGRect.Intersect(originalContainerViewFrameInWindow, keyboardFrameInWindow);
 
         if (_adjustMode == SoftKeyboardAdjustMode.Resize)
         {
-            newFrame = new CGRect(
-                originalContainerViewFrame.X,
-                originalContainerViewFrame.Y,
-                originalContainerViewFrame.Width,
-                originalContainerViewFrame.Height - keyboardIntersection.Height
-            );
-
             var resizeDelta = -keyboardIntersection.Height;
 
             _resizeDelta = resizeDelta;
@@ -498,10 +560,11 @@ public static partial class SoftKeyboardManager
                 UIViewAnimationOptions.CurveEaseInOut,
                 () =>
                 {
-                    _rootView.Frame = originalRootViewFrame;
-                    _containerView.Frame = newFrame;
                     // If the previous mode was pan, we need to restore the root view frame
                     RestoreRootView();
+
+                    _containerViewConstraints[0].Constant = resizeDelta;
+                    _containerView.Superview.LayoutIfNeeded();
                 },
                 ScrollToField
             );
@@ -536,7 +599,9 @@ public static partial class SoftKeyboardManager
                 () =>
                 {
                     _rootView.Frame = newFrame;
-                    _containerView.Frame = originalContainerViewFrame;
+                    // If the previous mode was resize, we need to restore the container view frame
+                    _containerViewConstraints[0].Constant = 0;
+                    _containerView.Superview.LayoutIfNeeded();
                 },
                 Noop
             );
@@ -766,8 +831,9 @@ public static partial class SoftKeyboardManager
     private static T? FindPlatformResponder<T>(this UIView view)
         where T : UIResponder
     {
-        var nextResponder = view as UIResponder;
+        UIResponder? nextResponder = view;
 
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         while (nextResponder is not null)
         {
             // We check for Window to avoid scenarios where an invalidate might propagate up the tree
