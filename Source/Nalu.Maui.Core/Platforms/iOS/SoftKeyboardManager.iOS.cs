@@ -195,11 +195,10 @@ public static partial class SoftKeyboardManager
                 _containerView = null;
             }
 
-            if (_containerView is null && containerView is not null)
+            if (_containerView is null && containerView is { Superview: { } containerViewSuperview })
             {
                 _containerView = containerView;
 
-                var containerViewSuperview = _containerView.Superview;
                 _containerView.TranslatesAutoresizingMaskIntoConstraints = false;
                 _containerViewConstraints = [
                     _containerView.BottomAnchor.ConstraintEqualTo(containerViewSuperview.BottomAnchor),
@@ -478,7 +477,7 @@ public static partial class SoftKeyboardManager
         if (_containerViewConstraints is not null && _containerView is not null)
         {
             _containerViewConstraints[0].Constant = 0;
-            _containerView.Superview.SetNeedsLayout();
+            _containerView.Superview?.SetNeedsLayout();
             _resizeDelta = null;
         } 
     }
@@ -564,7 +563,7 @@ public static partial class SoftKeyboardManager
                     RestoreRootView();
 
                     _containerViewConstraints[0].Constant = resizeDelta;
-                    _containerView.Superview.LayoutIfNeeded();
+                    _containerView.Superview?.LayoutIfNeeded();
                 },
                 ScrollToField
             );
@@ -601,7 +600,7 @@ public static partial class SoftKeyboardManager
                     _rootView.Frame = newFrame;
                     // If the previous mode was resize, we need to restore the container view frame
                     _containerViewConstraints[0].Constant = 0;
-                    _containerView.Superview.LayoutIfNeeded();
+                    _containerView.Superview?.LayoutIfNeeded();
                 },
                 Noop
             );
