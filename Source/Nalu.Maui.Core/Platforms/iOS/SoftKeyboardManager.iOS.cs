@@ -24,7 +24,7 @@ public static partial class SoftKeyboardManager
     private static readonly FieldInfo? _isKeyboardAutoScrollHandlingField
         = typeof(KeyboardAutoManagerScroll).GetField("IsKeyboardAutoScrollHandling", BindingFlags.NonPublic);
 
-    private static UIInterfaceOrientationMask _supportedOrientations = GetSupportedOrientations();
+    private static readonly UIInterfaceOrientationMask _supportedOrientations = GetSupportedOrientations();
     private static NSObject? _willShowToken;
     private static NSObject? _willHideToken;
     private static NSObject? _textFieldToken;
@@ -289,16 +289,6 @@ public static partial class SoftKeyboardManager
 
     private static void AdjustOrReset(NSDictionary userInfo, bool hiding = false)
     {
-        var isLocalKeyboard = ((NSNumber?) userInfo.GetValueOrDefault("UIKeyboardIsLocalUserInfoKey"))?.Int32Value;
-
-        if (isLocalKeyboard == 0)
-        {
-            // If the keyboard is not local, we don't have to react to the keyboard event.
-            DumpInfo("Keyboard is not local, skipping adjustment.");
-            return;
-        }
-
-
         userInfo.SetAnimationDuration();
 
         var startFrameSize = userInfo.GetValueOrDefault("UIKeyboardFrameBeginUserInfoKey");
