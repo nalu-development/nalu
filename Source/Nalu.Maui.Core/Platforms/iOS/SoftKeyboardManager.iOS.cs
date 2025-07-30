@@ -318,6 +318,7 @@ public static partial class SoftKeyboardManager
 #pragma warning disable CA1416 // Dereference of a possibly null reference.
             if ((OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13)) && window.WindowScene is { } windowScene)
             {
+                // Account for split-over
                 startFrameSizeRect = window.ConvertRectFromCoordinateSpace(startFrameSizeRect, windowScene.Screen.CoordinateSpace);
                 endFrameSizeRect = window.ConvertRectFromCoordinateSpace(endFrameSizeRect, windowScene.Screen.CoordinateSpace);
             }
