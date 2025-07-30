@@ -315,6 +315,14 @@ public static partial class SoftKeyboardManager
         // To properly evaluate the keyboard height, we need to intersect the keyboard frame with the window frame.
         if ((_textView?.Window ?? GetApplicationWindow()) is { } window)
         {
+#pragma warning disable CA1416 // Dereference of a possibly null reference.
+            if ((OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13)) && window.WindowScene is { } windowScene)
+            {
+                startFrameSizeRect = window.ConvertRectFromCoordinateSpace(startFrameSizeRect, windowScene.Screen.CoordinateSpace);
+                endFrameSizeRect = window.ConvertRectFromCoordinateSpace(endFrameSizeRect, windowScene.Screen.CoordinateSpace);
+            }
+#pragma warning restore CA1416 // Dereference of a possibly null reference.
+
             var newStartFrameSizeRect = CGRect.Intersect(startFrameSizeRect, window.Frame);
             var newEndFrameSizeRect = CGRect.Intersect(endFrameSizeRect, window.Frame);
 
