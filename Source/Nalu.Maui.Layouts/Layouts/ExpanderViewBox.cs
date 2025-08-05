@@ -252,6 +252,12 @@ public class ExpanderViewBox : ViewBoxBase, IExpanderViewBox, IDisposable
         {
             _arrangeWidth = width;
             _arrangeHeight = height;
+            if (_canCollapse != _scheduledCanCollapse)
+            {
+                _canCollapse = _scheduledCanCollapse;
+                CanCollapse = _scheduledCanCollapse;
+            }
+
             InvalidateMeasure();
 
             return;
