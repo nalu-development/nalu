@@ -12,6 +12,7 @@ internal sealed class PageNavigationContext : IDisposable
     public IServiceScope ServiceScope => _serviceScope ?? throw new ObjectDisposedException(nameof(PageNavigationContext));
     public bool Entered { get; set; }
     public bool Appeared { get; set; }
+    public IAwaitableIntentController? AwaitableIntentController { get; set; }
 
     private static readonly BindableProperty _navigationContextProperty = BindableProperty.CreateAttached(
         "PageNavigationContext",
@@ -46,6 +47,8 @@ internal sealed class PageNavigationContext : IDisposable
 
     public void Dispose()
     {
+        AwaitableIntentController?.Complete();
+
         if (_serviceScope is not null)
         {
             _serviceScope.Dispose();

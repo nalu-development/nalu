@@ -56,7 +56,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="CommunityToolkit.Maui" Version="11.2.0" />
+        <PackageReference Include="CommunityToolkit.Maui" Version="12.1.0" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
@@ -87,9 +87,5 @@
         <Generator>ResXFileCodeGenerator</Generator>
         <LastGenOutput>Texts.Designer.cs</LastGenOutput>
       </EmbeddedResource>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="PopupModels\" />
     </ItemGroup>
 </Project>

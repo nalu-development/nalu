@@ -295,6 +295,11 @@ internal class NavigationService : INavigationService, IDisposable
 
                 var page = CreatePage(pageType, stackPage.Page);
 
+                if (intent is IAwaitableIntentController awaitableIntent)
+                {
+                    PageNavigationContext.Get(page).AwaitableIntentController = awaitableIntent;
+                }
+
                 var isModal = Shell.GetPresentationMode(page).HasFlag(PresentationMode.Modal);
                 await NavigationHelper.SendEnteringAsync(ShellProxy, page, intent, Configuration).ConfigureAwait(true);
                 await shellProxy.PushAsync(segmentName, page).ConfigureAwait(true);
