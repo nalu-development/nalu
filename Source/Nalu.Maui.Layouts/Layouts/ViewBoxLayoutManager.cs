@@ -32,7 +32,8 @@ public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
         measuredWidth += paddingHorizontalThickness;
 
         IView layoutView = viewBox;
-        var finalHeight = LayoutManager.ResolveConstraints(heightConstraint, layoutView.Height, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
+        var layoutViewHeight = layoutView.Height;
+        var finalHeight = LayoutManager.ResolveConstraints(heightConstraint, layoutViewHeight, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
         var finalWidth = LayoutManager.ResolveConstraints(widthConstraint, layoutView.Width, measuredWidth, layoutView.MinimumWidth, layoutView.MaximumWidth);
 
         return new Size(finalWidth, finalHeight);
