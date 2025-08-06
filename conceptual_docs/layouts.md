@@ -170,7 +170,7 @@ A `CloseOnScrimTapped` property is available to control whether the popup should
 
 #### Styling the popups
 
-The base style for popups can be defined in your `Styles.xaml` file, allowing you to customize the appearance of all popups in your application.
+The base style for popups must be defined in your `Styles.xaml` file, allowing you to customize the appearance of all popups in your application.
 
 ```xml
 <Style TargetType="nalu:PopupScrim">

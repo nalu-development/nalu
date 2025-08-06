@@ -158,8 +158,8 @@ public abstract class PopupPageBase : ContentPage
     /// </summary>
     protected virtual void PreparePopupAnimation()
     {
-        // PopupBorder.Opacity = 0;
-        // PopupBorder.Scale = 0;
+        PopupBorder.Opacity = 0;
+        PopupBorder.Scale = 0;
     }
 
     /// <summary>
