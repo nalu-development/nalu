@@ -202,7 +202,7 @@ public static partial class SoftKeyboardManager
                 _containerView.TranslatesAutoresizingMaskIntoConstraints = false;
                 _containerViewConstraints = [
                     _containerView.BottomAnchor.ConstraintEqualTo(containerViewSuperview.BottomAnchor),
-                    _containerView.TopAnchor.ConstraintEqualTo(containerViewSuperview.TopAnchor),
+                    _containerView.TopAnchor.ConstraintEqualTo(containerViewSuperview.TopAnchor, _containerView.Frame.Top),
                     _containerView.LeadingAnchor.ConstraintEqualTo(containerViewSuperview.LeadingAnchor),
                     _containerView.TrailingAnchor.ConstraintEqualTo(containerViewSuperview.TrailingAnchor)
                 ];
