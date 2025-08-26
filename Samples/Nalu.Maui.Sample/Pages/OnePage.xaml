@@ -10,7 +10,6 @@
              x:DataType="pageModels:OnePageModel"
              Title="Page One"
              Padding="16">
-
     <ScrollView>
         <VerticalStackLayout Spacing="16">
             <Image Source="banner.png"
@@ -75,6 +74,17 @@
                     </FormattedString>
                 </Label.FormattedText>
             </Label>
+            
+            <Label Text="TemplateSourceSelector" />
+            <CollectionView VerticalOptions="Center" ItemTemplate="{layouts:TemplateSourceSelector}">
+                <CollectionView.ItemsSource>
+                    <layouts:DataTemplatesSource x:Key="VirtualizedViews">
+                        <DataTemplate x:DataType="pageModels:OnePageModel">
+                            <Label Text="{Binding Animal.Name}"/>
+                        </DataTemplate>
+                    </layouts:DataTemplatesSource>
+                </CollectionView.ItemsSource>
+            </CollectionView>
 
             <layouts:ViewBox ContentBindingContext="{Binding Animal}">
                 <Label Text="{Binding Name}" x:DataType="pageModels:AnimalModel" />
@@ -105,5 +115,4 @@
             </Button>
         </VerticalStackLayout>
     </ScrollView>
-
 </ContentPage>

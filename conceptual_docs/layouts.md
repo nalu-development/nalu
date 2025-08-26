@@ -71,6 +71,30 @@ This can also be used with one single expensive template:
                      WhenTrue="{StaticResource ExpensiveTemplate}" />
 ```
 
+### Need a "virtualized `ScrollView`"?
+
+You can use a `CollectionView` with our special `ItemsSource` and `ItemTemplate` to achieve that.
+
+```xml
+<CollectionView ItemTemplate="{nalu:TemplateSourceSelector}">
+    <CollectionView.ItemsSource>
+        <nalu:DataTemplatesSource x:Key="VirtualizedViews">
+            <!-- first virtualized view -->
+            <DataTemplate x:DataType="pageModels:MyPageModel">
+                <Label Text="{Binding MyPageModelPropertyHere}"/>
+            </DataTemplate>
+
+            <!-- second virtualized view -->
+            <DataTemplate x:DataType="pageModels:MyPageModel">
+                <Label Text="{Binding MyOtherPropertyHere}"/>
+            </DataTemplate>
+
+            <!-- ... -->
+        </nalu:DataTemplatesSource>
+    </CollectionView.ItemsSource>
+</CollectionView>
+```
+
 ### ExpanderViewBox
 
 `ExpanderViewBox` is a custom view that fully displays or **collapses** its content by **animating** the size transition.
