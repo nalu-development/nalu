@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Maui.Layouts;
 using Nalu.MagnetLayout;
 
@@ -80,4 +81,28 @@ public class Magnet : Layout, IStackLayout
     }
 
     private static void OnScenePropertyChanged(BindableObject bindable, object oldValue, object newValue) { }
+
+    /// <inheritdoc />
+    protected override Size MeasureOverride(double widthConstraint, double heightConstraint)
+    {
+        var sw = new Stopwatch();
+        sw.Start();
+        var measureOverride = base.MeasureOverride(widthConstraint, heightConstraint);
+        sw.Stop();
+        Debug.WriteLine($"Magnet MeasureOverride: {sw.Elapsed.Microseconds}us");
+
+        return measureOverride;
+    }
+
+    /// <inheritdoc />
+    protected override Size ArrangeOverride(Rect bounds)
+    {
+        var sw = new Stopwatch();
+        sw.Start();
+        var arrangeOverride = base.ArrangeOverride(bounds);
+        sw.Stop();
+        Debug.WriteLine($"Magnet ArrangeOverride: {sw.Elapsed.Microseconds}us");
+
+        return arrangeOverride;
+    }
 }

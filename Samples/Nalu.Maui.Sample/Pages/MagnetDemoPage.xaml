@@ -4,8 +4,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              xmlns:magnet="clr-namespace:Nalu.MagnetLayout;assembly=Nalu.Maui.Layouts"
+             xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
              x:Class="Nalu.Maui.Sample.Pages.MagnetDemoPage"
-             Title="Magnet Demo">
+             Title="Magnet Demo"
+             x:DataType="pageModels:MagnetDemoPageModel">
     <ContentPage.Resources>
         <magnet:MagnetStage x:Key="CardMagnetStage">
             <magnet:MagnetView Id="CardImage"
@@ -39,46 +42,123 @@
         </magnet:MagnetStage>
     </ContentPage.Resources>
 
-    <VerticalStackLayout>
-        <Border Margin="8"
-                VerticalOptions="Center"
-                StrokeThickness="0"
-                StrokeShape="RoundRectangle 8"
-                Style="{StaticResource CardStyle}">
-            <nalu:Magnet Stage="{StaticResource CardMagnetStage}">
-                <Border nalu:Magnet.StageId="CardImage"
-                        HeightRequest="48"
-                        WidthRequest="60"
-                        StrokeThickness="0"
-                        StrokeShape="RoundRectangle 8">
-                    <Image
-                        Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
-                        Aspect="AspectFill" />
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="ToggleCardDetail" />
-                    </Border.GestureRecognizers>
-                </Border>
-                <Label nalu:Magnet.StageId="CardName"
-                       FontSize="16"
-                       FontFamily="OpenSansSemibold"
-                       MaxLines="1"
-                       LineBreakMode="TailTruncation"
-                       Text="Regular card with long name" />
-                <Label nalu:Magnet.StageId="CardDetail"
-                       FontSize="12"
-                       x:Name="CardDetail"
-                       Text="Mastercard · 08/25" />
-                <Label nalu:Magnet.StageId="Money"
-                       FontSize="18"
-                       Background="{StaticResource Secondary}"
-                       TextColor="{StaticResource PrimaryDark}"
-                       FontFamily="OpenSansSemibold"
-                       Padding="8"
-                       VerticalTextAlignment="Center"
-                       Text="$1,200.50" />
-                <Image nalu:Magnet.StageId="Starred"
-                       Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
-            </nalu:Magnet>
-        </Border>
-    </VerticalStackLayout>
+    <ScrollView>
+        <VerticalStackLayout>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Credits}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="pageModels:CreditCardModel">
+                        <Border Margin="8"
+                                VerticalOptions="Center"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Style="{StaticResource CardStyle}">
+                            <pages:MeasuredGrid ColumnDefinitions="Auto,*,Auto">
+                                <Border HeightRequest="48"
+                                        WidthRequest="60"
+                                        Margin="4"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 8">
+                                    <Image
+                                        Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
+                                        Aspect="AspectFill" />
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1"
+                                                     VerticalOptions="Center">
+                                    <FlexLayout Direction="Row"
+                                                Wrap="NoWrap">
+                                        <Label FontSize="16"
+                                               FontFamily="OpenSansSemibold"
+                                               MaxLines="1"
+                                               FlexLayout.Shrink="1"
+                                               LineBreakMode="TailTruncation"
+                                               Text="{Binding Name}" />
+                                        <Image nalu:Magnet.StageId="Starred"
+                                               IsVisible="{Binding Starred}"
+                                               Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
+                                    </FlexLayout>
+                                    <Label FontSize="12">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="{Binding Type}"/>
+                                                <Span Text=" · "/>
+                                                <Span Text="{Binding Exp}"/>
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                </VerticalStackLayout>
+                                <Label Grid.Column="2"
+                                       FontSize="18"
+                                       Background="{StaticResource Secondary}"
+                                       TextColor="{StaticResource PrimaryDark}"
+                                       FontFamily="OpenSansSemibold"
+                                       Padding="8"
+                                       VerticalTextAlignment="Center"
+                                       Text="{Binding CreditDollar}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding StarUnstarCommand}" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </pages:MeasuredGrid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Credits}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="pageModels:CreditCardModel">
+                        <Border Margin="8"
+                                VerticalOptions="Center"
+                                StrokeThickness="0"
+                                StrokeShape="RoundRectangle 8"
+                                Style="{StaticResource CardStyle}">
+                            <nalu:Magnet Stage="{StaticResource CardMagnetStage}">
+                                <Border nalu:Magnet.StageId="CardImage"
+                                        HeightRequest="48"
+                                        WidthRequest="60"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 8">
+                                    <Image
+                                        Source="https://images.unsplash.com/photo-1519692933481-e162a57d6721?ixlib=rb-4.0.3&amp;q=80&amp;fm=jpg&amp;w=1200&amp;auto=format&amp;fit=crop&amp;cs=srgb&amp;dl=osman-rana-GXEZuWo5m4I-unsplash.jpg"
+                                        Aspect="AspectFill" />
+                                </Border>
+                                <Label nalu:Magnet.StageId="CardName"
+                                       FontSize="16"
+                                       FontFamily="OpenSansSemibold"
+                                       MaxLines="1"
+                                       LineBreakMode="TailTruncation"
+                                       Text="{Binding Name}" />
+                                <Label nalu:Magnet.StageId="CardDetail"
+                                       FontSize="12"
+                                       x:Name="CardDetail"
+                                       Text="Mastercard08/25">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="{Binding Type}"/>
+                                            <Span Text=" · "/>
+                                            <Span Text="{Binding Exp}"/>
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                                <Label nalu:Magnet.StageId="Money"
+                                       FontSize="18"
+                                       Background="{StaticResource Secondary}"
+                                       TextColor="{StaticResource PrimaryDark}"
+                                       FontFamily="OpenSansSemibold"
+                                       Padding="8"
+                                       VerticalTextAlignment="Center"
+                                       Text="{Binding CreditDollar}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding StarUnstarCommand}" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                                <Image nalu:Magnet.StageId="Starred"
+                                       IsVisible="{Binding Starred}"
+                                       Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
+                            </nalu:Magnet>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
