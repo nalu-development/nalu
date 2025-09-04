@@ -54,6 +54,7 @@ public abstract class TemplateBoxBase : ClippableViewBoxBase
             if (dataTemplate == null)
             {
                 ActualTemplate = null;
+                Template = null;
                 SetContent(null);
 
                 return;
@@ -140,5 +141,7 @@ public abstract class TemplateBoxBase : ClippableViewBoxBase
                 RemoveLogicalChild(oldElement);
             }
         }
+
+        TriggerContentChanged(oldView, newView);
     }
 }
