@@ -6,6 +6,7 @@ static file class EnumKeys<TEnum>
     where TEnum : struct, Enum
 {
     public static readonly TEnum[] Values = Enum.GetValues<TEnum>();
+    // ReSharper disable once StaticMemberInGenericType
     public static readonly int Length = Convert.ToInt32(Values.Max()) + 1;
 }
 
@@ -18,8 +19,11 @@ internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKe
 
     public SealedEnumDictionary(Func<TKey, TValue> initializer)
     {
-        foreach (var key in EnumKeys<TKey>.Values)
+        var keys = EnumKeys<TKey>.Values;
+        var keysLength = keys.Length;
+        for (var index = 0; index < keysLength; index++)
         {
+            var key = keys[index];
             _values[Convert.ToInt32(key)] = initializer(key);
         }
     }
@@ -33,11 +37,12 @@ internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKe
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         var values = EnumKeys<TKey>.Values;
-
-        foreach (var key in values)
+        var valuesLength = values.Length;
+        for (var i = 0; i < valuesLength; ++i)
         {
+            var key = values[i];
             var index = Convert.ToInt32(key);
-
+        
             yield return new KeyValuePair<TKey, TValue>(key, _values[index]);
         }
     }

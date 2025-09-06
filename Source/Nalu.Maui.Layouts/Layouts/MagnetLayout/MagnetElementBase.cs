@@ -197,8 +197,10 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
 
         if (appliedConstraints is not null)
         {
-            foreach (var appliedConstraint in appliedConstraints)
+            var appliedConstraintsCount = appliedConstraints.Count;
+            for (var index = 0; index < appliedConstraintsCount; ++index)
             {
+                var appliedConstraint = appliedConstraints[index];
                 stage.RemoveConstraint(appliedConstraint);
             }
         }
@@ -219,8 +221,10 @@ public abstract class MagnetElementBase<TConstraintType> : BindableObject, IMagn
             appliedConstraints.AddRange(constraintsFactory(stage));
         }
 
-        foreach (var constraint in appliedConstraints)
+        var newAppliedConstraintsCount = appliedConstraints.Count;
+        for (var index = 0; index < newAppliedConstraintsCount; index++)
         {
+            var constraint = appliedConstraints[index];
             stage.AddConstraint(constraint);
         }
     }

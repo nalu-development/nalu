@@ -20,7 +20,7 @@ public class Program
         }
 
         // dotnet run -c Release --project Tests/Nalu.Maui.Benchmarks
-        BenchmarkRunner.Run(typeof(MagnetBenchmarks).Assembly);
+        BenchmarkRunner.Run(typeof(MagnetBenchmarks).Assembly, null, args);
     }
 #pragma warning restore IDE0060
 }

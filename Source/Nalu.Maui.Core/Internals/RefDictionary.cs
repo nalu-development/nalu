@@ -8,14 +8,14 @@ namespace Nalu.Internals;
 internal class RefDictionary<TKey, TValue>
     where TKey : notnull
 {
-    private int[]? _buckets;
-    private Entry[]? _entries;
+    protected int[]? _buckets;
+    protected Entry[]? _entries;
     private ulong _fastModMultiplier;
-    private int _count;
-    private int _freeList;
-    private int _freeCount;
-    private readonly IEqualityComparer<TKey>? _comparer;
-    private const int _startOfFreeList = -3;
+    protected int _count;
+    protected int _freeList;
+    protected int _freeCount;
+    protected readonly IEqualityComparer<TKey>? _comparer;
+    protected const int _startOfFreeList = -3;
 
     public IEnumerable<TKey> Keys
     {
@@ -403,7 +403,7 @@ internal class RefDictionary<TKey, TValue>
         goto Return;
     }
 
-    private int Initialize(int capacity)
+    protected int Initialize(int capacity)
     {
         var size = HashHelpers.GetPrime(capacity);
         var buckets = new int[size];
@@ -548,7 +548,7 @@ internal class RefDictionary<TKey, TValue>
         return true;
     }
 
-    private void Resize() => Resize(HashHelpers.ExpandPrime(_count));
+    protected void Resize() => Resize(HashHelpers.ExpandPrime(_count));
 
     private void Resize(int newSize)
     {
@@ -856,7 +856,7 @@ internal class RefDictionary<TKey, TValue>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ref int GetBucket(uint hashCode)
+    protected ref int GetBucket(uint hashCode)
     {
         var buckets = _buckets!;
 
@@ -866,6 +866,7 @@ internal class RefDictionary<TKey, TValue>
     public ref struct EntryEnumerator
     {
         private Entry[] _entries;
+        private ref Entry _current;
         private int _index;
         private readonly int _count;
 
@@ -880,7 +881,8 @@ internal class RefDictionary<TKey, TValue>
         {
             while (++_index < _count)
             {
-                if (_entries[_index].Next >= -1)
+                _current = ref _entries[_index];
+                if (_current.Next >= -1)
                 {
                     return true;
                 }
@@ -889,7 +891,7 @@ internal class RefDictionary<TKey, TValue>
             return false;
         }
 
-        public readonly ref Entry Current => ref _entries[_index];
+        public readonly ref Entry Current => ref _current;
     }
 
     public EntryEnumerator GetEnumerator() => new(_entries ?? [], _count);

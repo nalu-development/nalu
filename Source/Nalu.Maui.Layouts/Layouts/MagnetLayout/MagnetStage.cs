@@ -231,22 +231,28 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     /// <inheritdoc />
     public void PrepareForMeasure(double width, double height)
     {
-        foreach (var element in _elements)
+        var len = _elements.Count;
+        int index;
+
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.DetectChanges();
         }
 
         SetBounds(width, height, true);
 
-        foreach (var element in _elements)
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.ApplyConstraints();
         }
 
         _solver.FetchChanges();
 
-        foreach (var element in _elements)
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.FinalizeConstraints();
         }
 
@@ -258,8 +264,12 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     {
         SetBounds(width, height, false);
 
-        foreach (var element in _elements)
+        var len = _elements.Count;
+        int index;
+
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.FinalizeConstraints();
         }
 
