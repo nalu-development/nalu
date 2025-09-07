@@ -8,6 +8,11 @@ internal class Row
     private double _constant;
 
     /// <summary>
+    /// The variable associated with this row, if any.
+    /// </summary>
+    public Variable? Variable { get; set; }
+
+    /// <summary>
     /// Construct a new Row.
     /// </summary>
     internal Row(double constant = 0.0)
@@ -181,13 +186,7 @@ internal class Row
     }
 
     /// <summary>
-    /// Test whether a value is approximately zero.
+    /// Update the variable (if any) with the current value of the row constant.
     /// </summary>
-    internal static bool NearZero(double value)
-    {
-        const double eps = 1.0e-8;
-        const double neps = 1.0e-8;
-
-        return value < 0.0 ? value > neps : value < eps;
-    }
+    public void UpdateVariable() => Variable?.CurrentValue = _constant;
 }

@@ -47,7 +47,7 @@ internal class CellDictionary : RefDictionary<Symbol, double>
                     ref var updateEntryValue = ref updateEntry.Value;
                     updateEntryValue += value;
                     
-                    if (Row.NearZero(updateEntryValue))
+                    if (Solver.NearZero(updateEntryValue))
                     {
                         if (last < 0)
                         {

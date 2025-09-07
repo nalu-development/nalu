@@ -15,6 +15,7 @@ public partial class Solver
 
         var newSymbol = MakeSymbol(SymbolType.External);
         _varMap[variable] = newSymbol;
+        _symbolMap[newSymbol] = variable;
 
         return newSymbol;
     }
@@ -188,6 +189,7 @@ public partial class Solver
             basicRow.SolveForEx(art, entering);
             Substitute(entering, basicRow);
             _rowMap[entering] = basicRow;
+            basicRow.Variable = _symbolMap.TryGetValue(entering, out var enteringVariable) ? enteringVariable : null;
         }
 
         // Remove the artificial variable from the tableau.

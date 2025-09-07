@@ -6,9 +6,13 @@ public partial class Solver
     /// Add a constraint to the solver.
     /// </summary>
     /// <param name="constraint">Constraint to add to the solver</param>
-    public void AddConstraint(Constraint constraint)
+    public void AddConstraint(Constraint constraint) => DoAddConstraint(constraint);
+
+    private Tag DoAddConstraint(Constraint constraint)
     {
-        if (_cnMap.ContainsKey(constraint))
+        ref var tag = ref _cnMap.GetOrAddDefaultRef(constraint, out var exists);
+
+        if (exists)
         {
             throw new InvalidOperationException("duplicate constraint");
         }
@@ -18,11 +22,16 @@ public partial class Solver
         // then its possible those variables will linger in the var map.
         // Since its likely that those variables will be used in other
         // constraints and since exceptional conditions are uncommon,
-        // i'm not too worried about aggressive cleanup of the var map.
-        var (row, tag) = CreateRow(constraint);
+        // I'm not too worried about aggressive cleanup of the var map.
+        var (row, createdTag) = CreateRow(constraint);
+
+        // Store the tag in the dictionary entry
+        tag = createdTag;
+
+        // Now choose a subject to solve the row for.
         var subject = ChooseSubject(row, tag);
 
-        // If chooseSubject couldnt find a valid entering symbol, one
+        // If chooseSubject couldn't find a valid entering symbol, one
         // last option is available if the entire row is composed of
         // dummy variables. If the constant of the row is zero, then
         // this represents redundant constraints and the new dummy
@@ -53,14 +62,19 @@ public partial class Solver
             row.SolveFor(subject);
             Substitute(subject, row);
             _rowMap[subject] = row;
-        }
 
-        _cnMap[constraint] = tag;
+            // Assign the variable if any
+            if (_symbolMap.TryGetValue(subject, out var subjectVariable))
+            {
+                row.Variable = subjectVariable;
+            }
+        }
 
         // Optimizing after each constraint is added performs less
         // aggregate work due to a smaller average system size. It
         // also ensures the solver remains in a consistent state.
         Optimize(_objective);
+        return tag;
     }
 
     /// <summary>
@@ -123,7 +137,8 @@ public partial class Solver
     /// <param name="strength">Strength, should be less than Strength.Required</param>
     public void AddEditVariable(Variable variable, double strength)
     {
-        if (_editMap.ContainsKey(variable))
+        ref var info = ref _editMap.GetOrAddDefaultRef(variable, out var exists);
+        if (exists)
         {
             throw new InvalidOperationException("duplicate edit variable");
         }
@@ -141,18 +156,9 @@ public partial class Solver
         var expr = Expression.From(variable); // Expression representing just the variable
         var cn = new Constraint(expr, RelationalOperator.Equal, strength);
 
-        AddConstraint(cn); // Add the constraint to the solver
+        var tag = DoAddConstraint(cn); // Add the constraint to the solver
 
-        // Find the tag associated with the newly added constraint
-        // This assumes AddConstraint successfully added the constraint, and it exists in _cnMap
-        if (!_cnMap.TryGetValue(cn, out var tag))
-        {
-            // This should not happen if AddConstraint was successful
-            throw new InvalidOperationException("Failed to find tag for newly added edit constraint.");
-        }
-
-        var info = new EditInfo(tag, cn, 0.0);
-        _editMap[variable] = info;
+        info = new EditInfo(tag, cn, 0.0);
     }
 
     /// <summary>
@@ -253,19 +259,9 @@ public partial class Solver
     /// </summary>
     public void UpdateVariables()
     {
-        foreach (ref var variableEntry in _varMap)
+        foreach (ref var rowEntry in _rowMap)
         {
-            var variable = variableEntry.Key;
-            var symbol = variableEntry.Value;
-
-            if (_rowMap.TryGetValue(symbol, out var row))
-            {
-                variable.CurrentValue = row.Constant();
-            }
-            else
-            {
-                variable.CurrentValue = 0.0;
-            }
+            rowEntry.Value.UpdateVariable();
         }
     }
 

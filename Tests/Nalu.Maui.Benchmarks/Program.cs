@@ -13,8 +13,7 @@ public class Program
             Console.WriteLine("Direct run");
 
             var magnetBenchmarks = new MagnetBenchmarks();
-            magnetBenchmarks.MagnetSetup();
-            magnetBenchmarks.MagnetLayoutPerfDirect(100_000);
+            magnetBenchmarks.MagnetLayoutConstantMeasure(100_000);
 
             return;
         }
