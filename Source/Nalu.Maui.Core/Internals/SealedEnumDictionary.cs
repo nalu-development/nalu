@@ -13,9 +13,24 @@ static file class EnumKeys<TEnum>
 internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     where TKey : struct, Enum
 {
-    private readonly TValue[] _values = new TValue[EnumKeys<TKey>.Length];
+    private struct Entry {
+        public TKey Key { get; set; }
+        public TValue Value { get; set; }
+    }
 
-    public SealedEnumDictionary() { }
+    private readonly Entry[] _values = new Entry[EnumKeys<TKey>.Length];
+
+    public SealedEnumDictionary()
+    {
+        var keys = EnumKeys<TKey>.Values;
+        var keysLength = keys.Length;
+        for (var index = 0; index < keysLength; index++)
+        {
+            var key = keys[index];
+            ref var entry = ref _values[index];
+            entry.Key = key;
+        }
+    }
 
     public SealedEnumDictionary(Func<TKey, TValue> initializer)
     {
@@ -24,26 +39,31 @@ internal class SealedEnumDictionary<TKey, TValue> : IEnumerable<KeyValuePair<TKe
         for (var index = 0; index < keysLength; index++)
         {
             var key = keys[index];
-            _values[Convert.ToInt32(key)] = initializer(key);
+            ref var entry = ref _values[index];
+            entry.Key = key;
+            entry.Value = initializer(key);
         }
     }
 
     public TValue this[TKey key]
     {
-        get => _values[Convert.ToInt32(key)];
-        set => _values[Convert.ToInt32(key)] = value;
+        get => _values[Convert.ToInt32(key)].Value;
+        set
+        {
+            ref var entry = ref _values[Convert.ToInt32(key)];
+            entry.Value = value;
+        }
     }
 
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
-        var values = EnumKeys<TKey>.Values;
+        var values = _values;
         var valuesLength = values.Length;
         for (var i = 0; i < valuesLength; ++i)
         {
-            var key = values[i];
-            var index = Convert.ToInt32(key);
+            ref var entry = ref _values[i];
         
-            yield return new KeyValuePair<TKey, TValue>(key, _values[index]);
+            yield return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
         }
     }
 
