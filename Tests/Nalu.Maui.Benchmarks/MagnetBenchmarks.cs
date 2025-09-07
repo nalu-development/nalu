@@ -205,7 +205,7 @@ public class MagnetBenchmarks
         }
     }
     
-    public void MagnetLayoutConstantMeasure(int iterations)
+    public void MagnetLayoutConstantMeasurePerf(int iterations)
     {
         MagnetConstantSetup();
         for (var i = 0; i < iterations; i++)

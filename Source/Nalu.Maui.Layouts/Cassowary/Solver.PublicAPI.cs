@@ -236,10 +236,8 @@ public partial class Solver
 
         // Otherwise update each row where the error variables exist.
         // Need to iterate over a copy of the keys to avoid modifying the collection during iteration
-        var i = -1;
         foreach (ref var entry in rows)
         {
-            ++i;
             var basicRow = entry.Value;
             var symbol = entry.Key;
             var coeff = basicRow.CoefficientFor(marker);

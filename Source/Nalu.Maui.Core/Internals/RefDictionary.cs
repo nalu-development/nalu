@@ -865,14 +865,13 @@ internal class RefDictionary<TKey, TValue>
 
     public ref struct EntryEnumerator
     {
-        private Entry[] _entries;
-        private ref Entry _current;
+        private readonly Span<Entry> _entries;
         private int _index;
         private readonly int _count;
 
         public EntryEnumerator(Entry[] entries, int count)
         {
-            _entries = entries;
+            _entries = entries.AsSpan(0, count);
             _index = -1;
             _count = count;
         }
@@ -881,17 +880,16 @@ internal class RefDictionary<TKey, TValue>
         {
             while (++_index < _count)
             {
-                _current = ref _entries[_index];
-                if (_current.Next >= -1)
+                ref var current = ref _entries[_index];
+                if (current.Next >= -1)
                 {
                     return true;
                 }
             }
-
             return false;
         }
 
-        public readonly ref Entry Current => ref _current;
+        public readonly ref Entry Current => ref _entries[_index];
     }
 
     public EntryEnumerator GetEnumerator() => new(_entries ?? [], _count);
