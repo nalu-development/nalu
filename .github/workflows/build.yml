@@ -34,7 +34,7 @@ jobs:
           lfs: true
           fetch-depth: 0
       - name: configure_java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
