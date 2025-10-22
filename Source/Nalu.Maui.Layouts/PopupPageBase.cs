@@ -139,14 +139,12 @@ public abstract class PopupPageBase : ContentPage
             }
         };
 
-        Scrim.GestureRecognizers.Add(scrimTapRecognizer);
+        var tappableScrim = new ViewBox();
+        tappableScrim.GestureRecognizers.Add(scrimTapRecognizer);
 
-        var ignoreSafeAreaPopupBorderLayout = new Grid { PopupBorder };
+        var ignoreSafeAreaPopupBorderLayout = new Grid { tappableScrim, PopupBorder };
 
-        var ignoreSafeAreaPageLayout = new Grid
-                                       {
-                                           IgnoreSafeArea = true
-                                       };
+        var ignoreSafeAreaPageLayout = new Grid { IgnoreSafeArea = true };
         ignoreSafeAreaPageLayout.Add(Scrim);
         ignoreSafeAreaPageLayout.Add(ignoreSafeAreaPopupBorderLayout);
 
