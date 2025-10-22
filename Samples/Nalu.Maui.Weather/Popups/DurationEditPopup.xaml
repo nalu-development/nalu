@@ -4,7 +4,6 @@
                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                xmlns:nalu="https://nalu-development.github.com/nalu/controls"
                xmlns:popupModels="clr-namespace:Nalu.Maui.Weather.PopupModels"
-               xmlns:popups="clr-namespace:Nalu.Maui.Weather.Popups"
                xmlns:nlayouts="https://nalu-development.github.com/nalu/layouts"
                x:Class="Nalu.Maui.Weather.Popups.DurationEditPopup"
                x:DataType="popupModels:DurationEditPopupModel">
@@ -12,7 +11,8 @@
         <Label Text="Turn the wheel"
                FontSize="24"
                HorizontalOptions="Center" />
-        <Grid Margin="0,16,0,24">
+        <Grid Margin="0,16,0,24"
+              MaximumWidthRequest="400">
             <nalu:DurationWheel x:Name="DurationWheel"
                                 ValueWidth="16"
                                 OuterBackgroundColor="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray950}}"

@@ -1,5 +1,6 @@
 using Microsoft.Maui.Controls.PlatformConfiguration;
 using Microsoft.Maui.Controls.PlatformConfiguration.iOSSpecific;
+using Nalu.Internals;
 
 namespace Nalu;
 
@@ -22,7 +23,40 @@ namespace Nalu;
 /// ]]>
 /// </code>
 /// </remarks>
-public sealed class PopupContainer : Border;
+public sealed class PopupContainer : Border
+{
+    /// <summary>
+    /// Bindable property for <see cref="OverlapsSafeArea"/>.
+    /// </summary>
+    public static readonly BindableProperty OverlapsSafeAreaProperty = GenericBindableProperty<PopupContainer>.Create(nameof(OverlapsSafeArea), false, propertyChanged: bindable => bindable.OnOverlapsSafeAreaPropertyChanged);
+
+    /// <summary>
+    /// Gets or sets whether this popup container should overlap safe area when needed
+    /// </summary>
+    public bool OverlapsSafeArea 
+    {
+        get => (bool)GetValue(OverlapsSafeAreaProperty);
+        set => SetValue(OverlapsSafeAreaProperty, value);
+    }
+
+    /// <inheritdoc />
+    protected override void OnParentSet()
+    {
+        base.OnParentSet();
+
+        UpdateIgnoreSafeArea();
+    }
+
+    private void OnOverlapsSafeAreaPropertyChanged(bool oldValue, bool newValue) => UpdateIgnoreSafeArea();
+
+    private void UpdateIgnoreSafeArea()
+    {
+        if (Parent is Layout layout)
+        {
+            layout.IgnoreSafeArea = OverlapsSafeArea;
+        }
+    }
+}
 
 /// <summary>
 /// The <see cref="ViewBox"/> acting as a scrim for the popup.
@@ -91,17 +125,10 @@ public abstract class PopupPageBase : ContentPage
     /// </summary>
     protected PopupPageBase()
     {
-        BackgroundColor = Colors.Transparent;
-        Background = Brush.Transparent;
-        Shell.SetPresentationMode(this, PresentationMode.ModalNotAnimated);
-        Shell.SetNavBarIsVisible(this, false);
-        On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.OverFullScreen);
+        SetPopupPresentationMode();
 
         PopupBorder = new PopupContainer();
-        Scrim = new PopupScrim
-                {
-                    Content = PopupBorder
-                };
+        Scrim = new PopupScrim();
 
         var scrimTapRecognizer = new TapGestureRecognizer();
         scrimTapRecognizer.Tapped += (_, _) =>
@@ -114,7 +141,44 @@ public abstract class PopupPageBase : ContentPage
 
         Scrim.GestureRecognizers.Add(scrimTapRecognizer);
 
-        Content = Scrim;
+        var ignoreSafeAreaPopupBorderLayout = new Grid { PopupBorder };
+
+        var ignoreSafeAreaPageLayout = new Grid
+                                       {
+                                           IgnoreSafeArea = true
+                                       };
+        ignoreSafeAreaPageLayout.Add(Scrim);
+        ignoreSafeAreaPageLayout.Add(ignoreSafeAreaPopupBorderLayout);
+
+        Content = ignoreSafeAreaPageLayout;
+    }
+
+    /// <summary>
+    /// Enables or disables popup presentation mode.
+    /// </summary>
+    /// <remarks>
+    /// The popup presentation mode involves: transparent background, no navbar, not animated modal <see cref="PresentationMode"/>.
+    /// This mode is enabled by default.
+    /// </remarks>
+    /// <param name="enabled">Whether to enable or disable the popup presentation mode.</param>
+    protected void SetPopupPresentationMode(bool enabled = true)
+    {
+        if (enabled)
+        {
+            BackgroundColor = Colors.Transparent;
+            Background = Brush.Transparent;
+            Shell.SetPresentationMode(this, PresentationMode.ModalNotAnimated);
+            Shell.SetNavBarIsVisible(this, false);
+            On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.OverFullScreen);
+        }
+        else
+        {
+            ClearValue(BackgroundColorProperty);
+            ClearValue(BackgroundProperty);
+            Shell.SetPresentationMode(this, PresentationMode.Modal);
+            Shell.SetNavBarIsVisible(this, true);
+            On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.FullScreen);
+        }
     }
 
     /// <inheritdoc />
