@@ -40,6 +40,8 @@ internal struct Symbol : IEquatable<Symbol>
 
     public readonly override int GetHashCode() => Id;
 
+    public static bool operator <(Symbol left, Symbol right) => left.Id < right.Id;
+    public static bool operator >(Symbol left, Symbol right) => left.Id > right.Id;
     public static bool operator ==(Symbol left, Symbol right) => left.Id == right.Id;
     public static bool operator !=(Symbol left, Symbol right) => left.Id != right.Id;
 }

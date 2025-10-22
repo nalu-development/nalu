@@ -6,6 +6,7 @@
     <RootNamespace>Nalu</RootNamespace>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">

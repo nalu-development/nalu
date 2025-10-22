@@ -88,6 +88,11 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
         _solver.AddEditVariable(Right, Strength.Weak);
         _solver.AddEditVariable(_lowBottom, Strength.Weak);
         _solver.AddEditVariable(_lowRight, Strength.Weak);
+        
+        _solver.SuggestValue(_lowRight, 0);
+        _solver.SuggestValue(_lowBottom, 0);
+        _solver.SuggestValue(Right, 0);
+        _solver.SuggestValue(Bottom, 0);
     }
 
     /// <inheritdoc />
@@ -231,22 +236,28 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     /// <inheritdoc />
     public void PrepareForMeasure(double width, double height)
     {
-        foreach (var element in _elements)
+        var len = _elements.Count;
+        int index;
+
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.DetectChanges();
         }
 
         SetBounds(width, height, true);
 
-        foreach (var element in _elements)
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.ApplyConstraints();
         }
 
         _solver.FetchChanges();
 
-        foreach (var element in _elements)
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.FinalizeConstraints();
         }
 
@@ -258,8 +269,12 @@ public class MagnetStage : BindableObject, IMagnetStage, IList<IMagnetElement>
     {
         SetBounds(width, height, false);
 
-        foreach (var element in _elements)
+        var len = _elements.Count;
+        int index;
+
+        for (index = 0; index < len; ++index)
         {
+            var element = _elements[index];
             element.FinalizeConstraints();
         }
 

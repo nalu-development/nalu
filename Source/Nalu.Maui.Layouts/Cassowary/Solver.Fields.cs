@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Nalu.Internals;
 
 namespace Nalu.Cassowary;
@@ -10,6 +11,7 @@ public partial class Solver
     private readonly RefDictionary<Constraint, Tag> _cnMap = new();
     private readonly RefDictionary<Symbol, Row> _rowMap = new(SymbolDictionaryComparer.Instance);
     private readonly RefDictionary<Variable, Symbol> _varMap = new();
+    private readonly RefDictionary<Symbol, Variable> _symbolMap = new();
     private readonly RefDictionary<Variable, EditInfo> _editMap = new();
     private readonly List<Symbol> _infeasibleRows = new();
     private readonly Row _objective = new();
@@ -34,11 +36,12 @@ public partial class Solver
     /// <summary>
     /// Test whether a value is approximately zero.
     /// </summary>
-    private static bool NearZero(double value)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool NearZero(double value)
     {
         const double eps = 1.0e-8;
-        const double neps = 1.0e-8;
+        const double neps = -1.0e-8;
 
-        return value < 0.0 ? value > neps : value < eps;
+        return value is > neps and < eps;
     }
 }

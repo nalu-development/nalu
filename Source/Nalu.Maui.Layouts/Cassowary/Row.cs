@@ -1,5 +1,3 @@
-using Nalu.Internals;
-
 namespace Nalu.Cassowary;
 
 /// <summary>
@@ -10,12 +8,17 @@ internal class Row
     private double _constant;
 
     /// <summary>
+    /// The variable associated with this row, if any.
+    /// </summary>
+    public Variable? Variable { get; set; }
+
+    /// <summary>
     /// Construct a new Row.
     /// </summary>
     internal Row(double constant = 0.0)
     {
         _constant = constant;
-        Cells = new RefDictionary<Symbol, double>(SymbolDictionaryComparer.Instance);
+        Cells = new CellDictionary();
     }
 
     /// <summary>
@@ -24,16 +27,16 @@ internal class Row
     /// <remarks>
     /// Cells will be cloned.
     /// </remarks>
-    private Row(RefDictionary<Symbol, double> cells, double constant = 0.0)
+    private Row(CellDictionary cells, double constant = 0.0)
     {
         _constant = constant;
-        Cells = new RefDictionary<Symbol, double>(cells);
+        Cells = new CellDictionary(cells);
     }
 
     /// <summary>
     /// Returns the mapping of symbols to coefficients.
     /// </summary>
-    public RefDictionary<Symbol, double> Cells { get; }
+    public CellDictionary Cells { get; }
 
     /// <summary>
     /// Returns the constant for the row.
@@ -79,15 +82,10 @@ internal class Row
     /// coefficient is zero, the symbol will be removed from the row.
     /// </summary>
     public void InsertSymbol(Symbol symbol, double coefficient = 1.0)
-    {
-        ref var value = ref Cells.GetOrAddDefaultRef(symbol, out _);
-        value += coefficient;
-
-        if (NearZero(value))
-        {
-            Cells.Remove(symbol);
-        }
-    }
+        => Cells.SumOrRemove(
+            symbol,
+            coefficient
+        );
 
     /// <summary>
     /// Insert a row into this row with a given coefficient.
@@ -188,13 +186,7 @@ internal class Row
     }
 
     /// <summary>
-    /// Test whether a value is approximately zero.
+    /// Update the variable (if any) with the current value of the row constant.
     /// </summary>
-    private static bool NearZero(double value)
-    {
-        const double eps = 1.0e-8;
-        const double neps = 1.0e-8;
-
-        return value < 0.0 ? value > neps : value < eps;
-    }
+    public void UpdateVariable() => Variable?.CurrentValue = _constant;
 }

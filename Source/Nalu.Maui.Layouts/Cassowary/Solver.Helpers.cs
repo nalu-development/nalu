@@ -15,6 +15,7 @@ public partial class Solver
 
         var newSymbol = MakeSymbol(SymbolType.External);
         _varMap[variable] = newSymbol;
+        _symbolMap[newSymbol] = variable;
 
         return newSymbol;
     }
@@ -131,7 +132,7 @@ public partial class Solver
         // 2) A negative slack or error tag variable.
         // If a subject cannot be found, an invalid symbol will be returned.
 
-        foreach (var pair in row.Cells)
+        foreach (ref var pair in row.Cells)
         {
             if (pair.Key.Type == SymbolType.External)
             {
@@ -139,12 +140,12 @@ public partial class Solver
             }
         }
 
-        if ((tag.Marker.Type == SymbolType.Slack || tag.Marker.Type == SymbolType.Error) && row.CoefficientFor(tag.Marker) < 0.0)
+        if (tag.Marker.Type is SymbolType.Slack or SymbolType.Error && row.CoefficientFor(tag.Marker) < 0.0)
         {
             return tag.Marker;
         }
 
-        if ((tag.Other.Type == SymbolType.Slack || tag.Other.Type == SymbolType.Error) && row.CoefficientFor(tag.Other) < 0.0)
+        if (tag.Other.Type is SymbolType.Slack or SymbolType.Error && row.CoefficientFor(tag.Other) < 0.0)
         {
             return tag.Other;
         }
@@ -188,6 +189,7 @@ public partial class Solver
             basicRow.SolveForEx(art, entering);
             Substitute(entering, basicRow);
             _rowMap[entering] = basicRow;
+            basicRow.Variable = _symbolMap.TryGetValue(entering, out var enteringVariable) ? enteringVariable : null;
         }
 
         // Remove the artificial variable from the tableau.
@@ -210,7 +212,7 @@ public partial class Solver
     /// </summary>
     private Symbol AnyPivotableSymbol(Row row)
     {
-        foreach (var pair in row.Cells)
+        foreach (ref var pair in row.Cells)
         {
             var type = pair.Key.Type;
 

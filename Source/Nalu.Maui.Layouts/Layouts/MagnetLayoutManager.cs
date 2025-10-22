@@ -27,8 +27,13 @@ internal class MagnetLayoutManager : LayoutManager
         var maxHeight = 0.0;
         var hasMagnetViews = false;
 
-        foreach (var child in Layout)
+        var layout = Layout;
+        var childCount = layout.Count;
+
+        for (var index = 0; index < childCount; ++index)
         {
+            var child = layout[index];
+
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
                 hasMagnetViews = true;
@@ -68,8 +73,12 @@ internal class MagnetLayoutManager : LayoutManager
             return NoStageArrange(bounds);
         }
 
-        foreach (var child in Layout)
+        var layout = Layout;
+        var childCount = layout.Count;
+        for (var index = 0; index < childCount; ++index)
         {
+            var child = layout[index];
+
             if (TryGetMagnetView(stage, child, out var magnetView))
             {
                 magnetView.View = child;
@@ -86,8 +95,10 @@ internal class MagnetLayoutManager : LayoutManager
 
         stage.PrepareForArrange(width, height);
 
-        foreach (var child in Layout)
+        for (var index = 0; index < childCount; ++index)
         {
+            var child = layout[index];
+
             if (child.Visibility is Visibility.Collapsed)
             {
                 continue;
