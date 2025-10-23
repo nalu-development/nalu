@@ -59,6 +59,27 @@ public sealed class PopupContainer : Border
 }
 
 /// <summary>
+/// Defines the presentation mode
+/// </summary>
+public enum PopupPresentationMode
+{
+    /// <summary>
+    /// Shows as a popup
+    /// </summary>
+    Popup,
+
+    /// <summary>
+    /// Shows as <see cref="PresentationMode.Animated"/>
+    /// </summary>
+    Page,
+
+    /// <summary>
+    /// Shows as <see cref="PresentationMode.ModalAnimated"/>
+    /// </summary>
+    ModalPage,
+}
+
+/// <summary>
 /// The <see cref="ViewBox"/> acting as a scrim for the popup.
 /// </summary>
 /// <remarks>
@@ -81,6 +102,7 @@ public sealed class PopupScrim : ViewBox;
 public abstract class PopupPageBase : ContentPage
 {
     private bool _hasAnimated;
+    private PopupPresentationMode _mode;
 
     /// <summary>
     /// Bindable property for <see cref="CloseOnScrimTapped"/>.
@@ -125,7 +147,7 @@ public abstract class PopupPageBase : ContentPage
     /// </summary>
     protected PopupPageBase()
     {
-        SetPopupPresentationMode();
+        SetPopupPresentationMode(PopupPresentationMode.Popup);
 
         PopupBorder = new PopupContainer();
         Scrim = new PopupScrim();
@@ -158,25 +180,34 @@ public abstract class PopupPageBase : ContentPage
     /// The popup presentation mode involves: transparent background, no navbar, not animated modal <see cref="PresentationMode"/>.
     /// This mode is enabled by default.
     /// </remarks>
-    /// <param name="enabled">Whether to enable or disable the popup presentation mode.</param>
-    protected void SetPopupPresentationMode(bool enabled = true)
+    /// <param name="mode">The presentation mode</param>
+    protected void SetPopupPresentationMode(PopupPresentationMode mode)
     {
-        if (enabled)
+        switch (mode)
         {
-            BackgroundColor = Colors.Transparent;
-            Background = Brush.Transparent;
-            Shell.SetPresentationMode(this, PresentationMode.ModalNotAnimated);
-            Shell.SetNavBarIsVisible(this, false);
-            On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.OverFullScreen);
+            case PopupPresentationMode.Popup:
+                BackgroundColor = Colors.Transparent;
+                Background = Brush.Transparent;
+                Shell.SetPresentationMode(this, PresentationMode.ModalNotAnimated);
+                Shell.SetNavBarIsVisible(this, false);
+                On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.OverFullScreen);
+                break;
+            case PopupPresentationMode.Page:
+            case PopupPresentationMode.ModalPage:
+                if (_mode == PopupPresentationMode.Popup)
+                {
+                    ClearValue(BackgroundColorProperty);
+                    ClearValue(BackgroundProperty);
+                    On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.FullScreen);
+                    Shell.SetNavBarIsVisible(this, true);
+                }
+                Shell.SetPresentationMode(this, mode == PopupPresentationMode.Page ? PresentationMode.Animated : PresentationMode.Modal);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
         }
-        else
-        {
-            ClearValue(BackgroundColorProperty);
-            ClearValue(BackgroundProperty);
-            Shell.SetPresentationMode(this, PresentationMode.Modal);
-            Shell.SetNavBarIsVisible(this, true);
-            On<iOS>().SetModalPresentationStyle(UIModalPresentationStyle.FullScreen);
-        }
+
+        _mode = mode;
     }
 
     /// <inheritdoc />
@@ -220,8 +251,11 @@ public abstract class PopupPageBase : ContentPage
     /// </summary>
     protected virtual void PreparePopupAnimation()
     {
-        PopupBorder.Opacity = 0;
-        PopupBorder.Scale = 0;
+        if (_mode == PopupPresentationMode.Popup)
+        {
+            PopupBorder.Opacity = 0;
+            PopupBorder.Scale = 0;
+        }
     }
 
     /// <summary>
@@ -230,18 +264,23 @@ public abstract class PopupPageBase : ContentPage
     /// By default, it animates the opacity and scale of the popup from 0 to 1 over a duration of 250 milliseconds using a cubic easing function.
     /// </summary>
     protected virtual void AnimatePopup()
-        => PopupBorder.Animate(
-            "PopupAppearing",
-            callback: v =>
-            {
-                PopupBorder.Opacity = v;
-                PopupBorder.Scale = v;
-            },
-            start: 0,
-            end: 1,
-            length: 250,
-            easing: Easing.CubicInOut
-        );
+    {
+        if (_mode == PopupPresentationMode.Popup)
+        {
+            PopupBorder.Animate(
+                "PopupAppearing",
+                callback: v =>
+                {
+                    PopupBorder.Opacity = v;
+                    PopupBorder.Scale = v;
+                },
+                start: 0,
+                end: 1,
+                length: 250,
+                easing: Easing.CubicInOut
+            );
+        }
+    }
 
     /// <summary>
     /// The <see cref="PopupScrim"/> that covers the entire screen when the popup is displayed.
