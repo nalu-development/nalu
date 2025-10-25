@@ -8,5 +8,16 @@
   href: layouts.md
 - name: Navigation
   href: navigation.md
+  items:
+    - name: Overview
+      href: navigation.md
+    - name: Lifecycle Events
+      href: navigation-lifecycle.md
+    - name: Intents
+      href: navigation-intents.md
+    - name: Advanced Features
+      href: navigation-advanced.md
+    - name: Testing & Troubleshooting
+      href: navigation-testing.md
 - name: API
   href: ../api/Nalu.yml
