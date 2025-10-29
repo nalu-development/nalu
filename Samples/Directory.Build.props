@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <MauiVersion>9.0.80</MauiVersion>
+    <MauiVersion>9.0.110</MauiVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Package">
