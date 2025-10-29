@@ -111,6 +111,8 @@ jobs:
   push-nuget:
     name: "Push NuGet Packages"
     needs: build
+    permissions:
+      id-token: write  # enable GitHub OIDC token issuance for this job
     if: github.event_name == 'release'
     environment:
       name: "NuGet"
