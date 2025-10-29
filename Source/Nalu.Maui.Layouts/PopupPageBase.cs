@@ -153,15 +153,17 @@ public abstract class PopupPageBase : ContentPage
         Scrim = new PopupScrim();
 
         var scrimTapRecognizer = new TapGestureRecognizer();
+        var closing = false;
         scrimTapRecognizer.Tapped += (_, _) =>
         {
-            if (CloseOnScrimTapped)
+            if (CloseOnScrimTapped && !closing)
             {
+                closing = true;
                 _ = Navigation?.PopModalAsync();
             }
         };
 
-        var tappableScrim = new ViewBox();
+        var tappableScrim = new Grid();
         tappableScrim.GestureRecognizers.Add(scrimTapRecognizer);
 
         var ignoreSafeAreaPopupBorderLayout = new Grid { tappableScrim, PopupBorder };
