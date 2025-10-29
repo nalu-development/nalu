@@ -117,6 +117,11 @@ jobs:
       url: https://www.nuget.org/packages/Nalu
     runs-on: windows-latest
     steps:
+      - name: NuGet login (get temporary API key using OIDC)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{secrets.NUGET_USER}}
       - name: "Download Artefact"
         uses: actions/download-artifact@v4.3.0
         with:
@@ -125,7 +130,7 @@ jobs:
         run: |
           Get-ChildItem .\ -Filter *.nupkg |
           Where-Object { !$_.Name.Contains('preview') } |
-          ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{secrets.NUGET_API_KEY}} }
+          ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.login.outputs.NUGET_API_KEY }} }
         shell: pwsh
 
   deploy-gh-pages:
