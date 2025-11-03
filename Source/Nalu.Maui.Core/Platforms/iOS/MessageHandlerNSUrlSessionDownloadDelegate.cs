@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Web;
 using CoreFoundation;
 using Foundation;
 using Microsoft.Extensions.Logging;
@@ -82,7 +83,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CookieContainer? cookieContainer, TimeSpan defaultTimeout, CancellationToken cancellationToken)
     {
-        var requestUrl = new NSUrl(request.RequestUri?.ToString() ?? throw new ArgumentException("RequestUri cannot be null."));
+        ArgumentNullException.ThrowIfNull(request.RequestUri);
+        // Build NSUrl from Uri components to preserve proper encoding of path, query items, user info, etc.
+        var requestUrl = BuildNativeUrl(request.RequestUri);
         var requestIdentifier = TryGetRequestIdentifier(request, out var id) ? id : Guid.NewGuid().ToString("N");
 
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
@@ -603,6 +606,73 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider()
         => IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+
+    // Build an NSUrl from a managed Uri using NSUrlComponents and HttpUtility.ParseQueryString for accurate query parsing.
+    private static NSUrl BuildNativeUrl(Uri uri)
+    {
+        var components = new NSUrlComponents
+        {
+            Scheme = uri.Scheme,
+            Host = uri.Host,
+            Path = string.IsNullOrEmpty(uri.AbsolutePath) ? "/" : uri.AbsolutePath
+        };
+
+        if (uri is { IsDefaultPort: false, Port: > 0 })
+        {
+            components.Port = NSNumber.FromInt32(uri.Port);
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            var userInfoParts = uri.UserInfo.Split(':');
+            if (userInfoParts.Length > 0)
+            {
+                components.User = WebUtility.UrlDecode(userInfoParts[0]);
+            }
+            if (userInfoParts.Length > 1)
+            {
+                components.Password = WebUtility.UrlDecode(userInfoParts[1]);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(uri.Query))
+        {
+            var nvc = HttpUtility.ParseQueryString(uri.Query); // handles leading '?'
+            var queryItems = new List<NSUrlQueryItem>();
+            foreach (var key in nvc.AllKeys)
+            {
+                if (key is null)
+                {
+                    continue; // Skip null keys (can happen with malformed query parts)
+                }
+                var values = nvc.GetValues(key);
+                if (values is null || values.Length == 0)
+                {
+                    // Key without value -> treat as empty value
+                    queryItems.Add(new NSUrlQueryItem(key, string.Empty));
+                    continue;
+                }
+
+                queryItems.AddRange(values.Select(value => new NSUrlQueryItem(key, value)));
+            }
+
+            if (queryItems.Count > 0)
+            {
+                components.QueryItems = [.. queryItems];
+            }
+            else
+            {
+                components.Query = string.Empty; // explicit empty query
+            }
+        }
+
+        if (!string.IsNullOrEmpty(uri.Fragment))
+        {
+            components.Fragment = uri.Fragment.TrimStart('#');
+        }
+
+        return components.Url ?? throw new InvalidOperationException("Failed to build valid NSUrl from Uri components.");
+    }
 
     [GeneratedRegex("(.+?): (.+)")]
     private static partial Regex HeaderValueRegex();
