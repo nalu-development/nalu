@@ -624,46 +624,23 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (!string.IsNullOrEmpty(uri.UserInfo))
         {
+            // Uri.UserInfo is already decoded by the Uri class, so use it directly
             var userInfoParts = uri.UserInfo.Split(':');
             if (userInfoParts.Length > 0)
             {
-                components.User = WebUtility.UrlDecode(userInfoParts[0]);
+                components.User = userInfoParts[0];
             }
             if (userInfoParts.Length > 1)
             {
-                components.Password = WebUtility.UrlDecode(userInfoParts[1]);
+                components.Password = userInfoParts[1];
             }
         }
 
         if (!string.IsNullOrEmpty(uri.Query))
         {
-            var nvc = HttpUtility.ParseQueryString(uri.Query); // handles leading '?'
-            var queryItems = new List<NSUrlQueryItem>();
-            foreach (var key in nvc.AllKeys)
-            {
-                if (key is null)
-                {
-                    continue; // Skip null keys (can happen with malformed query parts)
-                }
-                var values = nvc.GetValues(key);
-                if (values is null || values.Length == 0)
-                {
-                    // Key without value -> treat as empty value
-                    queryItems.Add(new NSUrlQueryItem(key, string.Empty));
-                    continue;
-                }
-
-                queryItems.AddRange(values.Select(value => new NSUrlQueryItem(key, value)));
-            }
-
-            if (queryItems.Count > 0)
-            {
-                components.QueryItems = [.. queryItems];
-            }
-            else
-            {
-                components.Query = string.Empty; // explicit empty query
-            }
+            // Use PercentEncodedQuery to preserve the exact encoding from the original URI.
+            // This avoids decoding/re-encoding which can change semantics (e.g., + vs %20 for spaces).
+            components.PercentEncodedQuery = uri.Query.TrimStart('?');
         }
 
         if (!string.IsNullOrEmpty(uri.Fragment))
