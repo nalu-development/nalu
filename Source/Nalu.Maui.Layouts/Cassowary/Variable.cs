@@ -41,6 +41,9 @@ public class Variable
     public void SetName(string name) => Name = name;
 
     /// <inheritdoc />
+    public override int GetHashCode() => (int) _id;
+
+    /// <inheritdoc />
     public override string ToString() => $"{Name ?? "v" + _id}: {CurrentValue}";
 
     #region operator +

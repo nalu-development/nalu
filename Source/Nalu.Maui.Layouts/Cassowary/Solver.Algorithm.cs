@@ -37,6 +37,7 @@ public partial class Solver
             row.SolveForEx(leaving, entering);
             Substitute(entering, row);
             _rowMap[entering] = row;
+            row.Variable = _symbolMap.TryGetValue(entering, out var enteringVariable) ? enteringVariable : null;
 
             iterations++;
         }
@@ -79,6 +80,7 @@ public partial class Solver
                 row.SolveForEx(leaving, entering);
                 Substitute(entering, row);
                 _rowMap[entering] = row;
+                row.Variable = _symbolMap.TryGetValue(entering, out var enteringVariable) ? enteringVariable : null;
             }
         }
     }

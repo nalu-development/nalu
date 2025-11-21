@@ -9,6 +9,11 @@ namespace Nalu;
 public interface INavigationServiceProvider : IServiceProvider, IDisposable
 {
     /// <summary>
+    /// Gets the <see cref="Page"/> instance which hosts this navigation service provider.
+    /// </summary>
+    Page ContextPage { get; }
+
+    /// <summary>
     /// Registers a service instance visible to nested routes and disposed when the current route is left.
     /// </summary>
     /// <param name="instance">The service instance.</param>

@@ -29,12 +29,12 @@ jobs:
         os: [windows-latest]
     steps:
       - name: "Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           lfs: true
           fetch-depth: 0
       - name: configure_java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -44,7 +44,7 @@ jobs:
           java --version
           echo $ENV:JAVA_HOME
       - name: "Setup .NET SDK"
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '9.0.102'
       - name: "Ensure workloads" # https://github.com/actions/runner/issues/3578
@@ -70,18 +70,18 @@ jobs:
         run: dotnet docfx build docfx.json
         shell: pwsh
       - name: Upload Documentation Site
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: docfx-site
           path: _site
 
       - name: "Publish Artefacts"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5
         with:
           name: ${{matrix.os}}
           path: "./Artefacts"
       - name: "Publish Binlog"
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5
         with:
           name: ${{matrix.os}}-binlog
           path: "./Binlog"
@@ -98,7 +98,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: "Download Artefact"
-        uses: actions/download-artifact@v4.1.8
+        uses: actions/download-artifact@v6
         with:
           name: "windows-latest"
       - name: "Dotnet NuGet Add Source"
@@ -111,21 +111,28 @@ jobs:
   push-nuget:
     name: "Push NuGet Packages"
     needs: build
+    permissions:
+      id-token: write  # enable GitHub OIDC token issuance for this job
     if: github.event_name == 'release'
     environment:
       name: "NuGet"
       url: https://www.nuget.org/packages/Nalu
     runs-on: windows-latest
     steps:
+      - name: NuGet login (get temporary API key using OIDC)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{secrets.NUGET_USER}}
       - name: "Download Artefact"
-        uses: actions/download-artifact@v4.3.0
+        uses: actions/download-artifact@v6
         with:
           name: "windows-latest"
       - name: "Dotnet NuGet Push"
         run: |
           Get-ChildItem .\ -Filter *.nupkg |
           Where-Object { !$_.Name.Contains('preview') } |
-          ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{secrets.NUGET_API_KEY}} }
+          ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.login.outputs.NUGET_API_KEY }} }
         shell: pwsh
 
   deploy-gh-pages:
@@ -142,10 +149,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Documentation Site
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: docfx-site
           path: ./_site
@@ -154,7 +161,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: './_site'
 

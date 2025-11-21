@@ -143,10 +143,13 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     protected sealed override void OnNavigating(ShellNavigatingEventArgs args)
     {
         var uri = args.Target.Location.OriginalString;
-
+        var currentUri = args.Current?.Location.OriginalString ?? string.Empty;
+        
         if (!_initialized || // Shell initialization process
             Handler is null || // Shell initialization process
             string.IsNullOrEmpty(uri) || // An empty URI is very likely Android trying to background the app when on a root page and back button is pressed.
+            CommunityToolkitPopupRegex().IsMatch(uri) || // CommunityToolkit popup navigation
+            CommunityToolkitPopupRegex().IsMatch(currentUri) || // CommunityToolkit popup navigation
             IsRemovingStackPages(args) || // ShellSectionProxy removing pages from the stack during cross-item navigation
             uri.EndsWith("?nalu")) // Nalu-triggered navigations
         {
@@ -250,4 +253,10 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
     private static string NormalizeSegment(string segment)
         => NormalizeSegmentRegex().Replace(segment, string.Empty);
+
+    // See: https://github.com/CommunityToolkit/Maui/blob/main/src/CommunityToolkit.Maui/Extensions/PopupExtensions.shared.cs#L165
+    // We need to match: $"{nameof(PopupPage)}" + Guid.NewGuid();
+    // In example: "PopupPageca6500ff-c430-49d4-9f79-f5536f71f959";
+    [GeneratedRegex(@"\bPopupPage[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", RegexOptions.IgnoreCase)]
+    private static partial Regex CommunityToolkitPopupRegex();
 }

@@ -10,7 +10,7 @@ public partial class CanLeavePopup
         InitializeComponent();
     }
 
-    private void YesOnClicked(object? sender, EventArgs e) => Close(true);
+    private void YesOnClicked(object? sender, EventArgs e) => CloseAsync(true);
 
-    private void NoOnClicked(object? sender, EventArgs e) => Close(false);
+    private void NoOnClicked(object? sender, EventArgs e) => CloseAsync(false);
 }

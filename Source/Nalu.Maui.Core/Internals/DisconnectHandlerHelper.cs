@@ -1,4 +1,10 @@
+using System;
 using System.ComponentModel;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
+using Microsoft.Maui;
+using ViewExtensions = Microsoft.Maui.Controls.ViewExtensions;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
@@ -23,48 +29,47 @@ public static class DisconnectHandlerHelper
         _disconnectPolicyProperty = policyBindableProperty ?? HandlerPropertiesBackport.DisconnectPolicyBackportProperty;
     }
 #endif
+    
+    // .NET10 https://github.com/dotnet/runtime/pull/114881
+    // [UnsafeAccessor("Microsoft.Maui.Platform.ViewExtensions", UnsafeAccessorKind.StaticMethod, Name = "OnUnloaded")]
+    // internal static IDisposable OnUnloaded(IElement element, Action action)
+
+    // .NET9 we have to use reflection
+    private static readonly Func<IElement, Action, IDisposable>? _onUnloaded =
+        typeof(Microsoft.Maui.Platform.ViewExtensions).GetMethod(
+            "OnUnloaded",
+            BindingFlags.Static | BindingFlags.NonPublic, [typeof(IElement), typeof(Action)]
+        )?.CreateDelegate<Func<IElement, Action, IDisposable>>();
 
     public static void DisconnectHandlers(IView view)
     {
-#if !NET9_0_OR_GREATER
-        // For our first go here
-        // My thinking is to build a flat list of all views in the tree
-        // And then iterate down the list disconnecting handlers.
-        // This gives me a stable list of views to call DisconnectHandler on
-        // I'm assuming as this PR evolves we'll probably add some interfaces
-        // that allow handlers to manage their own children and disconnect flow
-        var flatList = new List<IView>();
-        BuildFlatList(view, flatList);
-
-        foreach (var viewToDisconnect in flatList)
+        if (view is VisualElement { IsLoaded: true } && _onUnloaded is not null)
         {
-            viewToDisconnect.Handler?.DisconnectHandler();
+            _onUnloaded(view, () =>
+            {
+                SafeDisconnectHandlers(view);
+            });
         }
-
-        return;
-
-        static void BuildFlatList(IView view, List<IView> flatList)
+        else
         {
-            if (view is BindableObject bindable && (int) bindable.GetValue(_disconnectPolicyProperty) == 1)
-            {
-                return;
-            }
-
-            flatList.Add(view);
-
-            if (view is IVisualTreeElement vte)
-            {
-                foreach (var child in vte.GetVisualChildren())
-                {
-                    if (child is IView childView)
-                    {
-                        BuildFlatList(childView, flatList);
-                    }
-                }
-            }
+            SafeDisconnectHandlers(view);
         }
-#else
-        view.DisconnectHandlers();
-#endif
     }
+
+    private static void SafeDisconnectHandlers(IView view)
+    {
+        try
+        {
+            view.DisconnectHandlers();
+        }
+        catch (Exception ex)
+        {
+            // Log the exception or handle it as needed
+            Application.Current?.GetLogger<IViewHandler>()
+                       ?.LogError(ex, "Error disconnecting handlers for view: {ViewType}", view.GetType().Name);
+        }
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.StaticField, Name = "StaticId")]
+    public static extern ref Guid GetUnsafeStaticField();
 }

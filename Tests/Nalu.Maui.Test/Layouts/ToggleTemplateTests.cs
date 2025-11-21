@@ -68,4 +68,27 @@ public class ToggleTemplateTests
         toggleTemplate.Value = null;
         toggleTemplate.PresentedContent.Should().BeNull();
     }
+
+    [Fact(DisplayName = "ToggleTemplate clears when BindingContext is set to null")]
+    public void ToggleTemplateClearsWhenBindingContextIsSetToNull()
+    {
+        // Arrange
+        var toggleTemplate = new ToggleTemplate();
+        var trueTemplate = new DataTemplate(() => new Label());
+        var falseTemplate = new DataTemplate(() => new Button());
+        toggleTemplate.WhenTrue = trueTemplate;
+        toggleTemplate.WhenFalse = falseTemplate;
+        
+        var bindingContext = new { TheValue = true };
+        toggleTemplate.SetBinding(ToggleTemplate.ValueProperty, new Binding("TheValue"));
+        toggleTemplate.BindingContext = bindingContext;
+        // Ensure initial state
+        toggleTemplate.PresentedContent.Should().BeOfType<Label>();
+
+        // Act
+        toggleTemplate.BindingContext = null;
+
+        // Assert
+        toggleTemplate.PresentedContent.Should().BeNull();
+    }
 }

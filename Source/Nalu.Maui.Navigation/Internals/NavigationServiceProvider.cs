@@ -4,6 +4,7 @@ internal sealed class NavigationServiceProvider : INavigationServiceProviderInte
 {
     private readonly Dictionary<Type, object> _services = [];
     private INavigationServiceProvider? _parent;
+    private Page? _page;
 
     public object? GetService(Type serviceType)
     {
@@ -15,6 +16,8 @@ internal sealed class NavigationServiceProvider : INavigationServiceProviderInte
         return _parent?.GetService(serviceType);
     }
 
+    public Page ContextPage => _page ?? throw new InvalidOperationException("Context page is not set.");
+
     public void AddNavigationScoped<T>(T instance)
     {
         ArgumentNullException.ThrowIfNull(instance);
@@ -22,6 +25,8 @@ internal sealed class NavigationServiceProvider : INavigationServiceProviderInte
     }
 
     public void SetParent(INavigationServiceProvider parent) => _parent = parent;
+
+    public void SetContextPage(Page page) => _page = page;
 
     public void Dispose()
     {
@@ -34,5 +39,6 @@ internal sealed class NavigationServiceProvider : INavigationServiceProviderInte
         }
 
         _parent = null;
+        _page = null;
     }
 }

@@ -51,8 +51,6 @@ public static class MauiProgram
         builder.Services
                .AddSingleton<WeatherState>();
 
-        builder.Services.AddTransientPopup<DurationEditPopup, DurationEdit>();
-
 #if DEBUG
         builder.Logging.AddDebug();
         builder.Logging.AddSimpleConsole();

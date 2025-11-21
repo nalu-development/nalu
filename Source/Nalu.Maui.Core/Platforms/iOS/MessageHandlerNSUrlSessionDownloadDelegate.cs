@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Web;
 using CoreFoundation;
 using Foundation;
 using Microsoft.Extensions.Logging;
@@ -82,7 +83,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CookieContainer? cookieContainer, TimeSpan defaultTimeout, CancellationToken cancellationToken)
     {
-        var requestUrl = new NSUrl(request.RequestUri?.ToString() ?? throw new ArgumentException("RequestUri cannot be null."));
+        ArgumentNullException.ThrowIfNull(request.RequestUri);
+        // Build NSUrl from Uri components to preserve proper encoding of path, query items, user info, etc.
+        var requestUrl = BuildNativeUrl(request.RequestUri);
         var requestIdentifier = TryGetRequestIdentifier(request, out var id) ? id : Guid.NewGuid().ToString("N");
 
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
@@ -603,6 +606,50 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider()
         => IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+
+    // Build an NSUrl from a managed Uri using NSUrlComponents and HttpUtility.ParseQueryString for accurate query parsing.
+    private static NSUrl BuildNativeUrl(Uri uri)
+    {
+        var components = new NSUrlComponents
+        {
+            Scheme = uri.Scheme,
+            Host = uri.Host,
+            Path = string.IsNullOrEmpty(uri.AbsolutePath) ? "/" : uri.AbsolutePath
+        };
+
+        if (uri is { IsDefaultPort: false, Port: > 0 })
+        {
+            components.Port = NSNumber.FromInt32(uri.Port);
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            // Uri.UserInfo is already decoded by the Uri class, so use it directly
+            var userInfoParts = uri.UserInfo.Split(':');
+            if (userInfoParts.Length > 0)
+            {
+                components.User = userInfoParts[0];
+            }
+            if (userInfoParts.Length > 1)
+            {
+                components.Password = userInfoParts[1];
+            }
+        }
+
+        if (!string.IsNullOrEmpty(uri.Query))
+        {
+            // Use PercentEncodedQuery to preserve the exact encoding from the original URI.
+            // This avoids decoding/re-encoding which can change semantics (e.g., + vs %20 for spaces).
+            components.PercentEncodedQuery = uri.Query.TrimStart('?');
+        }
+
+        if (!string.IsNullOrEmpty(uri.Fragment))
+        {
+            components.Fragment = uri.Fragment.TrimStart('#');
+        }
+
+        return components.Url ?? throw new InvalidOperationException("Failed to build valid NSUrl from Uri components.");
+    }
 
     [GeneratedRegex("(.+?): (.+)")]
     private static partial Regex HeaderValueRegex();

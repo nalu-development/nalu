@@ -96,7 +96,7 @@ public partial class OnePageModel(
     {
         var httpRequestMessage = new HttpRequestMessage
                                  {
-                                     RequestUri = new Uri($"test?delay={delayMs}", UriKind.Relative),
+                                     RequestUri = new Uri($"test?delay={delayMs}&foo={{bar: 5}}", UriKind.Relative),
                                      Method = HttpMethod.Post,
                                      Content = JsonContent.Create(Animal)
                                  };

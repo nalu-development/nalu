@@ -72,6 +72,11 @@ public abstract class ViewBoxBase : View, IViewBox, ISafeAreaView
     private IView? _contentView;
 #pragma warning restore IDE0032
 
+    /// <summary>
+    /// Triggered when the content changes.
+    /// </summary>
+    public event EventHandler<ViewBoxContentChangedEventArgs>? ContentChanged;
+
     Size IContentView.CrossPlatformMeasure(double widthConstraint, double heightConstraint) => LayoutManager.Measure(widthConstraint, heightConstraint);
     Size IContentView.CrossPlatformArrange(Rect bounds) => LayoutManager.ArrangeChildren(bounds);
 
@@ -99,6 +104,11 @@ public abstract class ViewBoxBase : View, IViewBox, ISafeAreaView
             bindableView.BindingContext = newvalue;
         }
     }
+
+    /// <summary>
+    /// Triggers the <see cref="ContentChanged" /> event.
+    /// </summary>
+    protected void TriggerContentChanged(IView? oldView, IView? newView) => ContentChanged?.Invoke(this, new ViewBoxContentChangedEventArgs(oldView, newView));
 
     /// <summary>
     /// Sets the content of the layout.
@@ -136,6 +146,8 @@ public abstract class ViewBoxBase : View, IViewBox, ISafeAreaView
                 RemoveLogicalChild(oldElement);
             }
         }
+
+        TriggerContentChanged(oldView, newView);
     }
 
     /// <summary>

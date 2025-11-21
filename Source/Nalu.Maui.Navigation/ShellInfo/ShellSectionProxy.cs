@@ -10,8 +10,11 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 {
     private readonly ShellSection _section;
     private readonly List<ShellContentProxy> _contents;
+    private IShellContentProxy? _currentContent;
     public string SegmentName { get; }
-    public IShellContentProxy CurrentContent { get; private set; }
+
+    public IShellContentProxy CurrentContent => _currentContent ?? throw new InvalidOperationException($"Section '{_section.Route}' has no current content. This can happen if the section has no (visible) items.");
+
     public IReadOnlyList<IShellContentProxy> Contents => _contents;
     public IShellItemProxy Parent { get; init; }
 
@@ -113,8 +116,13 @@ internal sealed class ShellSectionProxy : IShellSectionProxy, IDisposable
 
     private void UpdateCurrentContent()
     {
-        var currentSegmentName = _section.CurrentItem.Route;
-        CurrentContent = Contents.First(c => c.SegmentName == currentSegmentName);
+        // When the section is empty or has no visible items, we cannot determine the current content.
+        var currentSegmentName = (_section.CurrentItem ?? _section.Items.FirstOrDefault())?.Route;
+
+        if (currentSegmentName is not null)
+        {
+            _currentContent = Contents.FirstOrDefault(c => c.SegmentName == currentSegmentName);
+        }
     }
 
     public static bool IsPageMarkedForRemoval(Page page) => (bool) page.GetValue(_navigationRemovalProperty);

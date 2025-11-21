@@ -194,7 +194,7 @@ public static partial class SoftKeyboardManager
             var wasVisible = State.IsVisible;
             var isVisible = insets.IsVisible(keyboardType);
 
-            if (!wasVisible && isVisible && _focusedView?.TryGetTarget(out var focusedView) is true)
+            if (!wasVisible && isVisible && _focusedView?.TryGetTarget(out var focusedView) is true && State.AdjustMode == SoftKeyboardAdjustMode.Resize)
             {
                 ScrollToFocusedField(focusedView);
             }
@@ -219,7 +219,7 @@ public static partial class SoftKeyboardManager
                 LogDebug("Focused view changed to: " + textView.GetType().Name);
                 SetAdjustMode(textView);
 
-                if (State.IsVisible)
+                if (State is { IsVisible: true, AdjustMode: SoftKeyboardAdjustMode.Resize })
                 {
                     LogDebug("Soft keyboard is visible, scrolling to focused field.");
                     ScrollToFocusedField(textView);
