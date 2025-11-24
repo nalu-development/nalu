@@ -10,6 +10,7 @@
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <local:SampleTabBar x:Key="SampleTabBar" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

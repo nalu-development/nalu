@@ -8,7 +8,8 @@
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems"
                 Title="Tabs"
-                Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}">
+                Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"
+                nalu:NaluShell.TabBarView="{StaticResource SampleTabBar}">
         <Tab Title="Pages"
              Route="pages"
              FlyoutDisplayOptions="AsMultipleItems"
