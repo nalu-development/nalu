@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             x:Class="Nalu.Maui.Sample.Pages.ElevenPage"
+             x:DataType="pageModels:ElevenPageModel"
+             Title="Page Eleven">
+    <ScrollView Padding="16" Background="LightGoldenrodYellow">
+        <VerticalStackLayout Spacing="16" VerticalOptions="Center">
+            <Image Source="banner.png"
+                   HeightRequest="128"
+                   Aspect="AspectFit"
+                   Margin="0,16,0,24" />
+            
+            <Label Text="Page Eleven"
+                   FontSize="32"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+            
+            <Label Text="{Binding Message}"
+                   FontSize="18"
+                   HorizontalOptions="Center" />
+            
+            <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
+                   HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
+
