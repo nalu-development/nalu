@@ -12,8 +12,9 @@ namespace Nalu;
 /// 
 /// Strategy:
 /// - Stores all view controllers internally in _allViewControllers
-/// - Only exposes the first 4 view controllers to the base UITabBarController
-/// - When tabs beyond index 4 are selected, dynamically swaps them into the ViewControllers array
+/// - Only exposes the first 5 view controllers to the base UITabBarController
+/// - When tabs beyond index 5 are selected, dynamically swaps them into the ViewControllers array
+/// - Uses LRU (Least Recently Used) eviction to determine which controller to swap out
 /// - Lets UITabBarController handle all view lifecycle, layout, and safe area management
 /// - Ensures all ShellSectionRenderers have IsInMoreTab = false to prevent redirection
 /// 
@@ -31,6 +32,10 @@ internal class NaluShellItemRenderer : ShellItemRenderer
     // Store all view controllers here to prevent More controller
     private UIViewController[]? _allViewControllers;
     private bool _isManagingViewControllers;
+    
+    // Track last access time for LRU eviction
+    private readonly Dictionary<UIViewController, long> _viewControllerAccessTimes = [];
+    private long _accessCounter;
 
     public NaluShellItemRenderer(IShellContext shellContext)
         : base(shellContext)
@@ -66,6 +71,13 @@ internal class NaluShellItemRenderer : ShellItemRenderer
                 _isManagingViewControllers = true;
                 var limitedControllers = new UIViewController[_maxViewControllersToAvoidMore];
                 Array.Copy(_allViewControllers, limitedControllers, _maxViewControllersToAvoidMore);
+                
+                // Initialize access times for the initially visible controllers
+                for (var i = 0; i < limitedControllers.Length; i++)
+                {
+                    _viewControllerAccessTimes[limitedControllers[i]] = i == 0 ? 1 : 0;
+                }
+                
                 base.ViewControllers = limitedControllers;
                 _isManagingViewControllers = false;
             }
@@ -82,6 +94,12 @@ internal class NaluShellItemRenderer : ShellItemRenderer
         get => base.SelectedViewController;
         set
         {
+            // Track access time for this view controller (for LRU eviction)
+            if (value != null)
+            {
+                _viewControllerAccessTimes[value] = ++_accessCounter;
+            }
+            
             // If we're managing view controllers and this is a selection beyond our limited set
             if (_allViewControllers is { Length: > _maxViewControllersToAvoidMore } &&
                 ViewControllers is { } currentTabs &&
@@ -89,14 +107,15 @@ internal class NaluShellItemRenderer : ShellItemRenderer
                 value is not null)
             {
                 var currentSelection = base.SelectedViewController;
-                var currentSelectedIndex = currentSelection is null ? -1 : Array.IndexOf(currentTabs, currentSelection);
-                var unselectedIndex = ++currentSelectedIndex % _maxViewControllersToAvoidMore;
+                
+                // Find the least recently used view controller (LRU) that isn't currently selected
+                var lruIndex = FindLeastRecentlyUsedIndex(currentTabs, currentSelection);
                     
                 // This controller is beyond the limited set shown to UITabBarController
                 // Swap it into the visible ViewControllers array so UITabBarController can select it
                 var copiedViewControllers = new UIViewController[_maxViewControllersToAvoidMore];
                 Array.Copy(currentTabs, copiedViewControllers, _maxViewControllersToAvoidMore);
-                copiedViewControllers[unselectedIndex] = value;
+                copiedViewControllers[lruIndex] = value;
                 base.ViewControllers = copiedViewControllers;
                 UpdateTabBarView();
             }
@@ -104,6 +123,35 @@ internal class NaluShellItemRenderer : ShellItemRenderer
             // Normal selection for controllers in the visible set
             base.SelectedViewController = value;
         }
+    }
+    
+    private int FindLeastRecentlyUsedIndex(UIViewController[] currentTabs, UIViewController? currentSelection)
+    {
+        var lruIndex = 0;
+        var oldestAccessTime = long.MaxValue;
+        
+        for (var i = 0; i < currentTabs.Length; i++)
+        {
+            var controller = currentTabs[i];
+            
+            // Skip the currently selected controller
+            if (controller == currentSelection)
+            {
+                continue;
+            }
+            
+            // Get access time (default to 0 if never accessed)
+            var accessTime = _viewControllerAccessTimes.TryGetValue(controller, out var time) ? time : 0;
+            
+            // Find the one with the oldest (smallest) access time
+            if (accessTime < oldestAccessTime)
+            {
+                oldestAccessTime = accessTime;
+                lruIndex = i;
+            }
+        }
+        
+        return lruIndex;
     }
 
     protected override void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
