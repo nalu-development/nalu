@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Grid xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+      xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+      xmlns:local="clr-namespace:Nalu"
+      x:Name="Root"
+      x:Class="Nalu.NaluTabBar"
+      x:DataType="ShellItem">
+    <Border StrokeShape="{Binding Source={x:Reference Root}, Path=BarStrokeShape, x:DataType=local:NaluTabBar}"
+            Stroke="{Binding Source={x:Reference Root}, Path=BarStroke, x:DataType=local:NaluTabBar}"
+            StrokeThickness="{Binding Source={x:Reference Root}, Path=BarStrokeThickness, x:DataType=local:NaluTabBar}"
+            Background="{Binding Source={x:Reference Root}, Path=BarBackground, x:DataType=local:NaluTabBar}"
+            Padding="{Binding Source={x:Reference Root}, Path=BarPadding, x:DataType=local:NaluTabBar}"
+            Margin="{Binding Source={x:Reference Root}, Path=BarMargin, x:DataType=local:NaluTabBar}"
+            HorizontalOptions="Center">
+        <ScrollView Orientation="Horizontal"
+                    HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Items}"
+                                   HorizontalOptions="Center"
+                                   Spacing="8">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="ShellSection">
+                        <Border x:Name="TabBorder"
+                                StrokeShape="{Binding Source={x:Reference Root}, Path=TabStrokeShape, x:DataType=local:NaluTabBar}"
+                                Stroke="{Binding Source={x:Reference Root}, Path=TabStroke, x:DataType=local:NaluTabBar}"
+                                StrokeThickness="{Binding Source={x:Reference Root}, Path=TabStrokeThickness, x:DataType=local:NaluTabBar}"
+                                Background="{Binding Source={x:Reference Root}, Path=TabBackground, x:DataType=local:NaluTabBar}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="TapGestureRecognizer_OnTapped"/>
+                            </Border.GestureRecognizers>
+                            <Border.Triggers>
+                                <DataTrigger TargetType="Border" Binding="{Binding IsChecked}" Value="True">
+                                    <Setter Property="StrokeShape" Value="{Binding Source={x:Reference Root}, Path=ActiveTabStrokeShape, x:DataType=local:NaluTabBar}"/>
+                                    <Setter Property="Stroke" Value="{Binding Source={x:Reference Root}, Path=ActiveTabStroke, x:DataType=local:NaluTabBar}"/>
+                                    <Setter Property="StrokeThickness" Value="{Binding Source={x:Reference Root}, Path=ActiveTabStrokeThickness, x:DataType=local:NaluTabBar}"/>
+                                    <Setter Property="Background" Value="{Binding Source={x:Reference Root}, Path=ActiveTabBackground, x:DataType=local:NaluTabBar}"/>
+                                </DataTrigger>
+                            </Border.Triggers>
+                            <Grid RowDefinitions="*,Auto"
+                                  WidthRequest="64"
+                                  IsVisible="{Binding IsVisible}"
+                                  Padding="4">
+                                <Image Source="{Binding Icon}" />
+                                <Label x:Name="TabLabel"
+                                       Text="{Binding Title}"
+                                       Grid.Row="1"
+                                       HorizontalTextAlignment="Center"
+                                       FontSize="11"
+                                       MaxLines="1"
+                                       LineBreakMode="TailTruncation"
+                                       TextColor="{Binding Source={x:Reference Root}, Path=TabForegroundColor, x:DataType=local:NaluTabBar}">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsChecked}" Value="True">
+                                            <Setter Property="TextColor" Value="{Binding Source={x:Reference Root}, Path=ActiveTabForegroundColor, x:DataType=local:NaluTabBar}"/>
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
+        </ScrollView>
+    </Border>
+</Grid>
+

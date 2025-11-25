@@ -268,7 +268,24 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
         "TabBarView",
         typeof(View),
         typeof(NaluShell),
-        null
+        null,
+        propertyChanged: (bindable, oldValue, newValue) =>
+        {
+            if (bindable is not ShellItem shellItem)
+            {
+                throw new InvalidOperationException("TabBarView can only be attached to ShellItem (TabBar or FlyoutItem).");
+            }
+
+            if (oldValue is View oldView)
+            {
+                oldView.BindingContext = null;
+            }
+
+            if (newValue is View newView)
+            {
+                newView.BindingContext = shellItem;
+            }
+        }
     );
 
     /// <summary>
@@ -282,13 +299,5 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     /// </summary>
     /// <param name="bindable">The <see cref="ShellItem" /> (TabBar or FlyoutItem).</param>
     /// <param name="value">The custom tab bar view.</param>
-    public static void SetTabBarView(BindableObject bindable, View? value)
-    {
-        if (bindable is not ShellItem)
-        {
-            throw new InvalidOperationException("TabBarView can only be attached to ShellItem (TabBar or FlyoutItem).");
-        }
-
-        bindable.SetValue(TabBarViewProperty, value);
-    }
+    public static void SetTabBarView(BindableObject bindable, View? value) => bindable.SetValue(TabBarViewProperty, value);
 }
