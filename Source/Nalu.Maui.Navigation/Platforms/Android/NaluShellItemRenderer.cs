@@ -79,6 +79,15 @@ public class NaluShellItemRenderer : ShellItemRenderer
         }
     }
 
+    public override void OnDestroy()
+    {
+        base.OnDestroy();
+        _crossPlatformTabBar?.DisconnectHandlers();
+        _platformTabBar?.RemoveFromParent();
+        _crossPlatformTabBar = null;
+        _platformTabBar = null;
+    }
+
     private void HideNativeMenuItems(bool hidden)
     {
         // Hide/show the BottomNavigationMenuView which contains the native menu items
