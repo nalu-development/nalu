@@ -395,6 +395,14 @@ await navigationService.Received().GoToAsync(
 
 > 📘 **Deep dive**: See [Testing and Troubleshooting](navigation-testing.md) for complete testing patterns and common issues.
 
+## Custom Tab Bar
+
+Nalu provides a customizable tab bar feature that works with both standard MAUI Shell and `NaluShell`. This feature is **independent** of Nalu's MVVM navigation system and allows you to replace the native tab bar with a fully customizable cross-platform view.
+
+This feature also solves the issues `Shell` has with pages under the iOS `More` tab.
+
+> 📘 **See**: [Custom Tab Bar](navigation-tabbar.md) for complete documentation on using custom tab bars, including setup, styling options, and platform-specific considerations.
+
 ## Common Patterns
 
 ### Initialization Flow
@@ -456,6 +464,7 @@ Each tab maintains its own navigation stack independently.
 - 📘 [Navigation Lifecycle](navigation-lifecycle.md) - Deep dive into lifecycle events and timing
 - 📘 [Navigation Intents](navigation-intents.md) - Passing data and returning results
 - 📘 [Advanced Navigation](navigation-advanced.md) - Guards, behaviors, scoped services, and leak detection
+- 📘 [Custom Tab Bar](navigation-tabbar.md) - Customizable tab bar for iOS/Android/MacCatalyst (works with standard Shell too)
 - 📘 [Testing & Troubleshooting](navigation-testing.md) - Unit testing and common issues
 
 ## Migration from Shell

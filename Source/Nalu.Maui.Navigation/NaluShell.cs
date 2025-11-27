@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Nalu.Internals;
 // ReSharper disable once RedundantUsingDirective
 using System.Windows.Input;
+using Microsoft.Maui.Controls;
 
 namespace Nalu;
 
@@ -259,4 +260,44 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     // In example: "PopupPageca6500ff-c430-49d4-9f79-f5536f71f959";
     [GeneratedRegex(@"\bPopupPage[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", RegexOptions.IgnoreCase)]
     private static partial Regex CommunityToolkitPopupRegex();
+
+    /// <summary>
+    /// Gets or sets the custom tab bar view to be used for the current <see cref="ShellItem" /> (TabBar or FlyoutItem).
+    /// </summary>
+    public static readonly BindableProperty TabBarViewProperty = BindableProperty.CreateAttached(
+        "TabBarView",
+        typeof(View),
+        typeof(NaluShell),
+        null,
+        propertyChanged: (bindable, oldValue, newValue) =>
+        {
+            if (bindable is not ShellItem shellItem)
+            {
+                throw new InvalidOperationException("TabBarView can only be attached to ShellItem (TabBar or FlyoutItem).");
+            }
+
+            if (oldValue is View oldView)
+            {
+                oldView.BindingContext = null;
+            }
+
+            if (newValue is View newView)
+            {
+                newView.BindingContext = shellItem;
+            }
+        }
+    );
+
+    /// <summary>
+    /// Gets the custom tab bar view to be used for the current <see cref="ShellItem" />.
+    /// </summary>
+    /// <param name="bindable">The <see cref="ShellItem" /> (TabBar or FlyoutItem).</param>
+    public static View? GetTabBarView(BindableObject bindable) => (View?) bindable.GetValue(TabBarViewProperty);
+
+    /// <summary>
+    /// Sets the custom tab bar view to be used for the current <see cref="ShellItem" />.
+    /// </summary>
+    /// <param name="bindable">The <see cref="ShellItem" /> (TabBar or FlyoutItem).</param>
+    /// <param name="value">The custom tab bar view.</param>
+    public static void SetTabBarView(BindableObject bindable, View? value) => bindable.SetValue(TabBarViewProperty, value);
 }

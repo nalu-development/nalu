@@ -51,6 +51,9 @@ public static class MauiProgram
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
+#if IOS || ANDROID || MACCATALYST
+            .UseNaluTabBar()
+#endif
             .UseNaluSoftKeyboardManager()
             .UseSkiaSharp()
             .UseNaluLayouts()
@@ -60,10 +63,6 @@ public static class MauiProgram
                 {
 #if IOS
                     // handlers.AddHandler<CollectionView, Microsoft.Maui.Controls.Handlers.Items2.CollectionViewHandler2>();
-#endif
-#if ANDROID
-                    // Fix for https://github.com/dotnet/maui/issues/7045
-                    handlers.AddHandler<Shell, PatchedShellRenderer>();
 #endif
                 }
             )

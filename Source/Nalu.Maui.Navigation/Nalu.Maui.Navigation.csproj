@@ -8,6 +8,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">
@@ -41,11 +42,14 @@
     <PackageReference Condition="$(TargetFramework.StartsWith('net9'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion9)"/>
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Platforms\Android\" />
-    <Folder Include="Platforms\iOS\" />
-    <Folder Include="Platforms\MacCatalyst\" />
-  </ItemGroup>
+  <Target Name="ApplePlatform" BeforeTargets="_MauiRemovePlatformCompileItems">
+    <ItemGroup Condition=" '$(TargetPlatformIdentifier)' == 'ios' or '$(TargetPlatformIdentifier)' == 'maccatalyst' ">
+      <Compile Remove="$(PlatformsProjectFolder)Apple/**/*$(DefaultLanguageSourceExtension)"/>
+      <Compile Include="$(PlatformsProjectFolder)Apple/**/*$(DefaultLanguageSourceExtension)">
+        <ExcludeFromCurrentConfiguration>false</ExcludeFromCurrentConfiguration>
+      </Compile>
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />

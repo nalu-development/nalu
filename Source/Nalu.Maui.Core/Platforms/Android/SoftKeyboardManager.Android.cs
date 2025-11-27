@@ -181,8 +181,14 @@ public static partial class SoftKeyboardManager
 
     private class OnApplyWindowInsetsListener : Object, IOnApplyWindowInsetsListener
     {
-        public WindowInsetsCompat OnApplyWindowInsets(View v, WindowInsetsCompat insets)
+        public WindowInsetsCompat OnApplyWindowInsets(View? v, WindowInsetsCompat? insets)
         {
+            if (v is null || insets is null)
+            {
+                LogDebug("View or insets are null, returning original insets.");
+                return ViewCompat.OnApplyWindowInsets(v, insets)!;
+            }
+
             var keyboardType = WindowInsetsCompat.Type.Ime();
 
             var wasVisible = State.IsVisible;
@@ -193,12 +199,12 @@ public static partial class SoftKeyboardManager
                 ScrollToFocusedField(focusedView);
             }
 
-            var keyboardHeight = insets.GetInsets(keyboardType).Bottom;
+            var keyboardHeight = insets.GetInsets(keyboardType)?.Bottom ?? 0;
             State.Height = v.Context.FromPixels(keyboardHeight);
 
             State.IsVisible = isVisible;
 
-            return ViewCompat.OnApplyWindowInsets(v, insets);
+            return ViewCompat.OnApplyWindowInsets(v, insets)!;
         }
     }
 

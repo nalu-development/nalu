@@ -7,6 +7,7 @@
              xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
              x:Class="Nalu.Maui.Sample.Pages.ThreePage"
              x:DataType="pageModels:ThreePageModel"
+             Shell.TabBarIsVisible="False"
              Title="Page Three"
              Padding="16">
     <ContentPage.Content>

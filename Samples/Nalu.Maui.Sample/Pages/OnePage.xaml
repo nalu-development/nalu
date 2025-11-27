@@ -8,9 +8,8 @@
              xmlns:layouts="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.OnePage"
              x:DataType="pageModels:OnePageModel"
-             Title="Page One"
-             Padding="16">
-    <ScrollView>
+             Title="Page One">
+    <ScrollView Padding="16" Background="WhiteSmoke">
         <VerticalStackLayout Spacing="16">
             <Image Source="banner.png"
                    HeightRequest="128"

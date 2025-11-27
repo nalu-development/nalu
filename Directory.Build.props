@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <MauiVersion9>9.0.30</MauiVersion9>
+    <MauiVersion9>9.0.80</MauiVersion9>
     <AllTargetFrameworks>net9.0;net9.0-android;net9.0-ios18.0;net9.0-maccatalyst</AllTargetFrameworks>
     <AllTargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(AllTargetFrameworks);net9.0-windows10.0.19041.0</AllTargetFrameworks>
   </PropertyGroup>

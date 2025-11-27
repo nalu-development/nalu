@@ -8,7 +8,8 @@
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems"
                 Title="Tabs"
-                Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}">
+                Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"
+                nalu:NaluShell.TabBarView="{nalu:NaluTabBar}">
         <Tab Title="Pages"
              Route="pages"
              FlyoutDisplayOptions="AsMultipleItems"
@@ -23,6 +24,21 @@
         <ShellContent nalu:Navigation.PageType="pages:TwoPage"
                       Title="Page Two"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:EightPage"
+                      Title="Page Eight"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8b8;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:NinePage"
+                      Title="Page Nine"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8b9;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:TenPage"
+                      Title="Page Ten"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:ElevenPage"
+                      Title="Page Eleven"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bb;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:TwelvePage"
+                      Title="Page Twelve"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bc;', Color='Black', Size=24}" />
     </FlyoutItem>
     <ShellContent nalu:Navigation.PageType="pages:FivePage"
                   Title="Page Five"
