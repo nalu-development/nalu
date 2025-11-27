@@ -23,10 +23,6 @@ public static class NaluMauiAppBuilderExtensions
 
         var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
         configure(configurator);
-        
-        #if IOS || ANDROID
-        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Shell, NaluShellRenderer>());
-        #endif
 
         return builder;
     }
@@ -42,4 +38,26 @@ public static class NaluMauiAppBuilderExtensions
     public static MauiAppBuilder UseNaluNavigation<TApplication>(this MauiAppBuilder builder)
         where TApplication : IApplication
         => builder.UseNaluNavigation<TApplication>(configurator => configurator.AddPages());
+
+#if IOS || MACCATALYST || ANDROID
+    /// <summary>
+    /// Configures a custom <see cref="Shell"/> handler that allows rendering a custom tab bar view via <see cref="NaluShell.TabBarViewProperty"/> when using <see cref="TabBar"/> or <see cref="FlyoutItem"/> with tabs.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// <![CDATA[
+    /// <TabBar nalu:NaluShell.TabBarView="{nalu:NaluTabBar}"/>
+    /// ]]>
+    /// </code>
+    /// </example>
+    /// <remarks>
+    /// Nalu provides a built-in customizable implementation of a custom tab bar view via the <see cref="NaluTabBar"/> control.
+    /// Any custom view will be bound to the corresponding <see cref="TabBar"/> or <see cref="FlyoutItem"/> to enable looping through tab items and handling tab selection.
+    /// </remarks>
+    public static MauiAppBuilder UseNaluTabBar(this MauiAppBuilder builder)
+    {
+        builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Shell, NaluShellRenderer>());
+        return builder;
+    }
+#endif
 }
