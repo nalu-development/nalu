@@ -51,7 +51,7 @@ public static class MauiProgram
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
-#if IOS || ANDROID
+#if IOS || ANDROID || MACCATALYST
             .UseNaluTabBar()
 #endif
             .UseNaluSoftKeyboardManager()

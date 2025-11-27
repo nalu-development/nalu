@@ -17,6 +17,8 @@
       href: navigation-intents.md
     - name: Advanced Features
       href: navigation-advanced.md
+    - name: Custom Tab Bar
+      href: navigation-tabbar.md
     - name: Testing & Troubleshooting
       href: navigation-testing.md
 - name: API

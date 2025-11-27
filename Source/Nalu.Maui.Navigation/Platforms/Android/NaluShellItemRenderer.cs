@@ -8,6 +8,8 @@ using Microsoft.Maui.Platform;
 using View = Android.Views.View;
 using ViewGroup = Android.Views.ViewGroup;
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 namespace Nalu;
 
 public class NaluShellItemRenderer : ShellItemRenderer

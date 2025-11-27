@@ -4,6 +4,8 @@ using Microsoft.Maui.Controls.Platform.Compatibility;
 using Microsoft.Maui.Platform;
 using UIKit;
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
 namespace Nalu;
 
 /// <summary>
@@ -23,7 +25,7 @@ namespace Nalu;
 /// This approach lets NaluShell provide unlimited custom tab bar experiences on iOS,
 /// avoiding the system "More" tab UI entirely.
 /// </summary>
-internal class NaluShellItemRenderer : ShellItemRenderer
+public class NaluShellItemRenderer : ShellItemRenderer
 {
     private const nint _mauiTabBarTag = 0x63D2AF;
     private const int _maxViewControllersToAvoidMore = 5;
