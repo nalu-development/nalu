@@ -3,6 +3,8 @@
 <Grid xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
       xmlns:local="clr-namespace:Nalu"
+      BackgroundColor="#22888888"
+      Padding="8"
       x:Name="Root"
       x:Class="Nalu.NaluTabBar"
       x:DataType="ShellItem">
@@ -12,7 +14,8 @@
             Background="{Binding Source={x:Reference Root}, Path=BarBackground, x:DataType=local:NaluTabBar}"
             Padding="{Binding Source={x:Reference Root}, Path=BarPadding, x:DataType=local:NaluTabBar}"
             Margin="{Binding Source={x:Reference Root}, Path=BarMargin, x:DataType=local:NaluTabBar}"
-            HorizontalOptions="Center">
+            HorizontalOptions="Center"
+            HeightRequest="60">
         <ScrollView Orientation="Horizontal"
                     HorizontalScrollBarVisibility="Never">
             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Items}"
@@ -37,7 +40,7 @@
                                 </DataTrigger>
                             </Border.Triggers>
                             <Grid RowDefinitions="*,Auto"
-                                  WidthRequest="64"
+                                  MinimumWidthRequest="64"
                                   IsVisible="{Binding IsVisible}"
                                   Padding="4">
                                 <Image Source="{Binding Icon}" />

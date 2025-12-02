@@ -2,6 +2,7 @@ using System.Collections.Specialized;
 using System.Runtime.CompilerServices;
 using Android.OS;
 using Android.Views;
+using Android.Widget;
 using Google.Android.Material.BottomNavigation;
 using Microsoft.Maui.Controls.Platform.Compatibility;
 using Microsoft.Maui.Platform;
@@ -24,6 +25,9 @@ public class NaluShellItemRenderer : ShellItemRenderer
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_bottomView")]
     private static extern ref BottomNavigationView GetBottomView(ShellItemRenderer instance);
+    
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_outerLayout")]
+    private static extern ref LinearLayout GetOuterLayout(ShellItemRenderer instance);
 
     protected override void OnShellItemsChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
@@ -52,13 +56,18 @@ public class NaluShellItemRenderer : ShellItemRenderer
             _platformTabBar = null;
             _crossPlatformTabBar = null;
 
-            // Show native tab bar items (in case they were hidden)
-            HideNativeMenuItems(false);
+            if (GetBottomView(this) is { Parent: null } bottomView)
+            {
+                var outerLayout = GetOuterLayout(this);
+                outerLayout.AddView(bottomView);
+            }
         }
         else if (_crossPlatformTabBar != tabBarView)
         {
             _crossPlatformTabBar?.DisconnectHandlers();
             _platformTabBar?.RemoveFromParent();
+
+            var outerLayout = GetOuterLayout(this);
 
             var mauiContext = ShellContext.Shell.Handler?.MauiContext ?? throw new InvalidOperationException("MauiContext is null");
             var platformView = tabBarView.ToPlatform(mauiContext);
@@ -67,17 +76,18 @@ public class NaluShellItemRenderer : ShellItemRenderer
             platformView.Focusable = true;
 
             // Set layout parameters to fill the entire BottomNavigationView
-            var layoutParams = new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MatchParent,
-                ViewGroup.LayoutParams.MatchParent
-            );
-            platformView.LayoutParameters = layoutParams;
+            platformView.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent);
+            // tabBarView.VerticalOptions = LayoutOptions.End;
 
             _platformTabBar = platformView;
             _crossPlatformTabBar = tabBarView;
-            var bottomView = GetBottomView(this);
-            bottomView.AddView(_platformTabBar);
-            HideNativeMenuItems(true);
+            
+            if (GetBottomView(this) is { Parent: not null } bottomView)
+            {
+                outerLayout.RemoveView(bottomView);
+            }
+
+            outerLayout.AddView(_platformTabBar);
         }
     }
 

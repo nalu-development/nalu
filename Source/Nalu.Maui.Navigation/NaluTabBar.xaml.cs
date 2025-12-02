@@ -1,5 +1,6 @@
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Layouts;
 
 namespace Nalu;
 
@@ -294,4 +295,19 @@ public partial class NaluTabBar
             Interlocked.Exchange(ref _navigating, 0);
         }
     }
+
+    /// <inheritdoc/>
+    protected override ILayoutManager CreateLayoutManager()
+    {
+        var layoutManager = base.CreateLayoutManager();
+        var wrappedLayoutManager = new WrappedLayoutManager(layoutManager);
+        return wrappedLayoutManager;
+    }
+}
+
+file class WrappedLayoutManager(ILayoutManager layoutManager) : ILayoutManager
+{
+    public Size Measure(double widthConstraint, double heightConstraint) => layoutManager.Measure(widthConstraint, heightConstraint);
+
+    public Size ArrangeChildren(Rect bounds) => layoutManager.ArrangeChildren(bounds);
 }

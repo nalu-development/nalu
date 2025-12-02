@@ -1,185 +1,225 @@
 using System.Collections.Specialized;
-using System.Runtime.CompilerServices;
+using System.ComponentModel;
 using Microsoft.Maui.Controls.Platform.Compatibility;
 using Microsoft.Maui.Platform;
 using UIKit;
 
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-
 namespace Nalu;
 
-/// <summary>
-/// Custom Shell Item Renderer that prevents iOS's UITabBarController from showing
-/// the "More" navigation controller when there are more than 5 tabs.
-/// 
-/// With this implementation:
-/// - All tab ShellSectionRenderers are forced to never be marked as "IsInMoreTab"
-/// - All the user's tabs (any number) are available through the custom tab bar UI,
-///   while only up to 5 are exposed to UITabBarController's ViewControllers property
-/// - When a tab beyond the 5 UITabBarController slots is selected, the implementation
-///   swaps that view controller into the visible array, replacing a currently visible tab
-/// - Eviction for replacement is handled by simply rotating out the least recently active visible tab
-/// - UITabBarController behaviors (lifecycle, layout, safe areas, etc.) are left fully intact
-/// - iOS's default "More" controller will never appear or be reachable by the user, regardless of tab count
-/// 
-/// This approach lets NaluShell provide unlimited custom tab bar experiences on iOS,
-/// avoiding the system "More" tab UI entirely.
-/// </summary>
-public class NaluShellItemRenderer : ShellItemRenderer
+#pragma warning disable CS1591
+public class NaluShellItemRenderer(IShellContext shellContext) : UIViewController, IShellItemRenderer
 {
-    private const nint _mauiTabBarTag = 0x63D2AF;
-    private const int _maxViewControllersToAvoidMore = 5;
-    private const int _maxViewControllersWhenMoreIsActive = 4;
-    
-    private readonly IShellContext _shellContext;
-    private UIView? _platformTabBar;
+    private readonly Dictionary<ShellSection, IShellSectionRenderer> _sectionRenderers = [];
+    private Page? _displayedPage;
+    private ShellSection? _selectedSection;
+    private NaluTabBarContainerView? _tabBar;
     private View? _crossPlatformTabBar;
-    private bool _hasCustomTabBarView;
 
-    public new ShellItem ShellItem
+    // ReSharper disable once MemberCanBePrivate.Global
+    protected IShellItemController ShellItemController => ShellItem;
+    
+    private readonly NaluShellSectionWrapperController _sectionWrapperController = new();
+
+    UIViewController IShellItemRenderer.ViewController => this;
+
+    public required ShellItem ShellItem
     {
-        get => base.ShellItem;
+        get;
         set
         {
-            base.ShellItem = value;
+            if (field is not null)
+            {
+                throw new InvalidOperationException($"{nameof(ShellItem)} can only be set once.");
+            }
+
+            ArgumentNullException.ThrowIfNull(value);
+
+            field = value;
+            OnShellItemSet();
+        }
+    }
+    
+    public override void LoadView()
+    {
+        base.LoadView();
+
+        View!.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
+        AddChildViewController(_sectionWrapperController);
+        var wrapperView = _sectionWrapperController.View!;
+        wrapperView.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
+        View!.AddSubview(wrapperView);
+        _sectionWrapperController.DidMoveToParentViewController(this);
+
+        UpdateTabBarView();
+        
+        GoTo(ShellItem.CurrentItem);
+    }
+
+    public override void ViewDidLayoutSubviews()
+    {
+        base.ViewDidLayoutSubviews();
+    
+        if (_crossPlatformTabBar is not null && _tabBar is { Hidden: false, NeedsMeasure: true })
+        {
+            var container = View!;
+            var size = _tabBar.SizeThatFits(container.Frame.Size);
+            var safeAreaInsets = container.SafeAreaInsets;
+            var heightWithInsets = size.Height + safeAreaInsets.Bottom;
+    
+            var frame = new CoreGraphics.CGRect(
+                0,
+                container.Bounds.Height - heightWithInsets,
+                container.Bounds.Width,
+                heightWithInsets);
+    
+            _tabBar.Frame = frame;
+            _sectionWrapperController.AdditionalSafeAreaInsets = new UIEdgeInsets(0, 0, heightWithInsets, 0);
+        }
+    }
+
+    protected virtual void OnShellItemSet()
+    {
+        if (ShellItem.CurrentItem == null)
+        {
+            throw new InvalidOperationException($"Content not found for active {ShellItem}. Title: {ShellItem.Title}. Route: {ShellItem.Route}.");
+        }
+
+        ShellItemController.ItemsCollectionChanged += OnItemsCollectionChanged;
+        ShellItem.PropertyChanged += OnShellItemPropertyChanged;
+        
+        OnItemsCollectionChanged(ShellItem, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, ShellItemController.GetItems()));
+    }
+
+    protected virtual void OnShellItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == ShellItem.CurrentItemProperty.PropertyName)
+        {
+            GoTo(ShellItem.CurrentItem);
+        }
+        else if (e.PropertyName == NaluShell.TabBarViewProperty.PropertyName)
+        {
             UpdateTabBarView();
         }
     }
 
-    public NaluShellItemRenderer(IShellContext shellContext)
-        : base(shellContext)
+    protected override void Dispose(bool disposing)
     {
-        _shellContext = shellContext;
-    }
-    
-    // UnsafeAccessor methods to access private/internal members of base ShellItemRenderer
-    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_sectionRenderers")]
-    private static extern ref Dictionary<UIViewController, IShellSectionRenderer> GetSectionRenderers(ShellItemRenderer instance);
-    
-    public override UIViewController? SelectedViewController
-    {
-        get => base.SelectedViewController;
-        set
+        base.Dispose(disposing);
+
+        if (disposing)
         {
-            if (_hasCustomTabBarView)
-            {
-                var newSelectedViewController = value!;
-                var oldSelectedViewController = base.SelectedViewController!;
-                var viewControllers = ViewControllers!;
-
-                var newSelectedIndex = Array.IndexOf(viewControllers, newSelectedViewController);
-
-                if (viewControllers.Length >= _maxViewControllersToAvoidMore &&
-                    newSelectedIndex >= _maxViewControllersWhenMoreIsActive)
-                {
-                    var oldSelectedIndex = Array.IndexOf(viewControllers, oldSelectedViewController);
-                    // Get the nearest unselected index to swap out
-                    var unselectedIndex = ++oldSelectedIndex % _maxViewControllersWhenMoreIsActive;
-                    // Create a new array with the swapped view controllers
-                    var newViewControllers = new UIViewController[viewControllers.Length];
-                    Array.Copy(viewControllers, newViewControllers, viewControllers.Length);
-                    // Swap the new selected controller with the unselected one
-                    newViewControllers[unselectedIndex] = newSelectedViewController;
-                    newViewControllers[newSelectedIndex] = viewControllers[unselectedIndex];
-                    // Update the ViewControllers array
-                    base.ViewControllers = newViewControllers;
-                    UpdateTabBarView();
-                }
-            }
-
-            base.SelectedViewController = value;
+            var sectionsToRemove = _sectionRenderers.Keys.ToList();
+            OnItemsCollectionChanged(ShellItem, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, sectionsToRemove));
+            _sectionRenderers.Clear();
+            
+            ShellItem.PropertyChanged -= OnShellItemPropertyChanged;
+            ShellItemController.ItemsCollectionChanged -= OnItemsCollectionChanged;
+            ((IShellSectionController?)_selectedSection)?.RemoveDisplayedPageObserver(this);
+            _selectedSection = null;
+            _displayedPage = null;
+            _tabBar?.RemoveFromSuperview();
+            _tabBar = null;
+            _crossPlatformTabBar = null;
         }
     }
 
-    protected override void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    private void UpdateTabBarView()
     {
-        base.OnItemsCollectionChanged(sender, e);
-        UpdateTabBarView();
-    }
-    
-    private void EnsureNoMoreTabRenderers(bool forceNotInMoreTab)
-    {
-        // Use UnsafeAccessor to access the section renderers dictionary from base class
-        ref var sectionRenderers = ref GetSectionRenderers(this);
-
-        var viewControllers = ViewControllers!;
-        var willUseMoreTab = viewControllers.Length > _maxViewControllersToAvoidMore;
-        for (var i = 0; i < viewControllers.Length; i++)
-        {
-            if (sectionRenderers.TryGetValue(viewControllers[i], out var renderer))
-            {
-                var isMainTab = forceNotInMoreTab || !willUseMoreTab || i < _maxViewControllersToAvoidMore - 1;
-                renderer.IsInMoreTab =  !isMainTab;
-            }
-        }
-    }
-
-    public void UpdateTabBarView()
-    {
-        // Get the TabBarView from the ShellItem
         var tabBarView = NaluShell.GetTabBarView(ShellItem);
 
         if (tabBarView == null)
         {
-            // Remove custom view if it was previously added
-            _crossPlatformTabBar?.DisconnectHandlers();
-            _platformTabBar?.RemoveFromSuperview();
-            _platformTabBar = null;
+            _tabBar?.RemoveFromSuperview();
             _crossPlatformTabBar = null;
-            _hasCustomTabBarView = false;
-
-            // Show native tab bar items (in case they were hidden)
-            HideNativeTabBarItems(false);
-            EnsureNoMoreTabRenderers(false);
+            AdditionalSafeAreaInsets = UIEdgeInsets.Zero;
         }
         else
         {
-            _hasCustomTabBarView = true;
-
-            if (_crossPlatformTabBar != tabBarView)
-            {
-                _crossPlatformTabBar?.DisconnectHandlers();
-                _platformTabBar?.RemoveFromSuperview();
-
-                var mauiContext = _shellContext.Shell.Handler?.MauiContext ?? throw new NullReferenceException("MauiContext is null");
-                var platformView = tabBarView.ToPlatform(mauiContext);
-                platformView.Tag = _mauiTabBarTag;
-                platformView.TranslatesAutoresizingMaskIntoConstraints = false;
-                _platformTabBar = platformView;
-                _crossPlatformTabBar = tabBarView;
-                TabBar.AddSubview(_platformTabBar);
-
-                NSLayoutConstraint.ActivateConstraints(
-                    [
-                        platformView.LeadingAnchor.ConstraintEqualTo(TabBar.LeadingAnchor),
-                        platformView.TrailingAnchor.ConstraintEqualTo(TabBar.TrailingAnchor),
-                        platformView.BottomAnchor.ConstraintEqualTo(TabBar.BottomAnchor),
-                        platformView.TopAnchor.ConstraintEqualTo(TabBar.TopAnchor)
-                    ]
-                );
-            }
-            EnsureNoMoreTabRenderers(true);
-            HideNativeTabBarItems(true);
+            var mauiContext = shellContext.Shell.Handler?.MauiContext ?? throw new NullReferenceException("MauiContext is null");
+            var platformView = tabBarView.ToPlatform(mauiContext);
+            var tabBarContainer = new NaluTabBarContainerView(platformView);
+            _tabBar = tabBarContainer;
+            _crossPlatformTabBar = tabBarView;
+            UpdateTabBarHidden();
+            View!.AddSubview(tabBarContainer);
         }
     }
 
-    private void HideNativeTabBarItems(bool hidden)
+    private void OnDisplayedPageChanged(Page page)
     {
-        // Show/hide all subviews that are not our custom MAUI bar
-        foreach (var subview in TabBar.Subviews)
+        if (page != _displayedPage)
         {
-            if (subview.Tag != _mauiTabBarTag)
+            if (_displayedPage != null)
             {
-                subview.Hidden = hidden;
+                _displayedPage.PropertyChanged -= OnDisplayedPagePropertyChanged;
+            }
+
+            _displayedPage = page;
+
+            if (_displayedPage != null)
+            {
+                _displayedPage.PropertyChanged += OnDisplayedPagePropertyChanged;
+                UpdateTabBarHidden();
             }
         }
+    }
 
-        // Disable/Enable liquid glass gestures on the native tab bar
-        if (TabBar.GestureRecognizers is { } gestureRecognizers)
+    private void OnDisplayedPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == Shell.TabBarIsVisibleProperty.PropertyName)
         {
-            foreach (var gestureRecognizer in gestureRecognizers)
+            UpdateTabBarHidden();
+        }
+    }
+
+    private void UpdateTabBarHidden()
+    {
+        if (_tabBar is not null)
+        {
+            var isTabBarVisible = _displayedPage?.GetValue(Shell.TabBarIsVisibleProperty) as bool? ?? true;
+            _tabBar.Hidden = !isTabBarVisible;
+        }
+    }
+
+    private void GoTo(ShellSection shellSection)
+    {
+        if (_sectionRenderers.TryGetValue(shellSection, out var renderer))
+        {
+            ((IShellSectionController?)_selectedSection)?.RemoveDisplayedPageObserver(this);
+            _selectedSection = shellSection;
+            ((IShellSectionController)_selectedSection)?.AddDisplayedPageObserver(this, OnDisplayedPageChanged);
+
+            _sectionWrapperController.SelectedViewController = renderer.ViewController;
+        }
+    }
+
+    private void OnItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (ShellSection removed in e.OldItems)
             {
-                gestureRecognizer.Enabled = !hidden;
+                if (_sectionRenderers.Remove(removed, out var renderer))
+                {
+                    _sectionWrapperController.RemoveViewController(renderer.ViewController);
+                    renderer.Dispose();
+                }
+            }
+        }
+        
+        if (e.NewItems is not null)
+        {
+            foreach (ShellSection added in e.NewItems)
+            {
+                if (_sectionRenderers.ContainsKey(added))
+                {
+                    throw new InvalidOperationException($"Section renderer for {added} already exists.");
+                }
+
+                var renderer = shellContext.CreateShellSectionRenderer(added);
+                renderer.ShellSection = added;
+                _sectionRenderers[added] = renderer;
+                _sectionWrapperController.AddViewController(renderer.ViewController);
             }
         }
     }
