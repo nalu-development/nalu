@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using CoreGraphics;
 using Microsoft.Maui.Controls.Platform.Compatibility;
 using Microsoft.Maui.Platform;
 using UIKit;
@@ -19,6 +20,7 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
     protected IShellItemController ShellItemController => ShellItem;
     
     private readonly NaluShellSectionWrapperController _sectionWrapperController = new();
+    private CGRect _lastBounds;
 
     UIViewController IShellItemRenderer.ViewController => this;
 
@@ -43,11 +45,17 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
     {
         base.LoadView();
 
-        View!.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
+        var container = View!;
         AddChildViewController(_sectionWrapperController);
         var wrapperView = _sectionWrapperController.View!;
-        wrapperView.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
-        View!.AddSubview(wrapperView);
+        container.AddSubview(wrapperView);
+        wrapperView.TranslatesAutoresizingMaskIntoConstraints = false;
+        NSLayoutConstraint.ActivateConstraints([
+            wrapperView.TopAnchor.ConstraintEqualTo(container.TopAnchor),
+            wrapperView.BottomAnchor.ConstraintEqualTo(container.BottomAnchor),
+            wrapperView.LeftAnchor.ConstraintEqualTo(container.LeftAnchor),
+            wrapperView.RightAnchor.ConstraintEqualTo(container.RightAnchor)
+        ]);
         _sectionWrapperController.DidMoveToParentViewController(this);
 
         UpdateTabBarView();
@@ -59,21 +67,29 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
     {
         base.ViewDidLayoutSubviews();
     
-        if (_crossPlatformTabBar is not null && _tabBar is { Hidden: false, NeedsMeasure: true })
+        if (_crossPlatformTabBar is not null && _tabBar is { Hidden: false })
         {
             var container = View!;
-            var size = _tabBar.SizeThatFits(container.Frame.Size);
-            var safeAreaInsets = container.SafeAreaInsets;
-            var heightWithInsets = size.Height + safeAreaInsets.Bottom;
-    
-            var frame = new CoreGraphics.CGRect(
-                0,
-                container.Bounds.Height - heightWithInsets,
-                container.Bounds.Width,
-                heightWithInsets);
-    
-            _tabBar.Frame = frame;
-            _sectionWrapperController.AdditionalSafeAreaInsets = new UIEdgeInsets(0, 0, heightWithInsets, 0);
+            var containerBounds = container.Bounds;
+
+            if (_tabBar.NeedsMeasure || containerBounds != _lastBounds)
+            {
+                _lastBounds = containerBounds;
+
+                var size = _tabBar.SizeThatFits(_lastBounds.Size);
+                var safeAreaInsets = container.SafeAreaInsets;
+                var heightWithInsets = size.Height + safeAreaInsets.Bottom;
+
+                var frame = new CGRect(
+                    0,
+                    containerBounds.Height - heightWithInsets,
+                    containerBounds.Width,
+                    heightWithInsets
+                );
+
+                _tabBar.Frame = frame;
+                _sectionWrapperController.AdditionalSafeAreaInsets = new UIEdgeInsets(0, 0, heightWithInsets, 0);
+            }
         }
     }
 

@@ -8,7 +8,6 @@
              xmlns:layouts="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.OnePage"
              x:DataType="pageModels:OnePageModel"
-             BackgroundColor="LawnGreen"
              Title="Page One">
     <ScrollView Padding="16">
         <VerticalStackLayout Spacing="16">

@@ -11,6 +11,7 @@ internal class NaluTabBarContainerView : UIView
     public NaluTabBarContainerView(UIView tabBar)
     {
         _tabBar = tabBar;
+        BackgroundColor = UIColor.Clear;
         AddSubview(_tabBar);
     }
 
