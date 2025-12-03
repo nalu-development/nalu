@@ -105,6 +105,8 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         _outerLayout = null;
         _navigationLayout = null;
         _tabBarLayout = null;
+        
+        UnhookEvents(ShellItem);
     }
 
     protected override AViewGroup GetNavigationTarget() => _navigationLayout ?? throw new InvalidOperationException("NavigationTarget has not been created yet.");
