@@ -2,15 +2,15 @@
 
 > **Note**: The custom tab bar feature is **independent** of Nalu's MVVM navigation system. It can be used with **standard MAUI Shell** as well as `NaluShell`.
 
-Nalu provides a custom tab bar implementation that allows you to replace the native tab bar with a fully customizable cross-platform view. This is especially useful when you need more than 5 tabs (avoiding the native "More" tab on iOS) or want complete control over tab bar styling.
+Nalu provides a custom tab bar implementation that allows you to replace the native tab bar with a fully customizable cross-platform view.
+This is especially useful when you need more than 5 tabs (avoiding the native "More" tab on iOS) or want complete control over tab bar styling.
 
 This feature also solves the issues `Shell` has with pages under the iOS `More` tab.
 
 ![Custom Tab Bar](assets/images/nalu-tab-bar.png)
 
-> ⚠️ **Important**: The tab bar **height cannot be customized** - it is determined by system constraints on each platform. You can customize all visual aspects (colors, shapes, spacing, etc.) but the overall height is fixed by the platform.
-
 **Platform support**: Android, iOS, and MacCatalyst only.
+**Edge-to-edge**: The custom tab bar allows edge-to-edge behavior when supported (iOS: always, Android: .NET10 + API 35 device).
 
 ## Quick Start
 
@@ -92,8 +92,6 @@ Then reference it in your Shell:
 ### Styling Properties
 
 The `NaluTabBar` control provides extensive styling options:
-
-> ⚠️ **Important limitation**: The tab bar **height cannot be customized** - it is determined by system constraints (safe area insets, platform-specific tab bar heights, etc.). All other visual aspects can be customized.
 
 **Bar Properties** (container):
 - `BarBackground` - Background brush for the tab bar container
