@@ -130,6 +130,7 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
         if (tabBarView == null)
         {
             _tabBar?.RemoveFromSuperview();
+            _tabBar = null;
             _crossPlatformTabBar = null;
             AdditionalSafeAreaInsets = UIEdgeInsets.Zero;
         }
