@@ -1,5 +1,9 @@
+using System.ComponentModel;
+using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Maui.Converters;
 using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Layouts;
 
 namespace Nalu;
 
@@ -41,8 +45,21 @@ public partial class NaluTabBar
         BindableProperty.Create(nameof(TabBackground), typeof(Brush), typeof(NaluTabBar), new SolidColorBrush(new Color(255,255,255, 128)));
 
     /// <summary>
+    /// Bindable property for <see cref="TabPadding"/>.
+    /// </summary>
+    public static readonly BindableProperty TabPaddingProperty =
+        BindableProperty.Create(nameof(TabPadding), typeof(Thickness), typeof(NaluTabBar), Thickness.Zero);
+
+    /// <summary>
+    /// Bindable property for <see cref="TabFontFamily"/>.
+    /// </summary>
+    public static readonly BindableProperty TabFontFamilyProperty =
+        BindableProperty.Create(nameof(TabFontFamily), typeof(string), typeof(NaluTabBar), null);
+
+    /// <summary>
     /// Gets or sets the stroke shape for tab buttons.
     /// </summary>
+    [TypeConverter(typeof(StrokeShapeTypeConverter))]
     public IShape? TabStrokeShape
     {
         get => (IShape?)GetValue(TabStrokeShapeProperty);
@@ -52,6 +69,7 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the stroke brush for tab buttons.
     /// </summary>
+    [TypeConverter(typeof(BrushTypeConverter))]
     public Brush? TabStroke
     {
         get => (Brush?)GetValue(TabStrokeProperty);
@@ -79,10 +97,30 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the background brush for tab buttons.
     /// </summary>
+    [TypeConverter(typeof(BrushTypeConverter))]
     public Brush? TabBackground
     {
         get => (Brush?)GetValue(TabBackgroundProperty);
         set => SetValue(TabBackgroundProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the padding for tab buttons.
+    /// </summary>
+    [TypeConverter(typeof(ThicknessTypeConverter))]
+    public Thickness TabPadding
+    {
+        get => (Thickness)GetValue(TabPaddingProperty);
+        set => SetValue(TabPaddingProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the font family for tab button labels.
+    /// </summary>
+    public string? TabFontFamily
+    {
+        get => (string?)GetValue(TabFontFamilyProperty);
+        set => SetValue(TabFontFamilyProperty, value);
     }
 
     #endregion
@@ -120,8 +158,21 @@ public partial class NaluTabBar
         BindableProperty.Create(nameof(ActiveTabBackground), typeof(Brush), typeof(NaluTabBar), Brush.White);
 
     /// <summary>
+    /// Bindable property for <see cref="ActiveTabPadding"/>.
+    /// </summary>
+    public static readonly BindableProperty ActiveTabPaddingProperty =
+        BindableProperty.Create(nameof(ActiveTabPadding), typeof(Thickness), typeof(NaluTabBar), Thickness.Zero);
+
+    /// <summary>
+    /// Bindable property for <see cref="ActiveTabFontFamily"/>.
+    /// </summary>
+    public static readonly BindableProperty ActiveTabFontFamilyProperty =
+        BindableProperty.Create(nameof(ActiveTabFontFamily), typeof(string), typeof(NaluTabBar), null);
+
+    /// <summary>
     /// Gets or sets the stroke shape for active tab buttons.
     /// </summary>
+    [TypeConverter(typeof(StrokeShapeTypeConverter))]
     public IShape? ActiveTabStrokeShape
     {
         get => (IShape?)GetValue(ActiveTabStrokeShapeProperty);
@@ -131,6 +182,7 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the stroke brush for active tab buttons.
     /// </summary>
+    [TypeConverter(typeof(BrushTypeConverter))]
     public Brush? ActiveTabStroke
     {
         get => (Brush?)GetValue(ActiveTabStrokeProperty);
@@ -158,10 +210,30 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the background brush for active tab buttons.
     /// </summary>
+    [TypeConverter(typeof(BrushTypeConverter))]
     public Brush? ActiveTabBackground
     {
         get => (Brush?)GetValue(ActiveTabBackgroundProperty);
         set => SetValue(ActiveTabBackgroundProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the padding for active tab buttons.
+    /// </summary>
+    [TypeConverter(typeof(ThicknessTypeConverter))]
+    public Thickness ActiveTabPadding
+    {
+        get => (Thickness)GetValue(ActiveTabPaddingProperty);
+        set => SetValue(ActiveTabPaddingProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the font family for active tab button labels.
+    /// </summary>
+    public string? ActiveTabFontFamily
+    {
+        get => (string?)GetValue(ActiveTabFontFamilyProperty);
+        set => SetValue(ActiveTabFontFamilyProperty, value);
     }
 
     #endregion
@@ -196,7 +268,7 @@ public partial class NaluTabBar
     /// Bindable property for <see cref="BarPadding"/>.
     /// </summary>
     public static readonly BindableProperty BarPaddingProperty =
-        BindableProperty.Create(nameof(BarPadding), typeof(Thickness), typeof(NaluTabBar), new Thickness(8, 0));
+        BindableProperty.Create(nameof(BarPadding), typeof(Thickness), typeof(NaluTabBar), Thickness.Zero);
 
     /// <summary>
     /// Bindable property for <see cref="BarMargin"/>.
@@ -205,8 +277,21 @@ public partial class NaluTabBar
         BindableProperty.Create(nameof(BarMargin), typeof(Thickness), typeof(NaluTabBar), Thickness.Zero);
 
     /// <summary>
+    /// Bindable property for <see cref="BarShadow"/>.
+    /// </summary>
+    public static readonly BindableProperty BarShadowProperty =
+        BindableProperty.Create(nameof(BarShadow), typeof(Shadow), typeof(NaluTabBar), null);
+
+    /// <summary>
+    /// Bindable property for <see cref="ScrollPadding"/>.
+    /// </summary>
+    public static readonly BindableProperty ScrollPaddingProperty =
+        BindableProperty.Create(nameof(ScrollPadding), typeof(Thickness), typeof(NaluTabBar), Thickness.Zero);
+
+    /// <summary>
     /// Gets or sets the stroke shape for the tab bar container.
     /// </summary>
+    [TypeConverter(typeof(StrokeShapeTypeConverter))]
     public IShape? BarStrokeShape
     {
         get => (IShape?)GetValue(BarStrokeShapeProperty);
@@ -216,6 +301,7 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the stroke brush for the tab bar container.
     /// </summary>
+    [TypeConverter(typeof(BrushTypeConverter))]
     public Brush? BarStroke
     {
         get => (Brush?)GetValue(BarStrokeProperty);
@@ -234,6 +320,7 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the background brush for the tab bar container.
     /// </summary>
+    [TypeConverter(typeof(BrushTypeConverter))]
     public Brush? BarBackground
     {
         get => (Brush?)GetValue(BarBackgroundProperty);
@@ -243,6 +330,7 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the padding for the tab bar container.
     /// </summary>
+    [TypeConverter(typeof(ThicknessTypeConverter))]
     public Thickness BarPadding
     {
         get => (Thickness)GetValue(BarPaddingProperty);
@@ -252,10 +340,33 @@ public partial class NaluTabBar
     /// <summary>
     /// Gets or sets the margin for the tab bar container.
     /// </summary>
+    [TypeConverter(typeof(ThicknessTypeConverter))]
     public Thickness BarMargin
     {
         get => (Thickness)GetValue(BarMarginProperty);
         set => SetValue(BarMarginProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the shadow for the tab bar container.
+    /// </summary>
+#if NET10_0_OR_GREATER
+    [TypeConverter(typeof(ShadowTypeConverter))]
+#endif
+    public Shadow? BarShadow
+    {
+        get => (Shadow?)GetValue(BarShadowProperty);
+        set => SetValue(BarShadowProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the padding for the scroll view container.
+    /// </summary>
+    [TypeConverter(typeof(ThicknessTypeConverter))]
+    public Thickness ScrollPadding
+    {
+        get => (Thickness)GetValue(ScrollPaddingProperty);
+        set => SetValue(ScrollPaddingProperty, value);
     }
 
     #endregion
@@ -294,4 +405,19 @@ public partial class NaluTabBar
             Interlocked.Exchange(ref _navigating, 0);
         }
     }
+
+    /// <inheritdoc/>
+    protected override ILayoutManager CreateLayoutManager()
+    {
+        var layoutManager = base.CreateLayoutManager();
+        var wrappedLayoutManager = new WrappedLayoutManager(layoutManager);
+        return wrappedLayoutManager;
+    }
+}
+
+file class WrappedLayoutManager(ILayoutManager layoutManager) : ILayoutManager
+{
+    public Size Measure(double widthConstraint, double heightConstraint) => layoutManager.Measure(widthConstraint, heightConstraint);
+
+    public Size ArrangeChildren(Rect bounds) => layoutManager.ArrangeChildren(bounds);
 }

@@ -1,104 +1,353 @@
-using System.Collections.Specialized;
-using System.Runtime.CompilerServices;
+using System.ComponentModel;
 using Android.OS;
 using Android.Views;
-using Google.Android.Material.BottomNavigation;
+using Android.Widget;
+using AndroidX.ConstraintLayout.Widget;
+using AndroidX.Core.View;
 using Microsoft.Maui.Controls.Platform.Compatibility;
 using Microsoft.Maui.Platform;
-using View = Android.Views.View;
-using ViewGroup = Android.Views.ViewGroup;
+using AView = Android.Views.View;
+using AViewGroup = Android.Views.ViewGroup;
+using IAndroidXOnApplyWindowInsetsListener = AndroidX.Core.View.IOnApplyWindowInsetsListener;
+using AInsets = AndroidX.Core.Graphics.Insets;
+using ARenderEffect = Android.Graphics.RenderEffect;
+using AShader = Android.Graphics.Shader;
+using AColor = Android.Graphics.Color;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 namespace Nalu;
 
-public class NaluShellItemRenderer : ShellItemRenderer
+public class NaluShellItemRenderer : ShellItemRendererBase
 {
-    private View? _platformTabBar;
-    private Microsoft.Maui.Controls.View? _crossPlatformTabBar;
+    public static readonly bool SupportsEdgeToEdge
+#if NET10_0_OR_GREATER
+        = OperatingSystem.IsAndroidVersionAtLeast(35);
+#else
+        = false;
+#endif
+    
+    private NaluShellItemRendererOuterLayout? _outerLayout;
+    private NaluShellItemRendererNavigationLayout? _navigationLayout;
+    private NaluShellItemRendererTabBarLayout? _tabBarLayout;
+    private AView? _tabBar;
+    private IMauiContext MauiContext => ShellContext.Shell.Handler?.MauiContext ?? throw new InvalidOperationException("MauiContext is not available.");
 
     public NaluShellItemRenderer(IShellContext shellContext)
         : base(shellContext)
     {
     }
 
-    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_bottomView")]
-    private static extern ref BottomNavigationView GetBottomView(ShellItemRenderer instance);
-
-    protected override void OnShellItemsChanged(object sender, NotifyCollectionChangedEventArgs e)
+    public override AView? OnCreateView(LayoutInflater inflater, AViewGroup? container, Bundle? savedInstanceState)
     {
-        base.OnShellItemsChanged(sender, e);
-        UpdateTabBarView();
-    }
+        base.OnCreateView(inflater, container, savedInstanceState);
+        
+        var context = MauiContext.Context ?? throw new InvalidOperationException("Context is not available.");
+        _outerLayout = new NaluShellItemRendererOuterLayout(context);
+        _navigationLayout = new NaluShellItemRendererNavigationLayout(context);
+        _tabBarLayout = new NaluShellItemRendererTabBarLayout(context);
+        
+        // generate IDs
+        var navigationLayoutId = AView.GenerateViewId();
+        var tabBarLayoutId = AView.GenerateViewId();
+        var outerLayoutId = AView.GenerateViewId();
+        _navigationLayout.Id = navigationLayoutId;
+        _tabBarLayout.Id = tabBarLayoutId;
+        _outerLayout.Id = outerLayoutId;
+        
+        // constrain navigation layout to fill the parent
+        var navigationLayoutParams = new ConstraintLayout.LayoutParams(0, 0);
+        navigationLayoutParams.TopToTop = outerLayoutId;
 
-    public override View? OnCreateView(LayoutInflater inflater, ViewGroup? container, Bundle? savedInstanceState)
-    {
-        var view = base.OnCreateView(inflater, container, savedInstanceState);
-        UpdateTabBarView();
-
-        return view;
-    }
-
-    public void UpdateTabBarView()
-    {
-        // Get the TabBarView from the ShellItem
-        var tabBarView = NaluShell.GetTabBarView(ShellItem);
-
-        if (tabBarView == null)
+        if (SupportsEdgeToEdge)
         {
-            // Remove custom view if it was previously added
-            _crossPlatformTabBar?.DisconnectHandlers();
-            _platformTabBar?.RemoveFromParent();
-            _platformTabBar = null;
-            _crossPlatformTabBar = null;
-
-            // Show native tab bar items (in case they were hidden)
-            HideNativeMenuItems(false);
+            navigationLayoutParams.BottomToBottom = outerLayoutId;
         }
-        else if (_crossPlatformTabBar != tabBarView)
+        else
         {
-            _crossPlatformTabBar?.DisconnectHandlers();
-            _platformTabBar?.RemoveFromParent();
-
-            var mauiContext = ShellContext.Shell.Handler?.MauiContext ?? throw new InvalidOperationException("MauiContext is null");
-            var platformView = tabBarView.ToPlatform(mauiContext);
-            platformView.TranslationZ = 1;
-            platformView.Clickable = true;
-            platformView.Focusable = true;
-
-            // Set layout parameters to fill the entire BottomNavigationView
-            var layoutParams = new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MatchParent,
-                ViewGroup.LayoutParams.MatchParent
-            );
-            platformView.LayoutParameters = layoutParams;
-
-            _platformTabBar = platformView;
-            _crossPlatformTabBar = tabBarView;
-            var bottomView = GetBottomView(this);
-            bottomView.AddView(_platformTabBar);
-            HideNativeMenuItems(true);
+            _outerLayout.SetFitsSystemWindows(true);
+            navigationLayoutParams.BottomToTop = tabBarLayoutId;
         }
+
+        navigationLayoutParams.StartToStart = outerLayoutId;
+        navigationLayoutParams.EndToEnd = outerLayoutId;
+        _navigationLayout.LayoutParameters = navigationLayoutParams;
+
+        _outerLayout.AddView(_navigationLayout);
+        
+        // constrain tab bar layout to the bottom
+        var tabBarLayoutParams = new ConstraintLayout.LayoutParams(0, AViewGroup.LayoutParams.WrapContent);
+        tabBarLayoutParams.BottomToBottom = outerLayoutId;
+        tabBarLayoutParams.StartToStart = outerLayoutId;
+        tabBarLayoutParams.EndToEnd = outerLayoutId;
+        _tabBarLayout.LayoutParameters = tabBarLayoutParams;
+        
+        _outerLayout.AddView(_tabBarLayout);
+
+        UpdateTabBarView();
+        
+        HookEvents(ShellItem);
+
+        return _outerLayout;
     }
 
     public override void OnDestroy()
     {
         base.OnDestroy();
-        _crossPlatformTabBar?.DisconnectHandlers();
-        _platformTabBar?.RemoveFromParent();
-        _crossPlatformTabBar = null;
-        _platformTabBar = null;
+
+        _tabBarLayout?.SetTabBar(null);
+
+        _outerLayout?.Dispose();
+        _navigationLayout?.Dispose();
+        _tabBarLayout?.Dispose();
+        
+        _tabBar = null;
+        _outerLayout = null;
+        _navigationLayout = null;
+        _tabBarLayout = null;
+        
+        UnhookEvents(ShellItem);
     }
 
-    private void HideNativeMenuItems(bool hidden)
+    protected override AViewGroup GetNavigationTarget() => _navigationLayout ?? throw new InvalidOperationException("NavigationTarget has not been created yet.");
+
+    protected override void OnShellItemPropertyChanged(object sender, PropertyChangedEventArgs e)
     {
-        // Hide/show the BottomNavigationMenuView which contains the native menu items
-        var bottomView = GetBottomView(this);
-#pragma warning disable XAOBS001
-        if (bottomView.GetChildAt(0) is BottomNavigationMenuView bottomNavMenuView)
+        base.OnShellItemPropertyChanged(sender, e);
+
+        if (e.PropertyName == NaluShell.TabBarViewProperty.PropertyName)
         {
-            bottomNavMenuView.Visibility = hidden ? ViewStates.Gone : ViewStates.Visible;
+            UpdateTabBarView();
         }
-#pragma warning restore XAOBS001
+    }
+
+    private void UpdateTabBarView()
+    {
+        var tabBarView = NaluShell.GetTabBarView(ShellItem);
+
+        if (tabBarView == null)
+        {
+            _tabBar = null;
+            _tabBarLayout?.SetTabBar(null);
+        }
+        else
+        {
+            var mauiContext = ShellContext.Shell.Handler?.MauiContext ?? throw new NullReferenceException("MauiContext is null");
+            var platformView = tabBarView.ToPlatform(mauiContext);
+            _tabBar = platformView;
+            _tabBarLayout?.SetTabBar(platformView);
+        }
+
+        UpdateTabBarHidden();
+    }
+
+    private void UpdateTabBarHidden()
+    {
+        var isTabBarVisible = _tabBar is not null && (DisplayedPage?.GetValue(Shell.TabBarIsVisibleProperty) as bool? ?? true);
+
+        if (_tabBarLayout is not null)
+        {
+            _tabBarLayout.Visibility = isTabBarVisible ? ViewStates.Visible : ViewStates.Gone;
+            ViewCompat.RequestApplyInsets(_outerLayout);
+        }
+    }
+
+    protected override void OnDisplayedPageChanged(Page? newPage, Page? oldPage)
+    {
+        base.OnDisplayedPageChanged(newPage, oldPage);
+
+        if (oldPage is not null)
+        {
+            oldPage.PropertyChanged -= OnDisplayedElementPropertyChanged;
+        }
+
+        if (newPage is not null)
+        {
+            newPage.PropertyChanged += OnDisplayedElementPropertyChanged;
+        }
+
+        UpdateTabBarVisibility();
+    }
+
+    private void UpdateTabBarVisibility()
+    {
+        if (_tabBarLayout is null)
+        {
+            return;
+        }
+
+        var isTabBarVisible = DisplayedPage?.GetValue(Shell.TabBarIsVisibleProperty) as bool? ?? true;
+        _tabBarLayout.Visibility = isTabBarVisible ? ViewStates.Visible : ViewStates.Gone;
+    }
+
+    private void OnDisplayedElementPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == Shell.TabBarIsVisibleProperty.PropertyName)
+        {
+            UpdateTabBarVisibility();
+        }
+    }
+}
+
+public class NaluShellItemRendererOuterLayout : ConstraintLayout
+{
+    private int _tabBarHeight;
+
+    public NaluShellItemRendererOuterLayout(Android.Content.Context context) : base(context)
+    {
+        SetClipChildren(false);
+    }
+
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        base.OnLayout(changed, left, top, right, bottom);
+
+        var tabBarView = GetChildAt(1)!;
+        var height = tabBarView.Visibility == ViewStates.Gone ? 0 : tabBarView.Height;
+        if (height == _tabBarHeight)
+        {
+            return;
+        }
+
+        _tabBarHeight = height;
+        ViewCompat.RequestApplyInsets(GetChildAt(0));
+    }
+}
+
+public class NaluShellItemRendererNavigationLayout : FrameLayout, IAndroidXOnApplyWindowInsetsListener
+{
+    private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
+    
+    public NaluShellItemRendererNavigationLayout(Android.Content.Context context) : base(context)
+    {
+        ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (disposing)
+        {
+            ViewCompat.SetOnApplyWindowInsetsListener(this, null);
+        }
+    }
+
+    WindowInsetsCompat? IAndroidXOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
+    {
+        ArgumentNullException.ThrowIfNull(insets);
+        var parent = view?.Parent as NaluShellItemRendererOuterLayout ?? throw new InvalidOperationException("NaluShellItemRendererNavigationLayout cannot be used outside NaluShellItemRendererOuterLayout.");
+
+        if (NaluShellItemRenderer.SupportsEdgeToEdge && parent.GetChildAt(1) is { Visibility: ViewStates.Visible, Height: >0 } tabBarLayout)
+        {
+            var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
+            var tabBarHeight = tabBarLayout.Height;
+            var modifiedSystemBarInsets = AInsets.Of(systemBarInsets.Left, systemBarInsets.Top, systemBarInsets.Right, tabBarHeight);
+            
+            using var builder = new WindowInsetsCompat.Builder(insets);
+            insets = builder
+                              .SetInsets(_systemBarsInsetsType, modifiedSystemBarInsets)!
+                              .Build();
+        }
+
+        return insets;
+    }
+}
+
+public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWindowInsetsListener
+{
+    private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
+    private int _systemBarInset;
+    private AView? _tabBar;
+
+    public NaluShellItemRendererTabBarLayout(Android.Content.Context context) : base(context)
+    {
+        ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+        SetClipChildren(false);
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(31))
+        {
+            var blurPixels = context.ToPixels(4);
+            var blur = ARenderEffect.CreateBlurEffect(blurPixels, 30f, AShader.TileMode.Clamp!);
+            var blurView = new AView(context);
+            blurView.SetRenderEffect(blur);
+            blurView.SetBackgroundColor(AColor.Black);
+            AddView(blurView);
+        }
+    }
+
+    public void SetTabBar(AView? tabBar)
+    {
+        if (_tabBar?.Parent?.Handle == Handle)
+        {
+            RemoveView(_tabBar);
+        }
+
+        _tabBar = tabBar;
+
+        if (tabBar != null)
+        {
+            AddView(tabBar);
+        }
+    }
+
+    protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        int width;
+        int height;
+        
+        if (_tabBar != null)
+        {
+            MeasureChild(_tabBar, widthMeasureSpec, heightMeasureSpec);
+            width = _tabBar.MeasuredWidth;
+            height = _tabBar.MeasuredHeight;
+
+            if (height > 0)
+            {
+                height += _systemBarInset;
+            }
+        }
+        else
+        {
+            width = 0;
+            height = 0;
+        }
+        
+        SetMeasuredDimension(width, height);
+    }
+
+    // protected override void OnLayout(bool changed, int l, int t, int r, int b)
+    // {
+    //     var childCount = ChildCount;
+    //
+    //     for (var i = 0; i < childCount; i++)
+    //     {
+    //         var child = GetChildAt(i)!;
+    //         child.Layout(0, 0, r - l, b - t);
+    //     }
+    // }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (disposing)
+        {
+            ViewCompat.SetOnApplyWindowInsetsListener(this, null);
+        }
+    }
+
+    WindowInsetsCompat? IAndroidXOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
+    {
+        ArgumentNullException.ThrowIfNull(insets);
+        var bottomInset = insets.GetInsets(_systemBarsInsetsType)?.Bottom ?? throw new InvalidOperationException("SystemBars insets are null.");
+
+        if (_systemBarInset != bottomInset)
+        {
+            _systemBarInset = bottomInset;
+            RequestLayout();
+        }
+
+        return insets;
     }
 }

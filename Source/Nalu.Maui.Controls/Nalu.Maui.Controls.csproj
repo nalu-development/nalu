@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <PackageReference Condition="$(TargetFramework.StartsWith('net9'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion9)"/>
+    <PackageReference Condition="$(TargetFramework.StartsWith('net10'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion10)"/>
     <PackageReference Include="SkiaSharp.Views.Maui.Controls" Version="3.116.1" />
   </ItemGroup>
 

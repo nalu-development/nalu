@@ -3,6 +3,7 @@
 <Grid xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
       xmlns:local="clr-namespace:Nalu"
+      Padding="8"
       x:Name="Root"
       x:Class="Nalu.NaluTabBar"
       x:DataType="ShellItem">
@@ -12,9 +13,11 @@
             Background="{Binding Source={x:Reference Root}, Path=BarBackground, x:DataType=local:NaluTabBar}"
             Padding="{Binding Source={x:Reference Root}, Path=BarPadding, x:DataType=local:NaluTabBar}"
             Margin="{Binding Source={x:Reference Root}, Path=BarMargin, x:DataType=local:NaluTabBar}"
+            Shadow="{Binding Source={x:Reference Root}, Path=BarShadow, x:DataType=local:NaluTabBar}"
             HorizontalOptions="Center">
         <ScrollView Orientation="Horizontal"
-                    HorizontalScrollBarVisibility="Never">
+                    HorizontalScrollBarVisibility="Never"
+                    Padding="{Binding Source={x:Reference Root}, Path=ScrollPadding, x:DataType=local:NaluTabBar}">
             <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Items}"
                                    HorizontalOptions="Center"
                                    Spacing="8">
@@ -37,9 +40,14 @@
                                 </DataTrigger>
                             </Border.Triggers>
                             <Grid RowDefinitions="*,Auto"
-                                  WidthRequest="64"
+                                  MinimumWidthRequest="64"
                                   IsVisible="{Binding IsVisible}"
-                                  Padding="4">
+                                  Padding="{Binding Source={x:Reference Root}, Path=TabPadding, x:DataType=local:NaluTabBar}">
+                                <Grid.Triggers>
+                                    <DataTrigger TargetType="Grid" Binding="{Binding IsChecked}" Value="True">
+                                        <Setter Property="Padding" Value="{Binding Source={x:Reference Root}, Path=ActiveTabPadding, x:DataType=local:NaluTabBar}"/>
+                                    </DataTrigger>
+                                </Grid.Triggers>
                                 <Image Source="{Binding Icon}" />
                                 <Label x:Name="TabLabel"
                                        Text="{Binding Title}"
@@ -48,9 +56,11 @@
                                        FontSize="11"
                                        MaxLines="1"
                                        LineBreakMode="TailTruncation"
+                                       FontFamily="{Binding Source={x:Reference Root}, Path=TabFontFamily, x:DataType=local:NaluTabBar}"
                                        TextColor="{Binding Source={x:Reference Root}, Path=TabForegroundColor, x:DataType=local:NaluTabBar}">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsChecked}" Value="True">
+                                            <Setter Property="FontFamily" Value="{Binding Source={x:Reference Root}, Path=ActiveTabFontFamily, x:DataType=local:NaluTabBar}"/>
                                             <Setter Property="TextColor" Value="{Binding Source={x:Reference Root}, Path=ActiveTabForegroundColor, x:DataType=local:NaluTabBar}"/>
                                         </DataTrigger>
                                     </Label.Triggers>

@@ -8,8 +8,9 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <MauiVersion9>9.0.80</MauiVersion9>
-    <AllTargetFrameworks>net9.0;net9.0-android;net9.0-ios18.0;net9.0-maccatalyst</AllTargetFrameworks>
-    <AllTargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(AllTargetFrameworks);net9.0-windows10.0.19041.0</AllTargetFrameworks>
+    <MauiVersion10>10.0.10</MauiVersion10>
+    <AllTargetFrameworks>net9.0;net9.0-android;net9.0-ios18.0;net9.0-maccatalyst;net10.0;net10.0-android;net10.0-ios26.0;net10.0-maccatalyst</AllTargetFrameworks>
+    <AllTargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(AllTargetFrameworks);net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0</AllTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup Label="Package">

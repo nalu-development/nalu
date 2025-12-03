@@ -12,7 +12,4 @@ public class NaluShellRenderer : ShellRenderer
            {
                ShellItem = item
            };
-
-    protected override IShellSectionRenderer CreateShellSectionRenderer(ShellSection shellSection)
-        => new NaluShellSectionRenderer(this);
 }

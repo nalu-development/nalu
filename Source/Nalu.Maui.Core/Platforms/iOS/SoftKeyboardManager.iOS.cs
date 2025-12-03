@@ -212,7 +212,7 @@ public static partial class SoftKeyboardManager
                 );
             }
 
-            _rootView ??= _containerView?.Window.RootViewController?.View;
+            _rootView ??= _containerView?.Window?.RootViewController?.View;
 
             // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
             while (parent != null)

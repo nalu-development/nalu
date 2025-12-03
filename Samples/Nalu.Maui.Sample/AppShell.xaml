@@ -4,12 +4,14 @@
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
                 xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
+                xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+                xmlns:sample="clr-namespace:Nalu.Maui.Sample"
                 x:Class="Nalu.Maui.Sample.AppShell">
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems"
                 Title="Tabs"
                 Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"
-                nalu:NaluShell.TabBarView="{nalu:NaluTabBar}">
+                nalu:NaluShell.TabBarView="{sample:AppShellTabBar}">
         <Tab Title="Pages"
              Route="pages"
              FlyoutDisplayOptions="AsMultipleItems"
@@ -25,8 +27,18 @@
                       Title="Page Two"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}" />
         <ShellContent nalu:Navigation.PageType="pages:EightPage"
-                      Title="Page Eight"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8b8;', Color='Black', Size=24}" />
+                      Title="Page Eight">
+            <ShellContent.Icon>
+                <x:Binding Source="{RelativeSource Self}"
+                                         Path="IsChecked">
+                        <x:Binding.Converter>
+                                <toolkit:BoolToObjectConverter x:TypeArguments="ImageSource"
+                                                             TrueObject="{FontImageSource FontFamily='MaterialFilled', Glyph='&#xe88e;', Color='Black', Size=24}"
+                                                             FalseObject="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
+                            </x:Binding.Converter>
+                    </x:Binding>
+            </ShellContent.Icon>
+        </ShellContent>
         <ShellContent nalu:Navigation.PageType="pages:NinePage"
                       Title="Page Nine"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8b9;', Color='Black', Size=24}" />

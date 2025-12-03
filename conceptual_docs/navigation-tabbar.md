@@ -2,15 +2,15 @@
 
 > **Note**: The custom tab bar feature is **independent** of Nalu's MVVM navigation system. It can be used with **standard MAUI Shell** as well as `NaluShell`.
 
-Nalu provides a custom tab bar implementation that allows you to replace the native tab bar with a fully customizable cross-platform view. This is especially useful when you need more than 5 tabs (avoiding the native "More" tab on iOS) or want complete control over tab bar styling.
+Nalu provides a custom `Shell` handler implementation that allows you to replace the native tab bar with a fully customizable cross-platform view.
+This is especially useful when you need more than 5 tabs (avoiding the native "More" tab on iOS) or want complete control over tab bar styling.
 
 This feature also solves the issues `Shell` has with pages under the iOS `More` tab.
 
 ![Custom Tab Bar](assets/images/nalu-tab-bar.png)
 
-> ⚠️ **Important**: The tab bar **height cannot be customized** - it is determined by system constraints on each platform. You can customize all visual aspects (colors, shapes, spacing, etc.) but the overall height is fixed by the platform.
-
 **Platform support**: Android, iOS, and MacCatalyst only.
+**Edge-to-edge**: The custom tab bar allows edge-to-edge behavior when supported (iOS: always, Android: .NET10 + API 35 device).
 
 ## Quick Start
 
@@ -28,15 +28,57 @@ builder
 #endif
 ```
 
-2. Attach the custom tab bar view to your `TabBar` or `FlyoutItem`:
+2. Create a custom tab bar class by creating a new XAML file (e.g., `AppShellTabBar.xaml`):
+
+You can use what Nalu provides (`NaluTabBar`) or create your own custom component.
+**Note**: This instance will be bound to its `ShellItem` (a.k.a `TabBar`).
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+
+<nalu:NaluTabBar xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                 xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
+                 x:Class="MyApp.AppShellTabBar"
+                 BarShadow="{Shadow Radius=16, Opacity=0.4}"
+                 HeightRequest="64"
+                 Padding="4"
+                 BarBackground="#CC2C479D"
+                 BarStrokeShape="RoundRectangle 32"
+                 TabStrokeShape="RoundRectangle 32"
+                 TabPadding="12,4"
+                 TabFontFamily="OpenSansSemibold"
+                 ActiveTabStrokeShape="RoundRectangle 32"
+                 ActiveTabPadding="12,4"
+                 ActiveTabFontFamily="OpenSansSemibold"
+                 BarPadding="0"
+                 ScrollPadding="4" />
+```
+
+3. Create the code-behind file (e.g., `AppShellTabBar.xaml.cs`):
+
+```csharp
+namespace MyApp;
+
+public partial class AppShellTabBar : NaluTabBar
+{
+    public AppShellTabBar()
+    {
+        InitializeComponent();
+    }
+}
+```
+
+4. Attach the custom tab bar view to your `TabBar` or `FlyoutItem`:
 
 **With standard Shell:**
 ```xml
 <Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
        xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
+       xmlns:sample="clr-namespace:MyApp"
        x:Class="MyApp.AppShell">
-    <TabBar nalu:NaluShell.TabBarView="{nalu:NaluTabBar}">
+    <TabBar nalu:NaluShell.TabBarView="{sample:AppShellTabBar}">
         <ShellContent Title="Home"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Size=24}" />
         <ShellContent Title="Search"
@@ -51,8 +93,9 @@ builder
 <nalu:NaluShell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                  xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
                  xmlns:pages="clr-namespace:MyApp.Pages"
+                 xmlns:sample="clr-namespace:MyApp"
                  x:Class="MyApp.AppShell">
-    <FlyoutItem nalu:NaluShell.TabBarView="{nalu:NaluTabBar}">
+    <FlyoutItem nalu:NaluShell.TabBarView="{sample:AppShellTabBar}">
         <ShellContent nalu:Navigation.PageType="pages:HomePage"
                       Title="Home"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Size=24}" />
@@ -61,39 +104,9 @@ builder
 </nalu:NaluShell>
 ```
 
-## Built-in `NaluTabBar` Control
-
-Nalu provides a customizable `NaluTabBar` control with extensive styling options. To customize it, define it as a resource:
-
-```xml
-<Application.Resources>
-    <ResourceDictionary>
-        <nalu:NaluTabBar x:Key="CustomTabBar"
-                         BarBackground="White"
-                         BarPadding="8,0"
-                         TabForegroundColor="Gray"
-                         TabBackground="Transparent"
-                         TabStrokeShape="{RoundRectangle CornerRadius=8}"
-                         ActiveTabBackground="Blue"
-                         ActiveTabForegroundColor="White"
-                         ActiveTabStrokeShape="{RoundRectangle CornerRadius=8}" />
-    </ResourceDictionary>
-</Application.Resources>
-```
-
-Then reference it in your Shell:
-
-```xml
-<TabBar nalu:NaluShell.TabBarView="{StaticResource CustomTabBar}">
-    <!-- Your ShellContent items -->
-</TabBar>
-```
-
 ### Styling Properties
 
 The `NaluTabBar` control provides extensive styling options:
-
-> ⚠️ **Important limitation**: The tab bar **height cannot be customized** - it is determined by system constraints (safe area insets, platform-specific tab bar heights, etc.). All other visual aspects can be customized.
 
 **Bar Properties** (container):
 - `BarBackground` - Background brush for the tab bar container
@@ -102,6 +115,7 @@ The `NaluTabBar` control provides extensive styling options:
 - `BarStroke` - Stroke brush for the container border
 - `BarStrokeThickness` - Thickness of the container border
 - `BarStrokeShape` - Shape of the container border
+- `BarShadow` - Shadow effect for the tab bar container
 
 **Tab Properties** (individual tabs):
 - `TabBackground` - Background brush for inactive tabs
@@ -109,6 +123,8 @@ The `NaluTabBar` control provides extensive styling options:
 - `TabStroke` - Stroke brush for inactive tab borders
 - `TabStrokeThickness` - Thickness of inactive tab borders
 - `TabStrokeShape` - Shape of inactive tab borders
+- `TabPadding` - Padding for inactive tab buttons
+- `TabFontFamily` - Font family for inactive tab labels
 
 **Active Tab Properties**:
 - `ActiveTabBackground` - Background brush for the active tab
@@ -116,69 +132,18 @@ The `NaluTabBar` control provides extensive styling options:
 - `ActiveTabStroke` - Stroke brush for the active tab border
 - `ActiveTabStrokeThickness` - Thickness of the active tab border
 - `ActiveTabStrokeShape` - Shape of the active tab border
+- `ActiveTabPadding` - Padding for active tab buttons
+- `ActiveTabFontFamily` - Font family for active tab labels
 
-## Custom Tab Bar View
-
-You can also create your own custom tab bar view. The view will be bound to the `ShellItem` (TabBar or FlyoutItem), allowing you to iterate through `Items` and handle tab selection:
-
-```xml
-<TabBar nalu:NaluShell.TabBarView="{StaticResource MyCustomTabBar}">
-    <!-- Your ShellContent items -->
-</TabBar>
-```
-
-When creating a custom tab bar view:
-
-1. **Binding Context**: The view will be bound to the `ShellItem` (TabBar or FlyoutItem)
-2. **Accessing Items**: Use `Items` property to iterate through `ShellSection` items
-3. **Tab Selection**: Handle tap gestures and navigate using `Shell.Current.GoToAsync($"//{shellSection.CurrentItem.Route}")`
-4. **Active State**: Check `IsChecked` property on `ShellSection` to determine active tab
-
-Example custom tab bar implementation:
-
-```xml
-<Grid xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-      x:DataType="ShellItem">
-    <HorizontalStackLayout BindableLayout.ItemsSource="{Binding Items}">
-        <BindableLayout.ItemTemplate>
-            <DataTemplate x:DataType="ShellSection">
-                <Border Background="{Binding IsChecked, Converter={StaticResource BoolToColorConverter}}"
-                        Padding="12,8">
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Tapped="OnTabTapped" />
-                    </Border.GestureRecognizers>
-                    <VerticalStackLayout>
-                        <Image Source="{Binding Icon}" />
-                        <Label Text="{Binding Title}" />
-                    </VerticalStackLayout>
-                </Border>
-            </DataTemplate>
-        </BindableLayout.ItemTemplate>
-    </HorizontalStackLayout>
-</Grid>
-```
+**Scroll Properties**:
+- `ScrollPadding` - Padding for the scroll view container
 
 ## Benefits
 
-- ✅ **No "More" tab limitation** - Supports unlimited tabs with horizontal scrolling
-- ✅ **Fully customizable styling** - Colors, shapes, spacing, and more
-- ✅ **Cross-platform consistent appearance** - Same look on all platforms
-- ✅ **Works with both standard Shell and NaluShell** - Flexible integration
-- ✅ **Independent feature** - Can be used without Nalu navigation
-
-## Platform Considerations
-
-### iOS
-
-On iOS, the custom tab bar prevents the native "More" navigation controller from appearing when you have more than 5 tabs. All tabs are accessible through the custom tab bar UI, while the underlying `UITabBarController` manages up to 5 view controllers at a time, with automatic swapping when tabs beyond the visible set are selected.
-
-### Android
-
-On Android, the custom tab bar replaces the native `BottomNavigationView` menu items with your custom view, providing full control over appearance and behavior.
-
-### MacCatalyst
-
-MacCatalyst uses the same iOS implementation, providing consistent behavior across Apple platforms.
+- ✅ **Fully customizable styling** - Size, colors, shapes, spacing, shadows, fonts, and more
+- ✅ **Cross-platform consistent appearance** - Same look on all platforms (except Windows)
+- ✅ **Independent feature** - Can be used even without Nalu navigation
+- ✅ **Edge-to-Edge** - Supports edge to edge by default acting like a system bar
 
 ## See Also
 

@@ -279,6 +279,7 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
             if (oldValue is View oldView)
             {
                 oldView.BindingContext = null;
+                oldView.DisconnectHandlers();
             }
 
             if (newValue is View newView)
