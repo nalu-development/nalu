@@ -1,3 +1,4 @@
+using Microsoft.Maui.Handlers;
 using Nalu;
 
 // ReSharper disable once CheckNamespace
@@ -57,6 +58,13 @@ public static class NaluMauiAppBuilderExtensions
     public static MauiAppBuilder UseNaluTabBar(this MauiAppBuilder builder)
     {
         builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Shell, NaluShellRenderer>());
+#if ANDROID && NET10_0_OR_GREATER
+        ScrollViewHandler.Mapper.Add("Nalu_ScrollSafeAreaRenderingFix",
+                                     (handler, _) =>
+                                     {
+                                         handler.PlatformView.SetClipToPadding(false);
+                                     });  
+#endif
         return builder;
     }
 #endif

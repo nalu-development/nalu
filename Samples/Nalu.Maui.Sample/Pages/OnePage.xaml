@@ -75,7 +75,7 @@
             </Label>
             
             <Label Text="TemplateSourceSelector" />
-            <CollectionView VerticalOptions="Center" ItemTemplate="{layouts:TemplateSourceSelector}">
+            <CollectionView VerticalOptions="Center" ItemTemplate="{layouts:TemplateSourceSelector}" HeightRequest="100">
                 <CollectionView.ItemsSource>
                     <layouts:DataTemplatesSource x:Key="VirtualizedViews">
                         <DataTemplate x:DataType="pageModels:OnePageModel">

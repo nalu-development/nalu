@@ -5,12 +5,13 @@
                 xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
                 xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
                 xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+                xmlns:sample="clr-namespace:Nalu.Maui.Sample"
                 x:Class="Nalu.Maui.Sample.AppShell">
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems"
                 Title="Tabs"
                 Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"
-                nalu:NaluShell.TabBarView="{nalu:NaluTabBar}">
+                nalu:NaluShell.TabBarView="{sample:AppShellTabBar}">
         <Tab Title="Pages"
              Route="pages"
              FlyoutDisplayOptions="AsMultipleItems"

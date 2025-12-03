@@ -1,3 +1,4 @@
+// using CoreAnimation;
 using CoreGraphics;
 using UIKit;
 
@@ -7,11 +8,37 @@ namespace Nalu;
 internal class NaluTabBarContainerView : UIView
 {
     private readonly UIView _tabBar;
+    // private readonly UIVisualEffectView? _blurView;
 
     public NaluTabBarContainerView(UIView tabBar)
     {
         _tabBar = tabBar;
         BackgroundColor = UIColor.Clear;
+
+        // if (OperatingSystem.IsIOSVersionAtLeast(13))
+        // {
+        //     var blurEffect = UIBlurEffect.FromStyle(UIBlurEffectStyle.SystemThinMaterial);
+        //     _blurView = new UIVisualEffectView(blurEffect)
+        //                 {
+        //                     AutoresizingMask = UIViewAutoresizing.FlexibleDimensions
+        //                 };
+        //     
+        //     var verticalGradient = new CAGradientLayer
+        //     {
+        //         Colors =
+        //         [
+        //             UIColor.Clear.CGColor,
+        //             UIColor.White.CGColor
+        //         ],
+        //         StartPoint = new CGPoint(0.5, 0),
+        //         EndPoint = new CGPoint(0.5, 0.15),
+        //     };
+        //     
+        //     _blurView.Layer.Mask = verticalGradient;
+        //     
+        //     AddSubview(_blurView);
+        // }
+
         AddSubview(_tabBar);
     }
 
@@ -39,5 +66,11 @@ internal class NaluTabBarContainerView : UIView
     {
         base.LayoutSubviews();
         _tabBar.Frame = Bounds;
+
+        // if (_blurView != null)
+        // {
+        //     _blurView.Frame = Bounds;
+        //     _blurView.Layer.Mask!.Frame = _blurView.Bounds;
+        // }
     }
 }

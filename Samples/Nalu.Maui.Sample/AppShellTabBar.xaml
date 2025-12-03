@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<nalu:NaluTabBar xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
+             x:Class="Nalu.Maui.Sample.AppShellTabBar"
+             BarShadow="{Shadow Radius=16, Opacity=0.4}"
+             HeightRequest="64"
+             Padding="4"
+             BarBackground="#CC2C479D"
+             BarStrokeShape="RoundRectangle 32"
+             TabStrokeShape="RoundRectangle 32"
+             TabPadding="12,4"
+             TabFontFamily="OpenSansSemibold"
+             ActiveTabStrokeShape="RoundRectangle 32"
+             ActiveTabPadding="12,4"
+             ActiveTabFontFamily="OpenSansSemibold"
+             BarPadding="0"
+             ScrollPadding="4"/>

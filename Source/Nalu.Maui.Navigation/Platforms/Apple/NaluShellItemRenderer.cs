@@ -77,8 +77,12 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
                 _lastBounds = containerBounds;
 
                 var size = _tabBar.SizeThatFits(_lastBounds.Size);
+#if NET10_0_OR_GREATER
+                var heightWithInsets = size.Height;
+#else
                 var safeAreaInsets = container.SafeAreaInsets;
                 var heightWithInsets = size.Height + safeAreaInsets.Bottom;
+#endif
 
                 var frame = new CGRect(
                     0,

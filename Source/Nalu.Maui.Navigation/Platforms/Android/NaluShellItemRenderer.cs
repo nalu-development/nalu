@@ -10,6 +10,9 @@ using AView = Android.Views.View;
 using AViewGroup = Android.Views.ViewGroup;
 using IAndroidXOnApplyWindowInsetsListener = AndroidX.Core.View.IOnApplyWindowInsetsListener;
 using AInsets = AndroidX.Core.Graphics.Insets;
+using ARenderEffect = Android.Graphics.RenderEffect;
+using AShader = Android.Graphics.Shader;
+using AColor = Android.Graphics.Color;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
@@ -18,15 +21,15 @@ namespace Nalu;
 public class NaluShellItemRenderer : ShellItemRendererBase
 {
     public static readonly bool SupportsEdgeToEdge
-#if NET10_OR_GREATER
+#if NET10_0_OR_GREATER
         = OperatingSystem.IsAndroidVersionAtLeast(35);
 #else
         = false;
 #endif
     
-    private ConstraintLayout? _outerLayout;
-    private FrameLayout? _navigationLayout;
-    private FrameLayout? _tabBarLayout;
+    private NaluShellItemRendererOuterLayout? _outerLayout;
+    private NaluShellItemRendererNavigationLayout? _navigationLayout;
+    private NaluShellItemRendererTabBarLayout? _tabBarLayout;
     private AView? _tabBar;
     private IMauiContext MauiContext => ShellContext.Shell.Handler?.MauiContext ?? throw new InvalidOperationException("MauiContext is not available.");
 
@@ -92,10 +95,7 @@ public class NaluShellItemRenderer : ShellItemRendererBase
     {
         base.OnDestroy();
 
-        if (_tabBar?.Parent == _tabBarLayout && _tabBarLayout is not null)
-        {
-            _tabBarLayout.RemoveView(_tabBar);
-        }
+        _tabBarLayout?.SetTabBar(null);
 
         _outerLayout?.Dispose();
         _navigationLayout?.Dispose();
@@ -125,21 +125,17 @@ public class NaluShellItemRenderer : ShellItemRendererBase
     {
         var tabBarView = NaluShell.GetTabBarView(ShellItem);
 
-        if (_tabBar is not null)
-        {
-            _tabBarLayout?.RemoveView(_tabBar);
-        }
-
         if (tabBarView == null)
         {
             _tabBar = null;
+            _tabBarLayout?.SetTabBar(null);
         }
         else
         {
             var mauiContext = ShellContext.Shell.Handler?.MauiContext ?? throw new NullReferenceException("MauiContext is null");
             var platformView = tabBarView.ToPlatform(mauiContext);
             _tabBar = platformView;
-            _tabBarLayout?.AddView(platformView);
+            _tabBarLayout?.SetTabBar(platformView);
         }
 
         UpdateTabBarHidden();
@@ -199,6 +195,7 @@ public class NaluShellItemRendererOuterLayout : ConstraintLayout
 
     public NaluShellItemRendererOuterLayout(Android.Content.Context context) : base(context)
     {
+        SetClipChildren(false);
     }
 
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
@@ -261,10 +258,37 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
     private int _systemBarInset;
-    
+    private AView? _tabBar;
+
     public NaluShellItemRendererTabBarLayout(Android.Content.Context context) : base(context)
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+        SetClipChildren(false);
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(31))
+        {
+            var blurPixels = context.ToPixels(4);
+            var blur = ARenderEffect.CreateBlurEffect(blurPixels, 30f, AShader.TileMode.Clamp!);
+            var blurView = new AView(context);
+            blurView.SetRenderEffect(blur);
+            blurView.SetBackgroundColor(AColor.Black);
+            AddView(blurView);
+        }
+    }
+
+    public void SetTabBar(AView? tabBar)
+    {
+        if (_tabBar?.Parent?.Handle == Handle)
+        {
+            RemoveView(_tabBar);
+        }
+
+        _tabBar = tabBar;
+
+        if (tabBar != null)
+        {
+            AddView(tabBar);
+        }
     }
 
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
@@ -272,12 +296,11 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
         int width;
         int height;
         
-        if (ChildCount > 0)
+        if (_tabBar != null)
         {
-            var child = GetChildAt(0)!;
-            MeasureChild(child, widthMeasureSpec, heightMeasureSpec);
-            width = child.MeasuredWidth;
-            height = child.MeasuredHeight;
+            MeasureChild(_tabBar, widthMeasureSpec, heightMeasureSpec);
+            width = _tabBar.MeasuredWidth;
+            height = _tabBar.MeasuredHeight;
 
             if (height > 0)
             {
@@ -292,6 +315,17 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
         
         SetMeasuredDimension(width, height);
     }
+
+    // protected override void OnLayout(bool changed, int l, int t, int r, int b)
+    // {
+    //     var childCount = ChildCount;
+    //
+    //     for (var i = 0; i < childCount; i++)
+    //     {
+    //         var child = GetChildAt(i)!;
+    //         child.Layout(0, 0, r - l, b - t);
+    //     }
+    // }
 
     protected override void Dispose(bool disposing)
     {
