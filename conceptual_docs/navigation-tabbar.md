@@ -10,7 +10,7 @@ This feature also solves the issues `Shell` has with pages under the iOS `More` 
 ![Custom Tab Bar](assets/images/nalu-tab-bar.png)
 
 **Platform support**: Android, iOS, and MacCatalyst only.
-**Edge-to-edge**: The custom tab bar allows edge-to-edge behavior when supported (iOS: always, Android: .NET10 + API 35 device).
+**Edge-to-edge**: The custom tab bar allows edge-to-edge behavior when supported (iOS: always, Android: starting from .NET10).
 
 ## Quick Start
 
@@ -145,9 +145,11 @@ The `NaluTabBar` control provides extensive styling options:
 **Scroll Properties**:
 - `ScrollPadding` - Padding for the scroll view container
 
-### Blur Effect
+### Blur/Glass Effect
 
 The custom tab bar supports a native blur/glass effect that creates a modern, translucent appearance similar to system tab bars. The effect blurs the content behind the tab bar, creating a frosted glass appearance. On iOS 26+ and MacCatalyst 26+, a native glass effect is used for an enhanced visual experience.
+
+![Custom Tab Bar Glass/Blur](assets/images/nalu-tab-bar-glass.png)
 
 **Enabling Blur Effect:**
 
