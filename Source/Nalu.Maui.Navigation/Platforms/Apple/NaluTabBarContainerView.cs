@@ -12,7 +12,7 @@ namespace Nalu;
 public class NaluTabBarContainerView : UIView
 {
     private readonly UIView _tabBar;
-    private readonly UIVisualEffectView? _blurView;
+    private readonly UIView? _blurView;
 
     /// <summary>
     /// Creates a new instance of <see cref="NaluTabBarContainerView"/>.
@@ -31,7 +31,13 @@ public class NaluTabBarContainerView : UIView
                             AutoresizingMask = UIViewAutoresizing.FlexibleDimensions
                         };
             
-            _blurView.Layer.Mask = NaluTabBar.BlurMaskFactory();
+            // Apply mask directly to blur view's layer to control opacity gradient
+            // This creates a semi-transparent blur that gradually fades
+            var maskLayer = NaluTabBar.BlurMaskFactory();
+            if (maskLayer != null)
+            {
+                _blurView.Layer.Mask = maskLayer;
+            }
             
             AddSubview(_blurView);
         }
@@ -71,7 +77,10 @@ public class NaluTabBarContainerView : UIView
         if (_blurView != null)
         {
             _blurView.Frame = Bounds;
-            _blurView.Layer.Mask!.Frame = _blurView.Bounds;
+            if (_blurView.Layer.Mask != null)
+            {
+                _blurView.Layer.Mask.Frame = _blurView.Bounds;
+            }
         }
     }
 }
