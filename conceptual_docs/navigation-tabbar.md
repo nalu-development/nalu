@@ -147,7 +147,7 @@ The `NaluTabBar` control provides extensive styling options:
 
 ### Blur Effect
 
-The custom tab bar supports a native blur effect that creates a modern, translucent appearance similar to system tab bars. The blur effect blurs the content behind the tab bar, creating a frosted glass effect.
+The custom tab bar supports a native blur/glass effect that creates a modern, translucent appearance similar to system tab bars. The effect blurs the content behind the tab bar, creating a frosted glass appearance. On iOS 26+ and MacCatalyst 26+, a native glass effect is used for an enhanced visual experience.
 
 **Enabling Blur Effect:**
 
@@ -165,9 +165,8 @@ static AppShellTabBar()
 **Platform-Specific Customization:**
 
 **iOS/MacCatalyst:**
-- `NaluTabBar.DefaultBlurStyle` - Sets the blur effect style used by the default `BlurEffectFactory` (default: `UIBlurEffectStyle.SystemThinMaterial` on iOS 13+, `UIBlurEffectStyle.Regular` on earlier versions)
-- `NaluTabBar.BlurEffectFactory` - Factory method to create the blur effect (default: uses `DefaultBlurStyle`)
-- `NaluTabBar.BlurMaskFactory` - Factory method to create a custom mask layer for the blur effect (default: vertical gradient from transparent to white)
+- `NaluTabBar.BlurEffectFactory` - Factory method to create the blur/glass effect. On iOS 26+ and MacCatalyst 26+, creates a `UIGlassEffect`; on earlier versions, creates a `UIBlurEffect` with `UIBlurEffectStyle.Light` (default)
+- `NaluTabBar.BlurMaskFactory` - Factory method to create a custom mask layer for the blur effect (default: `null`). **Note:** Effects work properly only with a fully opaque layer. Using a mask may lead to unexpected results, so use with caution.
 
 **Android:**
 - `NaluTabBar.DefaultBlurRadius` - Default blur radius in device-independent units (default: 8)

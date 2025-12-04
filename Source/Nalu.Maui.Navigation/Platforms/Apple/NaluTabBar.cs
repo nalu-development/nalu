@@ -5,11 +5,6 @@ namespace Nalu;
 
 public partial class NaluTabBar
 {
-    /// <summary>
-    /// Gets or sets the style of the blur effect used by the default <see cref="BlurEffectFactory"/>.
-    /// </summary>
-    public static UIBlurEffectStyle DefaultBlurStyle { get; set; }
-
 #pragma warning disable CS1574, CS1584, CS1581, CS1580
     /// <summary>
     /// Gets or sets the factory method to create the blur/glass effect.
