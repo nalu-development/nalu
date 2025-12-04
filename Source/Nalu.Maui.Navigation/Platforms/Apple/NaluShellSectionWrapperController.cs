@@ -9,6 +9,8 @@ namespace Nalu;
 /// </summary>
 internal class NaluShellSectionWrapperController : UIViewController
 {
+    private readonly HashSet<UIViewController> _registeredViewControllers = [];
+    
     public UIViewController? SelectedViewController
     {
         get;
@@ -16,7 +18,7 @@ internal class NaluShellSectionWrapperController : UIViewController
         {
             var oldValue = field;
 
-            if (value is not null && !ChildViewControllers.Contains(value))
+            if (value is not null && !_registeredViewControllers.Contains(value))
             {
                 throw new InvalidOperationException($"{nameof(SelectedViewController)} must be one of the child view controllers.");
             }
@@ -29,14 +31,7 @@ internal class NaluShellSectionWrapperController : UIViewController
         }
     }
 
-    public void AddViewController(UIViewController viewController)
-    {
-        AddChildViewController(viewController);
-        var viewControllerView = viewController.View!;
-        viewControllerView.Hidden = true;
-        View!.AddSubview(viewControllerView);
-        viewController.DidMoveToParentViewController(this);
-    }
+    public void AddViewController(UIViewController viewController) => _registeredViewControllers.Add(viewController);
 
     public void RemoveViewController(UIViewController viewController)
     {
@@ -44,10 +39,29 @@ internal class NaluShellSectionWrapperController : UIViewController
         {
             SelectedViewController = null;
         }
+
+        if (viewController.ParentViewController is not null)
+        {
+            viewController.WillMoveToParentViewController(null!);
+            viewController.View!.RemoveFromSuperview();
+            viewController.RemoveFromParentViewController();
+        }
         
-        viewController.WillMoveToParentViewController(null);
-        viewController.View!.RemoveFromSuperview();
-        viewController.RemoveFromParentViewController();
+        _registeredViewControllers.Remove(viewController);
+    }
+
+    private void EnsureChildViewController(UIViewController viewController)
+    {
+        var viewControllerView = viewController.View!;
+        if (viewControllerView.Superview is not null)
+        {
+            return;
+        }
+
+        AddChildViewController(viewController);
+        viewControllerView.Hidden = true;
+        View!.AddSubview(viewControllerView);
+        viewController.DidMoveToParentViewController(this);
     }
 
     private void SelectViewController(UIViewController? oldViewController, UIViewController? newViewController)
@@ -64,6 +78,7 @@ internal class NaluShellSectionWrapperController : UIViewController
                 return;
             }
 
+            EnsureChildViewController(newViewController);
             var newView = newViewController.View!;
             newView.Hidden = true;
             
@@ -86,6 +101,7 @@ internal class NaluShellSectionWrapperController : UIViewController
         
         if (newViewController is not null)
         {
+            EnsureChildViewController(newViewController);
             var newView = newViewController.View!;
             newView.Hidden = true;
 

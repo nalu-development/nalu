@@ -212,7 +212,6 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
             ((IShellSectionController?)_selectedSection)?.RemoveDisplayedPageObserver(this);
             _selectedSection = shellSection;
             ((IShellSectionController)_selectedSection)?.AddDisplayedPageObserver(this, OnDisplayedPageChanged);
-
             _sectionWrapperController.SelectedViewController = renderer.ViewController;
         }
     }
