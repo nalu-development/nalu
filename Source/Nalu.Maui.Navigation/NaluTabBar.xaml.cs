@@ -12,6 +12,13 @@ namespace Nalu;
 /// </summary>
 public partial class NaluTabBar
 {
+#if ANDROID || IOS || MACCATALYST
+    /// <summary>
+    /// Gets or sets a value indicating whether to use a blur effect for the tab bar background.
+    /// </summary>
+    public static bool UseBlurEffect { get; set; }
+#endif
+    
     #region Tab Properties
 
     /// <summary>

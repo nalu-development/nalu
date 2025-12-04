@@ -55,4 +55,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Platforms\Android\NaluTabBar.cs">
+      <ExcludeFromCurrentConfiguration>true</ExcludeFromCurrentConfiguration>
+    </Compile>
+  </ItemGroup>
 </Project>

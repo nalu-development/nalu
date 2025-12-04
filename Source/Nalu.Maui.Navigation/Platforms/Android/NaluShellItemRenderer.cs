@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using Android.Content;
+using Android.Graphics;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -11,8 +13,6 @@ using AViewGroup = Android.Views.ViewGroup;
 using IAndroidXOnApplyWindowInsetsListener = AndroidX.Core.View.IOnApplyWindowInsetsListener;
 using AInsets = AndroidX.Core.Graphics.Insets;
 using ARenderEffect = Android.Graphics.RenderEffect;
-using AShader = Android.Graphics.Shader;
-using AColor = Android.Graphics.Color;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
@@ -22,7 +22,7 @@ public class NaluShellItemRenderer : ShellItemRendererBase
 {
     public static readonly bool SupportsEdgeToEdge
 #if NET10_0_OR_GREATER
-        = OperatingSystem.IsAndroidVersionAtLeast(35);
+        = true;
 #else
         = false;
 #endif
@@ -44,8 +44,11 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         
         var context = MauiContext.Context ?? throw new InvalidOperationException("Context is not available.");
         _outerLayout = new NaluShellItemRendererOuterLayout(context);
-        _navigationLayout = new NaluShellItemRendererNavigationLayout(context);
+
         _tabBarLayout = new NaluShellItemRendererTabBarLayout(context);
+        _navigationLayout = SupportsEdgeToEdge && NaluTabBar.UseBlurEffect && NaluShellItemRendererNavigationBlurSupportLayout.IsSupported
+            ? new NaluShellItemRendererNavigationBlurSupportLayout(context, _tabBarLayout)
+            : new NaluShellItemRendererNavigationLayout(context);
         
         // generate IDs
         var navigationLayoutId = AView.GenerateViewId();
@@ -254,6 +257,105 @@ public class NaluShellItemRendererNavigationLayout : FrameLayout, IAndroidXOnApp
     }
 }
 
+public class NaluShellItemRendererNavigationBlurSupportLayout : NaluShellItemRendererNavigationLayout
+{
+    public static readonly bool IsSupported = OperatingSystem.IsAndroidVersionAtLeast(31);
+    
+#pragma warning disable CA1416
+    private readonly RenderNode _contentRenderNode = new("NaluShellItemRendererNavigationLayoutContent");
+    private readonly RenderNode _blurRenderNode = new("NaluShellItemRendererNavigationLayoutBlur");
+#pragma warning restore CA1416
+    private readonly NaluShellItemRendererTabBarLayout _tabBarLayout;
+    private ARenderEffect? _blurEffect;
+    private ARenderEffect? _shaderEffect;
+    private ARenderEffect? _combinedEffect;
+    private Shader? _shader;
+
+    public NaluShellItemRendererNavigationBlurSupportLayout(Context context, NaluShellItemRendererTabBarLayout tabBarLayout) : base(context)
+    {
+        _tabBarLayout = tabBarLayout;
+    }
+
+    protected override void DispatchDraw(Canvas canvas)
+    {
+        if (canvas.IsHardwareAccelerated)
+        {
+#pragma warning disable CA1416
+            var canvasWidth = canvas.Width;
+            var canvasHeight = canvas.Height;
+            _contentRenderNode.SetPosition(0, 0, canvasWidth, canvasHeight);
+            using var contentCanvas = _contentRenderNode.BeginRecording();
+            base.DispatchDraw(contentCanvas);
+            _contentRenderNode.EndRecording();
+
+            canvas.DrawRenderNode(_contentRenderNode);
+            
+            // Commented out for now
+            var tabBarHeight = _tabBarLayout.Visibility == ViewStates.Gone ? 0 : _tabBarLayout.Height;
+            
+            if (tabBarHeight > 0)
+            {
+                DisposeResources();
+
+                _blurRenderNode.SetPosition(0, 0, canvasWidth, tabBarHeight);
+                _blurRenderNode.SetTranslationY(canvasHeight - tabBarHeight);
+                
+                _blurEffect = NaluTabBar.BlurEffectFactory(Context!);
+                _shader = NaluTabBar.BlurShaderFactory(canvasWidth, tabBarHeight);
+
+                if (_shader is null)
+                {
+                    _blurRenderNode.SetRenderEffect(_blurEffect);
+                }
+                else
+                {
+                    // Create a color filter effect that uses the gradient as a mask
+                    _shaderEffect = ARenderEffect.CreateShaderEffect(_shader);
+                    _combinedEffect = ARenderEffect.CreateBlendModeEffect(_shaderEffect, _blurEffect, Android.Graphics.BlendMode.SrcIn!);
+                    _blurRenderNode.SetRenderEffect(_combinedEffect);
+                }
+
+                using var blurCanvas = _blurRenderNode.BeginRecording();
+                blurCanvas.Translate(0f, -(canvasHeight - tabBarHeight));
+                blurCanvas.DrawRenderNode(_contentRenderNode);
+                _blurRenderNode.EndRecording();
+                
+                canvas.DrawRenderNode(_blurRenderNode);
+            }
+#pragma warning restore CA1416
+        }
+        else
+        {
+            base.DispatchDraw(canvas);
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (disposing)
+        {
+            DisposeResources();
+            _blurRenderNode.Dispose();
+            _contentRenderNode.Dispose();
+        }
+    }
+
+    private void DisposeResources()
+    {
+        _shader?.Dispose();
+        _blurEffect?.Dispose();
+        _shaderEffect?.Dispose();
+        _combinedEffect?.Dispose();
+                
+        _shader = null;
+        _blurEffect = null;
+        _shaderEffect = null;
+        _combinedEffect = null;
+    }
+}
+
 public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWindowInsetsListener
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
@@ -264,16 +366,6 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
         SetClipChildren(false);
-
-        if (OperatingSystem.IsAndroidVersionAtLeast(31))
-        {
-            var blurPixels = context.ToPixels(4);
-            var blur = ARenderEffect.CreateBlurEffect(blurPixels, 30f, AShader.TileMode.Clamp!);
-            var blurView = new AView(context);
-            blurView.SetRenderEffect(blur);
-            blurView.SetBackgroundColor(AColor.Black);
-            AddView(blurView);
-        }
     }
 
     public void SetTabBar(AView? tabBar)
@@ -315,17 +407,6 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
         
         SetMeasuredDimension(width, height);
     }
-
-    // protected override void OnLayout(bool changed, int l, int t, int r, int b)
-    // {
-    //     var childCount = ChildCount;
-    //
-    //     for (var i = 0; i < childCount; i++)
-    //     {
-    //         var child = GetChildAt(i)!;
-    //         child.Layout(0, 0, r - l, b - t);
-    //     }
-    // }
 
     protected override void Dispose(bool disposing)
     {

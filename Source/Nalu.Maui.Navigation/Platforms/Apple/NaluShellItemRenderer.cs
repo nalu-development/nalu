@@ -78,7 +78,8 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
 
                 var size = _tabBar.SizeThatFits(_lastBounds.Size);
 #if NET10_0_OR_GREATER
-                var heightWithInsets = size.Height;
+                var safeAreaInsets = container.SafeAreaInsets;
+                var heightWithoutInsets = size.Height - safeAreaInsets.Bottom;
 #else
                 var safeAreaInsets = container.SafeAreaInsets;
                 var heightWithInsets = size.Height + safeAreaInsets.Bottom;
@@ -86,13 +87,13 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
 
                 var frame = new CGRect(
                     0,
-                    containerBounds.Height - heightWithInsets,
+                    containerBounds.Height - size.Height,
                     containerBounds.Width,
-                    heightWithInsets
+                    size.Height
                 );
 
                 _tabBar.Frame = frame;
-                _sectionWrapperController.AdditionalSafeAreaInsets = new UIEdgeInsets(0, 0, heightWithInsets, 0);
+                _sectionWrapperController.AdditionalSafeAreaInsets = new UIEdgeInsets(0, 0, heightWithoutInsets, 0);
             }
         }
     }

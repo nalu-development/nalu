@@ -62,6 +62,13 @@ namespace MyApp;
 
 public partial class AppShellTabBar : NaluTabBar
 {
+    static AppShellTabBar()
+    {
+#if IOS || ANDROID || MACCATALYST
+        NaluTabBar.UseBlurEffect = true;  // Optional: Enable blur effect
+#endif
+    }
+    
     public AppShellTabBar()
     {
         InitializeComponent();
@@ -138,9 +145,41 @@ The `NaluTabBar` control provides extensive styling options:
 **Scroll Properties**:
 - `ScrollPadding` - Padding for the scroll view container
 
+### Blur Effect
+
+The custom tab bar supports a native blur effect that creates a modern, translucent appearance similar to system tab bars. The blur effect blurs the content behind the tab bar, creating a frosted glass effect.
+
+**Enabling Blur Effect:**
+
+Enable the blur effect by setting `NaluTabBar.UseBlurEffect` to `true` in your tab bar's static constructor:
+
+```csharp
+static AppShellTabBar()
+{
+#if IOS || ANDROID || MACCATALYST
+    NaluTabBar.UseBlurEffect = true;
+#endif
+}
+```
+
+**Platform-Specific Customization:**
+
+**iOS/MacCatalyst:**
+- `NaluTabBar.DefaultBlurStyle` - Sets the blur effect style used by the default `BlurEffectFactory` (default: `UIBlurEffectStyle.SystemThinMaterial` on iOS 13+, `UIBlurEffectStyle.Regular` on earlier versions)
+- `NaluTabBar.BlurEffectFactory` - Factory method to create the blur effect (default: uses `DefaultBlurStyle`)
+- `NaluTabBar.BlurMaskFactory` - Factory method to create a custom mask layer for the blur effect (default: vertical gradient from transparent to white)
+
+**Android:**
+- `NaluTabBar.DefaultBlurRadius` - Default blur radius in device-independent units (default: 8)
+- `NaluTabBar.BlurEffectFactory` - Factory method to create the blur effect (only invoked on Android 12/API 31+)
+- `NaluTabBar.BlurShaderFactory` - Factory method to create a mask layer for the blur effect (default: vertical gradient from transparent to white)
+
+**Note:** The blur effect requires .NET 10 on all platforms. On Android, it additionally requires Android 12 (API level 31) or higher. On older Android versions or when using .NET versions prior to .NET 10, the blur effect will be automatically disabled.
+
 ## Benefits
 
 - ✅ **Fully customizable styling** - Size, colors, shapes, spacing, shadows, fonts, and more
+- ✅ **Native blur effect** - Modern translucent appearance with native blur support (requires .NET 10; Android additionally requires API 31+)
 - ✅ **Cross-platform consistent appearance** - Same look on all platforms (except Windows)
 - ✅ **Independent feature** - Can be used even without Nalu navigation
 - ✅ **Edge-to-Edge** - Supports edge to edge by default acting like a system bar
