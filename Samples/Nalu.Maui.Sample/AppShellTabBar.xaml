@@ -10,7 +10,6 @@
              BarBackground="Transparent"
              BarStrokeShape="RoundRectangle 32"
              TabStrokeShape="RoundRectangle 32"
-             TabBackground="Transparent"
              TabPadding="12,4"
              TabFontFamily="OpenSansSemibold"
              ActiveTabStrokeShape="RoundRectangle 32"

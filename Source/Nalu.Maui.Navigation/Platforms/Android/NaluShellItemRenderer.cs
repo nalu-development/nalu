@@ -13,6 +13,8 @@ using AViewGroup = Android.Views.ViewGroup;
 using IAndroidXOnApplyWindowInsetsListener = AndroidX.Core.View.IOnApplyWindowInsetsListener;
 using AInsets = AndroidX.Core.Graphics.Insets;
 using ARenderEffect = Android.Graphics.RenderEffect;
+using JniHandleOwnership = Android.Runtime.JniHandleOwnership;
+// ReSharper disable VirtualMemberCallInConstructor
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
@@ -44,10 +46,9 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         
         var context = MauiContext.Context ?? throw new InvalidOperationException("Context is not available.");
         _outerLayout = new NaluShellItemRendererOuterLayout(context);
-
         _tabBarLayout = new NaluShellItemRendererTabBarLayout(context);
         _navigationLayout = SupportsEdgeToEdge && NaluTabBar.UseBlurEffect && NaluShellItemRendererNavigationBlurSupportLayout.IsSupported
-            ? new NaluShellItemRendererNavigationBlurSupportLayout(context, _tabBarLayout)
+            ? new NaluShellItemRendererNavigationBlurSupportLayout(context)
             : new NaluShellItemRendererNavigationLayout(context);
         
         // generate IDs
@@ -195,8 +196,12 @@ public class NaluShellItemRenderer : ShellItemRendererBase
 public class NaluShellItemRendererOuterLayout : ConstraintLayout
 {
     private int _tabBarHeight;
+    
+    public NaluShellItemRendererOuterLayout(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
+    {
+    }
 
-    public NaluShellItemRendererOuterLayout(Android.Content.Context context) : base(context)
+    public NaluShellItemRendererOuterLayout(Context context) : base(context)
     {
         SetClipChildren(false);
     }
@@ -221,7 +226,11 @@ public class NaluShellItemRendererNavigationLayout : FrameLayout, IAndroidXOnApp
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
     
-    public NaluShellItemRendererNavigationLayout(Android.Content.Context context) : base(context)
+    public NaluShellItemRendererNavigationLayout(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
+    {
+    }
+    
+    public NaluShellItemRendererNavigationLayout(Context context) : base(context)
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
     }
@@ -265,15 +274,19 @@ public class NaluShellItemRendererNavigationBlurSupportLayout : NaluShellItemRen
     private readonly RenderNode _contentRenderNode = new("NaluShellItemRendererNavigationLayoutContent");
     private readonly RenderNode _blurRenderNode = new("NaluShellItemRendererNavigationLayoutBlur");
 #pragma warning restore CA1416
-    private readonly NaluShellItemRendererTabBarLayout _tabBarLayout;
     private ARenderEffect? _blurEffect;
     private ARenderEffect? _shaderEffect;
     private ARenderEffect? _combinedEffect;
     private Shader? _shader;
 
-    public NaluShellItemRendererNavigationBlurSupportLayout(Context context, NaluShellItemRendererTabBarLayout tabBarLayout) : base(context)
+    private AView TabBarLayout => ((AViewGroup) Parent!).GetChildAt(1)!;
+    
+    public NaluShellItemRendererNavigationBlurSupportLayout(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
     {
-        _tabBarLayout = tabBarLayout;
+    }
+
+    public NaluShellItemRendererNavigationBlurSupportLayout(Context context) : base(context)
+    {
     }
 
     protected override void DispatchDraw(Canvas canvas)
@@ -289,9 +302,11 @@ public class NaluShellItemRendererNavigationBlurSupportLayout : NaluShellItemRen
             _contentRenderNode.EndRecording();
 
             canvas.DrawRenderNode(_contentRenderNode);
+
+            var tabBarLayout = TabBarLayout;
             
             // Commented out for now
-            var tabBarHeight = _tabBarLayout.Visibility == ViewStates.Gone ? 0 : _tabBarLayout.Height;
+            var tabBarHeight = tabBarLayout.Visibility == ViewStates.Gone ? 0 : tabBarLayout.Height;
             
             if (tabBarHeight > 0)
             {
@@ -362,7 +377,11 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
     private int _systemBarInset;
     private AView? _tabBar;
 
-    public NaluShellItemRendererTabBarLayout(Android.Content.Context context) : base(context)
+    public NaluShellItemRendererTabBarLayout(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
+    {
+    }
+    
+    public NaluShellItemRendererTabBarLayout(Context context) : base(context)
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
         SetClipChildren(false);
@@ -418,7 +437,7 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IAndroidXOnApplyWi
         }
     }
 
-    WindowInsetsCompat? IAndroidXOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
+    WindowInsetsCompat IAndroidXOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
     {
         ArgumentNullException.ThrowIfNull(insets);
         var bottomInset = insets.GetInsets(_systemBarsInsetsType)?.Bottom ?? throw new InvalidOperationException("SystemBars insets are null.");
