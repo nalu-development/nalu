@@ -32,6 +32,7 @@ builder
 
 You can use what Nalu provides (`NaluTabBar`) or create your own custom component.
 **Note**: This instance will be bound to its `ShellItem` (a.k.a `TabBar`).
+**Important**: Do NOT use `Shadow` on the outer node due to a bug in MAUI.
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
