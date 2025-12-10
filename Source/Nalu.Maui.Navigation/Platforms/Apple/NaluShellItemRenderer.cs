@@ -14,7 +14,9 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
     private Page? _displayedPage;
     private ShellSection? _selectedSection;
     private NaluTabBarContainerView? _tabBar;
+    private UIView? _tabBarScrim;
     private View? _crossPlatformTabBar;
+    private View? _crossPlatformTabBarScrim;
 
     // ReSharper disable once MemberCanBePrivate.Global
     protected IShellItemController ShellItemController => ShellItem;
@@ -59,6 +61,7 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
         _sectionWrapperController.DidMoveToParentViewController(this);
 
         UpdateTabBarView();
+        UpdateTabBarScrimView();
         
         GoTo(ShellItem.CurrentItem);
     }
@@ -115,13 +118,17 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
 
     protected virtual void OnShellItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == ShellItem.CurrentItemProperty.PropertyName)
+        switch (e.PropertyName)
         {
-            GoTo(ShellItem.CurrentItem);
-        }
-        else if (e.PropertyName == NaluShell.TabBarViewProperty.PropertyName)
-        {
-            UpdateTabBarView();
+            case nameof(ShellItem.CurrentItem):
+                GoTo(ShellItem.CurrentItem);
+                break;
+            case "TabBarView":
+                UpdateTabBarView();
+                break;
+            case "TabBarScrimView":
+                UpdateTabBarScrimView();
+                break;
         }
     }
 
@@ -140,8 +147,13 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
             ((IShellSectionController?)_selectedSection)?.RemoveDisplayedPageObserver(this);
             _selectedSection = null;
             _displayedPage = null;
+            _tabBarScrim?.RemoveFromSuperview();
+            _tabBarScrim = null;
+            _crossPlatformTabBarScrim?.DisconnectHandlers();
+            _crossPlatformTabBarScrim = null;
             _tabBar?.RemoveFromSuperview();
             _tabBar = null;
+            _crossPlatformTabBar?.DisconnectHandlers();
             _crossPlatformTabBar = null;
         }
     }
@@ -150,11 +162,13 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
     {
         var tabBarView = NaluShell.GetTabBarView(ShellItem);
 
+        _tabBar?.RemoveFromSuperview();
+        _tabBar = null;
+        _crossPlatformTabBar?.DisconnectHandlers();
+        _crossPlatformTabBar = null;
+
         if (tabBarView == null)
         {
-            _tabBar?.RemoveFromSuperview();
-            _tabBar = null;
-            _crossPlatformTabBar = null;
             AdditionalSafeAreaInsets = UIEdgeInsets.Zero;
         }
         else
@@ -166,6 +180,33 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
             _crossPlatformTabBar = tabBarView;
             UpdateTabBarHidden();
             View!.AddSubview(tabBarContainer);
+        }
+    }
+
+    private void UpdateTabBarScrimView()
+    {
+        var tabBarScrimView = NaluShell.GetTabBarScrimView(ShellItem);
+
+        _tabBarScrim?.RemoveFromSuperview();
+        _tabBarScrim = null;
+        _crossPlatformTabBarScrim?.DisconnectHandlers();
+        _crossPlatformTabBarScrim = null;
+
+        if (tabBarScrimView != null)
+        {
+            var mauiContext = shellContext.Shell.Handler?.MauiContext ?? throw new NullReferenceException("MauiContext is null");
+            var platformView = tabBarScrimView.ToPlatform(mauiContext);
+            _tabBarScrim = platformView;
+            _crossPlatformTabBar = tabBarScrimView;
+            var container = _sectionWrapperController.View!;
+            container.AddSubview(platformView);
+            platformView.TranslatesAutoresizingMaskIntoConstraints = false;
+            NSLayoutConstraint.ActivateConstraints([
+                platformView.TopAnchor.ConstraintEqualTo(container.TopAnchor),
+                platformView.BottomAnchor.ConstraintEqualTo(container.BottomAnchor),
+                platformView.LeftAnchor.ConstraintEqualTo(container.LeftAnchor),
+                platformView.RightAnchor.ConstraintEqualTo(container.RightAnchor)
+            ]);
         }
     }
 

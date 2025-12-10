@@ -145,6 +145,31 @@ The `NaluTabBar` control provides extensive styling options:
 **Scroll Properties**:
 - `ScrollPadding` - Padding for the scroll view container
 
+### Tab Bar Scrim View
+
+The `TabBarScrimView` attached property allows you to overlay a custom view on top of the navigation area while sharing the same safe area insets as the tab bar. This is particularly useful when you want to display popups, overlays, or additional controls (such as a "More" menu) that need to appear above the tab content.
+
+**Usage Example:**
+
+```xml
+<TabBar nalu:NaluShell.TabBarView="{sample:AppShellTabBar}"
+        nalu:NaluShell.TabBarScrimView="{sample:TabBarMorePopup}">
+    <ShellContent Title="Home"
+                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Size=24}" />
+    <!-- More tabs... -->
+</TabBar>
+```
+
+The scrim view will:
+- Be positioned above the main navigation content
+- Respect the same safe area insets as the main navigation content
+- Have its `BindingContext` automatically set to the `ShellItem` (TabBar or FlyoutItem)
+
+**Common Use Cases:**
+- Displaying a "More" menu popup when there are many tabs
+- Showing contextual overlays that relate to tab navigation
+- Adding custom interactive elements that need to appear above the page content
+
 ### Blur/Glass Effect
 
 The custom tab bar supports a native blur/glass effect that creates a modern, translucent appearance similar to system tab bars. The effect blurs the content behind the tab bar, creating a frosted glass appearance. On iOS 26+ and MacCatalyst 26+, a native glass effect is used for an enhanced visual experience.

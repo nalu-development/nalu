@@ -14,6 +14,8 @@ using IAndroidXOnApplyWindowInsetsListener = AndroidX.Core.View.IOnApplyWindowIn
 using AInsets = AndroidX.Core.Graphics.Insets;
 using ARenderEffect = Android.Graphics.RenderEffect;
 using JniHandleOwnership = Android.Runtime.JniHandleOwnership;
+using View = Microsoft.Maui.Controls.View;
+
 // ReSharper disable VirtualMemberCallInConstructor
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
@@ -32,7 +34,11 @@ public class NaluShellItemRenderer : ShellItemRendererBase
     private NaluShellItemRendererOuterLayout? _outerLayout;
     private NaluShellItemRendererNavigationLayout? _navigationLayout;
     private NaluShellItemRendererTabBarLayout? _tabBarLayout;
+    private FrameLayout? _navigationTarget;
     private AView? _tabBar;
+    private View? _crossPlatformTabBar;
+    private AView? _tabBarScrim;
+    private View? _crossPlatformTabBarScrim;
     private IMauiContext MauiContext => ShellContext.Shell.Handler?.MauiContext ?? throw new InvalidOperationException("MauiContext is not available.");
 
     public NaluShellItemRenderer(IShellContext shellContext)
@@ -50,11 +56,16 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         _navigationLayout = SupportsEdgeToEdge && NaluTabBar.UseBlurEffect && NaluShellItemRendererNavigationBlurSupportLayout.IsSupported
             ? new NaluShellItemRendererNavigationBlurSupportLayout(context)
             : new NaluShellItemRendererNavigationLayout(context);
+
+        _navigationTarget = new FrameLayout(context);
+        _navigationLayout.AddView(_navigationTarget);
         
         // generate IDs
+        var navigationTargetId = AView.GenerateViewId();
         var navigationLayoutId = AView.GenerateViewId();
         var tabBarLayoutId = AView.GenerateViewId();
         var outerLayoutId = AView.GenerateViewId();
+        _navigationTarget.Id = navigationTargetId;
         _navigationLayout.Id = navigationLayoutId;
         _tabBarLayout.Id = tabBarLayoutId;
         _outerLayout.Id = outerLayoutId;
@@ -89,6 +100,7 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         _outerLayout.AddView(_tabBarLayout);
 
         UpdateTabBarView();
+        UpdateTabBarScrimView();
         
         HookEvents(ShellItem);
 
@@ -101,11 +113,21 @@ public class NaluShellItemRenderer : ShellItemRendererBase
 
         _tabBarLayout?.SetTabBar(null);
 
+        _tabBar = null;
+        _crossPlatformTabBar?.DisconnectHandlers();
+        _crossPlatformTabBar = null;
+        
+        _tabBarScrim?.RemoveFromParent();
+        _tabBarScrim = null;
+        _crossPlatformTabBarScrim?.DisconnectHandlers();
+        _crossPlatformTabBarScrim = null;
+
+        _navigationTarget?.Dispose();
+
         _outerLayout?.Dispose();
         _navigationLayout?.Dispose();
         _tabBarLayout?.Dispose();
-        
-        _tabBar = null;
+
         _outerLayout = null;
         _navigationLayout = null;
         _tabBarLayout = null;
@@ -113,7 +135,7 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         UnhookEvents(ShellItem);
     }
 
-    protected override AViewGroup GetNavigationTarget() => _navigationLayout ?? throw new InvalidOperationException("NavigationTarget has not been created yet.");
+    protected override AViewGroup GetNavigationTarget() => _navigationTarget ?? throw new InvalidOperationException("NavigationTarget has not been created yet.");
 
     protected override void OnShellItemPropertyChanged(object sender, PropertyChangedEventArgs e)
     {
@@ -123,15 +145,28 @@ public class NaluShellItemRenderer : ShellItemRendererBase
         {
             UpdateTabBarView();
         }
+        else if (e.PropertyName == NaluShell.TabBarScrimViewProperty.PropertyName)
+        {
+            UpdateTabBarScrimView();
+        }
     }
 
     private void UpdateTabBarView()
     {
         var tabBarView = NaluShell.GetTabBarView(ShellItem);
 
+        _tabBar?.RemoveFromParent();
+        _tabBar = null;
+        _crossPlatformTabBar?.DisconnectHandlers();
+        _crossPlatformTabBar = null;
+        
+        _tabBarScrim?.RemoveFromParent();
+        _tabBarScrim = null;
+        _crossPlatformTabBarScrim?.DisconnectHandlers();
+        _crossPlatformTabBarScrim = null;
+
         if (tabBarView == null)
         {
-            _tabBar = null;
             _tabBarLayout?.SetTabBar(null);
         }
         else
@@ -140,9 +175,29 @@ public class NaluShellItemRenderer : ShellItemRendererBase
             var platformView = tabBarView.ToPlatform(mauiContext);
             _tabBar = platformView;
             _tabBarLayout?.SetTabBar(platformView);
+            _crossPlatformTabBar = tabBarView;
         }
 
         UpdateTabBarHidden();
+    }
+    
+    private void UpdateTabBarScrimView()
+    {
+        var tabBarScrimView = NaluShell.GetTabBarScrimView(ShellItem);
+
+        _tabBarScrim?.RemoveFromParent();
+        _tabBarScrim = null;
+        _crossPlatformTabBarScrim?.DisconnectHandlers();
+        _crossPlatformTabBarScrim = null;
+
+        if (tabBarScrimView != null)
+        {
+            var mauiContext = ShellContext.Shell.Handler?.MauiContext ?? throw new NullReferenceException("MauiContext is null");
+            var platformView = tabBarScrimView.ToPlatform(mauiContext);
+            _tabBarScrim = platformView;
+            _crossPlatformTabBarScrim = tabBarScrimView;
+            _navigationLayout!.AddView(_tabBarScrim);
+        }
     }
 
     private void UpdateTabBarHidden()

@@ -290,6 +290,47 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     );
 
     /// <summary>
+    /// Gets or sets a scrim view which will be laid out on top of the navigation area, sharing the same safe area insets.
+    /// </summary>
+    public static readonly BindableProperty TabBarScrimViewProperty = BindableProperty.CreateAttached(
+        "TabBarScrimView",
+        typeof(View),
+        typeof(NaluShell),
+        null,
+        propertyChanged: (bindable, oldValue, newValue) =>
+        {
+            if (bindable is not ShellItem shellItem)
+            {
+                throw new InvalidOperationException("TabBarView can only be attached to ShellItem (TabBar or FlyoutItem).");
+            }
+
+            if (oldValue is View oldView)
+            {
+                oldView.BindingContext = null;
+                oldView.DisconnectHandlers();
+            }
+
+            if (newValue is View newView)
+            {
+                newView.BindingContext = shellItem;
+            }
+        }
+    );
+
+    /// <summary>
+    /// Gets the custom scrim view to be used for the current <see cref="ShellItem" />.
+    /// </summary>
+    /// <param name="bindable">The <see cref="ShellItem" /> (TabBar or FlyoutItem).</param>
+    public static View? GetTabBarScrimView(BindableObject bindable) => (View?) bindable.GetValue(TabBarScrimViewProperty);
+
+    /// <summary>
+    /// Sets the custom scrim view to be used for the current <see cref="ShellItem" />.
+    /// </summary>
+    /// <param name="bindable">The <see cref="ShellItem" /> (TabBar or FlyoutItem).</param>
+    /// <param name="value">The custom tab bar view.</param>
+    public static void SetTabBarScrimView(BindableObject bindable, View? value) => bindable.SetValue(TabBarScrimViewProperty, value);
+
+    /// <summary>
     /// Gets the custom tab bar view to be used for the current <see cref="ShellItem" />.
     /// </summary>
     /// <param name="bindable">The <see cref="ShellItem" /> (TabBar or FlyoutItem).</param>

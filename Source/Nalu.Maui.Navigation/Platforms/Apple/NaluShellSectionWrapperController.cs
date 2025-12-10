@@ -60,7 +60,7 @@ internal class NaluShellSectionWrapperController : UIViewController
 
         AddChildViewController(viewController);
         viewControllerView.Hidden = true;
-        View!.AddSubview(viewControllerView);
+        View!.InsertSubview(viewControllerView, 0);
         viewController.DidMoveToParentViewController(this);
     }
 
@@ -88,7 +88,7 @@ internal class NaluShellSectionWrapperController : UIViewController
             if (newView.Superview is null)
             {
                 newView.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
-                View!.AddSubview(newView);
+                View!.InsertSubview(newView, 0);
             }
             
             oldView.Hidden = true;
@@ -109,7 +109,7 @@ internal class NaluShellSectionWrapperController : UIViewController
 
             if (newView.Superview is null)
             {
-                View!.AddSubview(newView);
+                View!.InsertSubview(newView, 0);
             }
 
             newView.Hidden = false;

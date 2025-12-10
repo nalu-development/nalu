@@ -72,6 +72,12 @@ public class NaluTabBarContainerView : UIView
     public override void LayoutSubviews()
     {
         base.LayoutSubviews();
+
+        if (NeedsMeasure)
+        {
+            _tabBar.SizeThatFits(Bounds.Size);
+        }
+
         _tabBar.Frame = Bounds;
 
         if (_blurView != null)
