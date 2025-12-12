@@ -52,6 +52,9 @@
                       Title="Page Twelve"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bc;', Color='Black', Size=24}" />
     </FlyoutItem>
+    <MenuItem x:Name="CustomMenuItem"
+              Text="Hello"
+              IconImageSource="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
     <ShellContent nalu:Navigation.PageType="pages:FivePage"
                   Title="Page Five"
                   Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}" />

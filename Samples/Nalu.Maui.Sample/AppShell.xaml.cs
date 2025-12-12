@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Nalu.Maui.Sample.PageModels;
 using Nalu.Maui.Sample.Pages;
 
 namespace Nalu.Maui.Sample;
@@ -10,6 +11,11 @@ public partial class AppShell : NaluShell
         : base(navigationService, typeof(OnePage))
     {
         InitializeComponent();
+        CustomMenuItem.Command = new Command(() =>
+        {
+            navigationService.GoToAsync(Nalu.Navigation.Relative().Push<SixPage>());
+            FlyoutIsPresented = false;
+        });
         NavigationEvent += OnNavigationEvent;
     }
 

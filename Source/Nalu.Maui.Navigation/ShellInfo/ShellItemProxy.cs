@@ -57,6 +57,11 @@ internal class ShellItemProxy : IShellItemProxy, IDisposable
 
     private void UpdateCurrentSection()
     {
+        if (_item is IMenuItemController)
+        {
+            return;
+        }
+
         var currentSegmentName = _item.CurrentItem.Route;
         CurrentSection = Sections.First(s => s.SegmentName == currentSegmentName);
     }
