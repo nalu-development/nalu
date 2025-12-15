@@ -70,18 +70,18 @@ jobs:
         run: dotnet docfx build docfx.json
         shell: pwsh
       - name: Upload Documentation Site
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: docfx-site
           path: _site
 
       - name: "Publish Artefacts"
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{matrix.os}}
           path: "./Artefacts"
       - name: "Publish Binlog"
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{matrix.os}}-binlog
           path: "./Binlog"
