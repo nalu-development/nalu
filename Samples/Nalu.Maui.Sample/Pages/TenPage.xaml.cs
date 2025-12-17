@@ -6,8 +6,8 @@ public partial class TenPage : ContentPage
 {
     public TenPage(TenPageModel viewModel)
     {
-        InitializeComponent();
         BindingContext = viewModel;
+        InitializeComponent();
     }
 }
 

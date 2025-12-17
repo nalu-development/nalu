@@ -3,28 +3,75 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.TenPage"
              x:DataType="pageModels:TenPageModel"
              Title="Page Ten">
-    <ScrollView Padding="16" Background="LightCoral">
-        <VerticalStackLayout Spacing="16" VerticalOptions="Center">
-            <Image Source="banner.png"
-                   HeightRequest="128"
-                   Aspect="AspectFit"
-                   Margin="0,16,0,24" />
+    <ContentPage.Content>
+        <Grid IgnoreSafeArea="True">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" 
+                  ColumnDefinitions="*,*,*"
+                  Padding="16,8"
+                  ColumnSpacing="8">
+                <Button Grid.Column="0"
+                        Text="Add Item"
+                        Command="{Binding AddItemCommand}" />
+                <Button Grid.Column="1"
+                        Text="Remove Item"
+                        Command="{Binding RemoveItemCommand}" />
+                <Button Grid.Column="2"
+                        Text="Move Item"
+                        Command="{Binding MoveItemCommand}" />
+            </Grid>
+
+            <nalu:VirtualScroll Grid.Row="1"
+                                Adapter="{Binding Items}">
+                <nalu:VirtualScroll.Header>
+                    <VerticalStackLayout>
+                        <Image Source="banner.png"
+                               HeightRequest="128"
+                               Aspect="AspectFit"
+                               Margin="0,16,0,24" />
+                    
+                        <Label Text="Page Ten"
+                               FontSize="32"
+                               FontAttributes="Bold"
+                               HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </nalu:VirtualScroll.Header>
+                <nalu:VirtualScroll.Footer>
+                    <VerticalStackLayout Padding="16, 8">
+                        <Label Text="{Binding Message}"
+                               FontSize="18"
+                               HorizontalOptions="Center" />
             
-            <Label Text="Page Ten"
-                   FontSize="32"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Center" />
-            
-            <Label Text="{Binding Message}"
-                   FontSize="18"
-                   HorizontalOptions="Center" />
-            
-            <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
-                   HorizontalOptions="Center" />
-        </VerticalStackLayout>
-    </ScrollView>
+                        <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
+                               HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </nalu:VirtualScroll.Footer>
+                <nalu:VirtualScroll.ItemTemplate>
+                    <DataTemplate x:DataType="pageModels:TenItem">
+                        <nalu:ViewBox>
+                            <Border Shadow="{Shadow Radius=6, Opacity=0.2, Offset='1,1'}"
+                                    StrokeShape="RoundRectangle 8"
+                                    Margin="8"
+                                    Padding="16,8"
+                                    BackgroundColor="LightCoral">
+                                <Label Text="{Binding Name}"/>
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding AddLineCommand}"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </nalu:ViewBox>
+                    </DataTemplate>
+                </nalu:VirtualScroll.ItemTemplate>
+            </nalu:VirtualScroll>
+        </Grid>
+    </ContentPage.Content>
 </ContentPage>
 

@@ -58,6 +58,7 @@ public static class MauiProgram
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()
+            .UseNaluVirtualScroll()
             .UseMauiCommunityToolkit()
             .ConfigureMauiHandlers(handlers =>
                 {

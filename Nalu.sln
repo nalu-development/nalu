@@ -89,6 +89,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.Controls", "Sourc
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.Benchmarks", "Tests\Nalu.Maui.Benchmarks\Nalu.Maui.Benchmarks.csproj", "{57F62ED2-5ED6-4936-86FE-9D6D11C62210}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.Maui.VirtualScroll", "Source\Nalu.Maui.VirtualScroll\Nalu.Maui.VirtualScroll.csproj", "{9C918EAE-FD36-47EF-8857-C6A2101CA442}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -135,6 +137,10 @@ Global
 		{57F62ED2-5ED6-4936-86FE-9D6D11C62210}.Release|Any CPU.Build.0 = Release|Any CPU
 		{57F62ED2-5ED6-4936-86FE-9D6D11C62210}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{57F62ED2-5ED6-4936-86FE-9D6D11C62210}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C918EAE-FD36-47EF-8857-C6A2101CA442}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C918EAE-FD36-47EF-8857-C6A2101CA442}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C918EAE-FD36-47EF-8857-C6A2101CA442}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C918EAE-FD36-47EF-8857-C6A2101CA442}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -153,6 +159,7 @@ Global
 		{A1AA3AB2-9B35-4CC8-84D9-06317B0CC12D} = {3CC05E8E-99E0-471F-B74A-4B0307871648}
 		{8E79A36B-BB71-4037-848A-38C4C03308A1} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 		{57F62ED2-5ED6-4936-86FE-9D6D11C62210} = {E1B24F25-B8A4-46EE-B7EB-7803DCFC543F}
+		{9C918EAE-FD36-47EF-8857-C6A2101CA442} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {73F36209-F8D6-4066-8951-D97729F773CF}
