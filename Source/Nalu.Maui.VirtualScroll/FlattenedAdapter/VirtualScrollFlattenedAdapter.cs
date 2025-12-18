@@ -1,14 +1,25 @@
+using System.Runtime.CompilerServices;
+
 namespace Nalu;
 
-
+/// <summary>
+/// Implementation of VirtualScrollFlattenedAdapter that uses cached section offsets
+/// instead of storing a full flattened array. This reduces memory usage but GetItem is O(log n) instead of O(1).
+/// </summary>
 internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, IDisposable
 {
     private readonly IVirtualScrollAdapter _virtualScrollAdapter;
     private readonly IDisposable _subscription;
     private IVirtualScrollLayoutInfo _layoutInfo;
-    private VirtualScrollFlattenedPositionInfo[] _flattenedArray;
     private int _flattenedLength;
     private int[] _sectionOffsets; // Cumulative offsets for O(1) section start lookup
+    private int _sectionCount; // Actual number of sections (array may be larger due to capacity)
+    private bool _hasGlobalHeader; // Cached layout flags
+    private bool _hasGlobalFooter;
+    private bool _hasSectionHeader;
+    private bool _hasSectionFooter;
+    private int _globalFooterHeaderSize;
+    private int _sectionFooterHeaderSize;
     private readonly List<Action<VirtualScrollFlattenedChangeSet>> _subscribers = [];
 
     public VirtualScrollFlattenedAdapter(IVirtualScrollAdapter virtualScrollAdapter, IVirtualScrollLayoutInfo layoutInfo)
@@ -16,10 +27,10 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         _virtualScrollAdapter = virtualScrollAdapter;
         _layoutInfo = layoutInfo;
         _subscription = virtualScrollAdapter.Subscribe(OnAdapterChanged);
-        _flattenedArray = Array.Empty<VirtualScrollFlattenedPositionInfo>();
-        _flattenedLength = 0;
         _sectionOffsets = Array.Empty<int>();
-        RebuildFlattenedArray();
+        _flattenedLength = 0;
+        CacheLayoutFlags();
+        RebuildOffsets();
     }
 
     /// <summary>
@@ -34,12 +45,23 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
         var oldLength = _flattenedLength;
         _layoutInfo = layoutInfo;
-        RebuildFlattenedArray();
+        CacheLayoutFlags();
+        RebuildOffsets();
 
         if (oldLength != _flattenedLength)
         {
             NotifySubscribers(new VirtualScrollFlattenedChangeSet(new[] { VirtualScrollFlattenedChangeFactory.Reset() }));
         }
+    }
+
+    private void CacheLayoutFlags()
+    {
+        _hasGlobalHeader = _layoutInfo.HasGlobalHeader;
+        _hasGlobalFooter = _layoutInfo.HasGlobalFooter;
+        _hasSectionHeader = _layoutInfo.HasSectionHeader;
+        _hasSectionFooter = _layoutInfo.HasSectionFooter;
+        _globalFooterHeaderSize = (_hasGlobalHeader ? 1 : 0) + (_hasGlobalFooter ? 1 : 0);
+        _sectionFooterHeaderSize = (_hasSectionHeader ? 1 : 0) + (_hasSectionFooter ? 1 : 0);
     }
 
     public int GetItemCount() => _flattenedLength;
@@ -51,18 +73,47 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             throw new ArgumentOutOfRangeException(nameof(flattenedIndex));
         }
 
-        var positionInfo = _flattenedArray[flattenedIndex];
-        var value = positionInfo.Type switch
+        // Handle global header
+        if (_hasGlobalHeader)
         {
-            VirtualScrollFlattenedPositionType.GlobalHeader => null,
-            VirtualScrollFlattenedPositionType.GlobalFooter => null,
-            VirtualScrollFlattenedPositionType.SectionHeader => _virtualScrollAdapter.GetSection(positionInfo.SectionIndex),
-            VirtualScrollFlattenedPositionType.SectionFooter => _virtualScrollAdapter.GetSection(positionInfo.SectionIndex),
-            VirtualScrollFlattenedPositionType.Item => _virtualScrollAdapter.GetItem(positionInfo.SectionIndex, positionInfo.ItemIndex),
-            _ => throw new InvalidOperationException($"Unknown position type: {positionInfo.Type}")
-        };
+            if (flattenedIndex == 0)
+            {
+                return new VirtualScrollFlattenedItem(VirtualScrollFlattenedPositionType.GlobalHeader, null);
+            }
+            flattenedIndex--; // Adjust for global header
+        }
 
-        return new VirtualScrollFlattenedItem(positionInfo.Type, value);
+        // Find which section this flattened index belongs to using binary search
+        var sectionIndex = FindSectionForFlattenedIndex(flattenedIndex);
+        if (sectionIndex < 0)
+        {
+            // Must be global footer
+            return new VirtualScrollFlattenedItem(VirtualScrollFlattenedPositionType.GlobalFooter, null);
+        }
+
+        var sectionStartOffset = _sectionOffsets[sectionIndex];
+        var relativeIndex = flattenedIndex - sectionStartOffset;
+
+        // Check if it's section header
+        if (_hasSectionHeader)
+        {
+            if (relativeIndex == 0)
+            {
+                return new VirtualScrollFlattenedItem(VirtualScrollFlattenedPositionType.SectionHeader, _virtualScrollAdapter.GetSection(sectionIndex));
+            }
+            relativeIndex--;
+        }
+
+        var itemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
+        
+        // Check if it's within items
+        if (relativeIndex < itemCount)
+        {
+            return new VirtualScrollFlattenedItem(VirtualScrollFlattenedPositionType.Item, _virtualScrollAdapter.GetItem(sectionIndex, relativeIndex));
+        }
+
+        // Must be section footer
+        return new VirtualScrollFlattenedItem(VirtualScrollFlattenedPositionType.SectionFooter, _virtualScrollAdapter.GetSection(sectionIndex));
     }
 
     public IDisposable Subscribe(Action<VirtualScrollFlattenedChangeSet> changeCallback)
@@ -92,7 +143,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
     {
         if (change.Operation == VirtualScrollChangeOperation.Reset)
         {
-            RebuildFlattenedArray();
+            RebuildOffsets();
             return new[] { VirtualScrollFlattenedChangeFactory.Reset() };
         }
 
@@ -116,8 +167,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
                     var itemsToInsert = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
-                    InsertIntoFlattenedArray(startFlattenedIndex, change.StartSectionIndex, sectionCount);
-                    UpdateSectionIndicesAfterInsert(change.StartSectionIndex + sectionCount);
+                    UpdateOffsetsAfterSectionInsert(change.StartSectionIndex, sectionCount);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + itemsToInsert - 1));
                     break;
                 }
@@ -128,9 +178,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
                     var itemsToRemove = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
-                    RemoveFromFlattenedArray(startFlattenedIndex, itemsToRemove);
-                    RemoveSectionOffsets(change.StartSectionIndex, sectionCount);
-                    UpdateSectionIndicesAfterRemove(change.StartSectionIndex);
+                    UpdateOffsetsAfterSectionRemove(change.StartSectionIndex, sectionCount);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRemove - 1));
                     break;
                 }
@@ -138,19 +186,55 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.ReplaceSection:
             case VirtualScrollChangeOperation.ReplaceSectionRange:
                 {
-                    // Replace operations may change item counts, so we rebuild to be safe
-                    // This ensures correctness even if the section structure changed
-                    RebuildFlattenedArray();
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.Reset());
+                    // ReplaceSection(Range) means content changed but structure is the same
+                    // Emit ReplaceItemRange for the affected items
+                    var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
+                    var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
+                    var itemsToReplace = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
+                    
+                    if (itemsToReplace == 1)
+                    {
+                        flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex));
+                    }
+                    else
+                    {
+                        flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + itemsToReplace - 1));
+                    }
                     break;
                 }
 
             case VirtualScrollChangeOperation.MoveSection:
                 {
-                    // MoveSection is complex due to index shifting - rebuild for correctness
-                    // This is a relatively rare operation, so the performance impact is acceptable
-                    RebuildFlattenedArray();
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.Reset());
+                    // MoveSection: remove from old position, insert at new position
+                    var fromSectionIndex = change.StartSectionIndex;
+                    var toSectionIndex = change.EndSectionIndex;
+                    
+                    // Calculate positions BEFORE any changes
+                    var fromFlattenedIndex = GetFlattenedIndexForSectionStart(fromSectionIndex);
+                    var sectionSize = CalculateItemsForSections(fromSectionIndex, 1);
+                    
+                    // Calculate destination index
+                    // If moving forward, destination shifts back after removal
+                    // If moving backward, destination stays the same
+                    int toFlattenedIndex;
+                    if (fromSectionIndex < toSectionIndex)
+                    {
+                        // Moving forward: get position of section AFTER the target
+                        // After removal, target position shifts back by sectionSize
+                        toFlattenedIndex = GetFlattenedIndexForSectionStart(toSectionIndex + 1) - sectionSize;
+                    }
+                    else
+                    {
+                        // Moving backward: destination is the start of the target section
+                        toFlattenedIndex = GetFlattenedIndexForSectionStart(toSectionIndex);
+                    }
+                    
+                    // Update offsets to reflect the move
+                    RebuildOffsets();
+                    
+                    // Emit remove and insert changes
+                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(fromFlattenedIndex, fromFlattenedIndex + sectionSize - 1));
+                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItemRange(toFlattenedIndex, toFlattenedIndex + sectionSize - 1));
                     break;
                 }
 
@@ -183,7 +267,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.InsertItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
-                    InsertItemIntoFlattenedArray(flattenedIndex, change.StartSectionIndex, change.StartItemIndex);
+                    UpdateOffsetsAfterItemInsert(change.StartSectionIndex);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItem(flattenedIndex));
                     break;
                 }
@@ -192,7 +276,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                 {
                     var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
-                    InsertItemRangeIntoFlattenedArray(startFlattenedIndex, change.StartSectionIndex, change.StartItemIndex, count);
+                    UpdateOffsetsAfterItemInsert(change.StartSectionIndex, count);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + count - 1));
                     break;
                 }
@@ -200,7 +284,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.RemoveItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
-                    RemoveItemFromFlattenedArray(flattenedIndex);
+                    UpdateOffsetsAfterItemRemove(change.StartSectionIndex);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItem(flattenedIndex));
                     break;
                 }
@@ -209,7 +293,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                 {
                     var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
-                    RemoveItemRangeFromFlattenedArray(startFlattenedIndex, count);
+                    UpdateOffsetsAfterItemRemove(change.StartSectionIndex, count);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + count - 1));
                     break;
                 }
@@ -233,7 +317,12 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                 {
                     var fromFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var toFlattenedIndex = GetFlattenedIndexForItem(change.EndSectionIndex, change.EndItemIndex);
-                    MoveItemInFlattenedArray(fromFlattenedIndex, toFlattenedIndex);
+                    // Note: MoveItem doesn't change offsets if within same section, but we need to rebuild offsets if cross-section
+                    if (change.StartSectionIndex != change.EndSectionIndex)
+                    {
+                        UpdateOffsetsAfterItemRemove(change.StartSectionIndex);
+                        UpdateOffsetsAfterItemInsert(change.EndSectionIndex);
+                    }
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.MoveItem(fromFlattenedIndex, toFlattenedIndex));
                     break;
                 }
@@ -249,157 +338,78 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         return flattenedChanges;
     }
 
-    private void RebuildFlattenedArray()
+    private void RebuildOffsets()
     {
-        var sectionCount = _virtualScrollAdapter.GetSectionCount();
-        var estimatedCapacity = EstimateCapacity(sectionCount);
+        _sectionCount = _virtualScrollAdapter.GetSectionCount();
         
-        if (_flattenedArray.Length < estimatedCapacity)
+        // Ensure arrays are large enough (double capacity for growth)
+        if (_sectionOffsets.Length < _sectionCount)
         {
-            var newArray = new VirtualScrollFlattenedPositionInfo[estimatedCapacity];
-            if (_flattenedLength > 0)
-            {
-                Array.Copy(_flattenedArray, 0, newArray, 0, _flattenedLength);
-            }
-            _flattenedArray = newArray;
-        }
-
-        // Rebuild section offsets array
-        if (_sectionOffsets.Length < sectionCount)
-        {
-            _sectionOffsets = new int[Math.Max(sectionCount, sectionCount * 2)];
+            _sectionOffsets = new int[Math.Max(_sectionCount * 2, 4)];
         }
 
         _flattenedLength = 0;
 
         // Global header
-        if (_layoutInfo.HasGlobalHeader)
+        var globalHeaderOffset = 0;
+        if (_hasGlobalHeader)
         {
-            EnsureCapacity(1);
-            _flattenedArray[_flattenedLength++] = new VirtualScrollFlattenedPositionInfo
-            {
-                Type = VirtualScrollFlattenedPositionType.GlobalHeader,
-                SectionIndex = -1,
-                ItemIndex = -1
-            };
+            globalHeaderOffset = 1;
+            _flattenedLength++;
         }
 
-        // Sections
-        for (var sectionIndex = 0; sectionIndex < sectionCount; sectionIndex++)
+        // Build section offsets
+        // Offsets are stored relative to after global header (for use in GetItem after adjusting for global header)
+        for (var sectionIndex = 0; sectionIndex < _sectionCount; sectionIndex++)
         {
-            // Store the offset for this section start
-            _sectionOffsets[sectionIndex] = _flattenedLength;
-
-            // Section header
-            if (_layoutInfo.HasSectionHeader)
-            {
-                EnsureCapacity(1);
-                _flattenedArray[_flattenedLength++] = new VirtualScrollFlattenedPositionInfo
-                {
-                    Type = VirtualScrollFlattenedPositionType.SectionHeader,
-                    SectionIndex = sectionIndex,
-                    ItemIndex = -1
-                };
-            }
-
-            // Section items
+            // Store offset relative to after global header
+            _sectionOffsets[sectionIndex] = _flattenedLength - globalHeaderOffset;
+            
             var itemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
-            EnsureCapacity(itemCount);
-            for (var itemIndex = 0; itemIndex < itemCount; itemIndex++)
-            {
-                _flattenedArray[_flattenedLength++] = new VirtualScrollFlattenedPositionInfo
-                {
-                    Type = VirtualScrollFlattenedPositionType.Item,
-                    SectionIndex = sectionIndex,
-                    ItemIndex = itemIndex
-                };
-            }
-
-            // Section footer
-            if (_layoutInfo.HasSectionFooter)
-            {
-                EnsureCapacity(1);
-                _flattenedArray[_flattenedLength++] = new VirtualScrollFlattenedPositionInfo
-                {
-                    Type = VirtualScrollFlattenedPositionType.SectionFooter,
-                    SectionIndex = sectionIndex,
-                    ItemIndex = -1
-                };
-            }
+            
+            // Section header & footer
+            _flattenedLength += itemCount + _sectionFooterHeaderSize;
         }
 
         // Global footer
-        if (_layoutInfo.HasGlobalFooter)
+        if (_hasGlobalFooter)
         {
-            EnsureCapacity(1);
-            _flattenedArray[_flattenedLength++] = new VirtualScrollFlattenedPositionInfo
-            {
-                Type = VirtualScrollFlattenedPositionType.GlobalFooter,
-                SectionIndex = -1,
-                ItemIndex = -1
-            };
-        }
-    }
-
-    private int EstimateCapacity(int sectionCount)
-    {
-        var itemsPerSection = sectionCount > 0 ? _virtualScrollAdapter.GetItemCount(0) : 0;
-        var sectionOverhead = (_layoutInfo.HasSectionHeader ? 1 : 0) + (_layoutInfo.HasSectionFooter ? 1 : 0);
-        var globalOverhead = (_layoutInfo.HasGlobalHeader ? 1 : 0) + (_layoutInfo.HasGlobalFooter ? 1 : 0);
-        return sectionCount * (itemsPerSection + sectionOverhead) + globalOverhead;
-    }
-
-    private void EnsureCapacity(int additionalItems)
-    {
-        if (_flattenedLength + additionalItems > _flattenedArray.Length)
-        {
-            var newCapacity = Math.Max(_flattenedArray.Length * 2, _flattenedLength + additionalItems);
-            var newArray = new VirtualScrollFlattenedPositionInfo[newCapacity];
-            if (_flattenedLength > 0)
-            {
-                Array.Copy(_flattenedArray, 0, newArray, 0, _flattenedLength);
-            }
-            _flattenedArray = newArray;
+            _flattenedLength++;
         }
     }
 
     private int GetFlattenedIndexForSectionStart(int sectionIndex)
     {
         // Use cached offsets for O(1) lookup
-        if (sectionIndex >= 0 && sectionIndex < _sectionOffsets.Length)
+        // Offsets are stored relative to after global header
+        // Returns the index OF the section start (i.e., the section header position, or first item if no header)
+        if (sectionIndex >= 0 && sectionIndex < _sectionCount)
         {
-            return _sectionOffsets[sectionIndex];
+            var offset = _sectionOffsets[sectionIndex];
+            return _hasGlobalHeader ? offset + 1 : offset;
         }
 
-        // Fallback to calculation if offsets not available (shouldn't happen in normal operation)
-        var flattenedIndex = _layoutInfo.HasGlobalHeader ? 1 : 0;
-
-        for (var i = 0; i < sectionIndex; i++)
+        // Fallback calculation for sections beyond current count (e.g., during insert)
+        var flattenedIndex = _hasGlobalHeader ? 1 : 0;
+        var actualSectionCount = _virtualScrollAdapter.GetSectionCount();
+        var sectionsToIterate = Math.Min(sectionIndex, actualSectionCount);
+        
+        for (var i = 0; i < sectionsToIterate; i++)
         {
-            if (_layoutInfo.HasSectionHeader)
-            {
-                flattenedIndex++;
-            }
-            flattenedIndex += _virtualScrollAdapter.GetItemCount(i);
-            if (_layoutInfo.HasSectionFooter)
-            {
-                flattenedIndex++;
-            }
+            flattenedIndex += _virtualScrollAdapter.GetItemCount(i) + _sectionFooterHeaderSize;
         }
-
-        if (_layoutInfo.HasSectionHeader)
-        {
-            flattenedIndex++;
-        }
-
         return flattenedIndex;
     }
 
     private int GetFlattenedIndexForItem(int sectionIndex, int itemIndex)
     {
         var flattenedIndex = GetFlattenedIndexForSectionStart(sectionIndex);
-        // GetFlattenedIndexForSectionStart returns the index after the section header,
-        // so we can directly add the itemIndex
+        // GetFlattenedIndexForSectionStart returns the section start (header position),
+        // so we need to add the section header offset to get to items
+        if (_hasSectionHeader)
+        {
+            flattenedIndex++;
+        }
         return flattenedIndex + itemIndex;
     }
 
@@ -409,407 +419,161 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         for (var i = 0; i < sectionCount; i++)
         {
             var sectionIndex = startSectionIndex + i;
-            if (_layoutInfo.HasSectionHeader)
-            {
-                totalItems++;
-            }
-            totalItems += _virtualScrollAdapter.GetItemCount(sectionIndex);
-            if (_layoutInfo.HasSectionFooter)
-            {
-                totalItems++;
-            }
+            totalItems += _virtualScrollAdapter.GetItemCount(sectionIndex) + _sectionFooterHeaderSize;
         }
         return totalItems;
     }
 
-    private void InsertIntoFlattenedArray(int flattenedIndex, int startSectionIndex, int sectionCount)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int FindSectionForFlattenedIndex(int flattenedIndex)
     {
-        var itemsToInsert = CalculateItemsForSections(startSectionIndex, sectionCount);
-        EnsureCapacity(itemsToInsert);
+        // Binary search for the section containing this flattened index
+        var left = 0;
+        var right = _sectionCount - 1;
 
-        if (flattenedIndex < _flattenedLength)
+        while (left <= right)
         {
-            Array.Copy(_flattenedArray, flattenedIndex, _flattenedArray, flattenedIndex + itemsToInsert, _flattenedLength - flattenedIndex);
-        }
+            var sectionIndex = (left + right) / 2;
+            var sectionStart = _sectionOffsets[sectionIndex];
+            var sectionSize = GetCurrentSectionSize(sectionIndex, sectionStart);
+            var sectionEnd = sectionStart + sectionSize - 1;
 
-        // Update section offsets - shift existing sections forward and insert new ones
-        UpdateSectionOffsetsAfterInsert(startSectionIndex, sectionCount, itemsToInsert);
-
-        var currentIndex = flattenedIndex;
-        for (var i = 0; i < sectionCount; i++)
-        {
-            var sectionIndex = startSectionIndex + i;
-            
-            // Store offset for this section
-            _sectionOffsets[sectionIndex] = currentIndex;
-            
-            if (_layoutInfo.HasSectionHeader)
+            if (flattenedIndex >= sectionStart && flattenedIndex <= sectionEnd)
             {
-                _flattenedArray[currentIndex++] = new VirtualScrollFlattenedPositionInfo
-                {
-                    Type = VirtualScrollFlattenedPositionType.SectionHeader,
-                    SectionIndex = sectionIndex,
-                    ItemIndex = -1
-                };
+                return sectionIndex;
             }
 
-            var itemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
-            for (var itemIndex = 0; itemIndex < itemCount; itemIndex++)
+            if (flattenedIndex < sectionStart)
             {
-                _flattenedArray[currentIndex++] = new VirtualScrollFlattenedPositionInfo
-                {
-                    Type = VirtualScrollFlattenedPositionType.Item,
-                    SectionIndex = sectionIndex,
-                    ItemIndex = itemIndex
-                };
+                right = sectionIndex - 1;
             }
-
-            if (_layoutInfo.HasSectionFooter)
+            else
             {
-                _flattenedArray[currentIndex++] = new VirtualScrollFlattenedPositionInfo
-                {
-                    Type = VirtualScrollFlattenedPositionType.SectionFooter,
-                    SectionIndex = sectionIndex,
-                    ItemIndex = -1
-                };
+                left = sectionIndex + 1;
             }
         }
 
-        _flattenedLength += itemsToInsert;
+        return -1; // Not found (must be global footer)
     }
 
-    private void RemoveFromFlattenedArray(int flattenedIndex, int count)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int GetCurrentSectionSize(int mid, int sectionStart)
+        => mid < _sectionCount - 1
+            ? _sectionOffsets[mid + 1] - sectionStart
+            : _flattenedLength - sectionStart - _globalFooterHeaderSize;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int CalculateSectionSize(int sectionIndex)
     {
-        if (flattenedIndex + count < _flattenedLength)
-        {
-            Array.Copy(_flattenedArray, flattenedIndex + count, _flattenedArray, flattenedIndex, _flattenedLength - flattenedIndex - count);
-        }
-        _flattenedLength -= count;
+         var size = _virtualScrollAdapter.GetItemCount(sectionIndex) + _sectionFooterHeaderSize;
+         return size;
+    }
+
+    private void UpdateOffsetsAfterSectionInsert(int startSectionIndex, int insertedSectionCount)
+    {
+        var newSectionTotal = _virtualScrollAdapter.GetSectionCount();
         
-        // Update section offsets - shift subsequent sections backward
-        UpdateSectionOffsetsAfterRemove(flattenedIndex, count);
-    }
-
-    private void MoveInFlattenedArray(int fromIndex, int toIndex, int count)
-    {
-        if (fromIndex == toIndex)
+        // Ensure arrays are large enough
+        if (_sectionOffsets.Length < newSectionTotal)
         {
-            return;
-        }
-
-        var temp = new VirtualScrollFlattenedPositionInfo[count];
-        Array.Copy(_flattenedArray, fromIndex, temp, 0, count);
-
-        if (fromIndex < toIndex)
-        {
-            Array.Copy(_flattenedArray, fromIndex + count, _flattenedArray, fromIndex, toIndex - fromIndex);
-            Array.Copy(temp, 0, _flattenedArray, toIndex, count);
-        }
-        else
-        {
-            Array.Copy(_flattenedArray, toIndex, _flattenedArray, toIndex + count, fromIndex - toIndex);
-            Array.Copy(temp, 0, _flattenedArray, toIndex, count);
-        }
-    }
-
-    private void InsertItemIntoFlattenedArray(int flattenedIndex, int sectionIndex, int itemIndex)
-    {
-        EnsureCapacity(1);
-        if (flattenedIndex < _flattenedLength)
-        {
-            Array.Copy(_flattenedArray, flattenedIndex, _flattenedArray, flattenedIndex + 1, _flattenedLength - flattenedIndex);
-        }
-        _flattenedArray[flattenedIndex] = new VirtualScrollFlattenedPositionInfo
-        {
-            Type = VirtualScrollFlattenedPositionType.Item,
-            SectionIndex = sectionIndex,
-            ItemIndex = itemIndex
-        };
-        _flattenedLength++;
-
-        // Update section offsets for subsequent sections (shifted by 1)
-        UpdateSectionOffsetsAfterItemChange(sectionIndex + 1, 1);
-
-        // Update item indices for subsequent items in the same section
-        UpdateItemIndicesAfterInsert(sectionIndex, itemIndex);
-    }
-
-    private void InsertItemRangeIntoFlattenedArray(int startFlattenedIndex, int sectionIndex, int startItemIndex, int count)
-    {
-        EnsureCapacity(count);
-        if (startFlattenedIndex < _flattenedLength)
-        {
-            Array.Copy(_flattenedArray, startFlattenedIndex, _flattenedArray, startFlattenedIndex + count, _flattenedLength - startFlattenedIndex);
-        }
-
-        for (var i = 0; i < count; i++)
-        {
-            _flattenedArray[startFlattenedIndex + i] = new VirtualScrollFlattenedPositionInfo
-            {
-                Type = VirtualScrollFlattenedPositionType.Item,
-                SectionIndex = sectionIndex,
-                ItemIndex = startItemIndex + i
-            };
-        }
-
-        _flattenedLength += count;
-        
-        // Update section offsets for subsequent sections (shifted by count)
-        UpdateSectionOffsetsAfterItemChange(sectionIndex + 1, count);
-        
-        UpdateItemIndicesAfterInsert(sectionIndex, startItemIndex + count);
-    }
-
-    private void RemoveItemFromFlattenedArray(int flattenedIndex)
-    {
-        var positionInfo = _flattenedArray[flattenedIndex];
-        if (flattenedIndex + 1 < _flattenedLength)
-        {
-            Array.Copy(_flattenedArray, flattenedIndex + 1, _flattenedArray, flattenedIndex, _flattenedLength - flattenedIndex - 1);
-        }
-        _flattenedLength--;
-
-        // Update section offsets for subsequent sections (shifted backward by 1)
-        UpdateSectionOffsetsAfterItemChange(positionInfo.SectionIndex + 1, -1);
-
-        UpdateItemIndicesAfterRemove(positionInfo.SectionIndex, positionInfo.ItemIndex);
-    }
-
-    private void RemoveItemRangeFromFlattenedArray(int startFlattenedIndex, int count)
-    {
-        var firstPositionInfo = _flattenedArray[startFlattenedIndex];
-        if (startFlattenedIndex + count < _flattenedLength)
-        {
-            Array.Copy(_flattenedArray, startFlattenedIndex + count, _flattenedArray, startFlattenedIndex, _flattenedLength - startFlattenedIndex - count);
-        }
-        _flattenedLength -= count;
-
-        // Update section offsets for subsequent sections (shifted backward by count)
-        UpdateSectionOffsetsAfterItemChange(firstPositionInfo.SectionIndex + 1, -count);
-
-        UpdateItemIndicesAfterRemove(firstPositionInfo.SectionIndex, firstPositionInfo.ItemIndex + count);
-    }
-
-    private void MoveItemInFlattenedArray(int fromIndex, int toIndex)
-    {
-        if (fromIndex == toIndex)
-        {
-            return;
-        }
-
-        var temp = _flattenedArray[fromIndex];
-        if (fromIndex < toIndex)
-        {
-            Array.Copy(_flattenedArray, fromIndex + 1, _flattenedArray, fromIndex, toIndex - fromIndex);
-        }
-        else
-        {
-            Array.Copy(_flattenedArray, toIndex, _flattenedArray, toIndex + 1, fromIndex - toIndex);
-        }
-        _flattenedArray[toIndex] = temp;
-    }
-
-    private void UpdateItemIndicesAfterInsert(int sectionIndex, int insertedItemIndex)
-    {
-        var sectionStartIndex = GetFlattenedIndexForSectionStart(sectionIndex);
-        if (_layoutInfo.HasSectionHeader)
-        {
-            sectionStartIndex++;
-        }
-
-        var sectionItemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
-        for (var i = insertedItemIndex + 1; i < sectionItemCount; i++)
-        {
-            var flattenedIndex = sectionStartIndex + i;
-            if (flattenedIndex < _flattenedLength && _flattenedArray[flattenedIndex].Type == VirtualScrollFlattenedPositionType.Item)
-            {
-                var info = _flattenedArray[flattenedIndex];
-                info.ItemIndex = i;
-                _flattenedArray[flattenedIndex] = info;
-            }
-        }
-    }
-
-    private void UpdateItemIndicesAfterRemove(int sectionIndex, int removedItemIndex)
-    {
-        var sectionStartIndex = GetFlattenedIndexForSectionStart(sectionIndex);
-        if (_layoutInfo.HasSectionHeader)
-        {
-            sectionStartIndex++;
-        }
-
-        var sectionItemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
-        for (var i = removedItemIndex; i < sectionItemCount; i++)
-        {
-            var flattenedIndex = sectionStartIndex + i;
-            if (flattenedIndex < _flattenedLength && _flattenedArray[flattenedIndex].Type == VirtualScrollFlattenedPositionType.Item)
-            {
-                var info = _flattenedArray[flattenedIndex];
-                info.ItemIndex = i;
-                _flattenedArray[flattenedIndex] = info;
-            }
-        }
-    }
-
-
-    private void UpdateSectionOffsetsAfterInsert(int startSectionIndex, int sectionCount, int itemsInserted)
-    {
-        var sectionTotal = _virtualScrollAdapter.GetSectionCount();
-        
-        // Ensure offsets array is large enough
-        if (_sectionOffsets.Length < sectionTotal)
-        {
-            var newOffsets = new int[Math.Max(sectionTotal, _sectionOffsets.Length * 2)];
+            var newOffsets = new int[Math.Max(newSectionTotal * 2, _sectionOffsets.Length * 2)];
             Array.Copy(_sectionOffsets, 0, newOffsets, 0, startSectionIndex);
             _sectionOffsets = newOffsets;
         }
+
+        // Calculate offset for first inserted section (relative to after global header)
+        var insertOffset = 0;
+        if (startSectionIndex > 0)
+        {
+            insertOffset = _sectionOffsets[startSectionIndex - 1] + CalculateSectionSize(startSectionIndex - 1);
+        }
         
-        // Shift offsets for sections after insertion point forward by itemsInserted
-        for (var i = startSectionIndex + sectionCount; i < sectionTotal; i++)
+        // Shift existing offsets
+        var oldSectionsToShift = _sectionCount - startSectionIndex;
+        if (oldSectionsToShift > 0)
         {
-            if (i < _sectionOffsets.Length)
-            {
-                _sectionOffsets[i] += itemsInserted;
-            }
+            Array.Copy(_sectionOffsets, startSectionIndex, _sectionOffsets, startSectionIndex + insertedSectionCount, oldSectionsToShift);
+        }
+
+        // Insert new offsets
+        var currentOffset = insertOffset;
+        for (var i = 0; i < insertedSectionCount; i++)
+        {
+            var sectionIndex = startSectionIndex + i;
+            _sectionOffsets[sectionIndex] = currentOffset;
+            currentOffset += CalculateSectionSize(sectionIndex);
+        }
+
+        // Update offsets for subsequent sections
+        for (var i = startSectionIndex + insertedSectionCount; i < newSectionTotal; i++)
+        {
+            _sectionOffsets[i] = currentOffset;
+            currentOffset += CalculateSectionSize(i);
+        }
+
+        // Update section count
+        _sectionCount = newSectionTotal;
+
+        // Recalculate total length (add global header offset back)
+        _flattenedLength = currentOffset + (_hasGlobalHeader ? 1 : 0);
+        if (_hasGlobalFooter)
+        {
+            _flattenedLength++;
         }
     }
 
-    private void UpdateSectionOffsetsAfterRemove(int flattenedIndex, int itemsRemoved)
+    private void UpdateOffsetsAfterSectionRemove(int startSectionIndex, int removedSectionCount)
     {
-        // Find which section this removal affects and update subsequent sections
-        var sectionTotal = _virtualScrollAdapter.GetSectionCount();
-        
-        // Shift offsets for sections that come after the removed items
-        for (var i = 0; i < sectionTotal; i++)
+        var newSectionTotal = _virtualScrollAdapter.GetSectionCount();
+
+        // Shift offsets backward
+        var sectionsAfterRemoval = _sectionCount - startSectionIndex - removedSectionCount;
+        if (sectionsAfterRemoval > 0)
         {
-            if (i < _sectionOffsets.Length && _sectionOffsets[i] > flattenedIndex)
-            {
-                _sectionOffsets[i] -= itemsRemoved;
-            }
+            Array.Copy(_sectionOffsets, startSectionIndex + removedSectionCount, _sectionOffsets, startSectionIndex, sectionsAfterRemoval);
+        }
+
+        // Update section count
+        _sectionCount = newSectionTotal;
+
+        // Recalculate offsets for remaining sections (relative to after global header)
+        var currentOffset = 0;
+        for (var i = 0; i < _sectionCount; i++)
+        {
+            _sectionOffsets[i] = currentOffset;
+            currentOffset += CalculateSectionSize(i);
+        }
+
+        // Recalculate total length (add global header offset back)
+        _flattenedLength = currentOffset + (_hasGlobalHeader ? 1 : 0);
+        if (_hasGlobalFooter)
+        {
+            _flattenedLength++;
         }
     }
 
-    private void RemoveSectionOffsets(int startSectionIndex, int sectionCount)
+    private void UpdateOffsetsAfterItemInsert(int sectionIndex, int count = 1)
     {
-        // Remove offsets for deleted sections and shift remaining ones
-        var sectionTotal = _virtualScrollAdapter.GetSectionCount();
-        
-        // Shift offsets for sections after the removed range
-        if (startSectionIndex + sectionCount < _sectionOffsets.Length)
+        // Update offsets for subsequent sections
+        for (var i = sectionIndex + 1; i < _sectionCount; i++)
         {
-            Array.Copy(_sectionOffsets, startSectionIndex + sectionCount, _sectionOffsets, startSectionIndex, sectionTotal - startSectionIndex);
+            _sectionOffsets[i] += count;
         }
+
+        // Update total length
+        _flattenedLength += count;
     }
 
-    private void UpdateSectionOffsetsAfterItemChange(int startSectionIndex, int delta)
+    private void UpdateOffsetsAfterItemRemove(int sectionIndex, int count = 1)
     {
-        // When items are inserted/removed within a section, update offsets for subsequent sections
-        var sectionTotal = _virtualScrollAdapter.GetSectionCount();
-        
-        for (var i = startSectionIndex; i < sectionTotal; i++)
+        // Update offsets for subsequent sections
+        for (var i = sectionIndex + 1; i < _sectionCount; i++)
         {
-            if (i < _sectionOffsets.Length)
-            {
-                _sectionOffsets[i] += delta;
-            }
+            _sectionOffsets[i] -= count;
         }
-    }
 
-    private void UpdateSectionIndicesAfterInsert(int startSectionIndex)
-    {
-        // After inserting sections, all subsequent sections have their indices incremented
-        // Scan through flattened array and update SectionIndex for items belonging to affected sections
-        var currentSectionIndex = 0;
-        var sectionCount = _virtualScrollAdapter.GetSectionCount();
-        var skipGlobalHeader = _layoutInfo.HasGlobalHeader;
-
-        for (var i = 0; i < _flattenedLength && currentSectionIndex < sectionCount; i++)
-        {
-            var info = _flattenedArray[i];
-            
-            // Skip global header
-            if (skipGlobalHeader && info.Type == VirtualScrollFlattenedPositionType.GlobalHeader)
-            {
-                continue;
-            }
-
-            // Update section header
-            if (info.Type == VirtualScrollFlattenedPositionType.SectionHeader)
-            {
-                if (currentSectionIndex >= startSectionIndex)
-                {
-                    info.SectionIndex = currentSectionIndex;
-                    _flattenedArray[i] = info;
-                }
-            }
-            // Update section items
-            else if (info.Type == VirtualScrollFlattenedPositionType.Item)
-            {
-                if (currentSectionIndex >= startSectionIndex)
-                {
-                    info.SectionIndex = currentSectionIndex;
-                    _flattenedArray[i] = info;
-                }
-            }
-            // Update section footer and advance to next section
-            else if (info.Type == VirtualScrollFlattenedPositionType.SectionFooter)
-            {
-                if (currentSectionIndex >= startSectionIndex)
-                {
-                    info.SectionIndex = currentSectionIndex;
-                    _flattenedArray[i] = info;
-                }
-                currentSectionIndex++;
-            }
-        }
-    }
-
-    private void UpdateSectionIndicesAfterRemove(int startSectionIndex)
-    {
-        // After removing sections, all subsequent sections have their indices decremented
-        var currentSectionIndex = 0;
-        var sectionCount = _virtualScrollAdapter.GetSectionCount();
-        var skipGlobalHeader = _layoutInfo.HasGlobalHeader;
-
-        for (var i = 0; i < _flattenedLength && currentSectionIndex < sectionCount; i++)
-        {
-            var info = _flattenedArray[i];
-            
-            // Skip global header
-            if (skipGlobalHeader && info.Type == VirtualScrollFlattenedPositionType.GlobalHeader)
-            {
-                continue;
-            }
-
-            // Update section header
-            if (info.Type == VirtualScrollFlattenedPositionType.SectionHeader)
-            {
-                if (info.SectionIndex > startSectionIndex)
-                {
-                    info.SectionIndex = currentSectionIndex;
-                    _flattenedArray[i] = info;
-                }
-            }
-            // Update section items
-            else if (info.Type == VirtualScrollFlattenedPositionType.Item)
-            {
-                if (info.SectionIndex > startSectionIndex)
-                {
-                    info.SectionIndex = currentSectionIndex;
-                    _flattenedArray[i] = info;
-                }
-            }
-            // Update section footer and advance to next section
-            else if (info.Type == VirtualScrollFlattenedPositionType.SectionFooter)
-            {
-                if (info.SectionIndex > startSectionIndex)
-                {
-                    info.SectionIndex = currentSectionIndex;
-                    _flattenedArray[i] = info;
-                }
-                currentSectionIndex++;
-            }
-        }
+        // Update total length
+        _flattenedLength -= count;
     }
 
     private void NotifySubscribers(VirtualScrollFlattenedChangeSet changeSet)
@@ -821,13 +585,6 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
     }
 
     private void Unsubscribe(Action<VirtualScrollFlattenedChangeSet> callback) => _subscribers.Remove(callback);
-    
-    private struct VirtualScrollFlattenedPositionInfo
-    {
-        public int SectionIndex { get; set; }
-        public int ItemIndex { get; set; }
-        public VirtualScrollFlattenedPositionType Type { get; set; }
-    }
 
     private sealed class Subscription : IDisposable
     {
@@ -851,3 +608,4 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         }
     }
 }
+

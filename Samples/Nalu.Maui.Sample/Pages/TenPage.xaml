@@ -15,18 +15,21 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" 
-                  ColumnDefinitions="*,*,*"
+                  ColumnDefinitions="*,*,*,*"
                   Padding="16,8"
                   ColumnSpacing="8">
                 <Button Grid.Column="0"
-                        Text="Add Item"
+                        Text="Add"
                         Command="{Binding AddItemCommand}" />
                 <Button Grid.Column="1"
-                        Text="Remove Item"
+                        Text="Remove"
                         Command="{Binding RemoveItemCommand}" />
                 <Button Grid.Column="2"
-                        Text="Move Item"
+                        Text="Move"
                         Command="{Binding MoveItemCommand}" />
+                <Button Grid.Column="3"
+                        Text="Auto"
+                        Command="{Binding ToggleAutoChangesCommand}" />
             </Grid>
 
             <nalu:VirtualScroll Grid.Row="1"

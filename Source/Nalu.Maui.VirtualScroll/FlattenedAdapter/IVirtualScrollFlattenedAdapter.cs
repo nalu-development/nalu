@@ -3,7 +3,7 @@ namespace Nalu;
 /// <summary>
 /// Adapter interface for virtual scroll data sources.
 /// </summary>
-internal interface IVirtualScrollFlattenedAdapter
+internal interface IVirtualScrollFlattenedAdapter : IDisposable
 {
     /// <summary>
     /// Gets the total item count.
