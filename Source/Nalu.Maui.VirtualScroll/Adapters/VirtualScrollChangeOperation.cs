@@ -2,6 +2,7 @@ namespace Nalu;
 
 /// <summary>
 /// The operation that caused the change.
+/// Extends <see cref="VirtualScrollFlattenedChangeOperation"/> with section-level operations.
 /// </summary>
 public enum VirtualScrollChangeOperation
 {

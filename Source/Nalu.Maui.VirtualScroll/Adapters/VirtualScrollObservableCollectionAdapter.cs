@@ -67,12 +67,12 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
 
                     if (e.NewItems.Count == 1)
                     {
-                        changes.Add(VirtualScrollChange.InsertItem(_sectionIndex, e.NewStartingIndex));
+                        changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, e.NewStartingIndex));
                     }
                     else
                     {
                         var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
-                        changes.Add(VirtualScrollChange.InsertItemRange(_sectionIndex, e.NewStartingIndex, endIndex));
+                        changes.Add(VirtualScrollChangeFactory.InsertItemRange(_sectionIndex, e.NewStartingIndex, endIndex));
                     }
                     break;
 
@@ -84,12 +84,12 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
 
                     if (e.OldItems.Count == 1)
                     {
-                        changes.Add(VirtualScrollChange.RemoveItem(_sectionIndex, e.OldStartingIndex));
+                        changes.Add(VirtualScrollChangeFactory.RemoveItem(_sectionIndex, e.OldStartingIndex));
                     }
                     else
                     {
                         var endIndex = e.OldStartingIndex + e.OldItems.Count - 1;
-                        changes.Add(VirtualScrollChange.RemoveItemRange(_sectionIndex, e.OldStartingIndex, endIndex));
+                        changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, e.OldStartingIndex, endIndex));
                     }
                     break;
 
@@ -105,12 +105,12 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
                     // Replace the overlapping items
                     if (replaceCount == 1)
                     {
-                        changes.Add(VirtualScrollChange.ReplaceItem(_sectionIndex, startIndex));
+                        changes.Add(VirtualScrollChangeFactory.ReplaceItem(_sectionIndex, startIndex));
                     }
                     else if (replaceCount > 1)
                     {
                         var replaceEndIndex = startIndex + replaceCount - 1;
-                        changes.Add(VirtualScrollChange.ReplaceItemRange(_sectionIndex, startIndex, replaceEndIndex));
+                        changes.Add(VirtualScrollChangeFactory.ReplaceItemRange(_sectionIndex, startIndex, replaceEndIndex));
                     }
 
                     // Add remaining new items if there are more new items than old items
@@ -120,12 +120,12 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
                         var insertStartIndex = startIndex + replaceCount;
                         if (remainingNewCount == 1)
                         {
-                            changes.Add(VirtualScrollChange.InsertItem(_sectionIndex, insertStartIndex));
+                            changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, insertStartIndex));
                         }
                         else
                         {
                             var insertEndIndex = insertStartIndex + remainingNewCount - 1;
-                            changes.Add(VirtualScrollChange.InsertItemRange(_sectionIndex, insertStartIndex, insertEndIndex));
+                            changes.Add(VirtualScrollChangeFactory.InsertItemRange(_sectionIndex, insertStartIndex, insertEndIndex));
                         }
                     }
                     // Remove remaining old items if there are more old items than new items
@@ -135,12 +135,12 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
                         var removeStartIndex = startIndex + replaceCount;
                         if (remainingOldCount == 1)
                         {
-                            changes.Add(VirtualScrollChange.RemoveItem(_sectionIndex, removeStartIndex));
+                            changes.Add(VirtualScrollChangeFactory.RemoveItem(_sectionIndex, removeStartIndex));
                         }
                         else
                         {
                             var removeEndIndex = removeStartIndex + remainingOldCount - 1;
-                            changes.Add(VirtualScrollChange.RemoveItemRange(_sectionIndex, removeStartIndex, removeEndIndex));
+                            changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, removeStartIndex, removeEndIndex));
                         }
                     }
                     break;
@@ -153,7 +153,7 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
 
                     if (e.OldItems.Count == 1)
                     {
-                        changes.Add(VirtualScrollChange.MoveItem(_sectionIndex, e.OldStartingIndex, e.NewStartingIndex));
+                        changes.Add(VirtualScrollChangeFactory.MoveItem(_sectionIndex, e.OldStartingIndex, e.NewStartingIndex));
                     }
                     else
                     {
@@ -168,7 +168,7 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
                         {
                             for (var i = itemCount - 1; i >= 0; i--)
                             {
-                                changes.Add(VirtualScrollChange.MoveItem(_sectionIndex, fromIndex + i, toIndex + i));
+                                changes.Add(VirtualScrollChangeFactory.MoveItem(_sectionIndex, fromIndex + i, toIndex + i));
                             }
                         }
                         else
@@ -176,21 +176,21 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
                             // If moving backward, process from start to end
                             for (var i = 0; i < itemCount; i++)
                             {
-                                changes.Add(VirtualScrollChange.MoveItem(_sectionIndex, fromIndex + i, toIndex + i));
+                                changes.Add(VirtualScrollChangeFactory.MoveItem(_sectionIndex, fromIndex + i, toIndex + i));
                             }
                         }
 #else
                         // For multiple items on non-iOS platforms, handle it as remove + insert
                         var endIndex = e.OldStartingIndex + e.OldItems.Count - 1;
-                        changes.Add(VirtualScrollChange.RemoveItemRange(_sectionIndex, e.OldStartingIndex, endIndex));
+                        changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, e.OldStartingIndex, endIndex));
                         var insertEndIndex = e.NewStartingIndex + e.OldItems.Count - 1;
-                        changes.Add(VirtualScrollChange.InsertItemRange(_sectionIndex, e.NewStartingIndex, insertEndIndex));
+                        changes.Add(VirtualScrollChangeFactory.InsertItemRange(_sectionIndex, e.NewStartingIndex, insertEndIndex));
 #endif
                     }
                     break;
 
                 case NotifyCollectionChangedAction.Reset:
-                    changes.Add(VirtualScrollChange.Reset());
+                    changes.Add(VirtualScrollChangeFactory.Reset());
                     break;
             }
 

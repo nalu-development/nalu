@@ -1,55 +1,10 @@
 namespace Nalu;
 
 /// <summary>
-/// Describes a change in the virtual scroll data.
+/// Factory class for creating sectioned virtual scroll changes.
 /// </summary>
-public sealed class VirtualScrollChange
+public static class VirtualScrollChangeFactory
 {
-    /// <summary>
-    /// Gets the operation that caused the change.
-    /// </summary>
-    public VirtualScrollChangeOperation Operation { get; }
-
-    /// <summary>
-    /// Gets a value indicating whether the change is at the section level.
-    /// </summary>
-    public bool IsSectionChange => Operation >= VirtualScrollChangeOperation.InsertSection;
-
-    /// <summary>
-    /// Gets the section index affected by the change.
-    /// </summary>
-    public int StartSectionIndex { get; }
-
-    /// <summary>
-    /// Gets the item index affected by the change.
-    /// </summary>
-    /// <remarks>
-    /// -1 indicates that the change is at the section level (e.g., inserting or removing a section).
-    /// </remarks>
-    public int StartItemIndex { get; }
-    
-    /// <summary>
-    /// Gets the end section index affected by the change.
-    /// </summary>
-    public int EndSectionIndex { get; }
-    
-    /// <summary>
-    /// Gets the end item index affected by the change.
-    /// </summary>
-    /// <remarks>
-    /// -1 indicates that the change is at the section level (e.g., inserting or removing a section).
-    /// </remarks>
-    public int EndItemIndex { get; }
-
-    private VirtualScrollChange(VirtualScrollChangeOperation operation, int startSectionIndex, int startItemIndex, int endSectionIndex, int endItemIndex)
-    {
-        Operation = operation;
-        StartSectionIndex = startSectionIndex;
-        StartItemIndex = startItemIndex;
-        EndSectionIndex = endSectionIndex;
-        EndItemIndex = endItemIndex;
-    }
-
     // ─────────────────────────────
     // Item-level factory methods
     // ─────────────────────────────
@@ -199,3 +154,4 @@ public sealed class VirtualScrollChange
     /// <returns>A new <see cref="VirtualScrollChange"/> instance.</returns>
     public static VirtualScrollChange Reset() => new(VirtualScrollChangeOperation.Reset, -1, -1, -1, -1);
 }
+

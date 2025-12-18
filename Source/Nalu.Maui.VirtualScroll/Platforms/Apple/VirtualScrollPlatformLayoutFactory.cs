@@ -3,24 +3,6 @@ using UIKit;
 namespace Nalu;
 
 /// <summary>
-/// Information about global header and footer.
-/// </summary>
-internal class LayoutGlobalInfo
-{
-    public bool HasHeader { get; set; }
-    public bool HasFooter { get; set; }
-}
-
-/// <summary>
-/// Information about section headers and footers.
-/// </summary>
-internal class LayoutSectionInfo
-{
-    public bool HasHeader { get; set; }
-    public bool HasFooter { get; set; }
-}
-
-/// <summary>
 /// Factory for creating platform-specific layouts for virtual scroll.
 /// </summary>
 internal static class VirtualScrollPlatformLayoutFactory
@@ -34,98 +16,78 @@ internal static class VirtualScrollPlatformLayoutFactory
     /// Creates a list layout for the specified linear layout.
     /// </summary>
     /// <param name="linearLayout">The linear layout configuration.</param>
-    /// <param name="virtualScroll">The virtual scroll instance to extract header/footer information.</param>
+    /// <param name="layoutInfo">Information about headers and footers in the layout.</param>
     /// <returns>A UICollectionViewLayout configured for a list layout.</returns>
-    public static UICollectionViewLayout CreateList(LinearVirtualScrollLayout linearLayout, IVirtualScroll virtualScroll)
+    public static UICollectionViewLayout CreateList(LinearVirtualScrollLayout linearLayout, IVirtualScrollLayoutInfo layoutInfo)
     {
         var scrollDirection = linearLayout.Orientation == ItemsLayoutOrientation.Vertical
             ? UICollectionViewScrollDirection.Vertical
             : UICollectionViewScrollDirection.Horizontal;
 
-        // Extract header/footer information
-        var headerFooterInfo = new LayoutGlobalInfo
-        {
-            HasHeader = virtualScroll.Header is not null,
-            HasFooter = virtualScroll.Footer is not null
-        };
-
-        var groupingInfo = new LayoutSectionInfo
-        {
-            HasHeader = virtualScroll.SectionHeaderTemplate is not null,
-            HasFooter = virtualScroll.SectionFooterTemplate is not null
-        };
-
-        return CreateListLayout(scrollDirection, groupingInfo, headerFooterInfo);
+        return CreateListLayout(scrollDirection, layoutInfo);
     }
 
-    private static NSCollectionLayoutBoundarySupplementaryItem[] CreateSupplementaryItems(
-        LayoutSectionInfo? groupingInfo,
-        LayoutGlobalInfo? layoutHeaderFooterInfo,
-        UICollectionViewScrollDirection scrollDirection,
-        NSCollectionLayoutDimension width,
-        NSCollectionLayoutDimension height)
+    private static NSCollectionLayoutBoundarySupplementaryItem[] CreateGlobalSupplementaryItems(
+        IVirtualScrollLayoutInfo layoutInfo, UICollectionViewScrollDirection scrollDirection,
+        NSCollectionLayoutDimension width, NSCollectionLayoutDimension height)
     {
-        if (groupingInfo is not null && (groupingInfo.HasHeader || groupingInfo.HasFooter))
+        var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
+
+        if (layoutInfo.HasGlobalHeader)
         {
-            var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
-
-            if (groupingInfo.HasHeader)
-            {
-                items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                    NSCollectionLayoutSize.Create(width, height),
-                    ElementKindSectionHeader,
-                    scrollDirection == UICollectionViewScrollDirection.Vertical
-                        ? NSRectAlignment.Top
-                        : NSRectAlignment.Leading));
-            }
-
-            if (groupingInfo.HasFooter)
-            {
-                items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                    NSCollectionLayoutSize.Create(width, height),
-                    ElementKindSectionFooter,
-                    scrollDirection == UICollectionViewScrollDirection.Vertical
-                        ? NSRectAlignment.Bottom
-                        : NSRectAlignment.Trailing));
-            }
-
-            return items.ToArray();
+            items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
+                          NSCollectionLayoutSize.Create(width, height),
+                          ElementKindGlobalHeader,
+                          scrollDirection == UICollectionViewScrollDirection.Vertical
+                              ? NSRectAlignment.Top
+                              : NSRectAlignment.Leading));
         }
 
-        if (layoutHeaderFooterInfo is not null && (layoutHeaderFooterInfo.HasHeader || layoutHeaderFooterInfo.HasFooter))
+        if (layoutInfo.HasGlobalFooter)
         {
-            var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
-
-            if (layoutHeaderFooterInfo.HasHeader)
-            {
-                items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                    NSCollectionLayoutSize.Create(width, height),
-                    ElementKindGlobalHeader,
-                    scrollDirection == UICollectionViewScrollDirection.Vertical
-                        ? NSRectAlignment.Top
-                        : NSRectAlignment.Leading));
-            }
-
-            if (layoutHeaderFooterInfo.HasFooter)
-            {
-                items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                    NSCollectionLayoutSize.Create(width, height),
-                    ElementKindGlobalFooter,
-                    scrollDirection == UICollectionViewScrollDirection.Vertical
-                        ? NSRectAlignment.Bottom
-                        : NSRectAlignment.Trailing));
-            }
-
-            return items.ToArray();
+            items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
+                          NSCollectionLayoutSize.Create(width, height),
+                          ElementKindGlobalFooter,
+                          scrollDirection == UICollectionViewScrollDirection.Vertical
+                              ? NSRectAlignment.Bottom
+                              : NSRectAlignment.Trailing));
         }
 
-        return [];
+        return items.Count > 0 ? items.ToArray() : [];
+    }
+
+    private static NSCollectionLayoutBoundarySupplementaryItem[] CreateSectionSupplementaryItems(
+        IVirtualScrollLayoutInfo layoutInfo, UICollectionViewScrollDirection scrollDirection,
+        NSCollectionLayoutDimension width, NSCollectionLayoutDimension height)
+    {
+        var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
+
+        if (layoutInfo.HasSectionHeader)
+        {
+            items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
+                          NSCollectionLayoutSize.Create(width, height),
+                          ElementKindSectionHeader,
+                          scrollDirection == UICollectionViewScrollDirection.Vertical
+                              ? NSRectAlignment.Top
+                              : NSRectAlignment.Leading));
+        }
+
+        if (layoutInfo.HasSectionFooter)
+        {
+            items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
+                          NSCollectionLayoutSize.Create(width, height),
+                          ElementKindSectionFooter,
+                          scrollDirection == UICollectionViewScrollDirection.Vertical
+                              ? NSRectAlignment.Bottom
+                              : NSRectAlignment.Trailing));
+        }
+
+        return items.Count > 0 ? items.ToArray() : [];
     }
 
     private static UICollectionViewLayout CreateListLayout(
         UICollectionViewScrollDirection scrollDirection,
-        LayoutSectionInfo sectionInfo,
-        LayoutGlobalInfo globalInfo)
+        IVirtualScrollLayoutInfo layoutInfo)
     {
         var layoutConfiguration = new UICollectionViewCompositionalLayoutConfiguration();
         layoutConfiguration.ScrollDirection = scrollDirection;
@@ -139,9 +101,8 @@ internal static class VirtualScrollPlatformLayoutFactory
             ? NSCollectionLayoutDimension.CreateEstimated(44.0f)
             : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
 
-        layoutConfiguration.BoundarySupplementaryItems = CreateSupplementaryItems(
-            null,
-            globalInfo,
+        layoutConfiguration.BoundarySupplementaryItems = CreateGlobalSupplementaryItems(
+            layoutInfo,
             scrollDirection,
             groupWidth,
             groupHeight);
@@ -186,9 +147,8 @@ internal static class VirtualScrollPlatformLayoutFactory
             section.InterGroupSpacing = 0;
 
             // Create header and footer for section
-            section.BoundarySupplementaryItems = CreateSupplementaryItems(
-                sectionInfo,
-                null,
+            section.BoundarySupplementaryItems = CreateSectionSupplementaryItems(
+                layoutInfo,
                 scrollDirection,
                 sectionGroupWidth,
                 sectionGroupHeight);
@@ -196,11 +156,7 @@ internal static class VirtualScrollPlatformLayoutFactory
             return section;
         }, layoutConfiguration)
         {
-            ScrollDirection = scrollDirection,
-            HasGlobalHeader = globalInfo.HasHeader,
-            HasGlobalFooter = globalInfo.HasFooter,
-            HasSectionHeaders = sectionInfo.HasHeader,
-            HasSectionFooters = sectionInfo.HasFooter
+            ScrollDirection = scrollDirection
         };
         // ReSharper restore UnusedParameter.Local
 
@@ -211,10 +167,6 @@ internal static class VirtualScrollPlatformLayoutFactory
 internal class VirtualScrollCollectionViewLayout : UICollectionViewCompositionalLayout
 {
     public required UICollectionViewScrollDirection ScrollDirection { get; init; }
-    public required bool HasGlobalHeader { get; init; }
-    public required bool HasGlobalFooter { get; init; }
-    public required bool HasSectionHeaders { get; init; }
-    public required bool HasSectionFooters { get; init; }
     
     public VirtualScrollCollectionViewLayout(UICollectionViewCompositionalLayoutSectionProvider sectionProvider, UICollectionViewCompositionalLayoutConfiguration configuration) : base(sectionProvider, configuration)
     {

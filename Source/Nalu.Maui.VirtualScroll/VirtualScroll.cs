@@ -10,8 +10,13 @@ namespace Nalu;
 /// <remarks>
 /// This control is designed to replace traditional <see cref="CollectionView"/> control by providing a more efficient implementation tailored for Android and iOS platforms.
 /// </remarks>
-public class VirtualScroll : View, IVirtualScroll
+public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo
 {
+    private bool _hasGlobalHeader;
+    private bool _hasSectionHeader;
+    private bool _hasGlobalFooter;
+    private bool _hasSectionFooter;
+
     /// <summary>
     /// Bindable property for <see cref="Adapter"/>.
     /// </summary>
@@ -63,7 +68,8 @@ public class VirtualScroll : View, IVirtualScroll
         nameof(SectionHeaderTemplate),
         typeof(DataTemplate),
         typeof(VirtualScroll),
-        null
+        null,
+        propertyChanged: (bindable, _, newValue) => ((VirtualScroll)bindable)._hasSectionHeader = newValue is not null
     );
 
     /// <summary>
@@ -73,7 +79,8 @@ public class VirtualScroll : View, IVirtualScroll
         nameof(SectionFooterTemplate),
         typeof(DataTemplate),
         typeof(VirtualScroll),
-        null
+        null,
+        propertyChanged: (bindable, _, newValue) => ((VirtualScroll)bindable)._hasSectionFooter = newValue is not null
     );
 
     /// <summary>
@@ -84,7 +91,13 @@ public class VirtualScroll : View, IVirtualScroll
         typeof(View),
         typeof(VirtualScroll),
         null,
-        propertyChanged: (bindable, _, newValue) => ((VirtualScroll)bindable).GlobalHeaderTemplate = newValue is View view ? new DataTemplate(() => view) : null
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var globalHeaderTemplate = newValue is View view ? new DataTemplate(() => view) : null;
+            var virtualScroll = (VirtualScroll) bindable;
+            virtualScroll.GlobalHeaderTemplate = globalHeaderTemplate;
+            virtualScroll._hasGlobalHeader = globalHeaderTemplate is not null;
+        }
     );
 
     /// <summary>
@@ -95,7 +108,13 @@ public class VirtualScroll : View, IVirtualScroll
         typeof(View),
         typeof(VirtualScroll),
         null,
-        propertyChanged: (bindable, _, newValue) => ((VirtualScroll)bindable).GlobalFooterTemplate = newValue is View view ? new DataTemplate(() => view) : null
+        propertyChanged: (bindable, _, newValue) =>
+        {
+            var globalFooterTemplate = newValue is View view ? new DataTemplate(() => view) : null;
+            var virtualScroll = (VirtualScroll) bindable;
+            virtualScroll.GlobalFooterTemplate = globalFooterTemplate;
+            virtualScroll._hasGlobalFooter = globalFooterTemplate is not null;
+        }
     );
 
     /// <summary>
@@ -215,4 +234,19 @@ public class VirtualScroll : View, IVirtualScroll
 
         return null;
     }
+
+    bool IVirtualScrollLayoutInfo.HasGlobalHeader => _hasGlobalHeader;
+
+    bool IVirtualScrollLayoutInfo.HasGlobalFooter => _hasGlobalFooter;
+
+    bool IVirtualScrollLayoutInfo.HasSectionHeader => _hasSectionHeader;
+
+    bool IVirtualScrollLayoutInfo.HasSectionFooter => _hasSectionFooter;
+
+    bool IEquatable<IVirtualScrollLayoutInfo>.Equals(IVirtualScrollLayoutInfo? other)
+        => other is not null &&
+           _hasGlobalHeader == other.HasGlobalHeader &&
+           _hasGlobalFooter == other.HasGlobalFooter &&
+           _hasSectionHeader == other.HasSectionHeader &&
+           _hasSectionFooter == other.HasSectionFooter;
 }

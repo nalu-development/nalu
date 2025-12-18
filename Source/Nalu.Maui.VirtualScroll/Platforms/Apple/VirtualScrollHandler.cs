@@ -1,5 +1,4 @@
 using CoreGraphics;
-using Microsoft.Maui.Handlers;
 using UIKit;
 
 namespace Nalu;
@@ -10,44 +9,16 @@ namespace Nalu;
 /// <summary>
 /// Handler for the <see cref="VirtualScroll" /> view on iOS and Mac Catalyst.
 /// </summary>
-public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, UIView>
+public partial class VirtualScrollHandler
 {
-    /// <summary>
-    /// The property mapper for the <see cref="IVirtualScroll" /> interface.
-    /// </summary>
-    public static readonly IPropertyMapper<IVirtualScroll, VirtualScrollHandler> Mapper =
-        new PropertyMapper<IVirtualScroll, VirtualScrollHandler>(ViewHandler.ViewMapper)
-        {
-            [nameof(IVirtualScroll.Adapter)] = MapAdapter,
-            [nameof(IVirtualScroll.ItemsLayout)] = MapLayout,
-            [nameof(IVirtualScroll.ItemTemplate)] = MapItemTemplate,
-            [nameof(IVirtualScroll.SectionHeaderTemplate)] = MapSectionHeaderTemplate,
-            [nameof(IVirtualScroll.SectionFooterTemplate)] = MapSectionFooterTemplate,
-            [nameof(IVirtualScroll.Header)] = MapHeader,
-            [nameof(IVirtualScroll.Footer)] = MapFooter,
-        };
-
     private VirtualScrollPlatformReuseIdManager? _reuseIdManager;
     private VirtualScrollPlatformDataSourceNotifier? _notifier;
-
-    /// <summary>
-    /// A flag to skip the layout mapper during initial setup.
-    /// </summary>
-    protected bool IsConnecting { get; private set; } = true;
 
     /// <summary>
     /// Gets the <see cref="UICollectionView"/> platform view.
     /// </summary>
     /// <exception cref="InvalidOperationException">when the handler is not connected.</exception>
     protected UICollectionView CollectionView => (UICollectionView)PlatformView;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="VirtualScrollHandler" /> class.
-    /// </summary>
-    public VirtualScrollHandler()
-        : base(Mapper)
-    {
-    }
 
     /// <inheritdoc />
     protected override UIView CreatePlatformView()
@@ -59,14 +30,6 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, UIView>
         _reuseIdManager = reuseIdManager;
 
         return collectionView;
-    }
-
-    /// <inheritdoc />
-    public override void SetVirtualView(IView view)
-    {
-        IsConnecting = true;
-        base.SetVirtualView(view);
-        IsConnecting = false;
     }
 
     /// <inheritdoc />
@@ -124,11 +87,15 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, UIView>
     }
     
     private static UICollectionViewLayout CreatePlatformLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
-        => virtualScroll.ItemsLayout switch
+    {
+        var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("The provided IVirtualScroll does not implement IVirtualScrollLayoutInfo interface.");
+
+        return virtualScroll.ItemsLayout switch
         {
-            LinearVirtualScrollLayout linearLayout => VirtualScrollPlatformLayoutFactory.CreateList(linearLayout, virtualScroll),
+            LinearVirtualScrollLayout linearLayout => VirtualScrollPlatformLayoutFactory.CreateList(linearLayout, layoutInfo),
             _ => throw new NotSupportedException($"Layout type {virtualScroll.ItemsLayout.GetType().Name} is not supported.")
         };
+    }
 
     /// <summary>
     /// Maps the item template property from the virtual scroll to the platform collection view.
@@ -217,4 +184,3 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, UIView>
         MapLayout(handler, virtualScroll);
     }
 }
-
