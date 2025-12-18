@@ -22,6 +22,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     public static readonly IPropertyMapper<IVirtualScroll, VirtualScrollHandler> Mapper =
         new PropertyMapper<IVirtualScroll, VirtualScrollHandler>(ViewHandler.ViewMapper)
         {
+#if IOS || MACCATALYST || ANDROID
             [nameof(IVirtualScroll.Adapter)] = MapAdapter,
             [nameof(IVirtualScroll.ItemsLayout)] = MapLayout,
             [nameof(IVirtualScroll.ItemTemplate)] = MapItemTemplate,
@@ -29,7 +30,13 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             [nameof(IVirtualScroll.SectionFooterTemplate)] = MapSectionFooterTemplate,
             [nameof(IVirtualScroll.Header)] = MapHeader,
             [nameof(IVirtualScroll.Footer)] = MapFooter,
+#endif
         };
+
+#if !(IOS || MACCATALYST || ANDROID)
+    /// <inheritdoc />
+    protected override PlatformView CreatePlatformView() => throw new NotImplementedException();
+#endif
 
     /// <summary>
     /// A flag to skip the layout mapper during initial setup.
