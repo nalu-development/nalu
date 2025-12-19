@@ -66,55 +66,21 @@ internal class NaluShellSectionWrapperController : UIViewController
 
     private void SelectViewController(UIViewController? oldViewController, UIViewController? newViewController)
     {
+        if (newViewController is not null)
+        {
+            newViewController.BeginAppearanceTransition(true, false);
+            EnsureChildViewController(newViewController);
+            var newView = newViewController.View!;
+            newView.Hidden = false;
+            newViewController.EndAppearanceTransition();
+        }
+
         if (oldViewController is not null)
         {
             var oldView = oldViewController.View!;
-
-            if (newViewController is null)
-            {
-                oldViewController.BeginAppearanceTransition(false, false);
-                oldView.Hidden = true;
-                oldViewController.EndAppearanceTransition();
-                return;
-            }
-
-            EnsureChildViewController(newViewController);
-            var newView = newViewController.View!;
-            newView.Hidden = true;
-            
             oldViewController.BeginAppearanceTransition(false, false);
-            newViewController.BeginAppearanceTransition(true, false);
-
-            if (newView.Superview is null)
-            {
-                newView.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
-                View!.InsertSubview(newView, 0);
-            }
-            
             oldView.Hidden = true;
-            newView.Hidden = false;
-            
             oldViewController.EndAppearanceTransition();
-            newViewController.EndAppearanceTransition();
-            return;
-        }
-        
-        if (newViewController is not null)
-        {
-            EnsureChildViewController(newViewController);
-            var newView = newViewController.View!;
-            newView.Hidden = true;
-
-            newViewController.BeginAppearanceTransition(true, false);
-
-            if (newView.Superview is null)
-            {
-                View!.InsertSubview(newView, 0);
-            }
-
-            newView.Hidden = false;
-
-            newViewController.EndAppearanceTransition();
         }
     }
 }
