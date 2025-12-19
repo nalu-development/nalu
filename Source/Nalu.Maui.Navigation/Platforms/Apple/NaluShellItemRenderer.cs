@@ -101,6 +101,10 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
                 _sectionWrapperController.AdditionalSafeAreaInsets = new UIEdgeInsets(0, 0, heightWithoutInsets, 0);
             }
         }
+        else
+        {
+            _sectionWrapperController.AdditionalSafeAreaInsets = UIEdgeInsets.Zero;
+        }
     }
 
     protected virtual void OnShellItemSet()

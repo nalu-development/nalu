@@ -175,9 +175,10 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.RemoveSection:
             case VirtualScrollChangeOperation.RemoveSectionRange:
                 {
-                    var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
+                    var startFlattenedIndex = GetCachedFlattenedIndexForSectionStart(change.StartSectionIndex);
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
-                    var itemsToRemove = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
+                    // Use cached offsets instead of querying the adapter, because sections may already be removed
+                    var itemsToRemove = CalculateItemsForSectionsFromCachedOffsets(change.StartSectionIndex, sectionCount);
                     UpdateOffsetsAfterSectionRemove(change.StartSectionIndex, sectionCount);
                     flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRemove - 1));
                     break;
@@ -209,9 +210,9 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var fromSectionIndex = change.StartSectionIndex;
                     var toSectionIndex = change.EndSectionIndex;
                     
-                    // Calculate positions BEFORE any changes
-                    var fromFlattenedIndex = GetFlattenedIndexForSectionStart(fromSectionIndex);
-                    var sectionSize = CalculateItemsForSections(fromSectionIndex, 1);
+                    // Calculate positions BEFORE any changes using cached offsets
+                    var fromFlattenedIndex = GetCachedFlattenedIndexForSectionStart(fromSectionIndex);
+                    var sectionSize = CalculateItemsForSectionsFromCachedOffsets(fromSectionIndex, 1);
                     
                     // Calculate destination index
                     // If moving forward, destination shifts back after removal
@@ -219,14 +220,16 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     int toFlattenedIndex;
                     if (fromSectionIndex < toSectionIndex)
                     {
-                        // Moving forward: get position of section AFTER the target
-                        // After removal, target position shifts back by sectionSize
-                        toFlattenedIndex = GetFlattenedIndexForSectionStart(toSectionIndex + 1) - sectionSize;
+                        // Moving forward: calculate position AFTER the target section ends
+                        // Then subtract sectionSize because removal shifts everything back
+                        var toSectionEnd = GetCachedFlattenedIndexForSectionStart(toSectionIndex) 
+                            + CalculateItemsForSectionsFromCachedOffsets(toSectionIndex, 1);
+                        toFlattenedIndex = toSectionEnd - sectionSize;
                     }
                     else
                     {
                         // Moving backward: destination is the start of the target section
-                        toFlattenedIndex = GetFlattenedIndexForSectionStart(toSectionIndex);
+                        toFlattenedIndex = GetCachedFlattenedIndexForSectionStart(toSectionIndex);
                     }
                     
                     // Update offsets to reflect the move
@@ -462,6 +465,57 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             totalItems += _virtualScrollAdapter.GetItemCount(sectionIndex) + _sectionFooterHeaderSize;
         }
         return totalItems;
+    }
+
+    /// <summary>
+    /// Calculates the number of flattened items for the specified sections using cached offsets.
+    /// This is used for remove operations where the sections may have already been removed from the adapter.
+    /// </summary>
+    private int CalculateItemsForSectionsFromCachedOffsets(int startSectionIndex, int sectionCount)
+    {
+        if (startSectionIndex < 0 || startSectionIndex >= _sectionCount)
+        {
+            return 0;
+        }
+
+        var endSectionIndex = startSectionIndex + sectionCount - 1;
+        if (endSectionIndex >= _sectionCount)
+        {
+            endSectionIndex = _sectionCount - 1;
+            sectionCount = endSectionIndex - startSectionIndex + 1;
+        }
+
+        var startOffset = _sectionOffsets[startSectionIndex];
+        
+        // Calculate end offset
+        int endOffset;
+        if (endSectionIndex < _sectionCount - 1)
+        {
+            // Not the last section - use next section's offset
+            endOffset = _sectionOffsets[endSectionIndex + 1];
+        }
+        else
+        {
+            // Last section(s) - calculate from total length minus global footer
+            endOffset = _flattenedLength - (_hasGlobalHeader ? 1 : 0) - (_hasGlobalFooter ? 1 : 0);
+        }
+
+        return endOffset - startOffset;
+    }
+
+    /// <summary>
+    /// Gets the flattened index for the start of a section using cached offsets.
+    /// This is used for remove operations where the sections may have already been removed from the adapter.
+    /// </summary>
+    private int GetCachedFlattenedIndexForSectionStart(int sectionIndex)
+    {
+        if (sectionIndex < 0 || sectionIndex >= _sectionCount)
+        {
+            return -1;
+        }
+
+        var offset = _sectionOffsets[sectionIndex];
+        return _hasGlobalHeader ? offset + 1 : offset;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
