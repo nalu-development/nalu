@@ -15,7 +15,7 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" 
-                  ColumnDefinitions="*,*,*,*"
+                  ColumnDefinitions="*,*,*,*,*"
                   Padding="16,8"
                   ColumnSpacing="8">
                 <Button Grid.Column="0"
@@ -28,35 +28,43 @@
                         Text="Move"
                         Command="{Binding MoveItemCommand}" />
                 <Button Grid.Column="3"
+                        Text="Scroll"
+                        Command="{Binding ScrollToItemCommand}" />
+                <Button Grid.Column="4"
                         Text="Auto"
                         Command="{Binding ToggleAutoChangesCommand}" />
             </Grid>
 
             <nalu:VirtualScroll Grid.Row="1"
+                                x:Name="VirtualScroll"
                                 Adapter="{Binding Items}">
-                <nalu:VirtualScroll.Header>
-                    <VerticalStackLayout>
-                        <Image Source="banner.png"
-                               HeightRequest="128"
-                               Aspect="AspectFit"
-                               Margin="0,16,0,24" />
-                    
-                        <Label Text="Page Ten"
-                               FontSize="32"
-                               FontAttributes="Bold"
-                               HorizontalOptions="Center" />
-                    </VerticalStackLayout>
-                </nalu:VirtualScroll.Header>
-                <nalu:VirtualScroll.Footer>
-                    <VerticalStackLayout Padding="16, 8">
-                        <Label Text="{Binding Message}"
-                               FontSize="18"
-                               HorizontalOptions="Center" />
-            
-                        <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
-                               HorizontalOptions="Center" />
-                    </VerticalStackLayout>
-                </nalu:VirtualScroll.Footer>
+                <nalu:VirtualScroll.HeaderTemplate>
+                    <DataTemplate x:DataType="pageModels:TenPageModel">
+                        <VerticalStackLayout>
+                            <Image Source="banner.png"
+                                   HeightRequest="128"
+                                   Aspect="AspectFit"
+                                   Margin="0,16,0,24" />
+                        
+                            <Label Text="Page Ten"
+                                   FontSize="32"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </nalu:VirtualScroll.HeaderTemplate>
+                <nalu:VirtualScroll.FooterTemplate>
+                    <DataTemplate x:DataType="pageModels:TenPageModel">
+                        <VerticalStackLayout Padding="16, 8">
+                            <Label Text="{Binding Message}"
+                                   FontSize="18"
+                                   HorizontalOptions="Center" />
+                
+                            <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
+                                   HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </nalu:VirtualScroll.FooterTemplate>
                 <nalu:VirtualScroll.ItemTemplate>
                     <DataTemplate x:DataType="pageModels:TenItem">
                         <nalu:ViewBox>

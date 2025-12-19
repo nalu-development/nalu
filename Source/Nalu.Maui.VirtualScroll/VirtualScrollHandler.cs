@@ -20,7 +20,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     /// The property mapper for the <see cref="IVirtualScroll" /> interface.
     /// </summary>
     public static readonly IPropertyMapper<IVirtualScroll, VirtualScrollHandler> Mapper =
-        new PropertyMapper<IVirtualScroll, VirtualScrollHandler>(ViewHandler.ViewMapper)
+        new PropertyMapper<IVirtualScroll, VirtualScrollHandler>(ViewMapper)
         {
 #if IOS || MACCATALYST || ANDROID
             [nameof(IVirtualScroll.Adapter)] = MapAdapter,
@@ -28,11 +28,22 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             [nameof(IVirtualScroll.ItemTemplate)] = MapItemTemplate,
             [nameof(IVirtualScroll.SectionHeaderTemplate)] = MapSectionHeaderTemplate,
             [nameof(IVirtualScroll.SectionFooterTemplate)] = MapSectionFooterTemplate,
-            [nameof(IVirtualScroll.Header)] = MapHeader,
-            [nameof(IVirtualScroll.Footer)] = MapFooter,
+            [nameof(IVirtualScroll.HeaderTemplate)] = MapHeaderTemplate,
+            [nameof(IVirtualScroll.FooterTemplate)] = MapFooterTemplate,
             [nameof(IVirtualScroll.IsRefreshEnabled)] = MapIsRefreshEnabled,
             [nameof(IVirtualScroll.RefreshAccentColor)] = MapRefreshAccentColor,
             [nameof(IVirtualScroll.IsRefreshing)] = MapIsRefreshing,
+#endif
+        };
+
+    /// <summary>
+    /// The command mapper for the <see cref="IVirtualScroll" /> interface.
+    /// </summary>
+    public static readonly CommandMapper<IVirtualScroll, VirtualScrollHandler> CommandMapper =
+        new(ViewCommandMapper)
+        {
+#if IOS || MACCATALYST || ANDROID
+            [nameof(IVirtualScroll.ScrollTo)] = MapScrollTo,
 #endif
         };
 
@@ -50,7 +61,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     /// Initializes a new instance of the <see cref="VirtualScrollHandler" /> class.
     /// </summary>
     public VirtualScrollHandler()
-        : base(Mapper)
+        : base(Mapper, CommandMapper)
     {
     }
 
@@ -62,4 +73,5 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
         IsConnecting = false;
     }
 }
+
 

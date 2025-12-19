@@ -69,7 +69,7 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
     {
         var template = _reuseIdManager.GetTemplateById(viewType);
         var view = (IView)template.CreateContent();
-        if (_virtualScroll is Element virtualScrollElement && view is Element viewElement)
+        if (_virtualScroll is Element virtualScrollElement && view is Element { Parent: null } viewElement)
         {
             virtualScrollElement.AddLogicalChild(viewElement);
         }

@@ -22,6 +22,7 @@ public partial class VirtualScrollHandler
     private SwipeRefreshLayout? _swipeRefreshLayout;
     private FrameLayout? _rootLayout;
     private bool _isUpdatingIsRefreshingFromPlatform;
+    private IVirtualScrollFlattenedAdapter? _flattenedAdapter;
 
     /// <inheritdoc />
     protected override AView CreatePlatformView()
@@ -29,7 +30,6 @@ public partial class VirtualScrollHandler
         var context = Context;
 
         var recyclerView = new VirtualScrollRecyclerView(context);
-        
         _recyclerView = recyclerView;
 
         _swipeRefreshLayout = new SwipeRefreshLayout(context);
@@ -91,7 +91,7 @@ public partial class VirtualScrollHandler
         base.DisconnectHandler(platformView);
     }
 
-    protected VirtualScrollRecyclerView GetRecyclerView() => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");
+    internal VirtualScrollRecyclerView GetRecyclerView() => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");
 
     /// <summary>
     /// Maps the adapter property from the virtual scroll to the platform recycler view.
@@ -102,16 +102,28 @@ public partial class VirtualScrollHandler
         handler._notifier?.Dispose();
         handler._notifier = null;
 
-        var mauiContext = handler.MauiContext ?? throw new InvalidOperationException("MauiContext cannot be null when mapping the Adapter.");
-        var virtualScrollAdapter = virtualScroll.Adapter ?? throw new InvalidOperationException("VirtualScroll must have an Adapter set before it can be displayed.");
-        var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("VirtualScroll must implement IVirtualScrollLayoutInfo.");
-        var flattenedAdapter = new VirtualScrollFlattenedAdapter(virtualScrollAdapter, layoutInfo);
-        var recyclerViewAdapter = new VirtualScrollRecyclerViewAdapter(mauiContext, virtualScroll, flattenedAdapter);
-        handler.GetRecyclerView().SetAdapter(recyclerViewAdapter);
-        handler._recyclerViewAdapter = recyclerViewAdapter;
-        
-        // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
-        handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, flattenedAdapter);
+        var recyclerView = handler.GetRecyclerView();
+
+        if (virtualScroll.Adapter is { } adapter)
+        {
+            var mauiContext = handler.MauiContext ?? throw new InvalidOperationException("MauiContext cannot be null when mapping the Adapter.");
+            var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("VirtualScroll must implement IVirtualScrollLayoutInfo.");
+            var flattenedAdapter = new VirtualScrollFlattenedAdapter(adapter, layoutInfo);
+            var recyclerViewAdapter = new VirtualScrollRecyclerViewAdapter(mauiContext, virtualScroll, flattenedAdapter);
+            recyclerView.SetAdapter(recyclerViewAdapter);
+            handler._recyclerViewAdapter = recyclerViewAdapter;
+            handler._flattenedAdapter = flattenedAdapter;
+            
+            // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
+            handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, flattenedAdapter);
+        }
+        else
+        {
+            recyclerView.SetAdapter(new EmptyVirtualScrollRecyclerViewAdapter());
+            handler._recyclerViewAdapter?.Dispose();
+            handler._recyclerViewAdapter = null;
+            handler._flattenedAdapter = null;
+        }
     }
 
     /// <summary>
@@ -178,9 +190,9 @@ public partial class VirtualScrollHandler
     }
 
     /// <summary>
-    /// Maps the header property from the virtual scroll to the platform recycler view.
+    /// Maps the header template property from the virtual scroll to the platform recycler view.
     /// </summary>
-    public static void MapHeader(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    public static void MapHeaderTemplate(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         if (!handler.IsConnecting)
         {
@@ -189,9 +201,9 @@ public partial class VirtualScrollHandler
     }
 
     /// <summary>
-    /// Maps the footer property from the virtual scroll to the platform recycler view.
+    /// Maps the footer template property from the virtual scroll to the platform recycler view.
     /// </summary>
-    public static void MapFooter(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    public static void MapFooterTemplate(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         if (!handler.IsConnecting)
         {
@@ -248,5 +260,83 @@ public partial class VirtualScrollHandler
         }
 
         public void OnRefresh() => _onRefresh();
+    }
+
+    /// <summary>
+    /// Maps the ScrollTo command from the virtual scroll to the platform recycler view.
+    /// </summary>
+    public static void MapScrollTo(VirtualScrollHandler handler, IVirtualScroll virtualScroll, object? args)
+    {
+        if (args is not VirtualScrollCommandScrollToArgs scrollToArgs || handler._flattenedAdapter is null)
+        {
+            return;
+        }
+
+        var sectionIndex = scrollToArgs.SectionIndex;
+        var itemIndex = scrollToArgs.ItemIndex;
+        var position = scrollToArgs.Position;
+        var animated = scrollToArgs.Animated;
+
+        if (sectionIndex < 0 || virtualScroll.Adapter is null)
+        {
+            return;
+        }
+
+        // Validate section index
+        var sectionCount = virtualScroll.Adapter.GetSectionCount();
+        if (sectionIndex >= sectionCount)
+        {
+            return;
+        }
+
+        // If itemIndex is -1, check if section headers are enabled
+        if (itemIndex == -1)
+        {
+            var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo;
+            
+            // If section headers are not enabled, scroll to first item instead
+            if (layoutInfo?.HasSectionHeader != true)
+            {
+                var itemCount = virtualScroll.Adapter.GetItemCount(sectionIndex);
+                if (itemCount == 0)
+                {
+                    return;
+                }
+                itemIndex = 0;
+            }
+        }
+        else
+        {
+            if (itemIndex < 0)
+            {
+                return;
+            }
+
+            // Validate item index
+            var itemCount = virtualScroll.Adapter.GetItemCount(sectionIndex);
+            if (itemIndex >= itemCount)
+            {
+                return;
+            }
+        }
+
+        // Calculate flattened index using the flattened adapter
+        // GetFlattenedIndexForItem handles itemIndex == -1 to return section header index
+        var flattenedIndex = handler._flattenedAdapter.GetFlattenedIndexForItem(sectionIndex, itemIndex);
+        if (flattenedIndex < 0 || handler._recyclerView is null)
+        {
+            return;
+        }
+
+        // Use ScrollHelper to handle the scroll with proper positioning
+        var scrollHelper = handler._recyclerView.ScrollHelper;
+        if (animated)
+        {
+            scrollHelper.AnimateScrollToPosition(flattenedIndex, position);
+        }
+        else
+        {
+            scrollHelper.JumpScrollToPosition(flattenedIndex, position);
+        }
     }
 }

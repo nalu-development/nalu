@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace Nalu.Maui.Sample.PageModels;
 
-public partial class TenPageModel : ObservableObject
+public partial class TenPageModel : ObservableObject, ILeavingAware
 {
+    private readonly IMessenger _messenger;
     private static int _instanceCount;
 
     private int _idCounter;
@@ -16,8 +18,9 @@ public partial class TenPageModel : ObservableObject
     
     public ObservableCollection<TenItem> Items { get; }
 
-    public TenPageModel()
+    public TenPageModel(IMessenger messenger)
     {
+        _messenger = messenger;
         Items = new(Enumerable.Range(1, 30).Select(i => new TenItem($"Item {i}")));
         _idCounter = Items.Count;
     }
@@ -61,6 +64,16 @@ public partial class TenPageModel : ObservableObject
             Items.Move(fromIndex, toIndex);
         }
     }
+    
+    [RelayCommand]
+    private void ScrollToItem()
+    {
+        if (Items.Count > 0)
+        {
+            var randomIndex = Random.Shared.Next(Items.Count);
+            _messenger.Send(new TenPageScrollToItemMessage(randomIndex));
+        }
+    }
 
     private CancellationTokenSource? _autoChangesCts;
 
@@ -84,9 +97,19 @@ public partial class TenPageModel : ObservableObject
             AddItem();
             RemoveItem();
             MoveItem();
+            ScrollToItem();
         }
     }
+
+    public ValueTask OnLeavingAsync()
+    {
+        _autoChangesCts?.Cancel();
+        _autoChangesCts = null;
+        return ValueTask.CompletedTask;
+    }
 }
+
+public record TenPageScrollToItemMessage(int ItemIndex);
 
 public partial class TenItem : ObservableObject
 {

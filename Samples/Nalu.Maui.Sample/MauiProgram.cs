@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Nalu.Maui.Sample.PopupModels;
@@ -83,6 +84,7 @@ public static class MauiProgram
 #endif
 
         builder.Services.AddTransientPopup<CanLeavePopup, CanLeavePopupModel>();
+        builder.Services.AddSingleton<IMessenger>(new WeakReferenceMessenger());
 
         builder.Services.AddKeyedSingleton<HttpClient>(
             "dummyjson",

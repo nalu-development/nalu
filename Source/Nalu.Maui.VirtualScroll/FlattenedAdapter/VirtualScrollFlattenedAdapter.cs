@@ -378,12 +378,24 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         }
     }
 
-    private int GetFlattenedIndexForSectionStart(int sectionIndex)
+    /// <inheritdoc/>
+    public int GetFlattenedIndexForSectionStart(int sectionIndex)
     {
+        if (sectionIndex < 0)
+        {
+            return -1;
+        }
+
+        var sectionCount = _virtualScrollAdapter.GetSectionCount();
+        if (sectionIndex >= sectionCount)
+        {
+            return -1;
+        }
+
         // Use cached offsets for O(1) lookup
         // Offsets are stored relative to after global header
         // Returns the index OF the section start (i.e., the section header position, or first item if no header)
-        if (sectionIndex >= 0 && sectionIndex < _sectionCount)
+        if (sectionIndex < _sectionCount)
         {
             var offset = _sectionOffsets[sectionIndex];
             return _hasGlobalHeader ? offset + 1 : offset;
@@ -391,8 +403,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
         // Fallback calculation for sections beyond current count (e.g., during insert)
         var flattenedIndex = _hasGlobalHeader ? 1 : 0;
-        var actualSectionCount = _virtualScrollAdapter.GetSectionCount();
-        var sectionsToIterate = Math.Min(sectionIndex, actualSectionCount);
+        var sectionsToIterate = Math.Min(sectionIndex, sectionCount);
         
         for (var i = 0; i < sectionsToIterate; i++)
         {
@@ -401,8 +412,37 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         return flattenedIndex;
     }
 
-    private int GetFlattenedIndexForItem(int sectionIndex, int itemIndex)
+    /// <inheritdoc/>
+    public int GetFlattenedIndexForItem(int sectionIndex, int itemIndex)
     {
+        if (sectionIndex < 0)
+        {
+            return -1;
+        }
+
+        var sectionCount = _virtualScrollAdapter.GetSectionCount();
+        if (sectionIndex >= sectionCount)
+        {
+            return -1;
+        }
+
+        // If itemIndex is -1, return the section header index
+        if (itemIndex == -1)
+        {
+            return GetFlattenedIndexForSectionStart(sectionIndex);
+        }
+
+        if (itemIndex < 0)
+        {
+            return -1;
+        }
+
+        var itemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
+        if (itemIndex >= itemCount)
+        {
+            return -1;
+        }
+
         var flattenedIndex = GetFlattenedIndexForSectionStart(sectionIndex);
         // GetFlattenedIndexForSectionStart returns the section start (header position),
         // so we need to add the section header offset to get to items

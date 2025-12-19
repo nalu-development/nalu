@@ -33,14 +33,14 @@ public interface IVirtualScroll : IView
     DataTemplate? SectionFooterTemplate { get; set; }
     
     /// <summary>
-    /// Gets or sets the header view displayed at the top of the scroll view.
+    /// Gets or sets the template used to display the header at the top of the scroll view.
     /// </summary>
-    View? Header { get; set; }
+    DataTemplate? HeaderTemplate { get; set; }
     
     /// <summary>
-    /// Gets or sets the footer view displayed at the bottom of the scroll view.
+    /// Gets or sets the template used to display the footer at the bottom of the scroll view.
     /// </summary>
-    View? Footer { get; set; }
+    DataTemplate? FooterTemplate { get; set; }
     
     /// <summary>
     /// Gets the appropriate item template for the given item.
@@ -88,4 +88,22 @@ public interface IVirtualScroll : IView
     /// Setting this to false will stop the refresh indicator.
     /// </summary>
     bool IsRefreshing { get; set; }
+    
+    /// <summary>
+    /// Scrolls to the specified item in the virtual scroll.
+    /// </summary>
+    /// <param name="sectionIndex">The index of the section.</param>
+    /// <param name="itemIndex">The index of the item within the section. Use -1 to scroll to the section header.</param>
+    /// <param name="position">The position to scroll to. Defaults to <see cref="Microsoft.Maui.Controls.ScrollToPosition.MakeVisible"/>.</param>
+    /// <param name="animated">Whether the scroll should be animated. Defaults to <c>true</c>.</param>
+    void ScrollTo(int sectionIndex, int itemIndex, Microsoft.Maui.Controls.ScrollToPosition position = Microsoft.Maui.Controls.ScrollToPosition.MakeVisible, bool animated = true);
+    
+    /// <summary>
+    /// Scrolls to the specified item or section in the virtual scroll.
+    /// This method searches through all sections and items to find the matching object.
+    /// </summary>
+    /// <param name="itemOrSection">The item or section object to scroll to.</param>
+    /// <param name="position">The position to scroll to. Defaults to <see cref="Microsoft.Maui.Controls.ScrollToPosition.MakeVisible"/>.</param>
+    /// <param name="animated">Whether the scroll should be animated. Defaults to <c>true</c>.</param>
+    void ScrollTo(object itemOrSection, Microsoft.Maui.Controls.ScrollToPosition position = Microsoft.Maui.Controls.ScrollToPosition.MakeVisible, bool animated = true);
 }

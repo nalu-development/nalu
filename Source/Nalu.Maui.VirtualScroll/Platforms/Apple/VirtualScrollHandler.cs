@@ -1,4 +1,6 @@
 using CoreGraphics;
+using Foundation;
+using Microsoft.Maui.Controls.Handlers.Items;
 using Microsoft.Maui.Platform;
 using UIKit;
 
@@ -173,9 +175,9 @@ public partial class VirtualScrollHandler
     }
 
     /// <summary>
-    /// Maps the header property from the virtual scroll to the platform collection view.
+    /// Maps the header template property from the virtual scroll to the platform collection view.
     /// </summary>
-    public static void MapHeader(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    public static void MapHeaderTemplate(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         if (handler.IsConnecting)
         {
@@ -189,7 +191,7 @@ public partial class VirtualScrollHandler
         // var collectionView = handler.PlatformView;
         // if (collectionView.CollectionViewLayout is VirtualScrollCollectionViewLayout collectionViewLayout)
         // {
-        //     var hasGlobalHeader = virtualScroll.Header is not null;
+        //     var hasGlobalHeader = virtualScroll.HeaderTemplate is not null;
         //     if (collectionViewLayout.HasGlobalHeader != hasGlobalHeader)
         //     {
         //         MapLayout(handler, virtualScroll);
@@ -205,9 +207,9 @@ public partial class VirtualScrollHandler
     }
 
     /// <summary>
-    /// Maps the footer property from the virtual scroll to the platform collection view.
+    /// Maps the footer template property from the virtual scroll to the platform collection view.
     /// </summary>
-    public static void MapFooter(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    public static void MapFooterTemplate(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         if (handler.IsConnecting)
         {
@@ -234,7 +236,7 @@ public partial class VirtualScrollHandler
     /// </summary>
     public static void MapIsRefreshEnabled(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
-        var isRefreshEnabled = virtualScroll?.IsRefreshEnabled ?? false;
+        var isRefreshEnabled = virtualScroll.IsRefreshEnabled;
         var refreshControl = handler._refreshControl;
         if (refreshControl is not null)
         {
@@ -283,5 +285,99 @@ public partial class VirtualScrollHandler
             }
             handler._isUpdatingIsRefreshingFromPlatform = false;
         }
+    }
+
+    /// <summary>
+    /// Maps the ScrollTo command from the virtual scroll to the platform collection view.
+    /// </summary>
+    public static void MapScrollTo(VirtualScrollHandler handler, IVirtualScroll virtualScroll, object? args)
+    {
+        if (args is not VirtualScrollCommandScrollToArgs scrollToArgs)
+        {
+            return;
+        }
+
+        var sectionIndex = scrollToArgs.SectionIndex;
+        var itemIndex = scrollToArgs.ItemIndex;
+        var position = scrollToArgs.Position;
+        var animated = scrollToArgs.Animated;
+
+        if (sectionIndex < 0 || virtualScroll.Adapter is null)
+        {
+            return;
+        }
+
+        // Validate section index
+        var sectionCount = virtualScroll.Adapter.GetSectionCount();
+        if (sectionIndex >= sectionCount)
+        {
+            return;
+        }
+
+        var collectionView = handler.CollectionView;
+        NSIndexPath indexPath;
+        
+        // If itemIndex is -1, scroll to section header (or first item if no header)
+        if (itemIndex == -1)
+        {
+            var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo;
+            
+            // Check if section headers are enabled
+            if (layoutInfo?.HasSectionHeader == true)
+            {
+                // Try scrolling to section supplementary element directly for better accuracy
+                indexPath = NSIndexPath.FromItemSection(0, sectionIndex);
+                collectionView.CollectionViewLayout.PrepareLayout();
+                var attributes = collectionView.GetLayoutAttributesForSupplementaryElement(
+                    UICollectionElementKindSectionKey.Header,
+                    indexPath);
+
+                if (attributes is not null)
+                {
+                    var headerFrame = attributes.Frame;
+                    var contentOffset = collectionView.ContentOffset;
+                    contentOffset.Y = headerFrame.Y - collectionView.ContentInset.Top;
+                    collectionView.SetContentOffset(contentOffset, animated);
+                    return;
+                }
+            }
+            
+            // Fallback: scroll to first item in section (either no header or header not found)
+            var itemCount = virtualScroll.Adapter.GetItemCount(sectionIndex);
+            if (itemCount == 0)
+            {
+                return;
+            }
+            
+            indexPath = NSIndexPath.FromItemSection(0, sectionIndex);
+        }
+        else
+        {
+            if (itemIndex < 0)
+            {
+                return;
+            }
+
+            // Validate item index
+            var itemCount = virtualScroll.Adapter.GetItemCount(sectionIndex);
+            if (itemIndex >= itemCount)
+            {
+                return;
+            }
+
+            indexPath = NSIndexPath.FromItemSection(itemIndex, sectionIndex);
+        }
+        
+        // Get scroll direction from layout
+        var scrollDirection = UICollectionViewScrollDirection.Vertical;
+        if (collectionView.CollectionViewLayout is VirtualScrollCollectionViewLayout layout)
+        {
+            scrollDirection = layout.ScrollDirection;
+        }
+
+        // Convert ScrollToPosition to UICollectionViewScrollPosition
+        var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
+
+        collectionView.ScrollToItem(indexPath, scrollPosition, animated);
     }
 }

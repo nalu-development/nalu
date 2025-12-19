@@ -85,36 +85,34 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     );
 
     /// <summary>
-    /// Bindable property for <see cref="Header"/>.
+    /// Bindable property for <see cref="HeaderTemplate"/>.
     /// </summary>
-    public static readonly BindableProperty HeaderProperty = BindableProperty.Create(
-        nameof(Header),
-        typeof(View),
+    public static readonly BindableProperty HeaderTemplateProperty = BindableProperty.Create(
+        nameof(HeaderTemplate),
+        typeof(DataTemplate),
         typeof(VirtualScroll),
         null,
         propertyChanged: (bindable, _, newValue) =>
         {
-            var globalHeaderTemplate = newValue is View view ? new DataTemplate(() => view) : null;
             var virtualScroll = (VirtualScroll) bindable;
-            virtualScroll.GlobalHeaderTemplate = globalHeaderTemplate;
-            virtualScroll._hasGlobalHeader = globalHeaderTemplate is not null;
+            virtualScroll.GlobalHeaderTemplate = (DataTemplate?)newValue;
+            virtualScroll._hasGlobalHeader = newValue is not null;
         }
     );
 
     /// <summary>
-    /// Bindable property for <see cref="Footer"/>.
+    /// Bindable property for <see cref="FooterTemplate"/>.
     /// </summary>
-    public static readonly BindableProperty FooterProperty = BindableProperty.Create(
-        nameof(Footer),
-        typeof(View),
+    public static readonly BindableProperty FooterTemplateProperty = BindableProperty.Create(
+        nameof(FooterTemplate),
+        typeof(DataTemplate),
         typeof(VirtualScroll),
         null,
         propertyChanged: (bindable, _, newValue) =>
         {
-            var globalFooterTemplate = newValue is View view ? new DataTemplate(() => view) : null;
             var virtualScroll = (VirtualScroll) bindable;
-            virtualScroll.GlobalFooterTemplate = globalFooterTemplate;
-            virtualScroll._hasGlobalFooter = globalFooterTemplate is not null;
+            virtualScroll.GlobalFooterTemplate = (DataTemplate?)newValue;
+            virtualScroll._hasGlobalFooter = newValue is not null;
         }
     );
 
@@ -220,21 +218,21 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     }
 
     /// <summary>
-    /// Gets or sets the header view displayed at the top of the scroll view.
+    /// Gets or sets the template used to display the header at the top of the scroll view.
     /// </summary>
-    public View? Header
+    public DataTemplate? HeaderTemplate
     {
-        get => (View?)GetValue(HeaderProperty);
-        set => SetValue(HeaderProperty, value);
+        get => (DataTemplate?)GetValue(HeaderTemplateProperty);
+        set => SetValue(HeaderTemplateProperty, value);
     }
 
     /// <summary>
-    /// Gets or sets the footer view displayed at the bottom of the scroll view.
+    /// Gets or sets the template used to display the footer at the bottom of the scroll view.
     /// </summary>
-    public View? Footer
+    public DataTemplate? FooterTemplate
     {
-        get => (View?)GetValue(FooterProperty);
-        set => SetValue(FooterProperty, value);
+        get => (DataTemplate?)GetValue(FooterTemplateProperty);
+        set => SetValue(FooterTemplateProperty, value);
     }
 
     /// <summary>
@@ -369,6 +367,47 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         if (!handled)
         {
             wrappedCompletion();
+        }
+    }
+
+    /// <inheritdoc/>
+    public void ScrollTo(int sectionIndex, int itemIndex, ScrollToPosition position = ScrollToPosition.MakeVisible, bool animated = true) => Handler?.Invoke(nameof(ScrollTo), new VirtualScrollCommandScrollToArgs(sectionIndex, itemIndex, position, animated));
+
+    /// <inheritdoc/>
+    public void ScrollTo(object itemOrSection, ScrollToPosition position = ScrollToPosition.MakeVisible, bool animated = true)
+    {
+        if (Adapter is not IVirtualScrollAdapter adapter)
+        {
+            return;
+        }
+
+        var sectionCount = adapter.GetSectionCount();
+        
+        // First, check if it's a section
+        for (var sectionIdx = 0; sectionIdx < sectionCount; sectionIdx++)
+        {
+            var section = adapter.GetSection(sectionIdx);
+            if (ReferenceEquals(section, itemOrSection) || Equals(section, itemOrSection))
+            {
+                // Found as a section, scroll to section header
+                ScrollTo(sectionIdx, -1, position, animated);
+                return;
+            }
+        }
+        
+        // Then, check if it's an item
+        for (var sectionIdx = 0; sectionIdx < sectionCount; sectionIdx++)
+        {
+            var itemCount = adapter.GetItemCount(sectionIdx);
+            for (var itemIdx = 0; itemIdx < itemCount; itemIdx++)
+            {
+                var item = adapter.GetItem(sectionIdx, itemIdx);
+                if (ReferenceEquals(item, itemOrSection) || Equals(item, itemOrSection))
+                {
+                    ScrollTo(sectionIdx, itemIdx, position, animated);
+                    return;
+                }
+            }
         }
     }
 }
