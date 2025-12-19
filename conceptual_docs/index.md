@@ -126,3 +126,31 @@ The controls library provides a set of cross-platform controls to simplify your 
 - A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel!!
 
 **Find out more on the [Controls Wiki](controls.md)**.
+
+---
+
+### VirtualScroll [![Nalu.Maui.VirtualScroll NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.VirtualScroll.svg)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.VirtualScroll)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/)
+
+A **high-performance** virtualized scrolling view designed to replace the traditional `CollectionView` in .NET MAUI applications.
+
+- Optimized for Android (`RecyclerView`) and Apple's (`UICollectionView`)
+- Based on an adapter pattern and also full support for `ObservableCollection<T>` with change notifications (add, remove, move, replace)
+- **Dynamic item sizing** with automatic layout updates
+- Pull-to-refresh support
+- Header, footer, and section templates
+
+```xml
+<nalu:VirtualScroll Adapter="{Binding Items}">
+    <nalu:VirtualScroll.ItemTemplate>
+        <DataTemplate x:DataType="models:MyItem">
+            <nalu:ViewBox>
+                <Label Text="{Binding Name}" Padding="16" />
+            </nalu:ViewBox>
+        </DataTemplate>
+    </nalu:VirtualScroll.ItemTemplate>
+</nalu:VirtualScroll>
+```
+
+> **Note:** This package uses a **Non-Commercial License**.
+
+**Find out more on the [VirtualScroll Wiki](virtualscroll.md)**.

@@ -6,6 +6,8 @@
   href: controls.md
 - name: Layouts
   href: layouts.md
+- name: VirtualScroll
+  href: virtualscroll.md
 - name: Navigation
   href: navigation.md
   items:
