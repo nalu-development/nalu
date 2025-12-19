@@ -1,11 +1,10 @@
+#if IOS || MACCATALYST || ANDROID
 using Microsoft.Maui.Handlers;
 
 #if IOS || MACCATALYST
 using PlatformView = UIKit.UIView;
 #elif ANDROID
 using PlatformView = Android.Views.View;
-#else
-using PlatformView = object;
 #endif
 
 namespace Nalu;
@@ -22,7 +21,6 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     public static readonly IPropertyMapper<IVirtualScroll, VirtualScrollHandler> Mapper =
         new PropertyMapper<IVirtualScroll, VirtualScrollHandler>(ViewMapper)
         {
-#if IOS || MACCATALYST || ANDROID
             [nameof(IVirtualScroll.Adapter)] = MapAdapter,
             [nameof(IVirtualScroll.ItemsLayout)] = MapLayout,
             [nameof(IVirtualScroll.ItemTemplate)] = MapItemTemplate,
@@ -33,24 +31,16 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             [nameof(IVirtualScroll.IsRefreshEnabled)] = MapIsRefreshEnabled,
             [nameof(IVirtualScroll.RefreshAccentColor)] = MapRefreshAccentColor,
             [nameof(IVirtualScroll.IsRefreshing)] = MapIsRefreshing,
-#endif
         };
 
     /// <summary>
     /// The command mapper for the <see cref="IVirtualScroll" /> interface.
     /// </summary>
     public static readonly CommandMapper<IVirtualScroll, VirtualScrollHandler> CommandMapper =
-        new(ViewCommandMapper)
+        new(ViewCommandMapper!)
         {
-#if IOS || MACCATALYST || ANDROID
             [nameof(IVirtualScroll.ScrollTo)] = MapScrollTo,
-#endif
         };
-
-#if !(IOS || MACCATALYST || ANDROID)
-    /// <inheritdoc />
-    protected override PlatformView CreatePlatformView() => throw new NotImplementedException();
-#endif
 
     /// <summary>
     /// A flag to skip the layout mapper during initial setup.
@@ -73,5 +63,4 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
         IsConnecting = false;
     }
 }
-
-
+#endif
