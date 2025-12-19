@@ -155,11 +155,6 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     {
         base.PrepareForReuse();
 
-        if (VirtualView is Element { Parent: { } parentView } virtualView)
-        {
-            parentView.RemoveLogicalChild(virtualView);
-        }
-
         unchecked
         {
             _useCount++;
@@ -167,5 +162,22 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
         _readyForReuse = true;
         _needsMeasure = false;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        
+        if (disposing)
+        {
+            VirtualView?.DisconnectHandlers();
+
+            if (VirtualView is Element { Parent: { } parent } viewElement)
+            {
+                parent.RemoveLogicalChild(viewElement);
+            }
+
+            VirtualView = null;
+        }
     }
 }

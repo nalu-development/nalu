@@ -108,9 +108,9 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         {
             foreach (var weakCell in _createdCells)
             {
-                if (weakCell.TryGetTarget(out var cell) && cell?.VirtualView is { } virtualView)
+                if (weakCell.TryGetTarget(out var cell))
                 {
-                    virtualView.DisconnectHandlers();
+                    cell?.Dispose();
                 }
             }
             
