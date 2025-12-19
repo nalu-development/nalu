@@ -37,7 +37,10 @@
 
             <nalu:VirtualScroll Grid.Row="1"
                                 x:Name="VirtualScroll"
-                                Adapter="{Binding Items}">
+                                Adapter="{Binding Items}"
+                                IsRefreshEnabled="True"
+                                RefreshCommand="{Binding RefreshCommand}"
+                                RefreshAccentColor="CornflowerBlue">
                 <nalu:VirtualScroll.HeaderTemplate>
                     <DataTemplate x:DataType="pageModels:TenPageModel">
                         <VerticalStackLayout>

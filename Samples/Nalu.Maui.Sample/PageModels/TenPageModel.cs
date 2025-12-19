@@ -75,6 +75,24 @@ public partial class TenPageModel : ObservableObject, ILeavingAware
         }
     }
 
+    [RelayCommand]
+    private async Task RefreshAsync(Action completionCallback)
+    {
+        try
+        {
+            // Simulate loading for 2 seconds
+            await Task.Delay(2000);
+            
+            // Simulate refreshing data - add a new item at the beginning
+            Items.Insert(0, new TenItem($"Refreshed Item {_idCounter++}"));
+        }
+        finally
+        {
+            // Always call completion callback when done
+            completionCallback();
+        }
+    }
+
     private CancellationTokenSource? _autoChangesCts;
 
     [RelayCommand]
