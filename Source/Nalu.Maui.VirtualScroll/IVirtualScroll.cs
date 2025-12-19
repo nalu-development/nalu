@@ -1,3 +1,5 @@
+using System.Windows.Input;
+
 namespace Nalu;
 
 /// <summary>
@@ -64,4 +66,26 @@ public interface IVirtualScroll : IView
     /// Gets the appropriate global footer template.
     /// </summary>
     DataTemplate? GetGlobalFooterTemplate();
+    
+    /// <summary>
+    /// Gets or sets the command to execute when the user requests a refresh.
+    /// </summary>
+    ICommand? RefreshCommand { get; set; }
+    
+    /// <summary>
+    /// Gets or sets a value indicating whether pull-to-refresh is enabled.
+    /// </summary>
+    bool IsRefreshEnabled { get; set; }
+    
+    /// <summary>
+    /// Gets or sets the accent color for the refresh indicator.
+    /// </summary>
+    Color? RefreshAccentColor { get; set; }
+    
+    /// <summary>
+    /// Gets or sets a value indicating whether the refresh indicator is currently showing.
+    /// Setting this to true programmatically will trigger the refresh indicator.
+    /// Setting this to false will stop the refresh indicator.
+    /// </summary>
+    bool IsRefreshing { get; set; }
 }

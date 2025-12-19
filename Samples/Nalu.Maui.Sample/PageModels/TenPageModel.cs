@@ -79,7 +79,8 @@ public partial class TenPageModel : ObservableObject
 
         while (!token.IsCancellationRequested)
         {
-            await Task.Delay(500, token);
+            // ReSharper disable once MethodSupportsCancellation
+            await Task.Delay(500);
             AddItem();
             RemoveItem();
             MoveItem();

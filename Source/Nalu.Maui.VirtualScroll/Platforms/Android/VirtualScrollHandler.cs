@@ -1,7 +1,9 @@
 using Android.Widget;
 using AndroidX.RecyclerView.Widget;
+using AndroidX.SwipeRefreshLayout.Widget;
 using AViewGroup = Android.Views.ViewGroup;
 using AView = Android.Views.View;
+using Microsoft.Maui.Platform;
 using PlatformView = Android.Views.View;
 
 namespace Nalu;
@@ -17,6 +19,9 @@ public partial class VirtualScrollHandler
     private VirtualScrollRecyclerView? _recyclerView;
     private VirtualScrollRecyclerViewAdapter? _recyclerViewAdapter;
     private VirtualScrollPlatformFlattenedAdapterNotifier? _notifier;
+    private SwipeRefreshLayout? _swipeRefreshLayout;
+    private FrameLayout? _rootLayout;
+    private bool _isUpdatingIsRefreshingFromPlatform;
 
     /// <inheritdoc />
     protected override AView CreatePlatformView()
@@ -27,21 +32,47 @@ public partial class VirtualScrollHandler
         
         _recyclerView = recyclerView;
 
-        var platformView = new FrameLayout(context);
-        platformView.LayoutParameters = new AViewGroup.LayoutParams(
+        _swipeRefreshLayout = new SwipeRefreshLayout(context);
+        _swipeRefreshLayout.AddView(
+            recyclerView,
+            new AViewGroup.LayoutParams(
+                AViewGroup.LayoutParams.MatchParent,
+                AViewGroup.LayoutParams.MatchParent
+            )
+        );
+
+        _swipeRefreshLayout.SetOnRefreshListener(new SwipeRefreshListener(() =>
+        {
+            // User pulled to refresh - sync platform state to IsRefreshing first
+            if (VirtualView is { } virtualScroll && _swipeRefreshLayout is not null)
+            {
+                _isUpdatingIsRefreshingFromPlatform = true;
+                virtualScroll.IsRefreshing = _swipeRefreshLayout.Refreshing;
+                _isUpdatingIsRefreshingFromPlatform = false;
+            }
+            
+            // Then call Refresh() which will fire RefreshCommand/OnRefresh
+            if (VirtualView is IVirtualScrollController controller)
+            {
+                controller.Refresh(() => { /* Completion handled by IsRefreshing property */ });
+            }
+        }));
+
+        _rootLayout = new FrameLayout(context);
+        _rootLayout.LayoutParameters = new AViewGroup.LayoutParams(
             AViewGroup.LayoutParams.MatchParent,
             AViewGroup.LayoutParams.MatchParent
         );
 
-        platformView.AddView(
-            recyclerView,
+        _rootLayout.AddView(
+            _swipeRefreshLayout,
             new FrameLayout.LayoutParams(
                 AViewGroup.LayoutParams.MatchParent,
                 AViewGroup.LayoutParams.MatchParent
             )
         );
 
-        return platformView;
+        return _rootLayout;
     }
 
     /// <inheritdoc />
@@ -51,7 +82,12 @@ public partial class VirtualScrollHandler
         _notifier = null;
         _recyclerViewAdapter?.Dispose();
         _recyclerViewAdapter = null;
+        _recyclerView?.Dispose();
         _recyclerView = null;
+        _swipeRefreshLayout?.Dispose();
+        _swipeRefreshLayout = null;
+        _rootLayout?.Dispose();
+        _rootLayout = null;
         base.DisconnectHandler(platformView);
     }
 
@@ -161,5 +197,56 @@ public partial class VirtualScrollHandler
         {
             handler._recyclerViewAdapter?.NotifyDataSetChanged();
         }
+    }
+
+    /// <summary>
+    /// Maps the refresh accent color property from the virtual scroll to the platform swipe refresh layout.
+    /// </summary>
+    public static void MapRefreshAccentColor(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        if (virtualScroll.RefreshAccentColor is not null && handler._swipeRefreshLayout is not null)
+        {
+            handler._swipeRefreshLayout.SetColorSchemeColors(virtualScroll.RefreshAccentColor.ToPlatform());
+        }
+    }
+
+    /// <summary>
+    /// Maps the is refresh enabled property from the virtual scroll to the platform swipe refresh layout.
+    /// </summary>
+    public static void MapIsRefreshEnabled(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        if (handler._swipeRefreshLayout is not null)
+        {
+            handler._swipeRefreshLayout.Enabled = virtualScroll.IsRefreshEnabled;
+        }
+    }
+
+    /// <summary>
+    /// Maps the is refreshing property from the virtual scroll to the platform swipe refresh layout.
+    /// </summary>
+    public static void MapIsRefreshing(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        if (handler._swipeRefreshLayout is null || handler._isUpdatingIsRefreshingFromPlatform)
+        {
+            return;
+        }
+
+        var isRefreshing = virtualScroll.IsRefreshing;
+        handler._swipeRefreshLayout.Refreshing = isRefreshing;
+    }
+
+    /// <summary>
+    /// Listener for swipe refresh events.
+    /// </summary>
+    private class SwipeRefreshListener : Java.Lang.Object, SwipeRefreshLayout.IOnRefreshListener
+    {
+        private readonly Action _onRefresh;
+
+        public SwipeRefreshListener(Action onRefresh)
+        {
+            _onRefresh = onRefresh;
+        }
+
+        public void OnRefresh() => _onRefresh();
     }
 }

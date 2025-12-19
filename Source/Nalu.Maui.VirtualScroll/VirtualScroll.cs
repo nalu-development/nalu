@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.ObjectModel;
+using System.Windows.Input;
 using Microsoft.Maui.Controls.Internals;
 
 namespace Nalu;
@@ -10,7 +11,7 @@ namespace Nalu;
 /// <remarks>
 /// This control is designed to replace traditional <see cref="CollectionView"/> control by providing a more efficient implementation tailored for Android and iOS platforms.
 /// </remarks>
-public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo
+public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVirtualScrollController
 {
     private bool _hasGlobalHeader;
     private bool _hasSectionHeader;
@@ -128,6 +129,46 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo
     );
 
     /// <summary>
+    /// Bindable property for <see cref="RefreshCommand"/>.
+    /// </summary>
+    public static readonly BindableProperty RefreshCommandProperty = BindableProperty.Create(
+        nameof(RefreshCommand),
+        typeof(ICommand),
+        typeof(VirtualScroll),
+        null
+    );
+
+    /// <summary>
+    /// Bindable property for <see cref="IsRefreshEnabled"/>.
+    /// </summary>
+    public static readonly BindableProperty IsRefreshEnabledProperty = BindableProperty.Create(
+        nameof(IsRefreshEnabled),
+        typeof(bool),
+        typeof(VirtualScroll),
+        false
+    );
+
+    /// <summary>
+    /// Bindable property for <see cref="RefreshAccentColor"/>.
+    /// </summary>
+    public static readonly BindableProperty RefreshAccentColorProperty = BindableProperty.Create(
+        nameof(RefreshAccentColor),
+        typeof(Color),
+        typeof(VirtualScroll),
+        null
+    );
+
+    /// <summary>
+    /// Bindable property for <see cref="IsRefreshing"/>.
+    /// </summary>
+    public static readonly BindableProperty IsRefreshingProperty = BindableProperty.Create(
+        nameof(IsRefreshing),
+        typeof(bool),
+        typeof(VirtualScroll),
+        false,
+        BindingMode.TwoWay);
+
+    /// <summary>
     /// The adapter that provides data to the virtual scroll.
     /// </summary>
     public object? Adapter
@@ -196,6 +237,49 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo
         set => SetValue(FooterProperty, value);
     }
 
+    /// <summary>
+    /// Gets or sets the command to execute when the user requests a refresh.
+    /// </summary>
+    public ICommand? RefreshCommand
+    {
+        get => (ICommand?)GetValue(RefreshCommandProperty);
+        set => SetValue(RefreshCommandProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether pull-to-refresh is enabled.
+    /// </summary>
+    public bool IsRefreshEnabled
+    {
+        get => (bool)GetValue(IsRefreshEnabledProperty);
+        set => SetValue(IsRefreshEnabledProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the accent color for the refresh indicator.
+    /// </summary>
+    public Color? RefreshAccentColor
+    {
+        get => (Color?)GetValue(RefreshAccentColorProperty);
+        set => SetValue(RefreshAccentColorProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the refresh indicator is currently showing.
+    /// Setting this to true programmatically will trigger the refresh indicator.
+    /// Setting this to false will stop the refresh indicator.
+    /// </summary>
+    public bool IsRefreshing
+    {
+        get => (bool)GetValue(IsRefreshingProperty);
+        set => SetValue(IsRefreshingProperty, value);
+    }
+
+    /// <summary>
+    /// Event raised when the user triggers a refresh.
+    /// </summary>
+    public event EventHandler<RefreshEventArgs>? OnRefresh;
+
     internal DataTemplate? GlobalHeaderTemplate { get; private set; }
     internal DataTemplate? GlobalFooterTemplate { get; private set; }
 
@@ -249,4 +333,42 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo
            _hasGlobalFooter == other.HasGlobalFooter &&
            _hasSectionHeader == other.HasSectionHeader &&
            _hasSectionFooter == other.HasSectionFooter;
+
+    /// <inheritdoc/>
+    void IVirtualScrollController.Refresh(Action completionCallback)
+    {
+        // Set IsRefreshing to true to show the indicator
+        IsRefreshing = true;
+        
+        // Wrap completion callback to also set IsRefreshing to false
+        Action wrappedCompletion = () =>
+        {
+            IsRefreshing = false;
+            completionCallback();
+        };
+
+        var handled = false;
+
+        if (RefreshCommand is not null)
+        {
+            handled = true;
+
+            if (RefreshCommand.CanExecute(null))
+            {
+                RefreshCommand.Execute(wrappedCompletion);
+            }
+        }
+
+        if (OnRefresh is not null)
+        {
+            handled = true;
+            OnRefresh.Invoke(this, new RefreshEventArgs(wrappedCompletion));
+        }
+
+        // If no one handled the refresh, just call the completion callback immediately
+        if (!handled)
+        {
+            wrappedCompletion();
+        }
+    }
 }

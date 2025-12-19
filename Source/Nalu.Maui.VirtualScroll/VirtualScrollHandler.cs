@@ -30,6 +30,9 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             [nameof(IVirtualScroll.SectionFooterTemplate)] = MapSectionFooterTemplate,
             [nameof(IVirtualScroll.Header)] = MapHeader,
             [nameof(IVirtualScroll.Footer)] = MapFooter,
+            [nameof(IVirtualScroll.IsRefreshEnabled)] = MapIsRefreshEnabled,
+            [nameof(IVirtualScroll.RefreshAccentColor)] = MapRefreshAccentColor,
+            [nameof(IVirtualScroll.IsRefreshing)] = MapIsRefreshing,
 #endif
         };
 

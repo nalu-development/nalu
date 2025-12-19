@@ -1,4 +1,5 @@
 using CoreGraphics;
+using Microsoft.Maui.Platform;
 using UIKit;
 
 namespace Nalu;
@@ -13,6 +14,8 @@ public partial class VirtualScrollHandler
 {
     private VirtualScrollPlatformReuseIdManager? _reuseIdManager;
     private VirtualScrollPlatformDataSourceNotifier? _notifier;
+    private UIRefreshControl? _refreshControl;
+    private bool _isUpdatingIsRefreshingFromPlatform;
 
     /// <summary>
     /// Gets the <see cref="UICollectionView"/> platform view.
@@ -29,6 +32,29 @@ public partial class VirtualScrollHandler
 
         _reuseIdManager = reuseIdManager;
 
+        // Create refresh control
+        _refreshControl = new UIRefreshControl();
+        _refreshControl.Enabled = VirtualView.IsRefreshEnabled;
+        _refreshControl.AddTarget((s, a) =>
+        {
+            // User pulled to refresh - sync platform state to IsRefreshing first
+            if (VirtualView is VirtualScroll virtualScroll && _refreshControl is not null)
+            {
+                _isUpdatingIsRefreshingFromPlatform = true;
+                virtualScroll.IsRefreshing = _refreshControl.Refreshing;
+                _isUpdatingIsRefreshingFromPlatform = false;
+            }
+            
+            // Then call Refresh() which will fire RefreshCommand/OnRefresh
+            if (VirtualView is IVirtualScrollController controller)
+            {
+                controller.Refresh(() => { /* Completion handled by IsRefreshing property */ });
+            }
+        }, UIControlEvent.ValueChanged);
+
+        collectionView.AlwaysBounceVertical = true;
+        collectionView.RefreshControl = _refreshControl;
+
         return collectionView;
     }
 
@@ -38,9 +64,17 @@ public partial class VirtualScrollHandler
         _notifier?.Dispose();
         _notifier = null;
         
+        if (_refreshControl is not null)
+        {
+            _refreshControl.RemoveFromSuperview();
+            _refreshControl.Dispose();
+            _refreshControl = null;
+        }
+        
         base.DisconnectHandler(platformView);
         var collectionView = (VirtualScrollCollectionView)platformView;
         collectionView.DataSource = null!;
+        collectionView.RefreshControl = null;
         platformView.Dispose();
         _reuseIdManager = null;
     }
@@ -182,5 +216,72 @@ public partial class VirtualScrollHandler
 
         // TODO: Optimize instead of recreating layout
         MapLayout(handler, virtualScroll);
+    }
+
+    /// <summary>
+    /// Maps the refresh accent color property from the virtual scroll to the platform refresh control.
+    /// </summary>
+    public static void MapRefreshAccentColor(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        if (virtualScroll.RefreshAccentColor is not null && handler._refreshControl is not null)
+        {
+            handler._refreshControl.TintColor = virtualScroll.RefreshAccentColor.ToPlatform();
+        }
+    }
+
+    /// <summary>
+    /// Maps the is refresh enabled property from the virtual scroll to the platform refresh control.
+    /// </summary>
+    public static void MapIsRefreshEnabled(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        var isRefreshEnabled = virtualScroll?.IsRefreshEnabled ?? false;
+        var refreshControl = handler._refreshControl;
+        if (refreshControl is not null)
+        {
+            refreshControl.Enabled = isRefreshEnabled;
+            if (isRefreshEnabled && !ReferenceEquals(handler.CollectionView.RefreshControl, refreshControl))
+            {
+                handler.CollectionView.RefreshControl = refreshControl;
+            }
+            else if (!isRefreshEnabled && ReferenceEquals(handler.CollectionView.RefreshControl, refreshControl))
+            {
+                handler.CollectionView.RefreshControl = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maps the is refreshing property from the virtual scroll to the platform refresh control.
+    /// </summary>
+    public static void MapIsRefreshing(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        if (handler._refreshControl is null || handler._isUpdatingIsRefreshingFromPlatform)
+        {
+            return;
+        }
+
+        var isRefreshing = virtualScroll.IsRefreshing;
+        
+        if (isRefreshing && !handler._refreshControl.Refreshing)
+        {
+            // Programmatically trigger refresh indicator
+            handler._refreshControl.BeginRefreshing();
+        }
+        else if (!isRefreshing && handler._refreshControl.Refreshing)
+        {
+            // Stop refresh indicator
+            handler._refreshControl.EndRefreshing();
+        }
+        
+        // Sync platform state back to IsRefreshing (two-way binding)
+        if (handler._refreshControl.Refreshing != isRefreshing)
+        {
+            handler._isUpdatingIsRefreshingFromPlatform = true;
+            if (virtualScroll is VirtualScroll vs)
+            {
+                vs.IsRefreshing = handler._refreshControl.Refreshing;
+            }
+            handler._isUpdatingIsRefreshingFromPlatform = false;
+        }
     }
 }
