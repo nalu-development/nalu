@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui;
 using CommunityToolkit.Mvvm.Messaging;
+using FFImageLoading.Maui;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Nalu.Maui.Sample.PopupModels;
@@ -60,6 +61,7 @@ public static class MauiProgram
             .UseNaluLayouts()
             .UseNaluControls()
             .UseNaluVirtualScroll()
+            .UseFFImageLoading()
             .UseMauiCommunityToolkit()
             .ConfigureMauiHandlers(handlers =>
                 {
