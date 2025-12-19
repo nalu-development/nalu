@@ -6,6 +6,9 @@
     <RootNamespace>Nalu</RootNamespace>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <!-- Override license for this project - Non-Commercial License -->
+    <PackageLicenseExpression></PackageLicenseExpression>
+    <PackageLicenseFile>LICENSE-VirtualScroll.md</PackageLicenseFile>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">
@@ -61,5 +64,9 @@
     <Compile Update="Platforms\Android\VirtualScrollPlatformReuseIdManager.cs">
       <ExcludeFromCurrentConfiguration>true</ExcludeFromCurrentConfiguration>
     </Compile>
+  </ItemGroup>
+
+  <ItemGroup Label="Files">
+    <None Include="LICENSE-VirtualScroll.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
