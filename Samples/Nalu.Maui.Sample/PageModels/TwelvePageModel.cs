@@ -36,11 +36,11 @@ public partial class TwelvePageModel : ObservableObject
 
     private static readonly ImageSource[] _cardImageSources = 
     [
-        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1518791841217-8f162f1e1131?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=erik-jan-leusink-IbPxGLgJiMI-unsplash.jpg")),
-        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1517331156700-3c241d2b4d83?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=jari-hytonen-YCPkW_r_6uA-unsplash.jpg")),
-        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1516280030429-27679b3dc9cf?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=raquel-pedrotti-AHgpNYkX9dc-unsplash.jpg")),
-        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1583795128727-6ec3642408f8?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=lloyd-henneman-mBRfYA0dYYE-unsplash.jpg")),
-        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1532386236358-a33d8a9434e3?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=raul-varzar-1l2waV8glIQ-unsplash.jpg"))
+        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1518791841217-8f162f1e1131?ixlib=rb-4.1.0&q=85&fm=jpg&w=480&crop=entropy&cs=srgb&dl=erik-jan-leusink-IbPxGLgJiMI-unsplash.jpg")),
+        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1517331156700-3c241d2b4d83?ixlib=rb-4.1.0&q=85&fm=jpg&w=480&crop=entropy&cs=srgb&dl=jari-hytonen-YCPkW_r_6uA-unsplash.jpg")),
+        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1516280030429-27679b3dc9cf?ixlib=rb-4.1.0&q=85&fm=jpg&w=480&crop=entropy&cs=srgb&dl=raquel-pedrotti-AHgpNYkX9dc-unsplash.jpg")),
+        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1583795128727-6ec3642408f8?ixlib=rb-4.1.0&q=85&fm=jpg&w=480&crop=entropy&cs=srgb&dl=lloyd-henneman-mBRfYA0dYYE-unsplash.jpg")),
+        ImageSource.FromUri(new Uri("https://images.unsplash.com/photo-1532386236358-a33d8a9434e3?ixlib=rb-4.1.0&q=85&fm=jpg&w=480&crop=entropy&cs=srgb&dl=raul-varzar-1l2waV8glIQ-unsplash.jpg"))
     ];
 
     public string Message { get; } = "Credit Cards VirtualScroll Demo - 100 Sections, 30 Items Each";
