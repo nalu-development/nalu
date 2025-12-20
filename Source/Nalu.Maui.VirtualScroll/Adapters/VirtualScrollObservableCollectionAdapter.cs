@@ -1,21 +1,22 @@
-using System.Collections.ObjectModel;
+using System.Collections;
 using System.Collections.Specialized;
 
 namespace Nalu;
 
 /// <summary>
-/// An adapter that wraps an <see cref="ObservableCollection{T}"/> for use with <see cref="VirtualScroll"/>.
+/// An adapter that wraps an observable collection for use with <see cref="VirtualScroll"/>.
 /// </summary>
-/// <typeparam name="T">The type of items in the collection.</typeparam>
-public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
+/// <typeparam name="TItemCollection">The type of the observable collection.</typeparam>
+public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtualScrollAdapter
+    where TItemCollection : IList, INotifyCollectionChanged
 {
-    private readonly ObservableCollection<T> _collection;
+    private readonly TItemCollection _collection;
     private const int _sectionIndex = 0;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="VirtualScrollObservableCollectionAdapter{T}" /> class based on the specified observable collection.
+    /// Initializes a new instance of the <see cref="VirtualScrollObservableCollectionAdapter{TObservableCollection}" /> class based on the specified observable collection.
     /// </summary>
-    public VirtualScrollObservableCollectionAdapter(ObservableCollection<T> collection)
+    public VirtualScrollObservableCollectionAdapter(TItemCollection collection)
     {
         _collection = collection ?? throw new ArgumentNullException(nameof(collection));
     }
@@ -37,11 +38,11 @@ public class VirtualScrollObservableCollectionAdapter<T> : IVirtualScrollAdapter
 
     private sealed class ObservableCollectionAdapterSubscription : IDisposable
     {
-        private readonly ObservableCollection<T> _collection;
+        private readonly TItemCollection _collection;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
         private bool _disposed;
 
-        public ObservableCollectionAdapterSubscription(ObservableCollection<T> collection, Action<VirtualScrollChangeSet> changeCallback)
+        public ObservableCollectionAdapterSubscription(TItemCollection collection, Action<VirtualScrollChangeSet> changeCallback)
         {
             _collection = collection;
             _changeCallback = changeCallback;

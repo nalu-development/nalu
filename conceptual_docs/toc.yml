@@ -13,7 +13,7 @@
       href: virtualscroll.md
     - name: Scrolling
       href: virtualscroll-scrolling.md
-    - name: Custom Adapters
+    - name: Adapters
       href: virtualscroll-adapters.md
     - name: Performance
       href: virtualscroll-performance.md

@@ -1,5 +1,5 @@
 using System.Collections;
-using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Windows.Input;
 using Microsoft.Maui.Controls.Internals;
 
@@ -35,11 +35,9 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
 
             // Check if it's an ObservableCollection<T> or inherits from it
             var valueType = value.GetType();
-            var observableCollectionBaseType = FindObservableCollectionBaseType(valueType);
-            if (observableCollectionBaseType is not null)
+            if (FindObservableCollectionListType(valueType) is not null)
             {
-                var itemType = observableCollectionBaseType.GetGenericArguments()[0];
-                var adapterType = typeof(VirtualScrollObservableCollectionAdapter<>).MakeGenericType(itemType);
+                var adapterType = typeof(VirtualScrollObservableCollectionAdapter<>).MakeGenericType(valueType);
                 return Activator.CreateInstance(adapterType, value);
             }
 
@@ -366,21 +364,16 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     public DataTemplate? GetGlobalFooterTemplate() => GlobalFooterTemplate;
 
     /// <summary>
-    /// Finds the ObservableCollection&lt;T&gt; base type in the inheritance hierarchy.
+    /// Verifies whether the type implements <see cref="IList"/> and <see cref="INotifyCollectionChanged"/>.
     /// </summary>
     /// <param name="type">The type to check.</param>
-    /// <returns>The ObservableCollection&lt;T&gt; base type if found, otherwise null.</returns>
-    private static Type? FindObservableCollectionBaseType(Type type)
+    /// <returns>The type itself if it implements both interfaces; otherwise, <c>null</c>.</returns>
+    private static Type? FindObservableCollectionListType(Type type)
     {
-        var currentType = type;
-        while (currentType is not null)
+        // Check if the type implements both IList and INotifyCollectionChanged
+        if (typeof(IList).IsAssignableFrom(type) && typeof(INotifyCollectionChanged).IsAssignableFrom(type))
         {
-            if (currentType.IsGenericType && currentType.GetGenericTypeDefinition() == typeof(ObservableCollection<>))
-            {
-                return currentType;
-            }
-
-            currentType = currentType.BaseType;
+            return type;
         }
 
         return null;

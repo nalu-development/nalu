@@ -1,6 +1,69 @@
-# Custom Adapters
+# Adapters
 
-For advanced scenarios requiring sectioned data or direct data source access, implement `IVirtualScrollAdapter`:
+VirtualScroll uses adapters to access data. You can use the built-in adapters for observable collections, or implement `IVirtualScrollAdapter` for custom data sources.
+
+## Built-in Adapters
+
+### VirtualScrollObservableCollectionAdapter
+
+For flat lists backed by an `ObservableCollection<T>` or any collection implementing `IList` and `INotifyCollectionChanged`:
+
+```csharp
+// Simple usage - VirtualScroll auto-wraps ObservableCollection
+public ObservableCollection<ItemInfo> Items { get; } = new();
+
+// Or explicit adapter creation
+var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<ItemInfo>>(Items);
+```
+
+The adapter automatically subscribes to `CollectionChanged` events and notifies the VirtualScroll of additions, removals, replacements, moves, and resets.
+
+### VirtualScrollGroupedObservableCollectionAdapter
+
+For grouped/sectioned data where both the sections collection and item collections within each section are observable:
+
+```csharp
+public class CategoryGroup
+{
+    public string Name { get; set; }
+    public ObservableCollection<ItemInfo> Items { get; } = new();
+}
+
+// Create adapter with sections and a function to get items from each section
+var sections = new ObservableCollection<CategoryGroup>();
+var adapter = new VirtualScrollGroupedObservableCollectionAdapter<
+    ObservableCollection<CategoryGroup>, 
+    ObservableCollection<ItemInfo>>(
+    sections,
+    section => ((CategoryGroup)section).Items);
+```
+
+This adapter:
+- Tracks changes to the sections collection (add, remove, replace, move, reset)
+- Tracks changes to each section's items collection independently
+- Automatically updates subscriptions when sections are added, removed, or replaced
+
+**XAML usage:**
+
+```xml
+<nalu:VirtualScroll Adapter="{Binding Adapter}">
+    <nalu:VirtualScroll.SectionHeaderTemplate>
+        <DataTemplate x:DataType="models:CategoryGroup">
+            <Label Text="{Binding Name}" FontAttributes="Bold" />
+        </DataTemplate>
+    </nalu:VirtualScroll.SectionHeaderTemplate>
+    
+    <nalu:VirtualScroll.ItemTemplate>
+        <DataTemplate x:DataType="models:ItemInfo">
+            <Label Text="{Binding Title}" />
+        </DataTemplate>
+    </nalu:VirtualScroll.ItemTemplate>
+</nalu:VirtualScroll>
+```
+
+## Custom Adapters
+
+For advanced scenarios requiring direct data source access (databases, web APIs, etc.), implement `IVirtualScrollAdapter`:
 
 ```csharp
 public interface IVirtualScrollAdapter
@@ -14,35 +77,6 @@ public interface IVirtualScrollAdapter
 ```
 
 The adapter pattern is optimal since it allows for easily creating adapters backed by direct-access data stores such as databases. Instead of trying to load all data from the datastore into an in-memory collection and dealing with cache invalidation, you can write your adapter directly against any type of storage.
-
-## Example: Grouped Data Adapter
-
-```csharp
-public class GroupedDataAdapter : IVirtualScrollAdapter
-{
-    private readonly ObservableCollection<MyGroup> _groups;
-
-    public GroupedDataAdapter(ObservableCollection<MyGroup> groups)
-    {
-        _groups = groups;
-    }
-
-    public int GetSectionCount() => _groups.Count;
-
-    public int GetItemCount(int sectionIndex) => _groups[sectionIndex].Items.Count;
-
-    public object? GetSection(int sectionIndex) => _groups[sectionIndex];
-
-    public object? GetItem(int sectionIndex, int itemIndex) => _groups[sectionIndex].Items[itemIndex];
-
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback)
-    {
-        // Implement change notifications for your data structure
-        // Return a disposable that unsubscribes when disposed
-        return new MySubscription(_groups, changeCallback);
-    }
-}
-```
 
 ## Example: SQLite Database Adapter (Flat List)
 
