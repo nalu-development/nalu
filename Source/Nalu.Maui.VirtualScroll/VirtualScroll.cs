@@ -278,6 +278,75 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// </summary>
     public event EventHandler<RefreshEventArgs>? OnRefresh;
 
+    private int _onScrolledSubscriberCount;
+
+    /// <summary>
+    /// Bindable property for <see cref="ScrolledCommand"/>.
+    /// </summary>
+    public static readonly BindableProperty ScrolledCommandProperty = BindableProperty.Create(
+        nameof(ScrolledCommand),
+        typeof(ICommand),
+        typeof(VirtualScroll),
+        null,
+        propertyChanged: OnScrolledCommandChanged
+    );
+
+    private static void OnScrolledCommandChanged(BindableObject bindable, object? oldValue, object? newValue)
+    {
+        var virtualScroll = (VirtualScroll)bindable;
+        virtualScroll.UpdateScrollEventSubscription();
+    }
+
+    /// <summary>
+    /// Gets or sets the command to execute when the scroll position changes.
+    /// </summary>
+    public ICommand? ScrolledCommand
+    {
+        get => (ICommand?)GetValue(ScrolledCommandProperty);
+        set => SetValue(ScrolledCommandProperty, value);
+    }
+
+    /// <summary>
+    /// Event raised when the scroll position changes.
+    /// </summary>
+    public event EventHandler<VirtualScrollScrolledEventArgs>? OnScrolled
+    {
+        add
+        {
+            _onScrolledSubscriberCount++;
+            UpdateScrollEventSubscription();
+            // Use a private backing field to store the actual event handler
+            OnScrolledEvent += value;
+        }
+        remove
+        {
+            OnScrolledEvent -= value;
+            _onScrolledSubscriberCount--;
+            UpdateScrollEventSubscription();
+        }
+    }
+
+    private event EventHandler<VirtualScrollScrolledEventArgs>? OnScrolledEvent;
+
+    private void UpdateScrollEventSubscription()
+    {
+        if (Handler is null)
+        {
+            return;
+        }
+
+        var hasSubscribers = ScrolledCommand != null || _onScrolledSubscriberCount > 0;
+        Handler.Invoke("SetScrollEventEnabled", hasSubscribers);
+    }
+
+    /// <inheritdoc/>
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+        // Update scroll event subscription when handler is connected
+        UpdateScrollEventSubscription();
+    }
+
     internal DataTemplate? GlobalHeaderTemplate { get; private set; }
     internal DataTemplate? GlobalFooterTemplate { get; private set; }
 
@@ -368,6 +437,34 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         {
             wrappedCompletion();
         }
+    }
+
+    /// <inheritdoc/>
+    void IVirtualScrollController.Scrolled(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
+    {
+        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
+
+        if (ScrolledCommand != null && ScrolledCommand.CanExecute(args))
+        {
+            ScrolledCommand.Execute(args);
+        }
+
+        OnScrolledEvent?.Invoke(this, args);
+    }
+
+    /// <summary>
+    /// Gets the range of currently visible items in the virtual scroll.
+    /// </summary>
+    /// <returns>A <see cref="VirtualScrollRange"/> containing the first and last visible item positions, or <c>null</c> if no items are visible or the handler is not available.</returns>
+    public VirtualScrollRange? GetVisibleItemsRange()
+    {
+#if ANDROID || IOS || MACCATALYST
+        if (Handler is VirtualScrollHandler handler)
+        {
+            return handler.GetVisibleItemsRange();
+        }
+#endif
+        return null;
     }
 
     /// <inheritdoc/>

@@ -382,6 +382,127 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
     }
 
     /// <inheritdoc/>
+    public bool TryGetSectionAndItemIndex(int flattenedIndex, out int sectionIndex, out int itemIndex)
+    {
+        sectionIndex = -1;
+        itemIndex = -1;
+
+        if (flattenedIndex < 0 || flattenedIndex >= _flattenedLength)
+        {
+            return false;
+        }
+
+        var adjustedIndex = flattenedIndex;
+
+        // Handle global header
+        if (_hasGlobalHeader)
+        {
+            if (adjustedIndex == 0)
+            {
+                return false; // Global header, not an item
+            }
+            adjustedIndex--; // Adjust for global header
+        }
+
+        // Find which section this flattened index belongs to using binary search
+        var foundSectionIndex = FindSectionForFlattenedIndex(adjustedIndex);
+        if (foundSectionIndex < 0)
+        {
+            return false; // Global footer, not an item
+        }
+
+        var sectionStartOffset = _sectionOffsets[foundSectionIndex];
+        var relativeIndex = adjustedIndex - sectionStartOffset;
+
+        // Check if it's section header
+        if (_hasSectionHeader)
+        {
+            if (relativeIndex == 0)
+            {
+                return false; // Section header, not an item
+            }
+            relativeIndex--;
+        }
+
+        var itemCount = _virtualScrollAdapter.GetItemCount(foundSectionIndex);
+        
+        // Check if it's within items
+        if (relativeIndex < itemCount)
+        {
+            sectionIndex = foundSectionIndex;
+            itemIndex = relativeIndex;
+            return true;
+        }
+
+        // Must be section footer
+        return false;
+    }
+
+    public bool TryGetPositionInfo(int flattenedIndex, out VirtualScrollFlattenedPositionType positionType, out int sectionIndex)
+    {
+        positionType = VirtualScrollFlattenedPositionType.Item;
+        sectionIndex = -1;
+
+        if (flattenedIndex < 0 || flattenedIndex >= _flattenedLength)
+        {
+            return false;
+        }
+
+        var adjustedIndex = flattenedIndex;
+
+        // Handle global header
+        if (_hasGlobalHeader)
+        {
+            if (adjustedIndex == 0)
+            {
+                positionType = VirtualScrollFlattenedPositionType.GlobalHeader;
+                sectionIndex = VirtualScrollRange.GlobalHeaderSectionIndex;
+                return true;
+            }
+            adjustedIndex--; // Adjust for global header
+        }
+
+        // Find which section this flattened index belongs to using binary search
+        var foundSectionIndex = FindSectionForFlattenedIndex(adjustedIndex);
+        if (foundSectionIndex < 0)
+        {
+            // Must be global footer
+            positionType = VirtualScrollFlattenedPositionType.GlobalFooter;
+            sectionIndex = VirtualScrollRange.GlobalFooterSectionIndex;
+            return true;
+        }
+
+        var sectionStartOffset = _sectionOffsets[foundSectionIndex];
+        var relativeIndex = adjustedIndex - sectionStartOffset;
+
+        // Check if it's section header
+        if (_hasSectionHeader)
+        {
+            if (relativeIndex == 0)
+            {
+                positionType = VirtualScrollFlattenedPositionType.SectionHeader;
+                sectionIndex = foundSectionIndex;
+                return true;
+            }
+            relativeIndex--;
+        }
+
+        var itemCount = _virtualScrollAdapter.GetItemCount(foundSectionIndex);
+        
+        // Check if it's within items
+        if (relativeIndex < itemCount)
+        {
+            positionType = VirtualScrollFlattenedPositionType.Item;
+            sectionIndex = foundSectionIndex;
+            return true;
+        }
+
+        // Must be section footer
+        positionType = VirtualScrollFlattenedPositionType.SectionFooter;
+        sectionIndex = foundSectionIndex;
+        return true;
+    }
+
     public int GetFlattenedIndexForSectionStart(int sectionIndex)
     {
         if (sectionIndex < 0)

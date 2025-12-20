@@ -106,4 +106,9 @@ public interface IVirtualScroll : IView
     /// <param name="position">The position to scroll to. Defaults to <see cref="Microsoft.Maui.Controls.ScrollToPosition.MakeVisible"/>.</param>
     /// <param name="animated">Whether the scroll should be animated. Defaults to <c>true</c>.</param>
     void ScrollTo(object itemOrSection, Microsoft.Maui.Controls.ScrollToPosition position = Microsoft.Maui.Controls.ScrollToPosition.MakeVisible, bool animated = true);
+    
+    /// <summary>
+    /// Event raised when the scroll position changes.
+    /// </summary>
+    event EventHandler<VirtualScrollScrolledEventArgs> OnScrolled;
 }

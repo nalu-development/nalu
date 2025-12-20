@@ -1,3 +1,4 @@
+using Foundation;
 using UIKit;
 
 namespace Nalu;
@@ -11,6 +12,13 @@ internal static class VirtualScrollPlatformLayoutFactory
     public const string ElementKindGlobalFooter = "UICollectionElementKindGlobalFooter";
     public static readonly string ElementKindSectionHeader = UICollectionElementKindSectionKey.Header.ToString();
     public static readonly string ElementKindSectionFooter = UICollectionElementKindSectionKey.Footer.ToString();
+    
+    // ReSharper disable InconsistentNaming
+    public static readonly NSString NSElementKindGlobalHeader = new(ElementKindGlobalHeader);
+    public static readonly NSString NSElementKindGlobalFooter = new(ElementKindGlobalFooter);
+    public static readonly NSString NSElementKindSectionHeader = new(ElementKindSectionHeader);
+    public static readonly NSString NSElementKindSectionFooter = new(ElementKindSectionFooter);
+    // ReSharper restore InconsistentNaming
     
     /// <summary>
     /// Creates a list layout for the specified linear layout.

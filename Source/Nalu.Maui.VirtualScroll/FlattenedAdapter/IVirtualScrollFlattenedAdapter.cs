@@ -29,6 +29,24 @@ internal interface IVirtualScrollFlattenedAdapter : IDisposable
     /// <param name="sectionIndex">The index of the section.</param>
     /// <returns>The flattened index for the section start, or -1 if the section index is invalid.</returns>
     int GetFlattenedIndexForSectionStart(int sectionIndex);
+    
+    /// <summary>
+    /// Converts a flattened index to section and item indices.
+    /// </summary>
+    /// <param name="flattenedIndex">The flattened index to convert.</param>
+    /// <param name="sectionIndex">When this method returns, contains the section index, or -1 if the flattened index is invalid or points to a header/footer.</param>
+    /// <param name="itemIndex">When this method returns, contains the item index within the section, or -1 if the flattened index is invalid or points to a header/footer.</param>
+    /// <returns>True if the flattened index corresponds to an item (not a header/footer), false otherwise.</returns>
+    bool TryGetSectionAndItemIndex(int flattenedIndex, out int sectionIndex, out int itemIndex);
+    
+    /// <summary>
+    /// Gets the position type and section index for a flattened index.
+    /// </summary>
+    /// <param name="flattenedIndex">The flattened index.</param>
+    /// <param name="positionType">When this method returns, contains the position type.</param>
+    /// <param name="sectionIndex">When this method returns, contains the section index. For global header/footer, this will be -1 or -2. For section header/footer, this will be the actual section index. For items, this will be the section index.</param>
+    /// <returns>True if the flattened index is valid, false otherwise.</returns>
+    bool TryGetPositionInfo(int flattenedIndex, out VirtualScrollFlattenedPositionType positionType, out int sectionIndex);
 
     /// <summary>
     /// Subscribes to change notifications.

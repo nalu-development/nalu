@@ -21,6 +21,7 @@ public partial class VirtualScrollHandler
     private VirtualScrollPlatformFlattenedAdapterNotifier? _notifier;
     private SwipeRefreshLayout? _swipeRefreshLayout;
     private FrameLayout? _rootLayout;
+    private VirtualScrollRecyclerViewScrollListener? _scrollListener;
     private bool _isUpdatingIsRefreshingFromPlatform;
     private IVirtualScrollFlattenedAdapter? _flattenedAdapter;
 
@@ -31,6 +32,8 @@ public partial class VirtualScrollHandler
 
         var recyclerView = new VirtualScrollRecyclerView(context);
         _recyclerView = recyclerView;
+
+        // Scroll listener will be set up when needed via MapSetScrollEventEnabled
 
         _swipeRefreshLayout = new SwipeRefreshLayout(context);
         _swipeRefreshLayout.AddView(
@@ -80,6 +83,13 @@ public partial class VirtualScrollHandler
     {
         _notifier?.Dispose();
         _notifier = null;
+        
+        if (_recyclerView is not null && _scrollListener is not null)
+        {
+            _recyclerView.RemoveOnScrollListener(_scrollListener);
+            _scrollListener = null;
+        }
+        
         _recyclerViewAdapter?.Dispose();
         _recyclerViewAdapter = null;
         _recyclerView?.Dispose();
@@ -92,6 +102,78 @@ public partial class VirtualScrollHandler
     }
 
     internal VirtualScrollRecyclerView GetRecyclerView() => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");
+
+    /// <summary>
+    /// Gets the range of currently visible items in the virtual scroll.
+    /// </summary>
+    /// <returns>A <see cref="VirtualScrollRange"/> containing the first and last visible item positions, or <c>null</c> if no items are visible.</returns>
+    public VirtualScrollRange? GetVisibleItemsRange()
+    {
+        if (_recyclerView is null || _flattenedAdapter is null)
+        {
+            return null;
+        }
+
+        var layoutManager = _recyclerView.GetLayoutManager();
+        if (layoutManager is not LinearLayoutManager linearLayoutManager)
+        {
+            return null;
+        }
+
+        var firstVisiblePosition = linearLayoutManager.FindFirstVisibleItemPosition();
+        var lastVisiblePosition = linearLayoutManager.FindLastVisibleItemPosition();
+
+        if (firstVisiblePosition < 0 || lastVisiblePosition < 0)
+        {
+            return null;
+        }
+
+        (int Section, int Item)? start = null;
+        (int Section, int Item)? end = null;
+
+        for (var i = firstVisiblePosition; i <= lastVisiblePosition; i++)
+        {
+            var position = GetPositionFromFlattenedIndex(i);
+            if (!position.HasValue)
+            {
+                continue;
+            }
+
+            if (!start.HasValue)
+            {
+                start = position;
+            }
+
+            end = position;
+        }
+
+        if (!start.HasValue || !end.HasValue)
+        {
+            return null;
+        }
+
+        return new VirtualScrollRange(start.Value.Section, start.Value.Item, end.Value.Section, end.Value.Item);
+    }
+
+    private (int Section, int Item)? GetPositionFromFlattenedIndex(int flattenedIndex)
+    {
+        if (_flattenedAdapter is null || !_flattenedAdapter.TryGetPositionInfo(flattenedIndex, out var positionType, out var sectionIdx))
+        {
+            return null;
+        }
+
+        return positionType switch
+        {
+            VirtualScrollFlattenedPositionType.GlobalHeader => (VirtualScrollRange.GlobalHeaderSectionIndex, 0),
+            VirtualScrollFlattenedPositionType.GlobalFooter => (VirtualScrollRange.GlobalFooterSectionIndex, 0),
+            VirtualScrollFlattenedPositionType.SectionHeader => (sectionIdx, VirtualScrollRange.SectionHeaderItemIndex),
+            VirtualScrollFlattenedPositionType.SectionFooter => (sectionIdx, VirtualScrollRange.SectionFooterItemIndex),
+            VirtualScrollFlattenedPositionType.Item => _flattenedAdapter.TryGetSectionAndItemIndex(flattenedIndex, out var itemSectionIdx, out var itemIdx)
+                ? (itemSectionIdx, itemIdx)
+                : null,
+            _ => null
+        };
+    }
 
     /// <summary>
     /// Maps the adapter property from the virtual scroll to the platform recycler view.
@@ -262,6 +344,7 @@ public partial class VirtualScrollHandler
         public void OnRefresh() => _onRefresh();
     }
 
+
     /// <summary>
     /// Maps the ScrollTo command from the virtual scroll to the platform recycler view.
     /// </summary>
@@ -337,6 +420,48 @@ public partial class VirtualScrollHandler
         else
         {
             scrollHelper.JumpScrollToPosition(flattenedIndex, position);
+        }
+    }
+
+    /// <summary>
+    /// Maps the scroll event enabled state from the virtual scroll to the platform recycler view scroll listener.
+    /// </summary>
+    public static void MapSetScrollEventEnabled(VirtualScrollHandler handler, IVirtualScroll virtualScroll, object? args)
+    {
+        if (args is not bool enabled)
+        {
+            return;
+        }
+
+        var recyclerView = handler._recyclerView;
+        if (recyclerView is null)
+        {
+            return;
+        }
+
+        if (enabled)
+        {
+            // Enable scroll events - add listener if not already added
+            if (handler._scrollListener is null)
+            {
+                handler._scrollListener = new VirtualScrollRecyclerViewScrollListener((rv, scrollX, scrollY, totalWidth, totalHeight) =>
+                {
+                    if (virtualScroll is IVirtualScrollController controller)
+                    {
+                        controller.Scrolled(scrollX, scrollY, totalWidth, totalHeight);
+                    }
+                });
+                recyclerView.AddOnScrollListener(handler._scrollListener);
+            }
+        }
+        else
+        {
+            // Disable scroll events - remove listener
+            if (handler._scrollListener is not null)
+            {
+                recyclerView.RemoveOnScrollListener(handler._scrollListener);
+                handler._scrollListener = null;
+            }
         }
     }
 }

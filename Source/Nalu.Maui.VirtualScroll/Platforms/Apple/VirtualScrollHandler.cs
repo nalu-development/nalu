@@ -17,6 +17,7 @@ public partial class VirtualScrollHandler
     private VirtualScrollPlatformReuseIdManager? _reuseIdManager;
     private VirtualScrollPlatformDataSourceNotifier? _notifier;
     private UIRefreshControl? _refreshControl;
+    private VirtualScrollDelegate? _delegate;
     private bool _isUpdatingIsRefreshingFromPlatform;
 
     /// <summary>
@@ -24,6 +25,77 @@ public partial class VirtualScrollHandler
     /// </summary>
     /// <exception cref="InvalidOperationException">when the handler is not connected.</exception>
     protected UICollectionView CollectionView => (UICollectionView)PlatformView;
+
+    /// <summary>
+    /// Gets the range of currently visible items in the virtual scroll.
+    /// </summary>
+    /// <returns>A <see cref="VirtualScrollRange"/> containing the first and last visible item positions, or <c>null</c> if no items are visible.</returns>
+    public VirtualScrollRange? GetVisibleItemsRange()
+    {
+        var collectionView = CollectionView;
+        var layoutInfo = VirtualView as IVirtualScrollLayoutInfo;
+
+        (int Section, int Item)? start = null;
+        (int Section, int Item)? end = null;
+
+        void UpdateRange(int section, int item)
+        {
+            if (!start.HasValue || (section, item).CompareTo(start.Value) < 0)
+            {
+                start = (section, item);
+            }
+
+            if (!end.HasValue || (section, item).CompareTo(end.Value) > 0)
+            {
+                end = (section, item);
+            }
+        }
+
+        // Check global header
+        if (layoutInfo?.HasGlobalHeader == true &&
+            collectionView.GetIndexPathsForVisibleSupplementaryElements(VirtualScrollPlatformLayoutFactory.NSElementKindGlobalHeader).Length > 0)
+        {
+            UpdateRange(VirtualScrollRange.GlobalHeaderSectionIndex, 0);
+        }
+
+        // Check global footer
+        if (layoutInfo?.HasGlobalFooter == true &&
+            collectionView.GetIndexPathsForVisibleSupplementaryElements(VirtualScrollPlatformLayoutFactory.NSElementKindGlobalFooter).Length > 0)
+        {
+            UpdateRange(VirtualScrollRange.GlobalFooterSectionIndex, 0);
+        }
+
+        // Check section headers
+        if (layoutInfo?.HasSectionHeader == true)
+        {
+            foreach (var indexPath in collectionView.GetIndexPathsForVisibleSupplementaryElements(VirtualScrollPlatformLayoutFactory.NSElementKindSectionHeader))
+            {
+                UpdateRange(indexPath.Section, VirtualScrollRange.SectionHeaderItemIndex);
+            }
+        }
+
+        // Check section footers
+        if (layoutInfo?.HasSectionFooter == true)
+        {
+            foreach (var indexPath in collectionView.GetIndexPathsForVisibleSupplementaryElements(VirtualScrollPlatformLayoutFactory.NSElementKindSectionFooter))
+            {
+                UpdateRange(indexPath.Section, VirtualScrollRange.SectionFooterItemIndex);
+            }
+        }
+
+        // Check visible items
+        foreach (var indexPath in collectionView.IndexPathsForVisibleItems)
+        {
+            UpdateRange(indexPath.Section, indexPath.Item.ToInt32());
+        }
+
+        if (!start.HasValue || !end.HasValue)
+        {
+            return null;
+        }
+
+        return new VirtualScrollRange(start.Value.Section, start.Value.Item, end.Value.Section, end.Value.Item);
+    }
 
     /// <inheritdoc />
     protected override UIView CreatePlatformView()
@@ -57,6 +129,13 @@ public partial class VirtualScrollHandler
         collectionView.AlwaysBounceVertical = true;
         collectionView.RefreshControl = _refreshControl;
 
+        // Always create delegate (but scroll events are enabled/disabled via SetScrollEventsEnabled)
+        if (VirtualView is IVirtualScrollController controller)
+        {
+            _delegate = new VirtualScrollDelegate(controller);
+            collectionView.Delegate = _delegate;
+        }
+
         return collectionView;
     }
 
@@ -76,7 +155,12 @@ public partial class VirtualScrollHandler
         base.DisconnectHandler(platformView);
         var collectionView = (VirtualScrollCollectionView)platformView;
         collectionView.DataSource = null!;
+        collectionView.Delegate = null!;
         collectionView.RefreshControl = null;
+        
+        _delegate?.Dispose();
+        _delegate = null;
+        
         platformView.Dispose();
         _reuseIdManager = null;
     }
@@ -379,5 +463,19 @@ public partial class VirtualScrollHandler
         var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
 
         collectionView.ScrollToItem(indexPath, scrollPosition, animated);
+    }
+
+    /// <summary>
+    /// Maps the scroll event enabled state from the virtual scroll to the platform collection view delegate.
+    /// </summary>
+    public static void MapSetScrollEventEnabled(VirtualScrollHandler handler, IVirtualScroll virtualScroll, object? args)
+    {
+        if (args is not bool enabled)
+        {
+            return;
+        }
+
+        // Delegate is always attached, just enable/disable scroll event notifications
+        handler._delegate?.SetScrollEventsEnabled(enabled);
     }
 }

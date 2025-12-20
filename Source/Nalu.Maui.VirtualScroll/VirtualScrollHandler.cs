@@ -37,9 +37,10 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     /// The command mapper for the <see cref="IVirtualScroll" /> interface.
     /// </summary>
     public static readonly CommandMapper<IVirtualScroll, VirtualScrollHandler> CommandMapper =
-        new(ViewCommandMapper!)
+        new(ViewCommandMapper)
         {
             [nameof(IVirtualScroll.ScrollTo)] = MapScrollTo,
+            ["SetScrollEventEnabled"] = MapSetScrollEventEnabled,
         };
 
     /// <summary>

@@ -8,6 +8,15 @@
   href: layouts.md
 - name: VirtualScroll
   href: virtualscroll.md
+  items:
+    - name: Overview
+      href: virtualscroll.md
+    - name: Scrolling
+      href: virtualscroll-scrolling.md
+    - name: Custom Adapters
+      href: virtualscroll-adapters.md
+    - name: Performance
+      href: virtualscroll-performance.md
 - name: Navigation
   href: navigation.md
   items:
