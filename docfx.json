@@ -8,6 +8,7 @@
             "Source/Nalu.Maui.Core/Nalu.Maui.Core.csproj",
             "Source/Nalu.Maui.Controls/Nalu.Maui.Controls.csproj",
             "Source/Nalu.Maui.Layouts/Nalu.Maui.Layouts.csproj",
+            "Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj",
             "Source/Nalu.Maui.Navigation/Nalu.Maui.Navigation.csproj"
           ]
         }

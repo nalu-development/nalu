@@ -205,6 +205,44 @@ virtualScroll.OnRefresh += async (sender, args) =>
 };
 ```
 
+### Fading Edge
+
+`VirtualScroll` supports a fading edge effect that creates a smooth gradient at the scrollable edges, providing visual feedback about scrollable content. The fading edge automatically adapts to the scroll direction based on the `ItemsLayout` orientation.
+
+```xml
+<!-- Vertical scrolling with fading edge -->
+<nalu:VirtualScroll Adapter="{Binding Items}"
+                    ItemsLayout="{x:Static nalu:LinearVirtualScrollLayout.Vertical}"
+                    FadingEdgeLength="16">
+    ...
+</nalu:VirtualScroll>
+
+<!-- Horizontal scrolling with fading edge -->
+<nalu:VirtualScroll Adapter="{Binding Items}"
+                    ItemsLayout="{x:Static nalu:LinearVirtualScrollLayout.Horizontal}"
+                    FadingEdgeLength="24">
+    ...
+</nalu:VirtualScroll>
+```
+
+#### How It Works
+
+- **Vertical layouts**: The fading edge appears at the top and/or bottom edges when content extends beyond the visible area
+- **Horizontal layouts**: The fading edge appears at the left and/or right edges when content extends beyond the visible area
+- The fading edge automatically appears/disappears based on scroll position:
+  - When scrolled to the start, only the end edge shows fading
+  - When scrolled to the end, only the start edge shows fading
+  - When in the middle, both edges show fading
+  - When all content fits in the view, no fading edge is shown
+
+#### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `FadingEdgeLength` | `double` | `0.0` | The length of the fading edge effect in device-independent units. A value of `0` disables the fading edge. The orientation (horizontal or vertical) is automatically determined from the `ItemsLayout`. |
+
+> **Note:** The fading edge feature is optimized for Android and iOS platforms. On Android, it uses native `RecyclerView` fading edge support. On iOS, it uses a custom gradient mask implementation.
+
 ### Custom Adapters
 
 For advanced scenarios requiring sectioned data or direct data source access, implement `IVirtualScrollAdapter`. See [Custom Adapters](virtualscroll-adapters.md) for complete documentation.
@@ -354,36 +392,9 @@ public partial class ItemListPage : ContentPage
 }
 ```
 
-### Properties Reference
+### API Reference
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `Adapter` | `object?` | `null` | The data source. Accepts `ObservableCollection<T>`, `IEnumerable`, or `IVirtualScrollAdapter` |
-| `ItemTemplate` | `DataTemplate?` | `null` | Template for each item |
-| `HeaderTemplate` | `DataTemplate?` | `null` | Template for the global header |
-| `FooterTemplate` | `DataTemplate?` | `null` | Template for the global footer |
-| `SectionHeaderTemplate` | `DataTemplate?` | `null` | Template for section headers |
-| `SectionFooterTemplate` | `DataTemplate?` | `null` | Template for section footers |
-| `ItemsLayout` | `IVirtualScrollLayout` | `LinearVirtualScrollLayout.Vertical` | Controls item arrangement |
-| `ScrolledCommand` | `ICommand?` | `null` | Command executed when scroll position changes. Receives `VirtualScrollScrolledEventArgs` as parameter |
-| `IsRefreshEnabled` | `bool` | `false` | Enables pull-to-refresh |
-| `RefreshCommand` | `ICommand?` | `null` | Command for refresh action |
-| `RefreshAccentColor` | `Color?` | `null` | Refresh indicator color |
-| `IsRefreshing` | `bool` | `false` | Indicates refresh state (two-way) |
-
-### Methods Reference
-
-| Method | Description |
-|--------|-------------|
-| `ScrollTo(int sectionIndex, int itemIndex, ScrollToPosition position, bool animated)` | Scrolls to item by indices |
-| `ScrollTo(object itemOrSection, ScrollToPosition position, bool animated)` | Scrolls to item or section by object reference |
-| `GetVisibleItemsRange()` | Returns a `VirtualScrollRange?` containing the first and last visible item positions, or `null` if no items are visible |
-
-### Events Reference
-
-| Event | Description |
-|-------|-------------|
-| `OnScrolled` | Event raised when the scroll position changes. Provides `VirtualScrollScrolledEventArgs` with scroll position and dimensions |
+For complete API documentation including all properties, methods, and events, see the [VirtualScroll API Reference](https://nalu-development.github.io/nalu/api/Nalu.VirtualScroll.html).
 
 ### Platform Support
 
