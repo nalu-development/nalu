@@ -18,8 +18,14 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     private readonly List<WeakReference<VirtualScrollCell>> _createdCells = new(16);
     private readonly List<NSIndexPath> _invalidatedPaths = new(16);
     private bool _needsCellsLayout;
+    private CGSize _lastContentSize;
 
     bool IVirtualScrollCellsLayoutController.NeedsCellsLayout => _needsCellsLayout;
+    
+    /// <summary>
+    /// Event raised when the content size changes.
+    /// </summary>
+    internal event EventHandler<EventArgs>? ContentSizeChanged;
     
     
     /// <summary>
@@ -29,6 +35,7 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     {
         // ReSharper disable once VirtualMemberCallInConstructor
         AutomaticallyAdjustsScrollIndicatorInsets = true;
+        _lastContentSize = frame.Size;
     }
 
     internal void SetNeedsCellsLayout() => _needsCellsLayout = true;
@@ -38,6 +45,14 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     {
         InvalidateNeedingMeasureCells();
         base.LayoutSubviews();
+        
+        // Detect content size changes to update fading edge
+        var contentSize = ContentSize;
+        if (!contentSize.Equals(_lastContentSize))
+        {
+            _lastContentSize = contentSize;
+            ContentSizeChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
     
     private void InvalidateNeedingMeasureCells()

@@ -88,7 +88,16 @@ public interface IVirtualScroll : IView
     /// Setting this to false will stop the refresh indicator.
     /// </summary>
     bool IsRefreshing { get; set; }
-    
+
+    /// <summary>
+    /// Gets or sets the length of the fading edge effect in device-independent units.
+    /// </summary>
+    /// <remarks>
+    /// A value of 0 means no fading edge is applied (default).
+    /// The orientation of the fading edge is determined by the layout orientation (horizontal or vertical).
+    /// </remarks>
+    double FadingEdgeLength { get; }
+
     /// <summary>
     /// Scrolls to the specified item in the virtual scroll.
     /// </summary>
@@ -96,7 +105,7 @@ public interface IVirtualScroll : IView
     /// <param name="itemIndex">The index of the item within the section. Use -1 to scroll to the section header.</param>
     /// <param name="position">The position to scroll to. Defaults to <see cref="Microsoft.Maui.Controls.ScrollToPosition.MakeVisible"/>.</param>
     /// <param name="animated">Whether the scroll should be animated. Defaults to <c>true</c>.</param>
-    void ScrollTo(int sectionIndex, int itemIndex, Microsoft.Maui.Controls.ScrollToPosition position = Microsoft.Maui.Controls.ScrollToPosition.MakeVisible, bool animated = true);
+    void ScrollTo(int sectionIndex, int itemIndex, ScrollToPosition position = ScrollToPosition.MakeVisible, bool animated = true);
     
     /// <summary>
     /// Scrolls to the specified item or section in the virtual scroll.
@@ -105,7 +114,7 @@ public interface IVirtualScroll : IView
     /// <param name="itemOrSection">The item or section object to scroll to.</param>
     /// <param name="position">The position to scroll to. Defaults to <see cref="Microsoft.Maui.Controls.ScrollToPosition.MakeVisible"/>.</param>
     /// <param name="animated">Whether the scroll should be animated. Defaults to <c>true</c>.</param>
-    void ScrollTo(object itemOrSection, Microsoft.Maui.Controls.ScrollToPosition position = Microsoft.Maui.Controls.ScrollToPosition.MakeVisible, bool animated = true);
+    void ScrollTo(object itemOrSection, ScrollToPosition position = ScrollToPosition.MakeVisible, bool animated = true);
     
     /// <summary>
     /// Event raised when the scroll position changes.

@@ -1,6 +1,7 @@
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.Controls.Handlers.Items;
+using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 using UIKit;
 
@@ -19,12 +20,14 @@ public partial class VirtualScrollHandler
     private UIRefreshControl? _refreshControl;
     private VirtualScrollDelegate? _delegate;
     private bool _isUpdatingIsRefreshingFromPlatform;
+    private VirtualScrollCollectionView? _collectionView;
+    private VirtualScrollContainerView? _containerView;
 
     /// <summary>
     /// Gets the <see cref="UICollectionView"/> platform view.
     /// </summary>
     /// <exception cref="InvalidOperationException">when the handler is not connected.</exception>
-    protected UICollectionView CollectionView => (UICollectionView)PlatformView;
+    protected UICollectionView CollectionView => _collectionView ?? throw new InvalidOperationException("CollectionView has not been created.");
 
     /// <summary>
     /// Gets the range of currently visible items in the virtual scroll.
@@ -105,6 +108,7 @@ public partial class VirtualScrollHandler
         var reuseIdManager = new VirtualScrollPlatformReuseIdManager(collectionView);
 
         _reuseIdManager = reuseIdManager;
+        _collectionView = collectionView;
 
         // Create refresh control
         _refreshControl = new UIRefreshControl();
@@ -130,13 +134,52 @@ public partial class VirtualScrollHandler
         collectionView.RefreshControl = _refreshControl;
 
         // Always create delegate (but scroll events are enabled/disabled via SetScrollEventsEnabled)
-        if (VirtualView is IVirtualScrollController controller)
-        {
-            _delegate = new VirtualScrollDelegate(controller);
-            collectionView.Delegate = _delegate;
-        }
+        var controller = VirtualView as IVirtualScrollController ?? throw new InvalidOperationException("VirtualView must implement IVirtualScrollController.");
+        var virtualScroll = VirtualView as VirtualScroll ?? throw new InvalidOperationException("VirtualView must be a VirtualScroll instance.");
+        
+        var scrollDirection = layout is VirtualScrollCollectionViewLayout virtualScrollLayout
+            ? virtualScrollLayout.ScrollDirection
+            : UICollectionViewScrollDirection.Vertical;
+        
+        _delegate = new VirtualScrollDelegate(controller, scrollDirection, virtualScroll.FadingEdgeLength);
+        collectionView.Delegate = _delegate;
 
-        return collectionView;
+        // Wrap collection view in a container view for fading edge support
+        _containerView = new VirtualScrollContainerView();
+        
+        // Subscribe to events for fading edge updates
+        _containerView.BoundsChanged += OnFadingEdgeBoundsChanged;
+        collectionView.ContentSizeChanged += OnFadingEdgeBoundsChanged;
+        
+        var containerView = _containerView;
+        collectionView.TranslatesAutoresizingMaskIntoConstraints = false;
+        containerView.AddSubview(collectionView);
+        
+        NSLayoutConstraint.ActivateConstraints([
+            collectionView.TopAnchor.ConstraintEqualTo(containerView.TopAnchor),
+            collectionView.LeadingAnchor.ConstraintEqualTo(containerView.LeadingAnchor),
+            collectionView.TrailingAnchor.ConstraintEqualTo(containerView.TrailingAnchor),
+            collectionView.BottomAnchor.ConstraintEqualTo(containerView.BottomAnchor)
+        ]);
+
+        return containerView;
+    }
+
+    private void OnFadingEdgeBoundsChanged(object? s, EventArgs e)
+    {
+        if (_collectionView is not null)
+        {
+            _delegate?.UpdateFadingEdge(_collectionView);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void ConnectHandler(UIView platformView)
+    {
+        base.ConnectHandler(platformView);
+        
+        // Initial fading edge update
+        _delegate?.UpdateFadingEdge(_collectionView!);
     }
 
     /// <inheritdoc />
@@ -153,15 +196,26 @@ public partial class VirtualScrollHandler
         }
         
         base.DisconnectHandler(platformView);
-        var collectionView = (VirtualScrollCollectionView)platformView;
-        collectionView.DataSource = null!;
-        collectionView.Delegate = null!;
-        collectionView.RefreshControl = null;
+        
+        // Unsubscribe from events
+        if (_containerView is not null)
+        {
+            _containerView.BoundsChanged -= OnFadingEdgeBoundsChanged;
+        }
+        
+        if (_collectionView is not null)
+        {
+            _collectionView.ContentSizeChanged -= OnFadingEdgeBoundsChanged;
+            _collectionView.DataSource = null!;
+            _collectionView.Delegate = null!;
+            _collectionView.RefreshControl = null;
+        }
         
         _delegate?.Dispose();
         _delegate = null;
         
-        platformView.Dispose();
+        _collectionView = null;
+        _containerView = null;
         _reuseIdManager = null;
     }
 
@@ -204,6 +258,17 @@ public partial class VirtualScrollHandler
         var collectionView = handler.CollectionView;
         var animated = collectionView.Window is not null;
         collectionView.SetCollectionViewLayout(layout, animated);
+        
+        // Update cached orientation and fading edge when layout changes (orientation might have changed)
+        var scrollDirection = layout is VirtualScrollCollectionViewLayout virtualScrollLayout
+            ? virtualScrollLayout.ScrollDirection
+            : UICollectionViewScrollDirection.Vertical;
+        
+        handler._delegate?.UpdateOrientation(scrollDirection);
+        if (handler._collectionView is not null)
+        {
+            handler._delegate?.UpdateFadingEdge(handler._collectionView);
+        }
     }
     
     private static UICollectionViewLayout CreatePlatformLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
@@ -256,6 +321,15 @@ public partial class VirtualScrollHandler
 
         // TODO: Optimize instead of recreating layout
         MapLayout(handler, virtualScroll);
+    }
+    
+    /// <summary>
+    /// Maps the background property from the virtual scroll to the platform collection view.
+    /// </summary>
+    public static void MapBackground(VirtualScrollHandler handler, IView view)
+    {
+        var collectionView = handler.CollectionView;
+        collectionView.UpdateBackground(view);
     }
 
     /// <summary>
@@ -477,5 +551,16 @@ public partial class VirtualScrollHandler
 
         // Delegate is always attached, just enable/disable scroll event notifications
         handler._delegate?.SetScrollEventsEnabled(enabled);
+    }
+
+    /// <summary>
+    /// Maps the fading edge length property from the virtual scroll to the platform collection view.
+    /// </summary>
+    public static void MapFadingEdgeLength(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        if (virtualScroll is VirtualScroll vs && handler._collectionView is not null)
+        {
+            handler._delegate?.UpdateFadingEdgeLength(handler._collectionView, vs.FadingEdgeLength);
+        }
     }
 }

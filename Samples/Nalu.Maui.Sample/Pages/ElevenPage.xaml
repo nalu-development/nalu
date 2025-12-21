@@ -8,52 +8,51 @@
              x:DataType="pageModels:ElevenPageModel"
              Title="Grouped VirtualScroll">
     <ContentPage.Content>
-        <Grid>
+        <Grid Background="LightGoldenrodYellow">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Visible Range Info Label -->
-            <Label x:Name="RangeInfoLabel"
-                   Grid.Row="0"
-                   Text="Visible Range: -"
-                   FontSize="12"
-                   Padding="16,8"
-                   BackgroundColor="#E0E0E0"
-                   TextColor="Black" />
+            <VerticalStackLayout Grid.Row="0" BackgroundColor="#E0E0E0">
+                <!-- Visible Range Info Label -->
+                <Label x:Name="RangeInfoLabel"
+                       Text="Visible Range: -"
+                       FontSize="12"
+                       Padding="16,8"
+                       TextColor="Black" />
 
-            <!-- Toolbar with action buttons -->
-            <Grid Grid.Row="1" 
-                  ColumnDefinitions="*,*,*,*,*"
-                  Padding="16,8"
-                  ColumnSpacing="8"
-                  Background="LightGoldenrodYellow">
-                <Button Grid.Column="0"
-                        Text="+Grp"
-                        FontSize="12"
-                        Command="{Binding AddGroupCommand}" />
-                <Button Grid.Column="1"
-                        Text="-Grp"
-                        FontSize="12"
-                        Command="{Binding RemoveGroupCommand}" />
-                <Button Grid.Column="2"
-                        Text="+Item"
-                        FontSize="12"
-                        Command="{Binding AddItemCommand}" />
-                <Button Grid.Column="3"
-                        Text="-Item"
-                        FontSize="12"
-                        Command="{Binding RemoveItemCommand}" />
-                <Button Grid.Column="4"
-                        Text="Move"
-                        FontSize="12"
-                        Command="{Binding MoveItemCommand}" />
-            </Grid>
+                <!-- Toolbar with action buttons -->
+                <Grid ColumnDefinitions="*,*,*,*,*"
+                      Padding="16,8"
+                      ColumnSpacing="8">
+                    <Button Grid.Column="0"
+                            Text="+Grp"
+                            FontSize="12"
+                            Command="{Binding AddGroupCommand}" />
+                    <Button Grid.Column="1"
+                            Text="-Grp"
+                            FontSize="12"
+                            Command="{Binding RemoveGroupCommand}" />
+                    <Button Grid.Column="2"
+                            Text="+Item"
+                            FontSize="12"
+                            Command="{Binding AddItemCommand}" />
+                    <Button Grid.Column="3"
+                            Text="-Item"
+                            FontSize="12"
+                            Command="{Binding RemoveItemCommand}" />
+                    <Button Grid.Column="4"
+                            Text="Move"
+                            FontSize="12"
+                            Command="{Binding MoveItemCommand}" />
+                </Grid>
+            </VerticalStackLayout>
 
             <!-- Grouped VirtualScroll -->
-            <nalu:VirtualScroll Grid.Row="2"
+            <nalu:VirtualScroll Grid.Row="1"
+                                FadingEdgeLength="32"
+                                Background="LightGoldenrodYellow"
                                 x:Name="VirtualScroll"
                                 Adapter="{Binding Adapter}"
                                 OnScrolled="VirtualScroll_OnScrolled">
@@ -61,7 +60,7 @@
                 <!-- Global Header -->
                 <nalu:VirtualScroll.HeaderTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenPageModel">
-                        <VerticalStackLayout Padding="16" Background="LightGoldenrodYellow">
+                        <VerticalStackLayout Padding="16">
                             <Image Source="banner.png"
                                    HeightRequest="100"
                                    Aspect="AspectFit"
@@ -99,16 +98,14 @@
                 <!-- Section Header Template -->
                 <nalu:VirtualScroll.SectionHeaderTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenGroup">
-                        <nalu:ViewBox>
-                            <Grid BackgroundColor="#FF6B6B"
-                                  Padding="16,12">
-                                <Label Text="{Binding Title}"
-                                       FontSize="18"
-                                       FontAttributes="Bold"
-                                       TextColor="White"
-                                       VerticalOptions="Center" />
-                            </Grid>
-                        </nalu:ViewBox>
+                        <Grid BackgroundColor="#FF6B6B"
+                              Padding="16,12">
+                            <Label Text="{Binding Title}"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Center" />
+                        </Grid>
                     </DataTemplate>
                 </nalu:VirtualScroll.SectionHeaderTemplate>
 
@@ -130,7 +127,7 @@
                 <!-- Item Template -->
                 <nalu:VirtualScroll.ItemTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenItem">
-                        <nalu:ViewBox>
+                        <nalu:ViewBox BackgroundColor="White">
                             <Border Shadow="{Shadow Radius=4, Opacity=0.15, Offset='1,1'}"
                                     StrokeShape="RoundRectangle 8"
                                     Margin="12,6"

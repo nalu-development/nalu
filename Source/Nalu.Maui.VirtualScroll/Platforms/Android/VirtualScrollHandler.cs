@@ -236,6 +236,9 @@ public partial class VirtualScrollHandler
             AViewGroup.LayoutParams.MatchParent,
             AViewGroup.LayoutParams.MatchParent
         );
+        
+        // Update fading edge when layout changes (orientation might have changed)
+        handler.UpdateFadingEdge(virtualScroll);
     }
 
     /// <summary>
@@ -327,6 +330,55 @@ public partial class VirtualScrollHandler
 
         var isRefreshing = virtualScroll.IsRefreshing;
         handler._swipeRefreshLayout.Refreshing = isRefreshing;
+    }
+
+    /// <summary>
+    /// Maps the fading edge length property from the virtual scroll to the platform recycler view.
+    /// </summary>
+    public static void MapFadingEdgeLength(VirtualScrollHandler handler, IVirtualScroll virtualScroll) => handler.UpdateFadingEdge(virtualScroll);
+
+    private void UpdateFadingEdge(IVirtualScroll virtualScroll)
+    {
+        var recyclerView = _recyclerView;
+        // ReSharper disable once UseNullPropagation
+        if (recyclerView is null)
+        {
+            return;
+        }
+
+        // Fading edge must be updated when the view is already part of the visual tree otherwise it won't appear
+        recyclerView.Post(DoUpdateFadingEdge);
+
+        return;
+
+        void DoUpdateFadingEdge()
+        {
+            if (virtualScroll.FadingEdgeLength <= 0)
+            {
+                recyclerView.HorizontalFadingEdgeEnabled = false;
+                recyclerView.VerticalFadingEdgeEnabled = false;
+                return;
+            }
+
+            var orientation = virtualScroll.ItemsLayout is LinearVirtualScrollLayout linearLayout
+                ? linearLayout.Orientation
+                : ItemsLayoutOrientation.Vertical;
+
+            switch (orientation)
+            {
+                case ItemsLayoutOrientation.Horizontal:
+                    recyclerView.HorizontalFadingEdgeEnabled = true;
+                    recyclerView.VerticalFadingEdgeEnabled = false;
+                    break;
+                case ItemsLayoutOrientation.Vertical:
+                    recyclerView.HorizontalFadingEdgeEnabled = false;
+                    recyclerView.VerticalFadingEdgeEnabled = true;
+                    break;
+            }
+
+            var fadingEdgePx = (int)recyclerView.Context!.ToPixels(virtualScroll.FadingEdgeLength);
+            recyclerView.SetFadingEdgeLength(fadingEdgePx);
+        }
     }
 
     /// <summary>

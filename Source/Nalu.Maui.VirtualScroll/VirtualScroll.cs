@@ -165,6 +165,15 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         BindingMode.TwoWay);
 
     /// <summary>
+    /// Bindable property for <see cref="FadingEdgeLength"/>.
+    /// </summary>
+    public static readonly BindableProperty FadingEdgeLengthProperty = BindableProperty.Create(
+        nameof(FadingEdgeLength),
+        typeof(double),
+        typeof(VirtualScroll),
+        0.0);
+
+    /// <summary>
     /// The adapter that provides data to the virtual scroll.
     /// </summary>
     public object? Adapter
@@ -269,6 +278,19 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     {
         get => (bool)GetValue(IsRefreshingProperty);
         set => SetValue(IsRefreshingProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the length of the fading edge effect in device-independent units.
+    /// </summary>
+    /// <remarks>
+    /// A value of 0 means no fading edge is applied (default).
+    /// The orientation of the fading edge is determined by the layout orientation (horizontal or vertical).
+    /// </remarks>
+    public double FadingEdgeLength
+    {
+        get => (double)GetValue(FadingEdgeLengthProperty);
+        set => SetValue(FadingEdgeLengthProperty, value);
     }
 
     /// <summary>

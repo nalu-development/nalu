@@ -39,6 +39,7 @@
                                 x:Name="VirtualScroll"
                                 Adapter="{Binding Items}"
                                 IsRefreshEnabled="True"
+                                FadingEdgeLength="32"
                                 RefreshCommand="{Binding RefreshCommand}"
                                 RefreshAccentColor="CornflowerBlue">
                 <nalu:VirtualScroll.HeaderTemplate>
