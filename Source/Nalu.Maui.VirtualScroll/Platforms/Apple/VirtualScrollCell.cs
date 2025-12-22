@@ -68,8 +68,8 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
         var constraint = ScrollDirection == UICollectionViewScrollDirection.Vertical
             ? new CGSize(layoutAttributes.Size.Width, double.PositiveInfinity)
             : new CGSize(double.PositiveInfinity, layoutAttributes.Size.Height);
-        
-        var measure = virtualView.Measure(constraint.Width, constraint.Height);
+
+        var measure = NativeView!.Hidden ? Size.Zero : virtualView.Measure(constraint.Width, constraint.Height);
         
         var size = ScrollDirection == UICollectionViewScrollDirection.Vertical
             ? new CGSize(layoutAttributes.Frame.Width, measure.Height)
