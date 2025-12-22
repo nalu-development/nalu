@@ -143,11 +143,10 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     {
         base.LayoutSubviews();
 
-        if (VirtualView is { } virtualView && NativeView is { } nativeView)
+        if (VirtualView is { } virtualView)
         {
-            var bounds = ContentView.Bounds;
-            virtualView.Arrange(bounds.ToRectangle());
-            nativeView.Frame = bounds;
+            var frame = ContentView.Bounds.ToRectangle();
+            virtualView.Arrange(frame);
         }
     }
 

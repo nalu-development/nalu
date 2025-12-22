@@ -4,6 +4,7 @@ using System.Text;
 using CoreFoundation;
 using CoreGraphics;
 using Foundation;
+using Microsoft.Maui.Controls.Handlers.Items;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
 using UIKit;
@@ -395,13 +396,16 @@ public static partial class SoftKeyboardManager
 
             void RestoreScrollView()
             {
-                parentScrollView?.SetContentOffset(
-                    new CGPoint(
-                        parentScrollView.ContentOffset.X,
-                        offsetY
-                    ),
-                    true
-                );
+                if (parentScrollView is MauiCollectionView collectionView)
+                {
+                    collectionView.SetContentOffset(
+                        new CGPoint(
+                            parentScrollView.ContentOffset.X,
+                            offsetY
+                        ),
+                        true
+                    );
+                }
             }
 
             UIView.Animate(

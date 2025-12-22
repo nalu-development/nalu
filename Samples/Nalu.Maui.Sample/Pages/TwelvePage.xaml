@@ -9,18 +9,56 @@
              x:DataType="pageModels:TwelvePageModel"
              Title="Credit Cards Comparison">
     <ContentPage.Content>
-        <Grid RowDefinitions="*,*">
-            <!-- CollectionView Row -->
-            <Grid Grid.Row="0" RowDefinitions="Auto,*">
-                <Label Grid.Row="0"
-                       Text="CollectionView (MAUI)"
-                       FontSize="18"
-                       FontAttributes="Bold"
-                       Padding="16,8"
-                       Background="LightGray"
-                       HorizontalOptions="Fill" />
-                <CollectionView Grid.Row="1"
-                                ItemsSource="{Binding Groups}"
+        <Grid RowDefinitions="Auto,*">
+            <!-- Toggle Buttons -->
+            <Grid Grid.Row="0"
+                  ColumnDefinitions="*,*"
+                  Padding="8"
+                  BackgroundColor="LightGray">
+                <Button Grid.Column="0"
+                        Text="CollectionView (MAUI)"
+                        Command="{Binding ShowCollectionViewCommandCommand}"
+                        Margin="4,0">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="BackgroundColor" Value="LightGray" />
+                            <Setter Property="TextColor" Value="Black" />
+                            <Style.Triggers>
+                                <DataTrigger TargetType="Button"
+                                             Binding="{Binding ShowCollectionView}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="#4A90E2" />
+                                    <Setter Property="TextColor" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Grid.Column="1"
+                        Text="VirtualScroll (Nalu)"
+                        Command="{Binding ShowVirtualScrollCommandCommand}"
+                        Margin="4,0">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="BackgroundColor" Value="LightGray" />
+                            <Setter Property="TextColor" Value="Black" />
+                            <Style.Triggers>
+                                <DataTrigger TargetType="Button"
+                                             Binding="{Binding ShowVirtualScroll}"
+                                             Value="True">
+                                    <Setter Property="BackgroundColor" Value="#4A90E2" />
+                                    <Setter Property="TextColor" Value="White" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+
+            <!-- CollectionView -->
+            <Grid Grid.Row="1"
+                  IsVisible="{Binding ShowCollectionView}">
+                <CollectionView ItemsSource="{Binding Groups}"
                                 IsGrouped="True">
                     <CollectionView.GroupHeaderTemplate>
                         <DataTemplate x:DataType="pageModels:TwelveGroup">
@@ -94,17 +132,10 @@
                 </CollectionView>
             </Grid>
 
-            <!-- VirtualScroll Row -->
-            <Grid Grid.Row="1" RowDefinitions="Auto,*">
-                <Label Grid.Row="0"
-                       Text="VirtualScroll (Nalu)"
-                       FontSize="18"
-                       FontAttributes="Bold"
-                       Padding="16,8"
-                       Background="LightGray"
-                       HorizontalOptions="Fill" />
-                <nalu:VirtualScroll Grid.Row="1"
-                                    Adapter="{Binding Adapter}">
+            <!-- VirtualScroll -->
+            <Grid Grid.Row="1"
+                  IsVisible="{Binding ShowVirtualScroll}">
+                <nalu:VirtualScroll Adapter="{Binding Adapter}">
                     <!-- Section Header Template -->
                     <nalu:VirtualScroll.SectionHeaderTemplate>
                         <DataTemplate x:DataType="pageModels:TwelveGroup">

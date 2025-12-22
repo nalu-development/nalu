@@ -30,9 +30,9 @@ public partial class SoftKeyboardManagerPage : ContentPage
 
 			return border;
 		});
-		var cv = new CollectionView {
+		var cv = new VirtualScroll {
 			AutomationId = "CV",
-			ItemsSource = new List<Items>
+			Adapter = new List<Items>
 			{
 				new(15),
 				new(3),

@@ -7,7 +7,7 @@ using Microsoft.Maui.Controls;
 
 namespace Nalu.Maui.Sample.PageModels;
 
-public partial class TwelvePageModel : ObservableObject
+public partial class TwelvePageModel : ObservableObject, IDisposable
 {
     private static int _instanceCount;
     private static readonly string[] _ownerNames =
@@ -51,6 +51,23 @@ public partial class TwelvePageModel : ObservableObject
 
     public TwelveGroupedAdapter Adapter { get; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowVirtualScroll))]
+    private bool _showCollectionView = true;
+
+    public bool ShowVirtualScroll => !ShowCollectionView;
+
+    [RelayCommand]
+    private void ShowCollectionViewCommand() => ShowCollectionView = true;
+
+    [RelayCommand]
+    private void ShowVirtualScrollCommand() => ShowCollectionView = false;
+
+    partial void OnShowCollectionViewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowVirtualScroll));
+    }
+
     public TwelvePageModel()
     {
         Groups = new ObservableCollection<TwelveGroup>(
@@ -80,6 +97,27 @@ public partial class TwelvePageModel : ObservableObject
             Starred = rand.Next(0, 2) == 1,
             ImageSource = _cardImageSources[rand.Next(_cardImageSources.Length)]
         };
+    }
+
+    private static readonly LeakDetector _leakDetector = new();
+
+    public void Dispose()
+    {
+        var sections = Adapter.GetSectionCount();
+
+        for (var s = 0; s < sections; s++)
+        {
+            var section = Adapter.GetSection(s);
+            _leakDetector.Track(section);
+            
+            var items = Adapter.GetItemCount(s);
+            for (var i = 0; i < items; i++)
+            {
+                var item = Adapter.GetItem(s, i);
+                _leakDetector.Track(item);
+            }
+        }
+        Adapter.Dispose();
     }
 }
 

@@ -1,8 +1,6 @@
 using System.ComponentModel;
-using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Converters;
-using Microsoft.Maui.Graphics;
 using Microsoft.Maui.Layouts;
 
 namespace Nalu;
@@ -388,10 +386,7 @@ public partial class NaluTabBar
 
     private volatile int _navigating;
     
-    // ReSharper disable once AsyncVoidEventHandlerMethod
-#pragma warning disable VSTHRD100
-    private async void TapGestureRecognizer_OnTapped(object? sender, TappedEventArgs e)
-#pragma warning restore VSTHRD100
+    private void TapGestureRecognizer_OnTapped(object? sender, TappedEventArgs e)
     {
         if (sender is not View { BindingContext: ShellSection shellSection })
         {
@@ -405,12 +400,27 @@ public partial class NaluTabBar
 
         try
         {
-            await Shell.Current.GoToAsync($"//{shellSection.CurrentItem.Route}");
+            // ReSharper disable once ArrangeStaticMemberQualifier
+            NaluTabBar.GoTo(shellSection);
         }
         finally
         {
             Interlocked.Exchange(ref _navigating, 0);
         }
+    }
+
+    /// <summary>
+    /// Navigates to the specified shell section.
+    /// </summary>
+    /// <param name="shellSection">The shell section to navigate to.</param>
+    /// <remarks>
+    /// This method is useful when creating a completely custom tab bar that doesn't inherit from <see cref="NaluTabBar"/>.
+    /// Call this method when a tab button is pressed to trigger navigation.
+    /// </remarks>
+    public static void GoTo(ShellSection shellSection)
+    {
+        var shellItem = shellSection.Parent as ShellItem ?? throw new InvalidOperationException("ShellSection does not have a parent ShellItem.");
+        shellItem.SetValueFromRenderer(ShellItem.CurrentItemProperty, shellSection);
     }
 
     /// <inheritdoc/>

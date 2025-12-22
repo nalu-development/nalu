@@ -7,6 +7,7 @@ namespace Nalu;
 
 internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
 {
+    private readonly VirtualScrollCellManager<VirtualScrollViewHolder> _cellManager = new(holder => holder.ViewWrapper.VirtualView);
     private readonly IMauiContext _mauiContext;
     private readonly IVirtualScroll _virtualScroll;
     private readonly IVirtualScrollFlattenedAdapter _adapter;
@@ -30,6 +31,7 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
 
         if (disposing)
         {
+            _cellManager.Dispose();
             _adapter.Dispose();
         }
     }
@@ -78,6 +80,8 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
         var recyclerView = (VirtualScrollRecyclerView) parent;
         var wrapperPlatformView = CreateViewHolderViewWrapper(recyclerView, view, platformView);
         var holder = new VirtualScrollViewHolder(wrapperPlatformView);
+        
+        _cellManager.TrackCell(holder);
         
         return holder;
     }

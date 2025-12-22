@@ -50,37 +50,32 @@ internal class NaluShellSectionWrapperController : UIViewController
         _registeredViewControllers.Remove(viewController);
     }
 
-    private void EnsureChildViewController(UIViewController viewController)
-    {
-        var viewControllerView = viewController.View!;
-        if (viewControllerView.Superview is not null)
-        {
-            return;
-        }
-
-        AddChildViewController(viewController);
-        viewControllerView.Hidden = true;
-        View!.InsertSubview(viewControllerView, 0);
-        viewController.DidMoveToParentViewController(this);
-    }
-
     private void SelectViewController(UIViewController? oldViewController, UIViewController? newViewController)
     {
         if (newViewController is not null)
         {
-            newViewController.BeginAppearanceTransition(true, false);
-            EnsureChildViewController(newViewController);
-            var newView = newViewController.View!;
-            newView.Hidden = false;
-            newViewController.EndAppearanceTransition();
+            AddChildViewController(newViewController);
         }
 
         if (oldViewController is not null)
         {
-            var oldView = oldViewController.View!;
-            oldViewController.BeginAppearanceTransition(false, false);
-            oldView.Hidden = true;
-            oldViewController.EndAppearanceTransition();
+            oldViewController.WillMoveToParentViewController(null);
+        }
+
+        if (newViewController is not null)
+        {
+            View!.InsertSubview(newViewController.View!, 0);
+        }
+        
+        if (oldViewController is not null)
+        {
+            oldViewController.View!.RemoveFromSuperview();
+            oldViewController.RemoveFromParentViewController();
+        }
+
+        if (newViewController is not null)
+        {
+            newViewController.DidMoveToParentViewController(this);
         }
     }
 }

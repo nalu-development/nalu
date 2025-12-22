@@ -23,15 +23,13 @@ builder
     .UseMauiApp<App>()
     // Optional: Only if using Nalu navigation
     .UseNaluNavigation<App>(nav => nav.AddPages())
-#if IOS || ANDROID || MACCATALYST
     .UseNaluTabBar()  // Works with both standard Shell and NaluShell
-#endif
 ```
 
 2. Create a custom tab bar class by creating a new XAML file (e.g., `AppShellTabBar.xaml`):
 
 You can use what Nalu provides (`NaluTabBar`) or create your own custom component.
-**Note**: This instance will be bound to its `ShellItem` (a.k.a `TabBar`).
+**Note**: This instance will be bound to its `ShellItem` (a.k.a `TabBar`).
 **Important**: Do NOT use `Shadow` on the outer node due to a bug in MAUI.
 
 ```xml
@@ -76,6 +74,24 @@ public partial class AppShellTabBar : NaluTabBar
     }
 }
 ```
+
+**Creating a Completely Custom Tab Bar:**
+
+If you create a completely custom tab bar that doesn't inherit from `NaluTabBar`, you need to handle navigation manually. When a tab button is pressed, call `NaluTabBar.GoTo(shellSection)` to trigger navigation:
+
+```csharp
+// In your custom tab bar's button tap handler
+private void OnTabTapped(object? sender, EventArgs args)
+{
+    if (sender is BindableObject { BindingContext: ShellSection shellSection })
+    {
+        NaluTabBar.GoTo(shellSection);
+    }
+}
+```
+
+The `BindingContext` of your custom tab bar will be set to the `ShellItem` (TabBar or FlyoutItem), so you can iterate through `ShellItem.Items` to access the `ShellSection` instances for each tab. Each tab button should have its `BindingContext` set to the corresponding `ShellSection` so that `NaluTabBar.GoTo()` can be called with the correct section.
+
 
 4. Attach the custom tab bar view to your `TabBar` or `FlyoutItem`:
 

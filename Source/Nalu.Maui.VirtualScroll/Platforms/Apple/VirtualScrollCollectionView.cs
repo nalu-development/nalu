@@ -15,7 +15,7 @@ internal interface IVirtualScrollCellsLayoutController
 /// </summary>
 public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCellsLayoutController
 {
-    private readonly List<WeakReference<VirtualScrollCell>> _createdCells = new(16);
+    private readonly VirtualScrollCellManager<VirtualScrollCell> _cellManager = new(cell => cell.VirtualView);
     private readonly List<NSIndexPath> _invalidatedPaths = new(16);
     private bool _needsCellsLayout;
     private CGSize _lastContentSize;
@@ -96,7 +96,7 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         var cell = base.DequeueReusableCell(reuseIdentifier, indexPath);
         if (cell is VirtualScrollCell { UseCount: 0 } virtualCell)
         {
-            _createdCells.Add(new WeakReference<VirtualScrollCell>(virtualCell));
+            _cellManager.TrackCell(virtualCell);
         }
 
         return cell;
@@ -108,7 +108,7 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         var cell = base.DequeueReusableSupplementaryView(kind, identifier, indexPath);
         if (cell is VirtualScrollCell { UseCount: 0 } virtualCell)
         {
-            _createdCells.Add(new WeakReference<VirtualScrollCell>(virtualCell));
+            _cellManager.TrackCell(virtualCell);
         }
 
         return cell;
@@ -121,15 +121,7 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
 
         if (disposing)
         {
-            foreach (var weakCell in _createdCells)
-            {
-                if (weakCell.TryGetTarget(out var cell))
-                {
-                    cell?.Dispose();
-                }
-            }
-            
-            _createdCells.Clear();
+            _cellManager.Dispose();
         }
     }
 }

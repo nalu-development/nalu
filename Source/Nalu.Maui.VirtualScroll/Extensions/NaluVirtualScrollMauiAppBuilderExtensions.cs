@@ -12,6 +12,9 @@ public static class NaluVirtualScrollMauiAppBuilderExtensions
     /// Adds Nalu virtual scroll to the application.
     /// </summary>
     /// <param name="builder">Maui app builder.</param>
+    /// <remarks>
+    /// This feature is only supported on iOS, Mac Catalyst and Android platforms.
+    /// </remarks>
     public static MauiAppBuilder UseNaluVirtualScroll(this MauiAppBuilder builder)
     {
         _ = new NaluXamlVirtualScrollInitializer();

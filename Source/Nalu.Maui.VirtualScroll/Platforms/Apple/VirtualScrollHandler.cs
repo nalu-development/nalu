@@ -1,7 +1,6 @@
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.Controls.Handlers.Items;
-using Microsoft.Maui.Handlers;
 using Microsoft.Maui.Platform;
 using UIKit;
 
@@ -329,6 +328,13 @@ public partial class VirtualScrollHandler
     public static void MapBackground(VirtualScrollHandler handler, IView view)
     {
         var collectionView = handler.CollectionView;
+        if (view.Background.IsNullOrEmpty())
+        {
+            collectionView.RemoveBackgroundLayer();
+            collectionView.BackgroundColor = null;
+            return;
+        }
+        
         collectionView.UpdateBackground(view);
     }
 
