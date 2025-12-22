@@ -88,8 +88,12 @@ internal class LeakDetector : IDisposable
 
         if (shell?.CurrentPage is { } page)
         {
-            var objectName = leakedObject.GetType()!.Name + (resurrected ? " (resurrected)" : string.Empty);
+            var objectName = leakedObject.GetType().Name + (resurrected ? " (resurrected)" : string.Empty);
+#if NET10_0_OR_GREATER
             await page.Dispatcher.DispatchAsync(() => _ = page.DisplayAlertAsync("Leak detected", $"{objectName} still alive", "OK"));
+#else
+            await page.Dispatcher.DispatchAsync(() => _ = page.DisplayAlert("Leak detected", $"{objectName} still alive", "OK"));
+#endif
         }
     }
 }

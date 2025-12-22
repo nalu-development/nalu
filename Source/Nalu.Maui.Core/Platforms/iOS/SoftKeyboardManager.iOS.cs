@@ -396,9 +396,9 @@ public static partial class SoftKeyboardManager
 
             void RestoreScrollView()
             {
-                if (parentScrollView is MauiCollectionView collectionView)
+                if (parentScrollView?.GetType().Name is "MauiCollectionView")
                 {
-                    collectionView.SetContentOffset(
+                    parentScrollView.SetContentOffset(
                         new CGPoint(
                             parentScrollView.ContentOffset.X,
                             offsetY
