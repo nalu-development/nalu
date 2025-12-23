@@ -59,10 +59,11 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
                     _collectionView.DeleteSections(removeRange);
                 }
                 
-                // Reload all sections that will exist after the reset
-                if (newSectionCount > 0)
+                // Reload all existing sections that will exist after the reset
+                var remainingSectionCount = Math.Min(currentSectionCount, newSectionCount);
+                if (remainingSectionCount > 0)
                 {
-                    var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, newSectionCount));
+                    var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
                     _collectionView.ReloadSections(reloadRange);
                 }
             }, null);

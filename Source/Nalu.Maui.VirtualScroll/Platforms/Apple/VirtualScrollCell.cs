@@ -87,6 +87,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     public void SetupView(Func<object> viewFactory, IElementHandler handler, object? item)
     {
         var view = VirtualView;
+        var isRebinding = true;
         if (view is null)
         {
             if (NativeView is not null)
@@ -96,6 +97,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
             view = viewFactory() as IView ?? throw new InvalidOperationException("View factory did not return a valid IView.");
             VirtualView = view;
+            isRebinding = false;
         }
 
         if (view is BindableObject bindable)
@@ -106,7 +108,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
             }
             else
             {
-                if (bindable.BindingContext == item)
+                if (isRebinding && bindable.BindingContext == item)
                 {
                     // One time bindings should be reapplied
                     ReapplyBindings(bindable);
