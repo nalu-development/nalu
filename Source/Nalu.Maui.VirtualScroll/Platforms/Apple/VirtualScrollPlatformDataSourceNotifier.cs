@@ -9,7 +9,9 @@ namespace Nalu;
 internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
 {
     private readonly UICollectionView _collectionView;
+    private readonly IVirtualScrollAdapter _adapter;
     private readonly IDisposable _subscription;
+    private int _previousSectionCount;
     private bool _disposed;
 
     /// <summary>
@@ -20,6 +22,8 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
     public VirtualScrollPlatformDataSourceNotifier(UICollectionView collectionView, IVirtualScrollAdapter adapter)
     {
         _collectionView = collectionView ?? throw new ArgumentNullException(nameof(collectionView));
+        _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
+        _previousSectionCount = adapter.GetSectionCount();
         _subscription = adapter.Subscribe(OnAdapterChanged);
     }
 
@@ -30,6 +34,44 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
             return;
         }
 
+        var changes = changeSet.Changes.ToList();
+        
+        // If Reset is present, handle section count changes and reload
+        if (changes.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
+        {
+            var currentSectionCount = _previousSectionCount;
+            var newSectionCount = _adapter.GetSectionCount();
+            
+            // Use PerformBatchUpdates to handle section count changes, then reload sections
+            _collectionView.PerformBatchUpdates(() =>
+            {
+                if (currentSectionCount < newSectionCount)
+                {
+                    // Sections were added - insert them
+                    var addedCount = newSectionCount - currentSectionCount;
+                    var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
+                    _collectionView.InsertSections(insertRange);
+                }
+                else if (currentSectionCount > newSectionCount)
+                {
+                    // Sections were removed - delete them
+                    var removeRange = NSIndexSet.FromNSRange(new NSRange(newSectionCount, currentSectionCount - newSectionCount));
+                    _collectionView.DeleteSections(removeRange);
+                }
+                
+                // Reload all sections that will exist after the reset
+                if (newSectionCount > 0)
+                {
+                    var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, newSectionCount));
+                    _collectionView.ReloadSections(reloadRange);
+                }
+            }, null);
+            
+            // Update tracked section count
+            _previousSectionCount = newSectionCount;
+            return;
+        }
+
         _collectionView.PerformBatchUpdates(() =>
         {
             foreach (var change in changeSet.Changes)
@@ -37,6 +79,9 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
                 ApplyChange(change);
             }
         }, null);
+        
+        // Update tracked section count after processing changes
+        _previousSectionCount = _adapter.GetSectionCount();
     }
 
     private void ApplyChange(VirtualScrollChange change)
