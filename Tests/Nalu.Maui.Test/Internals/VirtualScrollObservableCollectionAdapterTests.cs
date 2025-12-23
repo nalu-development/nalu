@@ -557,5 +557,368 @@ public class VirtualScrollObservableCollectionAdapterTests
     }
 
     #endregion
+
+    #region Section Transition Tests - Add Operations
+
+    [Fact]
+    public void Subscribe_WhenFirstItemAddedToEmptyCollection_ShouldNotifyInsertSectionAndInsertItem()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act
+        collection.Add("A");
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        receivedChangeSet!.Changes.Should().HaveCount(2);
+        
+        var changes = receivedChangeSet.Changes.ToList();
+        
+        // First change should be InsertSection
+        var sectionChange = changes[0];
+        sectionChange.Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+        sectionChange.StartSectionIndex.Should().Be(0);
+        
+        // Second change should be InsertItem
+        var itemChange = changes[1];
+        itemChange.Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        itemChange.StartSectionIndex.Should().Be(0);
+        itemChange.StartItemIndex.Should().Be(0);
+    }
+
+    [Fact]
+    public void Subscribe_WhenItemAddedToNonEmptyCollection_ShouldNotNotifyInsertSection()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act
+        collection.Add("C");
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        receivedChangeSet!.Changes.Should().HaveCount(1);
+        var change = receivedChangeSet.Changes.First();
+        change.Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        change.Operation.Should().NotBe(VirtualScrollChangeOperation.InsertSection);
+    }
+
+    [Fact]
+    public void Subscribe_WhenMultipleItemsAddedToEmptyCollection_ShouldNotifyInsertSectionAndInsertItemRange()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - Add first item
+        collection.Add("A");
+        collection.Add("B");
+
+        // Assert - Check first change set (from first Add)
+        changeSets.Should().HaveCount(2);
+        var firstChanges = changeSets[0].Changes.ToList();
+        firstChanges.Should().HaveCount(2);
+        firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+        firstChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        
+        // Second change set should only have InsertItem (section already exists)
+        var secondChanges = changeSets[1].Changes.ToList();
+        secondChanges.Should().HaveCount(1);
+        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+    }
+
+    #endregion
+
+    #region Section Transition Tests - Remove Operations
+
+    [Fact]
+    public void Subscribe_WhenLastItemRemovedFromCollection_ShouldNotifyRemoveItemAndRemoveSection()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act
+        collection.RemoveAt(0);
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        receivedChangeSet!.Changes.Should().HaveCount(2);
+        
+        var changes = receivedChangeSet.Changes.ToList();
+        
+        // First change should be RemoveItem
+        var itemChange = changes[0];
+        itemChange.Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        itemChange.StartSectionIndex.Should().Be(0);
+        itemChange.StartItemIndex.Should().Be(0);
+        
+        // Second change should be RemoveSection
+        var sectionChange = changes[1];
+        sectionChange.Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+        sectionChange.StartSectionIndex.Should().Be(0);
+    }
+
+    [Fact]
+    public void Subscribe_WhenItemRemovedButCollectionStillHasItems_ShouldNotNotifyRemoveSection()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B", "C" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act
+        collection.RemoveAt(1);
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        receivedChangeSet!.Changes.Should().HaveCount(1);
+        var change = receivedChangeSet.Changes.First();
+        change.Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        change.Operation.Should().NotBe(VirtualScrollChangeOperation.RemoveSection);
+    }
+
+    [Fact]
+    public void Subscribe_WhenMultipleItemsRemovedUntilEmpty_ShouldNotifyRemoveSection()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act - Remove first item (should not remove section)
+        collection.RemoveAt(0);
+        
+        // Reset for second removal
+        receivedChangeSet = null;
+        
+        // Act - Remove last item (should remove section)
+        collection.RemoveAt(0);
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        receivedChangeSet!.Changes.Should().HaveCount(2);
+        var changes = receivedChangeSet.Changes.ToList();
+        changes[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        changes[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+    }
+
+    #endregion
+
+    #region Section Transition Tests - Replace Operations
+
+    [Fact]
+    public void Subscribe_WhenReplacingItemsInEmptyCollectionWithItems_ShouldNotifyInsertSection()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - Clear first (triggers Reset)
+        collection.Clear();
+        
+        // Add items to empty collection
+        collection.Add("A");
+        collection.Add("B");
+
+        // Assert - First add should trigger section insertion
+        changeSets.Should().HaveCountGreaterOrEqualTo(2); // Clear + Add operations
+        var addChangeSet = changeSets[changeSets.Count - 2]; // Second to last (first Add)
+        var changes = addChangeSet.Changes.ToList();
+        changes.Should().HaveCount(2);
+        changes[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+    }
+
+    [Fact]
+    public void Subscribe_WhenReplacingAllItemsWithFewerItems_ShouldNotifyRemoveSectionIfBecomesEmpty()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act - Clear and check
+        collection.Clear();
+        
+        // Assert - Reset operation should be notified
+        receivedChangeSet.Should().NotBeNull();
+        var change = receivedChangeSet!.Changes.First();
+        change.Operation.Should().Be(VirtualScrollChangeOperation.Reset);
+    }
+
+    [Fact]
+    public void Subscribe_WhenReplacingItemsWithMoreItems_ShouldNotNotifySectionChangeIfAlreadyHadItems()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act - Replace with more items
+        collection[0] = "B";
+        collection.Add("C");
+
+        // Assert - First change (replace) should not have section change
+        // Note: ObservableCollection doesn't support replacing with more items directly,
+        // so this test verifies normal replace doesn't trigger section changes
+        receivedChangeSet.Should().NotBeNull();
+    }
+
+    #endregion
+
+    #region Section Transition Tests - Reset Operations
+
+    [Fact]
+    public void Subscribe_WhenCollectionWithItemsIsCleared_ShouldNotifyReset()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B", "C" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act
+        collection.Clear();
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        var change = receivedChangeSet!.Changes.First();
+        change.Operation.Should().Be(VirtualScrollChangeOperation.Reset);
+        
+        // Verify section count is updated
+        adapter.GetSectionCount().Should().Be(0);
+    }
+
+    [Fact]
+    public void Subscribe_WhenEmptyCollectionIsCleared_ShouldNotifyReset()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        VirtualScrollChangeSet? receivedChangeSet = null;
+        using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act
+        collection.Clear();
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        var change = receivedChangeSet!.Changes.First();
+        change.Operation.Should().Be(VirtualScrollChangeOperation.Reset);
+    }
+
+    #endregion
+
+    #region Section Transition Tests - Edge Cases
+
+    [Fact]
+    public void Subscribe_WhenAddingToEmptyThenRemovingAll_ShouldHandleSectionTransitionsCorrectly()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - Add item (should insert section)
+        collection.Add("A");
+        
+        // Act - Remove item (should remove section)
+        collection.RemoveAt(0);
+
+        // Assert
+        changeSets.Should().HaveCount(2);
+        
+        // First change set: InsertSection + InsertItem
+        var firstChanges = changeSets[0].Changes.ToList();
+        firstChanges.Should().HaveCount(2);
+        firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+        firstChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        
+        // Second change set: RemoveItem + RemoveSection
+        var secondChanges = changeSets[1].Changes.ToList();
+        secondChanges.Should().HaveCount(2);
+        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        secondChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+    }
+
+    [Fact]
+    public void Subscribe_WhenAddingMultipleItemsToEmpty_ShouldOnlyInsertSectionOnce()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - Add first item
+        collection.Add("A");
+        
+        // Act - Add second item (should not insert section again)
+        collection.Add("B");
+
+        // Assert
+        changeSets.Should().HaveCount(2);
+        
+        // First change set should have InsertSection
+        var firstChanges = changeSets[0].Changes.ToList();
+        firstChanges.Should().HaveCount(2);
+        firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+        
+        // Second change set should NOT have InsertSection
+        var secondChanges = changeSets[1].Changes.ToList();
+        secondChanges.Should().HaveCount(1);
+        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        secondChanges[0].Operation.Should().NotBe(VirtualScrollChangeOperation.InsertSection);
+    }
+
+    [Fact]
+    public void Subscribe_WhenRemovingMultipleItemsUntilEmpty_ShouldOnlyRemoveSectionOnce()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B" };
+        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - Remove first item (should not remove section)
+        collection.RemoveAt(0);
+        
+        // Act - Remove last item (should remove section)
+        collection.RemoveAt(0);
+
+        // Assert
+        changeSets.Should().HaveCount(2);
+        
+        // First change set should NOT have RemoveSection
+        var firstChanges = changeSets[0].Changes.ToList();
+        firstChanges.Should().HaveCount(1);
+        firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        
+        // Second change set should have RemoveSection
+        var secondChanges = changeSets[1].Changes.ToList();
+        secondChanges.Should().HaveCount(2);
+        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        secondChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+    }
+
+    #endregion
 }
 

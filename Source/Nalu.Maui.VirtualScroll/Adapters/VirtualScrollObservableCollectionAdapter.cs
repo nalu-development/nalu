@@ -41,11 +41,13 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
         private readonly TItemCollection _collection;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
         private bool _disposed;
+        private bool _isEmpty;
 
         public ObservableCollectionAdapterSubscription(TItemCollection collection, Action<VirtualScrollChangeSet> changeCallback)
         {
             _collection = collection;
             _changeCallback = changeCallback;
+            _isEmpty = _collection.Count == 0;
             _collection.CollectionChanged += OnCollectionChanged;
         }
 
@@ -66,6 +68,13 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                         break;
                     }
 
+                    // If transitioning from empty to non-empty, insert section first
+                    if (_isEmpty)
+                    {
+                        changes.Add(VirtualScrollChangeFactory.InsertSection(_sectionIndex));
+                        _isEmpty = false;
+                    }
+
                     if (e.NewItems.Count == 1)
                     {
                         changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, e.NewStartingIndex));
@@ -83,6 +92,9 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                         break;
                     }
 
+                    // Collection has already been updated, so check current count
+                    var isEmptyAfterRemove = _collection.Count == 0;
+
                     if (e.OldItems.Count == 1)
                     {
                         changes.Add(VirtualScrollChangeFactory.RemoveItem(_sectionIndex, e.OldStartingIndex));
@@ -92,6 +104,13 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                         var endIndex = e.OldStartingIndex + e.OldItems.Count - 1;
                         changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, e.OldStartingIndex, endIndex));
                     }
+
+                    // If transitioning from non-empty to empty, remove section after items
+                    if (isEmptyAfterRemove && !_isEmpty)
+                    {
+                        changes.Add(VirtualScrollChangeFactory.RemoveSection(_sectionIndex));
+                        _isEmpty = true;
+                    }
                     break;
 
                 case NotifyCollectionChangedAction.Replace:
@@ -99,6 +118,8 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                     {
                         break;
                     }
+
+                    var willBeEmptyAfterReplace = _collection.Count == 0;
 
                     var replaceCount = Math.Min(e.NewItems.Count, e.OldItems.Count);
                     var startIndex = e.NewStartingIndex;
@@ -119,6 +140,14 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                     {
                         var remainingNewCount = e.NewItems.Count - e.OldItems.Count;
                         var insertStartIndex = startIndex + replaceCount;
+                        
+                        // Check if this will transition from empty to non-empty
+                        if (_isEmpty)
+                        {
+                            changes.Add(VirtualScrollChangeFactory.InsertSection(_sectionIndex));
+                            _isEmpty = false;
+                        }
+                        
                         if (remainingNewCount == 1)
                         {
                             changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, insertStartIndex));
@@ -142,6 +171,13 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                         {
                             var removeEndIndex = removeStartIndex + remainingOldCount - 1;
                             changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, removeStartIndex, removeEndIndex));
+                        }
+                        
+                        // Check if this will transition from non-empty to empty
+                        if (willBeEmptyAfterReplace && !_isEmpty)
+                        {
+                            changes.Add(VirtualScrollChangeFactory.RemoveSection(_sectionIndex));
+                            _isEmpty = true;
                         }
                     }
                     break;
@@ -191,6 +227,7 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
                     break;
 
                 case NotifyCollectionChangedAction.Reset:
+                    _isEmpty = _collection.Count == 0;
                     changes.Add(VirtualScrollChangeFactory.Reset());
                     break;
             }
