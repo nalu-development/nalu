@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Android.Views;
 using AndroidX.RecyclerView.Widget;
 using Microsoft.Maui.Platform;
@@ -54,6 +55,9 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
         return reuseId;
     }
 
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "ApplyBindings")]
+    private static extern void ReapplyBindings(BindableObject bindable);
+
     public override void OnBindViewHolder(RecyclerView.ViewHolder holder, int position)
     {
         var item = _adapter.GetItem(position);
@@ -63,7 +67,16 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
             var itemValue = item.Type is VirtualScrollFlattenedPositionType.GlobalFooter or VirtualScrollFlattenedPositionType.GlobalHeader
                 ? (_virtualScroll as BindableObject)?.BindingContext
                 : item.Value;
-            bindable.BindingContext = itemValue;
+
+            if (bindable.BindingContext == itemValue)
+            {
+                // One time bindings should be reapplied
+                ReapplyBindings(bindable);
+            }
+            else
+            {
+                bindable.BindingContext = itemValue;
+            }
         }
     }
 

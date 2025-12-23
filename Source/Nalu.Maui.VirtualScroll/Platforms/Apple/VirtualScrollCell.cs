@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.Platform;
@@ -80,6 +81,9 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
         return layoutAttributes;
     }
 
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "ApplyBindings")]
+    private static extern void ReapplyBindings(BindableObject bindable);
+
     public void SetupView(Func<object> viewFactory, IElementHandler handler, object? item)
     {
         var view = VirtualView;
@@ -100,9 +104,17 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
             {
                 bindable.ClearValue(BindableObject.BindingContextProperty);
             }
-            else 
+            else
             {
-                bindable.BindingContext = item;
+                if (bindable.BindingContext == item)
+                {
+                    // One time bindings should be reapplied
+                    ReapplyBindings(bindable);
+                }
+                else
+                {
+                    bindable.BindingContext = item;
+                }
             }
         }
 

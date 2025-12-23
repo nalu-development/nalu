@@ -112,6 +112,8 @@
                     </nalu:RelativeNavigation>
                 </Button.CommandParameter>
             </Button>
+            
+            <Entry Placeholder="Type something" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

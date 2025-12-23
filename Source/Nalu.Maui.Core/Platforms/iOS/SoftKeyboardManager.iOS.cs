@@ -1,15 +1,17 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using CoreFoundation;
 using CoreGraphics;
 using Foundation;
-using Microsoft.Maui.Controls.Handlers.Items;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
 using UIKit;
 using ContentView = Microsoft.Maui.Platform.ContentView;
 // ReSharper disable NotAccessedField.Local
+#pragma warning disable CS0414 // Field is assigned but its value is never used
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+#pragma warning disable CS0169 // Field is never used
 
 // ReSharper disable InconsistentNaming
 
@@ -18,14 +20,18 @@ namespace Nalu;
 /// <summary>
 /// Manager for handling soft keyboard adjustments.
 /// </summary>
+[SuppressMessage("Style", "IDE0022:Use expression body for method")]
 public static partial class SoftKeyboardManager
 {
-    private const int _textViewDistanceFromBottom = 20;
+    private static Action? _windowBackgroundColorReset;
+    private static CGRect _textViewBounds;
+    private static nfloat _lastPan;
+    private static UIView? _rootView;
+    private static UIEdgeInsets _initialAdditionalSafeAreaInsets = UIEdgeInsets.Zero;
+    private static NSLayoutConstraint? _scrollViewBottomInsetConstraint;
+    private static UIScrollView? _scrollView;
+    private static UIWindow? _applicationWindow;
 
-    private static readonly FieldInfo? _isKeyboardAutoScrollHandlingField
-        = typeof(KeyboardAutoManagerScroll).GetField("IsKeyboardAutoScrollHandling", BindingFlags.NonPublic);
-
-    private static readonly UIInterfaceOrientationMask _supportedOrientations = GetSupportedOrientations();
     private static NSObject? _willShowToken;
     private static NSObject? _willHideToken;
     private static NSObject? _textFieldToken;
@@ -34,15 +40,13 @@ public static partial class SoftKeyboardManager
     private static NSObject? _textViewEndToken;
     private static NSObject? _orientationChangeToken;
     private static NSObject? _didChangeFrameToken;
-    private static DispatchSource.Timer? _textViewResizedTimer;
-    private static bool _textViewResizedTimerRunning;
+    private static DispatchSource.Timer? _textViewBoundsWatcherTimer;
+    private static bool _textViewBoundsWatcher;
     private static nfloat _textViewHeight;
     private static UIView? _textView;
-    private static UIView? _rootView;
-    private static UIView? _containerView;
+    private static UIViewController? _pageViewController;
     private static NSLayoutConstraint[]? _containerViewConstraints;
     private static double? _resizeDelta;
-    private static double? _panDelta;
     private static SoftKeyboardAdjustMode _adjustMode = SoftKeyboardAdjustMode.Resize;
     private static double _animationDuration = 0.25;
     private static CGRect _keyboardFrame;
@@ -50,12 +54,8 @@ public static partial class SoftKeyboardManager
     private static bool _adjusted;
     private static bool _editing;
     private static bool _shown;
-
-    private static bool MauiKeyboardScrollManagerHandlingFlag
-    {
-        get => _isKeyboardAutoScrollHandlingField?.GetValue(null) as bool? ?? false;
-        set => _isKeyboardAutoScrollHandlingField?.SetValue(null, value);
-    }
+    
+    private static UIWindow ApplicationWindow => _applicationWindow ??= GetApplicationWindow() ?? throw new InvalidOperationException("Could not find application window.");
 
     internal static void Configure(MauiAppBuilder builder)
         => builder.ConfigureLifecycleEvents(events => events.AddiOS(Configure));
@@ -82,20 +82,21 @@ public static partial class SoftKeyboardManager
         _willHideToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.WillHideNotification, WillHideKeyboard);
         _didChangeFrameToken = NSNotificationCenter.DefaultCenter.AddObserver(UIKeyboard.DidChangeFrameNotification, DidChangeFrame);
         _orientationChangeToken = NSNotificationCenter.DefaultCenter.AddObserver(UIDevice.OrientationDidChangeNotification, OrientationChanged);
-        _textViewResizedTimer = new DispatchSource.Timer(DispatchQueue.MainQueue);
-        _textViewResizedTimer.SetTimer(DispatchTime.Now, 300_000, 0);
-        _textViewResizedTimer.SetEventHandler(CheckTextViewResized);
+        _textViewBoundsWatcherTimer = new DispatchSource.Timer(DispatchQueue.MainQueue);
+        _textViewBoundsWatcherTimer.SetTimer(DispatchTime.Now, 300_000, 0);
+        _textViewBoundsWatcherTimer.SetEventHandler(OnTextViewBoundsWatcherTick);
     }
 
     static partial void DumpInfo(string message);
 
     static partial void DumpNotification(NSNotification notification);
 
-    private static void CheckTextViewResized()
+    private static void OnTextViewBoundsWatcherTick()
     {
-        if (_textView is not null && _textViewHeight != _textView.Frame.Height)
+        if (_textView is { } textView && !textView.Bounds.Equals(_textViewBounds))
         {
-            _textViewHeight = _textView.Frame.Height;
+            DumpInfo("TextView bounds changed.");
+            _textViewBounds = textView.Bounds;
             Adjust();
         }
     }
@@ -103,145 +104,192 @@ public static partial class SoftKeyboardManager
     private static void OrientationChanged(NSNotification obj)
     {
         DumpNotification(obj);
-        var nativeSize = UIScreen.MainScreen.Bounds.Size;
-        var orientation = UIDevice.CurrentDevice.Orientation;
-
-        if (_screenWidth == 0)
-        {
-            _screenWidth = nativeSize.Width;
-            return;
-        }
-
-        if (orientation == UIDeviceOrientation.Portrait && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.Portrait) ||
-            orientation == UIDeviceOrientation.PortraitUpsideDown && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.PortraitUpsideDown) ||
-            orientation == UIDeviceOrientation.LandscapeLeft && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.LandscapeLeft) ||
-            orientation == UIDeviceOrientation.LandscapeRight && !_supportedOrientations.HasFlag(UIInterfaceOrientationMask.LandscapeRight))
-        {
-            return;
-        }
-        
-
-        var width = orientation switch
-        {
-            UIDeviceOrientation.LandscapeLeft or UIDeviceOrientation.LandscapeRight => Math.Max(nativeSize.Height, nativeSize.Width),
-            UIDeviceOrientation.Portrait or UIDeviceOrientation.PortraitUpsideDown => Math.Min(nativeSize.Height, nativeSize.Width),
-            _ => _screenWidth
-        };
-
-        _screenWidth = width;
     }
     
-    private static UIInterfaceOrientationMask GetSupportedOrientations()
+    private static void OnKeyboardFrameChanged(NSDictionary userInfo)
     {
-        if (NSBundle.MainBundle.InfoDictionary["UISupportedInterfaceOrientations"] is not NSArray orientations)
-        {
-            return UIInterfaceOrientationMask.All;
-        }
-
-        var mask = (UIInterfaceOrientationMask)0;
-
-        foreach (var item in orientations)
-        {
-            switch (item.ToString())
-            {
-                case "UIInterfaceOrientationPortrait":
-                    mask |= UIInterfaceOrientationMask.Portrait;
-                    break;
-                case "UIInterfaceOrientationPortraitUpsideDown":
-                    mask |= UIInterfaceOrientationMask.PortraitUpsideDown;
-                    break;
-                case "UIInterfaceOrientationLandscapeLeft":
-                    mask |= UIInterfaceOrientationMask.LandscapeLeft;
-                    break;
-                case "UIInterfaceOrientationLandscapeRight":
-                    mask |= UIInterfaceOrientationMask.LandscapeRight;
-                    break;
-            }
-        }
-
-        return mask;
+        var frameDescription = userInfo.GetValueOrDefault(UIKeyboard.FrameEndUserInfoKey)?.Description;
+        var frame = DescriptionToCGRect(frameDescription) ?? CGRect.Empty;
+        _keyboardFrame = _shown ? frame : CGRect.Empty;
+        SetAnimationDuration(userInfo);
+        Adjust();
     }
 
+    private static void Adjust()
+    {
+        var frame = _keyboardFrame;
+        var targetHeight = _keyboardFrame.Height;
+        var transform = CGAffineTransform.MakeIdentity();
+
+        if (_pageViewController is not null)
+        {
+            var rootView = _rootView ?? throw new InvalidOperationException("The root view is null.");
+            var pageView = _pageViewController.View ?? throw new InvalidOperationException("The page view controller has no view.");
+            
+            if (targetHeight != 0)
+            {
+                var window = pageView.Window ?? GetApplicationWindow() ?? throw new InvalidOperationException("Could not find application window.");
+
+                if ((OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13)) && window.WindowScene is { } windowScene)
+                {
+                    // Account for split-over
+                    frame = window.ConvertRectFromCoordinateSpace(frame, windowScene.Screen.CoordinateSpace);
+                }
+#pragma warning restore CA1416 // Dereference of a possibly null reference.
+
+                frame = CGRect.Intersect(frame, window.Frame);
+
+                var keyboardFrameInWindow = CGRect.Intersect(frame, window.Frame);
+
+                if (_adjustMode == SoftKeyboardAdjustMode.Pan)
+                {
+                    var cursorInWindow = FindCursorPosition() ?? CGRect.Empty;
+                    var deltaY = rootView.Center.Y - (rootView.Bounds.Height / 2) - rootView.Frame.Y;
+                    var cursorBottom = cursorInWindow.Bottom + deltaY;
+                    targetHeight = cursorBottom < keyboardFrameInWindow.Top
+                        ? 0
+                        : (nfloat)Math.Min(keyboardFrameInWindow.Height, cursorBottom - keyboardFrameInWindow.Top + 20); // Add a little padding
+
+                    if (_lastPan == targetHeight)
+                    {
+                        return;
+                    }
+
+                    _lastPan = targetHeight;
+                }
+                else if (_adjustMode == SoftKeyboardAdjustMode.Resize)
+                {
+                    _lastPan = 0;
+
+                    var originalContainerViewFrameInWindow = pageView.ConvertRectToView(pageView.Frame, null);
+                    var keyboardIntersection = CGRect.Intersect(originalContainerViewFrameInWindow, keyboardFrameInWindow);
+                    var superviewSafeAreaInsets = pageView.Superview?.SafeAreaInsets ?? UIEdgeInsets.Zero;
+                    targetHeight = keyboardIntersection.Height - superviewSafeAreaInsets.Bottom;
+                }
+                else
+                {
+                    targetHeight = 0;
+                    _lastPan = 0;
+                }
+            }
+
+            if (_adjustMode == SoftKeyboardAdjustMode.Resize)
+            {
+                var initialInsets = _initialAdditionalSafeAreaInsets;
+
+                var newInsets = new UIEdgeInsets(
+                    initialInsets.Top,
+                    initialInsets.Left,
+                    initialInsets.Bottom + targetHeight,
+                    initialInsets.Right
+                );
+
+                _pageViewController.AdditionalSafeAreaInsets = newInsets;
+            }
+            else if (_adjustMode == SoftKeyboardAdjustMode.Pan)
+            {
+                _pageViewController.AdditionalSafeAreaInsets = _initialAdditionalSafeAreaInsets;
+                transform = CGAffineTransform.MakeTranslation(0, -targetHeight);
+            }
+
+            UIView.Animate(
+                _animationDuration,
+                () =>
+                {
+                    _rootView?.Transform = transform;
+                    ApplicationWindow.LayoutIfNeeded();
+                }
+            );
+        }
+
+    }
 
     private static void DidUITextBeginEditing(NSNotification notification)
     {
         DumpNotification(notification);
-        _editing = true;
+        _textView = notification.Object as UIView ?? throw new InvalidOperationException("Notification object is not a UIView.");
+        _textViewBounds = _textView.Bounds;
 
-        if (notification.Object is UIView view)
+        if (!_textViewBoundsWatcher)
         {
-            _textView = view;
-            _textViewHeight = view.Frame.Height;
+            _textViewBoundsWatcherTimer!.Resume();
+            _textViewBoundsWatcher = true;
+        }
 
-            if (!_textViewResizedTimerRunning)
+        var pageViewController = _textView.GetContainerPlatformViewController() ?? throw new InvalidOperationException("Could not find container view controller.");
+        if (_pageViewController is not null && !ReferenceEquals(_pageViewController, pageViewController))
+        {
+            // Reset previous page controller insets
+            _pageViewController.AdditionalSafeAreaInsets = _initialAdditionalSafeAreaInsets;
+            _pageViewController = null;
+            var rootView = _rootView ?? throw new InvalidOperationException("The root view should not be null here.");
+            rootView.Transform = CGAffineTransform.MakeIdentity();
+            _rootView = null;
+            _windowBackgroundColorReset?.Invoke();
+            _windowBackgroundColorReset = null;
+        }
+
+        if (_pageViewController is null)
+        {
+            _pageViewController = pageViewController;
+            _initialAdditionalSafeAreaInsets = _pageViewController.AdditionalSafeAreaInsets;
+            var window = _textView.Window ?? throw new InvalidOperationException("Could not find text view's window.");
+            var weakWindow = new WeakReference<UIWindow>(window);
+            var originalBackgroundColor = window.BackgroundColor;
+            _windowBackgroundColorReset = () =>
             {
-                _textViewResizedTimer!.Resume();
-                _textViewResizedTimerRunning = true;
-            }
-
-            var parent = view;
-            var containerView = view.GetContainerPlatformView();
-
-            // When switching to a new container view with the keyboard already visible and the adjust mode was Resize,
-            // we need to restore the previous container view's frame.
-            if (_adjustMode == SoftKeyboardAdjustMode.Resize &&
-                _containerViewConstraints is not null &&
-                _containerView is not null &&
-                !ReferenceEquals(containerView, _containerView))
-            {
-                RestoreContainerView();
-                NSLayoutConstraint.DeactivateConstraints(_containerViewConstraints);
-                _containerView.TranslatesAutoresizingMaskIntoConstraints = true;
-                _containerViewConstraints = null;
-                _containerView = null;
-            }
-
-            if (_containerView is null && containerView is { Superview: { } containerViewSuperview })
-            {
-                _containerView = containerView;
-
-                _containerView.TranslatesAutoresizingMaskIntoConstraints = false;
-                _containerViewConstraints = [
-                    _containerView.BottomAnchor.ConstraintEqualTo(containerViewSuperview.BottomAnchor),
-                    _containerView.TopAnchor.ConstraintEqualTo(containerViewSuperview.TopAnchor, _containerView.Frame.Top),
-                    _containerView.LeadingAnchor.ConstraintEqualTo(containerViewSuperview.LeadingAnchor),
-                    _containerView.TrailingAnchor.ConstraintEqualTo(containerViewSuperview.TrailingAnchor)
-                ];
-
-                NSLayoutConstraint.ActivateConstraints(
-                    _containerViewConstraints
-                );
-            }
-
-            _rootView ??= _containerView?.Window?.RootViewController?.View;
-
-            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-            while (parent != null)
-            {
-                if (_adjustRuleViews.TryGetValue(parent, out var adjustModeBox))
+                if (weakWindow.TryGetTarget(out var targetWindow))
                 {
-                    _adjustMode = adjustModeBox.Value;
-                    State.AdjustMode = _adjustMode;
-
-                    return;
+                    targetWindow.BackgroundColor = originalBackgroundColor;
                 }
+            };
+            window.BackgroundColor = _pageViewController.View!.BackgroundColor ?? UIColor.SystemGray;
+            _rootView ??= window?.RootViewController?.View ?? throw new InvalidOperationException("Could not find root view.");
+        }
 
-                parent = parent.Superview;
+        var parent = _textView;
+        var adjustMode = DefaultAdjustMode;
+        while (parent != null)
+        {
+            if (_adjustRuleViews.TryGetValue(parent, out var adjustModeBox))
+            {
+                adjustMode = adjustModeBox.Value;
+                break;
             }
 
-            _adjustMode = DefaultAdjustMode;
-            State.AdjustMode = _adjustMode;
+            parent = parent.Superview;
+        }
+
+        _adjustMode = adjustMode;
+        State.AdjustMode = adjustMode;
+        
+        if (_shown)
+        {
+            Adjust();
         }
     }
 
     private static void DidUITextViewEndEditing(NSNotification notification)
     {
         DumpNotification(notification);
-        _editing = false;
+
+        if (_textViewBoundsWatcher)
+        {
+            _textViewBoundsWatcherTimer!.Suspend();
+            _textViewBoundsWatcher = false;
+        }
 
         if (!_shown)
         {
-            ResetTextViewData();
+            _pageViewController = null;
+            _initialAdditionalSafeAreaInsets = UIEdgeInsets.Zero;
+            _adjustMode = DefaultAdjustMode;
+            State.AdjustMode = DefaultAdjustMode;
+            _windowBackgroundColorReset?.Invoke();
+            _windowBackgroundColorReset = null;
+            _textView = null;
+            _pageViewController = null;
+            _rootView = null;
         }
     }
 
@@ -249,12 +297,11 @@ public static partial class SoftKeyboardManager
     {
         DumpNotification(notification);
         _shown = true;
+        State.IsVisible = true;
 
-        var userInfo = notification.UserInfo;
-
-        if (userInfo is not null)
+        if (notification.UserInfo is { } userInfo)
         {
-            AdjustOrReset(userInfo);
+            OnKeyboardFrameChanged(userInfo);
         }
     }
 
@@ -262,416 +309,25 @@ public static partial class SoftKeyboardManager
     {
         DumpNotification(notification);
         _shown = false;
-
-        var userInfo = notification.UserInfo;
-
-        if (userInfo is not null)
+        State.IsVisible = false;
+        
+        if (notification.UserInfo is { } userInfo)
         {
-            AdjustOrReset(userInfo, true);
+            OnKeyboardFrameChanged(userInfo);
         }
     }
 
     private static void DidChangeFrame(NSNotification notification)
     {
         DumpNotification(notification);
-
-        if (!_adjusted && notification.UserInfo is { } userInfo)
+        if (notification.UserInfo is { } userInfo)
         {
-            DumpInfo("ChangeFrame AdjustOrReset");
-            AdjustOrReset(userInfo);
+            OnKeyboardFrameChanged(userInfo);
         }
-
-        DumpInfo("ChangeFrame Skip");
-        _adjusted = false;
     }
 
     private static UIWindow? GetApplicationWindow()
         => Application.Current?.Windows.FirstOrDefault()?.Handler?.PlatformView as UIWindow;
-
-    private static void AdjustOrReset(NSDictionary userInfo, bool hiding = false)
-    {
-        userInfo.SetAnimationDuration();
-
-        var startFrameSize = userInfo.GetValueOrDefault("UIKeyboardFrameBeginUserInfoKey");
-        var endFrameSize = userInfo.GetValueOrDefault("UIKeyboardFrameEndUserInfoKey");
-
-        // We need keyboard frames to be able to adjust the view.
-        if (DescriptionToCGRect(startFrameSize?.Description) is not { } startFrameSizeRect ||
-            DescriptionToCGRect(endFrameSize?.Description) is not { } endFrameSizeRect)
-        {
-            // If the start frame size is null, we can't adjust, so we just return
-            DumpInfo("Keyboard frame size is null, skipping adjustment.");
-            return;
-        }
-
-        // If the keyboard frame is not the full width of the screen,
-        // it means the device is being rotated, so we can't trust this keyboard notification,
-        // so skip and wait for the next one.
-        if (endFrameSizeRect.Width != _screenWidth)
-        {
-            DumpInfo("Keyboard frame width does not match screen width, skipping adjustment.");
-            return;
-        }
-
-        // To properly evaluate the keyboard height, we need to intersect the keyboard frame with the window frame.
-        if ((_textView?.Window ?? GetApplicationWindow()) is { } window)
-        {
-#pragma warning disable CA1416 // Dereference of a possibly null reference.
-            if ((OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13)) && window.WindowScene is { } windowScene)
-            {
-                // Account for split-over
-                startFrameSizeRect = window.ConvertRectFromCoordinateSpace(startFrameSizeRect, windowScene.Screen.CoordinateSpace);
-                endFrameSizeRect = window.ConvertRectFromCoordinateSpace(endFrameSizeRect, windowScene.Screen.CoordinateSpace);
-            }
-#pragma warning restore CA1416 // Dereference of a possibly null reference.
-
-            var newStartFrameSizeRect = CGRect.Intersect(startFrameSizeRect, window.Frame);
-            var newEndFrameSizeRect = CGRect.Intersect(endFrameSizeRect, window.Frame);
-
-            // When rotating the device from landscape left to landscape right, we get a non-final notification which we should skip
-            if (!hiding && endFrameSizeRect.Height != 0 && newEndFrameSizeRect.Height == 0)
-            {
-                DumpInfo("Not hiding when keyboard frame height is zero, skipping adjustment.");
-                return;
-            }
-
-            startFrameSizeRect = newStartFrameSizeRect;
-            endFrameSizeRect = newEndFrameSizeRect;
-        }
-
-        // Sometimes `WillHideKeyboard` is called even when the keyboard will not hide, but simply change its frame.
-        // The only way to determine if the keyboard is actually hiding is to check if the start and end frames are the same size.
-        var willHide = hiding &&
-                       startFrameSizeRect.Height == endFrameSizeRect.Height &&
-                       startFrameSizeRect.Width == endFrameSizeRect.Width;
-
-        if (willHide && !hiding)
-        {
-            // Sometimes `WillHideKeyboard` is called even when the keyboard will change to a different frame
-            // so if the frame change is not matching the hiding behavior, we skip this notification.
-            DumpInfo("Will hide keyboard, but the frames do not prove it, skipping adjustment.");
-            return;
-        }
-
-        // If the keyboard height is very small (quick type bar) or if we are hiding the keyboard for real
-        if (endFrameSizeRect.Height <= 80 || willHide)
-        {
-            Reset();
-            DumpInfo($"Keyboard height is small {endFrameSizeRect.Height} or hiding {willHide}, resetting adjustments.");
-            _adjusted = true;
-
-            return;
-        }
-
-        _keyboardFrame = endFrameSizeRect;
-        State.Height = _keyboardFrame.Height;
-        State.IsVisible = true;
-        
-        DumpInfo($"Keyboard frame adjusted: {endFrameSizeRect} (visible: {State.IsVisible}, height: {State.Height})");
-
-        Adjust();
-        _adjusted = true;
-    }
-
-    private static void Reset()
-    {
-        if (!State.IsVisible)
-        {
-            DumpInfo("Keyboard is not visible, no need to reset adjustments.");
-            return;
-        }
-
-        State.IsVisible = false;
-
-        if (_containerView != null &&
-            _rootView != null)
-        {
-            double offsetY = 0;
-            var parentScrollView = FindParentVerticalScroll(_textView?.FindPlatformResponder<UIScrollView>());
-            if (_adjustMode == SoftKeyboardAdjustMode.Resize &&
-                parentScrollView is not null)
-            {
-                offsetY = parentScrollView.ContentOffset.Y;
-            }
-
-            void RestoreScrollView()
-            {
-                if (parentScrollView?.GetType().Name is "MauiCollectionView")
-                {
-                    parentScrollView.SetContentOffset(
-                        new CGPoint(
-                            parentScrollView.ContentOffset.X,
-                            offsetY
-                        ),
-                        true
-                    );
-                }
-            }
-
-            UIView.Animate(
-                _animationDuration,
-                0,
-                UIViewAnimationOptions.CurveEaseInOut,
-                () =>
-                {
-                    RestoreRootView();
-                    RestoreContainerView();
-                    RestoreScrollView();
-                },
-                RestoreScrollView
-            );
-        }
-
-        _panDelta = null;
-        _resizeDelta = null;
-
-        if (!_editing)
-        {
-            ResetTextViewData();
-        }
-    }
-
-    private static void ResetTextViewData()
-    {
-        if (_textViewResizedTimerRunning)
-        {
-            _textViewResizedTimer!.Suspend();
-            _textViewResizedTimerRunning = false;
-        }
-
-        MauiKeyboardScrollManagerHandlingFlag = false;
-
-        if (_containerView is not null && _containerViewConstraints is not null)
-        {
-            _containerView.TranslatesAutoresizingMaskIntoConstraints = true;
-            NSLayoutConstraint.DeactivateConstraints(_containerViewConstraints);
-            _containerViewConstraints = null;
-        }
-
-        _containerView = null;
-        _rootView = null;
-        _textView = null;
-        _adjustMode = DefaultAdjustMode;
-    }
-
-    private static void RestoreRootView()
-    {
-        DumpInfo($"Restoring root view {_rootView} frame from pan {_panDelta}.");
-        
-        if (_panDelta.HasValue && _rootView is not null)
-        {
-            var frame = _rootView.Frame;
-
-            _rootView.Frame = new CGRect(
-                frame.X,
-                frame.Y - (nfloat) _panDelta.Value,
-                frame.Width,
-                frame.Height
-            );
-
-            _panDelta = null;
-        }
-    }
-
-    private static void RestoreContainerView()
-    {
-        DumpInfo($"Restoring container view {_containerView} frame from resize {_resizeDelta}.");
-        
-        if (_containerViewConstraints is not null && _containerView is not null)
-        {
-            _containerViewConstraints[0].Constant = 0;
-            _containerView.Superview?.SetNeedsLayout();
-            _resizeDelta = null;
-        } 
-    }
-
-    internal static void Adjust()
-    {
-        if (_textView?.Window is null ||
-            _keyboardFrame == CGRect.Empty ||
-            _containerViewConstraints is null ||
-            _containerView is not { Window: { } window } ||
-            _rootView is null)
-        {
-            // Can't adjust if we don't have the necessary views or keyboard frame
-            MauiKeyboardScrollManagerHandlingFlag = false;
-
-            return;
-        }
-
-        MauiKeyboardScrollManagerHandlingFlag = true;
-
-        if (_adjustMode != SoftKeyboardAdjustMode.Resize && _resizeDelta.HasValue)
-        {
-            UIView.Animate(
-                _animationDuration,
-                0,
-                UIViewAnimationOptions.CurveEaseInOut,
-                RestoreContainerView,
-                ForceAdjustAgain
-            );
-
-            return;
-        }
-
-        if (_adjustMode != SoftKeyboardAdjustMode.Pan && _panDelta.HasValue)
-        {
-            UIView.Animate(
-                _animationDuration,
-                0,
-                UIViewAnimationOptions.CurveEaseInOut,
-                RestoreRootView,
-                ForceAdjustAgain
-            );
-
-            return;
-        }
-
-        if (_adjustMode == SoftKeyboardAdjustMode.None)
-        {
-            return;
-        }
-
-        var rootViewFrame = _rootView.Frame;
-
-        var originalRootViewFrame = _panDelta.HasValue
-            ? new CGRect(
-                rootViewFrame.X,
-                rootViewFrame.Y - (nfloat) _panDelta.Value,
-                rootViewFrame.Width,
-                rootViewFrame.Height
-            )
-            : rootViewFrame;
-
-        CGRect newFrame;
-
-        var originalContainerViewFrame = new CGRect(_containerView.Frame.X, _containerView.Frame.Y, _containerView.Frame.Width, _containerView.Frame.Height - (_resizeDelta ?? 0));
-        var keyboardFrameInWindow = CGRect.Intersect(_keyboardFrame, window.Frame);
-        var originalContainerViewFrameInWindow = _containerView.ConvertRectToView(originalContainerViewFrame, null);
-        var keyboardIntersection = CGRect.Intersect(originalContainerViewFrameInWindow, keyboardFrameInWindow);
-
-        if (_adjustMode == SoftKeyboardAdjustMode.Resize)
-        {
-            var resizeDelta = -keyboardIntersection.Height;
-
-            _resizeDelta = resizeDelta;
-
-            UIView.Animate(
-                _animationDuration,
-                0,
-                UIViewAnimationOptions.CurveEaseInOut,
-                () =>
-                {
-                    // If the previous mode was pan, we need to restore the root view frame
-                    RestoreRootView();
-
-                    _containerViewConstraints[0].Constant = resizeDelta;
-                    _containerView.Superview?.LayoutIfNeeded();
-                },
-                ScrollToField
-            );
-        }
-        else
-        {
-            var cursorPosition = FindCursorPosition() ?? CGRect.Empty;
-            var cursorY = cursorPosition.Y + (originalRootViewFrame.Y - _rootView.Frame.Y);
-            var cursorBottom = cursorY + cursorPosition.Height + _textViewDistanceFromBottom;
-            var safeAreaBottom = _containerView.SafeAreaInsets.Bottom;
-            var panY = cursorBottom > keyboardIntersection.Top ? keyboardIntersection.Top - cursorBottom - safeAreaBottom : 0;
-            var maxPanValue = _keyboardFrame.Height;
-
-            if (panY < -maxPanValue)
-            {
-                panY = -maxPanValue;
-            }
-
-            _panDelta = panY;
-
-            newFrame = new CGRect(
-                originalRootViewFrame.X,
-                originalRootViewFrame.Y + panY,
-                originalRootViewFrame.Width,
-                originalRootViewFrame.Height
-            );
-
-            UIView.Animate(
-                _animationDuration,
-                0,
-                UIViewAnimationOptions.CurveEaseInOut,
-                () =>
-                {
-                    _rootView.Frame = newFrame;
-                    // If the previous mode was resize, we need to restore the container view frame
-                    _containerViewConstraints[0].Constant = 0;
-                    _containerView.Superview?.LayoutIfNeeded();
-                },
-                Noop
-            );
-        }
-
-        return;
-
-        void ForceAdjustAgain()
-        {
-            Adjust();
-        }
-
-        void ScrollToField()
-        {
-            if (_textView?.Window is null)
-            {
-                return;
-            }
-
-            // Ensure that - if the text view is *inside* a UIScrollView - the cursor is fully visible
-            var parentScrollView = FindParentVerticalScroll(_textView.FindPlatformResponder<UIScrollView>());
-
-            if (parentScrollView is not null)
-            {
-                var cursorPosition = FindCursorPosition() ?? CGRect.Empty;
-                var cursorY = cursorPosition.Y + (originalRootViewFrame.Y - _rootView!.Frame.Y);
-                var cursorBottom = cursorY + cursorPosition.Height + _textViewDistanceFromBottom;
-
-                if (cursorBottom > _keyboardFrame.Y)
-                {
-                    cursorPosition = FindLocalCursorPosition() ?? CGRect.Empty;
-                    var cursorRect = _textView.ConvertRectToView(cursorPosition, parentScrollView);
-                    cursorRect = new CGRect(cursorRect.X, cursorRect.Y, cursorRect.Width, cursorRect.Height + _textViewDistanceFromBottom);
-                    MauiKeyboardScrollManagerHandlingFlag = false;
-                    parentScrollView.ScrollRectToVisible(cursorRect, true);
-                    MauiKeyboardScrollManagerHandlingFlag = true;
-                }
-            }
-        }
-
-        void Noop()
-        {
-            // No operation, just to satisfy the delegate signature
-        }
-    }
-
-    // private static void PreFixContentOffset(CGRect originalRootViewFrame, CGRect keyboardIntersection)
-    // {
-    //     var parentScrollView = FindParentVerticalScroll(_textView!.FindPlatformResponder<UIScrollView>());
-    //     if (parentScrollView is not null)
-    //     {
-    //         // Now check how much the cursor is hidden behind the keyboard
-    //         var cursorPosition = FindCursorPosition() ?? CGRect.Empty;
-    //         var cursorY = cursorPosition.Y + (originalRootViewFrame.Y - _rootView!.Frame.Y);
-    //         var cursorBottom = cursorY + cursorPosition.Height + _textViewDistanceFromBottom;
-    //         var safeAreaBottom = _containerView!.SafeAreaInsets.Bottom;
-    //         var panY = cursorBottom > keyboardIntersection.Top
-    //             ? keyboardIntersection.Top - cursorBottom - safeAreaBottom
-    //             : 0;
-    //
-    //         if (panY != 0)
-    //         {
-    //             var currentOffset = parentScrollView.ContentOffset;
-    //             var newOffset = Math.Max(0, currentOffset.Y - panY);
-    //             parentScrollView.ContentOffset = new CGPoint(currentOffset.X, newOffset);
-    //         }
-    //     }
-    // }
 
     // Used to get the numeric values from the UserInfo dictionary's NSObject value to CGRect.
     // Doing manually since CGRectFromString is not yet bound
@@ -760,12 +416,12 @@ public static partial class SoftKeyboardManager
     private static CGRect? FindCursorPosition()
     {
         var localCursor = FindLocalCursorPosition();
-
-        if (localCursor is { } local && _containerView is not null)
+        
+        if (localCursor is { } local && _pageViewController is { View: { } containerView })
         {
-            var cursorInContainer = _containerView.ConvertRectFromView(local, _textView);
-            var cursorInWindow = _containerView.ConvertRectToView(cursorInContainer, null);
-
+            var cursorInContainer = containerView.ConvertRectFromView(local, _textView);
+            var cursorInWindow = containerView.ConvertRectToView(cursorInContainer, null);
+        
             return cursorInWindow;
         }
 
@@ -784,6 +440,21 @@ public static partial class SoftKeyboardManager
         var firstViewController = startingPoint?.FindTopController<UIViewController>();
 
         return firstViewController?.ViewIfLoaded?.FindDescendantView<ContentView>();
+    }
+    
+    private static UIViewController? GetContainerPlatformViewController(this UIView? startingPoint)
+    {
+        var rootViewController = startingPoint?.FindPlatformResponder<ContainerViewController>();
+
+        if (rootViewController is not null)
+        {
+            return rootViewController;
+        }
+
+        // Not a MAUI page, get the nearest UIViewController
+        var firstViewController = startingPoint?.FindPlatformResponder<UIViewController>();
+
+        return firstViewController;
     }
 
     internal static T? FindTopController<T>(this UIView view)
