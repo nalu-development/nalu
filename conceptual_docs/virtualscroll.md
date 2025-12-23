@@ -48,6 +48,71 @@ The `Adapter` property accepts:
 - **`IEnumerable`**: Static lists are supported but won't react to changes
 - **`IVirtualScrollAdapter`**: Custom adapters for advanced scenarios like sectioned data
 
+### Factory Methods
+
+For programmatic adapter creation, `VirtualScroll` provides factory methods that offer type-safe ways to create adapters:
+
+#### Observable Collection Adapters
+
+Create adapters for observable collections with full change notification support:
+
+```csharp
+// Single collection
+var adapter = VirtualScroll.CreateObservableCollectionAdapter(items);
+
+// Read-only observable collection
+var adapter = VirtualScroll.CreateObservableCollectionAdapter(readOnlyItems);
+
+// Grouped collections
+var adapter = VirtualScroll.CreateObservableCollectionAdapter(
+    sections, 
+    section => section.Items);
+```
+
+The factory methods support various combinations of `ObservableCollection<T>` and `ReadOnlyObservableCollection<T>` for both sections and items.
+
+#### Static Collection Adapters
+
+Create adapters for static collections (no change notifications):
+
+```csharp
+// Single collection
+var adapter = VirtualScroll.CreateStaticCollectionAdapter(items);
+
+// Grouped collections
+var adapter = VirtualScroll.CreateStaticCollectionAdapter(
+    sections, 
+    section => section.Items);
+```
+
+Static collection adapters are useful when:
+- Your data doesn't change after initial load
+- You want to use `IEnumerable<T>` collections like arrays or LINQ results
+- You're working with grouped data that doesn't need change notifications
+
+**Example usage:**
+
+```csharp
+public partial class MyPageModel : ObservableObject
+{
+    public IVirtualScrollAdapter Adapter { get; }
+
+    public MyPageModel()
+    {
+        // Create grouped adapter from static data
+        var categories = new[]
+        {
+            new Category { Name = "A", Items = new[] { new Item("A1"), new Item("A2") } },
+            new Category { Name = "B", Items = new[] { new Item("B1"), new Item("B2") } }
+        };
+        
+        Adapter = VirtualScroll.CreateStaticCollectionAdapter(
+            categories,
+            category => category.Items);
+    }
+}
+```
+
 ### Templates
 
 `VirtualScroll` supports multiple template types to create rich scrolling experiences:

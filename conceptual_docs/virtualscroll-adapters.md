@@ -4,6 +4,8 @@ VirtualScroll uses adapters to access data. You can use the built-in adapters fo
 
 ## Built-in Adapters
 
+VirtualScroll provides built-in adapters for common scenarios. You can create them directly or use the convenient factory methods.
+
 ### VirtualScrollObservableCollectionAdapter
 
 For flat lists backed by an `ObservableCollection<T>` or any collection implementing `IList` and `INotifyCollectionChanged`:
@@ -14,6 +16,9 @@ public ObservableCollection<ItemInfo> Items { get; } = new();
 
 // Or explicit adapter creation
 var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<ItemInfo>>(Items);
+
+// Or use factory method (recommended)
+var adapter = VirtualScroll.CreateObservableCollectionAdapter(Items);
 ```
 
 The adapter automatically subscribes to `CollectionChanged` events and notifies the VirtualScroll of additions, removals, replacements, moves, and resets.
@@ -31,11 +36,18 @@ public class CategoryGroup
 
 // Create adapter with sections and a function to get items from each section
 var sections = new ObservableCollection<CategoryGroup>();
+
+// Direct adapter creation
 var adapter = new VirtualScrollGroupedObservableCollectionAdapter<
     ObservableCollection<CategoryGroup>, 
     ObservableCollection<ItemInfo>>(
     sections,
     section => ((CategoryGroup)section).Items);
+
+// Or use factory method (recommended - type-safe and cleaner)
+var adapter = VirtualScroll.CreateObservableCollectionAdapter(
+    sections,
+    section => section.Items);
 ```
 
 This adapter:
@@ -60,6 +72,50 @@ This adapter:
     </nalu:VirtualScroll.ItemTemplate>
 </nalu:VirtualScroll>
 ```
+
+### VirtualScrollListAdapter
+
+For flat lists backed by static collections (`IEnumerable<T>`, arrays, LINQ results, etc.) that don't need change notifications:
+
+```csharp
+// Direct adapter creation
+var items = new[] { new ItemInfo("Item 1"), new ItemInfo("Item 2") };
+var adapter = new VirtualScrollListAdapter(items);
+
+// Or use factory method (recommended)
+var adapter = VirtualScroll.CreateStaticCollectionAdapter(items);
+```
+
+**Note:** This adapter doesn't support change notifications. If your data changes, you'll need to recreate the adapter or use `VirtualScrollObservableCollectionAdapter` instead.
+
+### VirtualScrollGroupedListAdapter
+
+For grouped/sectioned data where the collections are static (no change notifications needed):
+
+```csharp
+public class CategoryGroup
+{
+    public string Name { get; set; }
+    public IEnumerable<ItemInfo> Items { get; set; }
+}
+
+// Direct adapter creation
+var sections = new[]
+{
+    new CategoryGroup { Name = "A", Items = new[] { new ItemInfo("A1"), new ItemInfo("A2") } },
+    new CategoryGroup { Name = "B", Items = new[] { new ItemInfo("B1"), new ItemInfo("B2") } }
+};
+var adapter = new VirtualScrollGroupedListAdapter(
+    sections,
+    section => ((CategoryGroup)section).Items);
+
+// Or use factory method (recommended - type-safe and cleaner)
+var adapter = VirtualScroll.CreateStaticCollectionAdapter(
+    sections,
+    section => section.Items);
+```
+
+**Note:** This adapter doesn't support change notifications. If your data changes, you'll need to recreate the adapter or use `VirtualScrollGroupedObservableCollectionAdapter` instead.
 
 ## Custom Adapters
 

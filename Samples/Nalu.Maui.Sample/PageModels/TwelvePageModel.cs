@@ -1,9 +1,6 @@
-using System.Collections;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Maui.Controls;
 
 namespace Nalu.Maui.Sample.PageModels;
 
@@ -49,7 +46,7 @@ public partial class TwelvePageModel : ObservableObject, IDisposable
 
     public ObservableCollection<TwelveGroup> Groups { get; }
 
-    public TwelveGroupedAdapter Adapter { get; }
+    public IVirtualScrollAdapter Adapter { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowVirtualScroll))]
@@ -73,7 +70,7 @@ public partial class TwelvePageModel : ObservableObject, IDisposable
         Groups = new ObservableCollection<TwelveGroup>(
             Enumerable.Range(0, 100).Select(i => CreateGroup(i))
         );
-        Adapter = new TwelveGroupedAdapter(Groups);
+        Adapter = VirtualScroll.CreateObservableCollectionAdapter(Groups, g => g.Items);
     }
 
     private TwelveGroup CreateGroup(int index)
@@ -117,7 +114,6 @@ public partial class TwelvePageModel : ObservableObject, IDisposable
                 _leakDetector.Track(item);
             }
         }
-        Adapter.Dispose();
     }
 }
 
@@ -170,296 +166,3 @@ public partial class TwelveCreditCard : ObservableObject
     [RelayCommand]
     public void StarUnstar() => Starred = !Starred;
 }
-
-/// <summary>
-/// Custom adapter for grouped/sectioned credit card data in VirtualScroll.
-/// </summary>
-public sealed class TwelveGroupedAdapter : IVirtualScrollAdapter, IDisposable
-{
-    private readonly ObservableCollection<TwelveGroup> _groups;
-    private readonly List<Subscription> _subscriptions = [];
-
-    public TwelveGroupedAdapter(ObservableCollection<TwelveGroup> groups)
-    {
-        _groups = groups;
-    }
-
-    public int GetSectionCount() => _groups.Count;
-
-    public int GetItemCount(int sectionIndex) => _groups[sectionIndex].Items.Count;
-
-    public object? GetSection(int sectionIndex) => _groups[sectionIndex];
-
-    public object? GetItem(int sectionIndex, int itemIndex) => _groups[sectionIndex].Items[itemIndex];
-
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback)
-    {
-        var subscription = new Subscription(this, _groups, changeCallback);
-        _subscriptions.Add(subscription);
-        return subscription;
-    }
-
-    private void RemoveSubscription(Subscription subscription)
-    {
-        _subscriptions.Remove(subscription);
-    }
-
-    public void Dispose()
-    {
-        foreach (var subscription in _subscriptions.ToList())
-        {
-            subscription.Dispose();
-        }
-        _subscriptions.Clear();
-    }
-
-    private sealed class Subscription : IDisposable
-    {
-        private readonly TwelveGroupedAdapter _adapter;
-        private readonly ObservableCollection<TwelveGroup> _groups;
-        private readonly Action<VirtualScrollChangeSet> _changeCallback;
-        private readonly Dictionary<TwelveGroup, NotifyCollectionChangedEventHandler> _itemHandlers = new();
-        private bool _disposed;
-
-        public Subscription(
-            TwelveGroupedAdapter adapter,
-            ObservableCollection<TwelveGroup> groups,
-            Action<VirtualScrollChangeSet> changeCallback)
-        {
-            _adapter = adapter;
-            _groups = groups;
-            _changeCallback = changeCallback;
-
-            // Subscribe to group collection changes
-            _groups.CollectionChanged += OnGroupsChanged;
-
-            // Subscribe to each group's items collection
-            foreach (var group in _groups)
-            {
-                SubscribeToGroupItems(group);
-            }
-        }
-
-        private void SubscribeToGroupItems(TwelveGroup group)
-        {
-            void Handler(object? sender, NotifyCollectionChangedEventArgs e) => OnItemsChanged(group, e);
-            _itemHandlers[group] = Handler;
-            group.Items.CollectionChanged += Handler;
-        }
-
-        private void UnsubscribeFromGroupItems(TwelveGroup group)
-        {
-            if (_itemHandlers.TryGetValue(group, out var handler))
-            {
-                group.Items.CollectionChanged -= handler;
-                _itemHandlers.Remove(group);
-            }
-        }
-
-        private void OnGroupsChanged(object? sender, NotifyCollectionChangedEventArgs e)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            var changes = new List<VirtualScrollChange>();
-
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    if (e.NewItems is { Count: > 0 })
-                    {
-                        foreach (TwelveGroup group in e.NewItems)
-                        {
-                            SubscribeToGroupItems(group);
-                        }
-
-                        if (e.NewItems.Count == 1)
-                        {
-                            changes.Add(VirtualScrollChangeFactory.InsertSection(e.NewStartingIndex));
-                        }
-                        else
-                        {
-                            var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
-                            changes.Add(VirtualScrollChangeFactory.InsertSectionRange(e.NewStartingIndex, endIndex));
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Remove:
-                    if (e.OldItems is { Count: > 0 })
-                    {
-                        foreach (TwelveGroup group in e.OldItems)
-                        {
-                            UnsubscribeFromGroupItems(group);
-                        }
-
-                        if (e.OldItems.Count == 1)
-                        {
-                            changes.Add(VirtualScrollChangeFactory.RemoveSection(e.OldStartingIndex));
-                        }
-                        else
-                        {
-                            var endIndex = e.OldStartingIndex + e.OldItems.Count - 1;
-                            changes.Add(VirtualScrollChangeFactory.RemoveSectionRange(e.OldStartingIndex, endIndex));
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Move:
-                    if (e.OldItems is { Count: 1 })
-                    {
-                        changes.Add(VirtualScrollChangeFactory.MoveSection(e.OldStartingIndex, e.NewStartingIndex));
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Replace:
-                    if (e.OldItems is { Count: > 0 })
-                    {
-                        foreach (TwelveGroup group in e.OldItems)
-                        {
-                            UnsubscribeFromGroupItems(group);
-                        }
-                    }
-                    if (e.NewItems is { Count: > 0 })
-                    {
-                        foreach (TwelveGroup group in e.NewItems)
-                        {
-                            SubscribeToGroupItems(group);
-                        }
-
-                        if (e.NewItems.Count == 1)
-                        {
-                            changes.Add(VirtualScrollChangeFactory.ReplaceSection(e.NewStartingIndex));
-                        }
-                        else
-                        {
-                            var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
-                            changes.Add(VirtualScrollChangeFactory.ReplaceSectionRange(e.NewStartingIndex, endIndex));
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Reset:
-                    // Unsubscribe from all item handlers
-                    foreach (var group in _itemHandlers.Keys.ToList())
-                    {
-                        UnsubscribeFromGroupItems(group);
-                    }
-                    // Re-subscribe to current groups
-                    foreach (var group in _groups)
-                    {
-                        SubscribeToGroupItems(group);
-                    }
-                    changes.Add(VirtualScrollChangeFactory.Reset());
-                    break;
-            }
-
-            if (changes.Count > 0)
-            {
-                _changeCallback(new VirtualScrollChangeSet(changes));
-            }
-        }
-
-        private void OnItemsChanged(TwelveGroup group, NotifyCollectionChangedEventArgs e)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            var sectionIndex = _groups.IndexOf(group);
-            if (sectionIndex < 0)
-            {
-                return;
-            }
-
-            var changes = new List<VirtualScrollChange>();
-
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                    if (e.NewItems is { Count: > 0 })
-                    {
-                        if (e.NewItems.Count == 1)
-                        {
-                            changes.Add(VirtualScrollChangeFactory.InsertItem(sectionIndex, e.NewStartingIndex));
-                        }
-                        else
-                        {
-                            var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
-                            changes.Add(VirtualScrollChangeFactory.InsertItemRange(sectionIndex, e.NewStartingIndex, endIndex));
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Remove:
-                    if (e.OldItems is { Count: > 0 })
-                    {
-                        if (e.OldItems.Count == 1)
-                        {
-                            changes.Add(VirtualScrollChangeFactory.RemoveItem(sectionIndex, e.OldStartingIndex));
-                        }
-                        else
-                        {
-                            var endIndex = e.OldStartingIndex + e.OldItems.Count - 1;
-                            changes.Add(VirtualScrollChangeFactory.RemoveItemRange(sectionIndex, e.OldStartingIndex, endIndex));
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Move:
-                    if (e.OldItems is { Count: 1 })
-                    {
-                        changes.Add(VirtualScrollChangeFactory.MoveItem(sectionIndex, e.OldStartingIndex, e.NewStartingIndex));
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Replace:
-                    if (e.NewItems is { Count: > 0 })
-                    {
-                        if (e.NewItems.Count == 1)
-                        {
-                            changes.Add(VirtualScrollChangeFactory.ReplaceItem(sectionIndex, e.NewStartingIndex));
-                        }
-                        else
-                        {
-                            var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
-                            changes.Add(VirtualScrollChangeFactory.ReplaceItemRange(sectionIndex, e.NewStartingIndex, endIndex));
-                        }
-                    }
-                    break;
-
-                case NotifyCollectionChangedAction.Reset:
-                    changes.Add(VirtualScrollChangeFactory.ReplaceSection(sectionIndex));
-                    break;
-            }
-
-            if (changes.Count > 0)
-            {
-                _changeCallback(new VirtualScrollChangeSet(changes));
-            }
-        }
-
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-
-            _groups.CollectionChanged -= OnGroupsChanged;
-
-            foreach (var group in _itemHandlers.Keys.ToList())
-            {
-                UnsubscribeFromGroupItems(group);
-            }
-
-            _adapter.RemoveSubscription(this);
-        }
-    }
-}
-
