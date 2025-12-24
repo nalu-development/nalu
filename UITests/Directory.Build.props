@@ -20,6 +20,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="xunit.v3" Version="3.2.1" />
+    <PackageReference Include="Appium.WebDriver" Version="8.0.1" />
+    <PackageReference Include="Plugin.Maui.UITestHelpers.Appium" Version="1.0.0-preview5" />
   </ItemGroup>
 
   <ItemGroup Label="Testing Presets">

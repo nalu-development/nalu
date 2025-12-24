@@ -29,6 +29,7 @@ public static class MauiProgram
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()
+            .UseNaluVirtualScroll()
             .UseMauiCommunityToolkit()
             .ConfigureFonts(fonts =>
                 {
