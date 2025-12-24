@@ -546,7 +546,7 @@ public class VirtualScrollObservableCollectionAdapterTests
 
         // Assert
         result.Should().NotBeNull();
-        result!.Id.Should().Be(2);
+        result.Id.Should().Be(2);
         result.Name.Should().Be("Second");
     }
 
@@ -737,7 +737,7 @@ public class VirtualScrollObservableCollectionAdapterTests
         collection.Add("B");
 
         // Assert - First add should trigger section insertion
-        changeSets.Should().HaveCountGreaterOrEqualTo(2); // Clear + Add operations
+        changeSets.Should().HaveCountGreaterThanOrEqualTo(2); // Clear + Add operations
         var addChangeSet = changeSets[changeSets.Count - 2]; // Second to last (first Add)
         var changes = addChangeSet.Changes.ToList();
         changes.Should().HaveCount(2);

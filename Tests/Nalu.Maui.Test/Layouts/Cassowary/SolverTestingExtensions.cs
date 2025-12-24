@@ -12,7 +12,7 @@ public static class SolverTestingExtensions
         foreach (var (variable, value) in expected)
         {
             var actual = variable.CurrentValue;
-            Math.Abs(actual - value).Should().BeLessOrEqualTo(0.1, $"Variable {variable.Name} should be {value} but was {actual}");
+            Math.Abs(actual - value).Should().BeLessThanOrEqualTo(0.1, $"Variable {variable.Name} should be {value} but was {actual}");
         }
     }
 }

@@ -192,7 +192,7 @@ public class TemplateBoxTests
                 // Assert
                 var container = templatedComponent.PresentedContent as TemplateContentPresenter;
                 container.Should().NotBeNull();
-                container!.Content.Should().Be(projectedContent);
+                container.Content.Should().Be(projectedContent);
             }
         );
 
