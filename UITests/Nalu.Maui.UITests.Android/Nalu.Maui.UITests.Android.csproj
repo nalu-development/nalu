@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <RootNamespace>Nalu.Maui.UITests</RootNamespace>
+        <DefineConstants>$(DefineConstants);ANDROID</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AndroidSdk" Version="0.26.0" />
+        <PackageReference Include="Appium.WebDriver" Version="8.0.1" />
+        <PackageReference Include="Plugin.Maui.UITestHelpers.Appium" Version="1.0.0-preview5" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit"/>
+        <AssemblyAttribute Include="Xunit.CollectionBehavior">
+            <_Parameter1>Xunit.CollectionBehavior+CollectionPerAssembly</_Parameter1>
+            <_Parameter2>false</_Parameter2>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Utils\VisualTestUtils.MagickNet\VisualTestUtils.MagickNet.csproj" />
+        <Compile Include="..\Nalu.Maui.UITests.Shared\**\*.cs" Exclude="..\Nalu.Maui.UITests.Shared\obj\**;..\Nalu.Maui.UITests.Shared\bin\**" LinkBase="Shared" Visible="false" />
+    </ItemGroup>
+
+</Project>
