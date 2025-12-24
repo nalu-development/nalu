@@ -77,6 +77,11 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
             {
                 bindable.BindingContext = itemValue;
             }
+
+            if (_virtualScroll is Element virtualScrollElement && bindable is Element { Parent: null } viewElement)
+            {
+                virtualScrollElement.AddLogicalChild(viewElement);
+            }
         }
     }
 
@@ -84,10 +89,6 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
     {
         var template = _reuseIdManager.GetTemplateById(viewType);
         var view = (IView)template.CreateContent();
-        if (_virtualScroll is Element virtualScrollElement && view is Element { Parent: null } viewElement)
-        {
-            virtualScrollElement.AddLogicalChild(viewElement);
-        }
 
         var platformView = view.ToPlatform(_mauiContext);
         var recyclerView = (VirtualScrollRecyclerView) parent;

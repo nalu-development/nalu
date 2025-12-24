@@ -8,7 +8,7 @@ namespace Nalu.Maui.Sample;
 public partial class AppShell : NaluShell
 {
     public AppShell(INavigationService navigationService)
-        : base(navigationService, typeof(SoftKeyboardManagerPage))
+        : base(navigationService, typeof(OnePage))
     {
         InitializeComponent();
         CustomMenuItem.Command = new Command(() =>
