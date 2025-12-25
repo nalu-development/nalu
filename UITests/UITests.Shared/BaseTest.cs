@@ -23,6 +23,16 @@ public abstract class BaseTest
 
     public BaseTest()
     {
+        try
+        {
+            var resetButton = App.WaitForElement("ResetButton", timeout: TimeSpan.FromSeconds(1));
+            resetButton?.Tap();
+        }
+        catch
+        {
+            // Ignore if Reset button is not found
+        }
+
         if (TestPageName is { } pageName)
         {
             App.WaitForElement("TestName");

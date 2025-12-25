@@ -4,9 +4,37 @@ namespace Nalu.Maui.TestApp.Tests;
 
 [UsedImplicitly]
 [TestPage("Virtual Scroll List Tests")]
+public class VirtualScrollListTestsNavigationPage : NavigationPage
+{
+    public VirtualScrollListTestsNavigationPage() : base(new VirtualScrollListTestsController())
+    {
+        
+    }
+}
+
+public class VirtualScrollListTestsController : ContentPage
+{
+    public VirtualScrollListTestsController()
+    {
+        var scrollView = new ScrollView();
+        var verticalStack = new VerticalStackLayout { Spacing = 8, Padding = 16 };
+        scrollView.Content = verticalStack;
+        
+        var openTestPageButton = new Button { Text = "Open Virtual Scroll List Test Page", AutomationId =  "OpenTestPage" };
+        openTestPageButton.Clicked += (_, _) =>
+        {
+            Navigation.PushAsync(new VirtualScrollListTests());
+        };
+        
+        verticalStack.Add(openTestPageButton);
+        
+        Content = scrollView;
+    }
+}
+
 public class VirtualScrollListTests : ContentPage
 {
-    public VirtualScrollListTests()
+    public VirtualScrollListTests(Action<VirtualScroll>? configure = null)
     {
         BindingContext = new { Header = "The header", Footer = "The footer" };
 
@@ -56,6 +84,8 @@ public class VirtualScrollListTests : ContentPage
                                     }
                                 )
                             };
+        
+        configure?.Invoke(virtualScroll);
 
         var grid = new Grid
                    {

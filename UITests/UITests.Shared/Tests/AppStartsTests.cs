@@ -5,7 +5,7 @@ using Xunit;
 namespace UITests;
 
 // This is an example of tests that do not need anything platform specific.
-// Typically you will want all your tests to be in the shared project so they are ran across all platforms.
+// Typically, you will want all your tests to be in the shared project so they are ran across all platforms.
 public class AppStartsTests : BaseTest
 {
 	[Fact]
