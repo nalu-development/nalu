@@ -80,8 +80,13 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
         }
     }
 
+    // private readonly Dictionary<int, int> _countPerType = new();
+    
     public override RecyclerView.ViewHolder OnCreateViewHolder(ViewGroup parent, int viewType)
     {
+        // ref var count = ref CollectionsMarshal.GetValueRefOrAddDefault(_countPerType, viewType, out _);
+        // ++count;
+
         var template = _reuseIdManager.GetTemplateById(viewType);
         var view = (IView)template.CreateContent();
         if (_virtualScroll is Element virtualScrollElement && view is Element { Parent: null } viewElement)

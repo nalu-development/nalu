@@ -49,20 +49,75 @@ public partial class TwelvePageModel : ObservableObject, IDisposable
     public IVirtualScrollAdapter Adapter { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowVirtualScroll))]
-    private bool _showCollectionView = true;
+    [NotifyPropertyChangedFor(nameof(IsNoneSelected), nameof(IsCollectionViewSelected), nameof(IsVirtualScrollSelected))]
+    private bool? _viewMode = null; // null = none, true = CollectionView, false = VirtualScroll
 
-    public bool ShowVirtualScroll => !ShowCollectionView;
+    public bool IsNoneSelected => ViewMode == null;
+    public bool IsCollectionViewSelected => ViewMode == true;
+    public bool IsVirtualScrollSelected => ViewMode == false;
+
+    [ObservableProperty]
+    private int _currentSectionIndex = 0;
+
+    [ObservableProperty]
+    private int _currentItemIndex = 0;
+
+    [ObservableProperty]
+    private int _scrollTrigger = 0; // Incremented to trigger scroll
 
     [RelayCommand]
-    private void ShowCollectionViewCommand() => ShowCollectionView = true;
+    private void ShowNone() => ViewMode = null;
 
     [RelayCommand]
-    private void ShowVirtualScrollCommand() => ShowCollectionView = false;
+    private void ShowCollectionView() => ViewMode = true;
 
-    partial void OnShowCollectionViewChanged(bool value)
+    [RelayCommand]
+    private void ShowVirtualScroll() => ViewMode = false;
+
+    [RelayCommand]
+    private async Task StartAutoScrollAsync()
     {
-        OnPropertyChanged(nameof(ShowVirtualScroll));
+        if (ViewMode == null)
+        {
+            return;
+        }
+
+        // Reset to start
+        CurrentSectionIndex = 0;
+        CurrentItemIndex = 0;
+
+        for (var i = 0; i < 10; i++)
+        {
+            // Calculate next position (current item + 50)
+            var targetItemIndex = CurrentItemIndex + 50;
+            var targetSectionIndex = CurrentSectionIndex;
+
+            // Handle wrapping across sections
+            while (targetSectionIndex < Groups.Count && targetItemIndex >= Groups[targetSectionIndex].Items.Count)
+            {
+                targetItemIndex -= Groups[targetSectionIndex].Items.Count;
+                targetSectionIndex++;
+            }
+
+            // Clamp to bounds
+            if (targetSectionIndex >= Groups.Count)
+            {
+                targetSectionIndex = Groups.Count - 1;
+                targetItemIndex = Groups[targetSectionIndex].Items.Count - 1;
+            }
+            else if (targetItemIndex >= Groups[targetSectionIndex].Items.Count)
+            {
+                targetItemIndex = Groups[targetSectionIndex].Items.Count - 1;
+            }
+
+            CurrentSectionIndex = targetSectionIndex;
+            CurrentItemIndex = targetItemIndex;
+
+            // Trigger scroll by incrementing the trigger
+            ScrollTrigger++;
+
+            await Task.Delay(1000); // Small delay between scrolls
+        }
     }
 
     public TwelvePageModel()
