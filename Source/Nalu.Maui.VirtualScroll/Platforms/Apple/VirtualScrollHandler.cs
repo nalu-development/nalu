@@ -194,8 +194,6 @@ public partial class VirtualScrollHandler
             _refreshControl = null;
         }
         
-        base.DisconnectHandler(platformView);
-        
         // Unsubscribe from events
         if (_containerView is not null)
         {
@@ -213,9 +211,15 @@ public partial class VirtualScrollHandler
         _delegate?.Dispose();
         _delegate = null;
         
+        _collectionView?.Dispose();
         _collectionView = null;
+        _containerView?.Dispose();
         _containerView = null;
         _reuseIdManager = null;
+
+        base.DisconnectHandler(platformView);
+
+        EnsureCreatedCellsCleanup();
     }
 
     /// <summary>

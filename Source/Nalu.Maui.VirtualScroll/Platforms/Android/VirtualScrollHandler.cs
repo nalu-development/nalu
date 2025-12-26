@@ -98,7 +98,10 @@ public partial class VirtualScrollHandler
         _swipeRefreshLayout = null;
         _rootLayout?.Dispose();
         _rootLayout = null;
+
         base.DisconnectHandler(platformView);
+
+        EnsureCreatedCellsCleanup();
     }
 
     internal VirtualScrollRecyclerView GetRecyclerView() => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");

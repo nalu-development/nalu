@@ -36,7 +36,7 @@ internal sealed class VirtualScrollCellManager<T> : IDisposable
 
                 if (view is BindableObject bindableObject)
                 {
-                    bindableObject.ClearValue(BindableObject.BindingContextProperty);
+                    bindableObject.BindingContext = null;
                 }
 
                 if (cell is IDisposable disposableCell)
