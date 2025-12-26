@@ -31,23 +31,6 @@ public class VirtualScrollViewWrapper : FrameLayout
     {
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        if (VirtualView is { } virtualView)
-        {
-            virtualView.DisconnectHandlers();
-
-            if (virtualView is Element element)
-            {
-                element.Parent?.RemoveLogicalChild(element);
-            }
-
-            VirtualView = null;
-        }
-        
-        base.Dispose(disposing);
-    }
-
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
         if (LayoutParameters!.Width == ViewGroup.LayoutParams.MatchParent)
