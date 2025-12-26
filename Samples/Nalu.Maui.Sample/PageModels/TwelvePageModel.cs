@@ -4,6 +4,14 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Nalu.Maui.Sample.PageModels;
 
+public partial class TwelvePageStaticModel : ObservableObject
+{
+    public static TwelvePageStaticModel Instance { get; } = new();
+    
+    [ObservableProperty]
+    public partial string Message { get; set; } = "Credit Cards Demo";
+}
+
 public partial class TwelvePageModel : ObservableObject, IDisposable
 {
     private static int _instanceCount;

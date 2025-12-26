@@ -83,162 +83,172 @@
 
             <!-- ToggleTemplate for CollectionView and VirtualScroll -->
             <nalu:ToggleTemplate Grid.Row="2"
-                                  Value="{Binding ViewMode}">
+                                 Value="{Binding ViewMode}">
                 <nalu:ToggleTemplate.WhenTrue>
                     <DataTemplate x:DataType="pageModels:TwelvePageModel">
                         <CollectionView ItemsSource="{Binding Groups}"
-                                       IsGrouped="True">
-                    <CollectionView.GroupHeaderTemplate>
-                        <DataTemplate x:DataType="pageModels:TwelveGroup">
-                            <Grid BackgroundColor="#4A90E2"
-                                  Padding="16,12">
-                                <Label Text="{Binding OwnerName}"
-                                       FontSize="24"
-                                       FontAttributes="Bold"
-                                       TextColor="White"
-                                       HorizontalOptions="Center"
-                                       VerticalOptions="Center" />
-                            </Grid>
-                        </DataTemplate>
-                    </CollectionView.GroupHeaderTemplate>
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="pageModels:TwelveCreditCard">
-                            <Border Margin="8"
-                                    VerticalOptions="Center"
-                                    StrokeThickness="0"
-                                    StrokeShape="RoundRectangle 8"
-                                    Style="{StaticResource CardStyle}">
-                                <Grid ColumnDefinitions="Auto,*,Auto">
-                                    <Border Grid.Column="0"
-                                            HeightRequest="48"
-                                            WidthRequest="60"
-                                            Margin="4"
+                                        IsGrouped="True">
+                            <CollectionView.GroupHeaderTemplate>
+                                <DataTemplate x:DataType="pageModels:TwelveGroup">
+                                    <Grid BackgroundColor="#4A90E2"
+                                          Padding="16,12">
+                                        <Label Text="{Binding OwnerName}"
+                                               FontSize="24"
+                                               FontAttributes="Bold"
+                                               TextColor="White"
+                                               HorizontalOptions="Center"
+                                               VerticalOptions="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.GroupHeaderTemplate>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="pageModels:TwelveCreditCard">
+                                    <Border Margin="8"
+                                            VerticalOptions="Center"
                                             StrokeThickness="0"
-                                            StrokeShape="RoundRectangle 8">
-                                        <!-- <maui:CachedImage Source="{Binding ImageSource}" -->
-                                        <!--                   Aspect="AspectFill" /> -->
-                                    </Border>
-                                    <VerticalStackLayout Grid.Column="1"
-                                                         VerticalOptions="Center">
-                                        <FlexLayout Direction="Row"
-                                                    Wrap="NoWrap">
-                                            <Label FontSize="16"
+                                            StrokeShape="RoundRectangle 8"
+                                            Style="{StaticResource CardStyle}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Border Grid.Column="0"
+                                                    HeightRequest="48"
+                                                    WidthRequest="60"
+                                                    Margin="4"
+                                                    StrokeThickness="0"
+                                                    StrokeShape="RoundRectangle 8">
+                                                <!-- <maui:CachedImage Source="{Binding ImageSource}" -->
+                                                <!--                   Aspect="AspectFill" /> -->
+                                            </Border>
+                                            <VerticalStackLayout Grid.Column="1"
+                                                                 VerticalOptions="Center">
+                                                <FlexLayout Direction="Row"
+                                                            Wrap="NoWrap">
+                                                    <Label FontSize="16"
+                                                           FontFamily="OpenSansSemibold"
+                                                           MaxLines="1"
+                                                           FlexLayout.Shrink="1"
+                                                           LineBreakMode="TailTruncation"
+                                                           Text="{Binding Name}" />
+                                                    <Image IsVisible="{Binding Starred}"
+                                                           Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
+                                                </FlexLayout>
+                                                <Label FontSize="12">
+                                                    <Label.FormattedText>
+                                                        <FormattedString>
+                                                            <Span Text="{Binding Type}" />
+                                                            <Span Text=" · " />
+                                                            <Span Text="{Binding Exp}" />
+                                                        </FormattedString>
+                                                    </Label.FormattedText>
+                                                </Label>
+                                            </VerticalStackLayout>
+                                            <Label Grid.Column="2"
+                                                   FontSize="18"
+                                                   Background="{StaticResource Secondary}"
+                                                   TextColor="{StaticResource PrimaryDark}"
                                                    FontFamily="OpenSansSemibold"
-                                                   MaxLines="1"
-                                                   FlexLayout.Shrink="1"
-                                                   LineBreakMode="TailTruncation"
-                                                   Text="{Binding Name}" />
-                                            <Image IsVisible="{Binding Starred}"
-                                                   Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
-                                        </FlexLayout>
-                                        <Label FontSize="12">
-                                            <Label.FormattedText>
-                                                <FormattedString>
-                                                    <Span Text="{Binding Type}"/>
-                                                    <Span Text=" · "/>
-                                                    <Span Text="{Binding Exp}"/>
-                                                </FormattedString>
-                                            </Label.FormattedText>
-                                        </Label>
-                                    </VerticalStackLayout>
-                                    <Label Grid.Column="2"
-                                           FontSize="18"
-                                           Background="{StaticResource Secondary}"
-                                           TextColor="{StaticResource PrimaryDark}"
-                                           FontFamily="OpenSansSemibold"
-                                           Padding="8"
-                                           VerticalTextAlignment="Center"
-                                           Text="{Binding CreditDollar}">
-                                        <Label.GestureRecognizers>
-                                            <TapGestureRecognizer Command="{Binding StarUnstarCommand}" />
-                                        </Label.GestureRecognizers>
-                                    </Label>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
+                                                   Padding="8"
+                                                   VerticalTextAlignment="Center"
+                                                   Text="{Binding CreditDollar}">
+                                                <Label.GestureRecognizers>
+                                                    <TapGestureRecognizer Command="{Binding StarUnstarCommand}" />
+                                                </Label.GestureRecognizers>
+                                            </Label>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
                         </CollectionView>
                     </DataTemplate>
                 </nalu:ToggleTemplate.WhenTrue>
                 <nalu:ToggleTemplate.WhenFalse>
                     <DataTemplate x:DataType="pageModels:TwelvePageModel">
                         <nalu:VirtualScroll Adapter="{Binding Adapter}">
-                    <!-- Section Header Template -->
-                    <nalu:VirtualScroll.SectionHeaderTemplate>
-                        <DataTemplate x:DataType="pageModels:TwelveGroup">
-                            <nalu:ViewBox>
-                                <Grid BackgroundColor="#4A90E2"
-                                      Padding="16,12">
-                                    <Label Text="{Binding OwnerName}"
-                                           FontSize="24"
-                                           FontAttributes="Bold"
-                                           TextColor="White"
-                                           HorizontalOptions="Center"
-                                           VerticalOptions="Center" />
-                                </Grid>
-                            </nalu:ViewBox>
-                        </DataTemplate>
-                    </nalu:VirtualScroll.SectionHeaderTemplate>
+                            <nalu:VirtualScroll.HeaderTemplate>
+                                <DataTemplate x:DataType="pageModels:TwelvePageModel">
+                                    <nalu:ViewBox ContentBindingContext="{x:Static pageModels:TwelvePageStaticModel.Instance}">
+                                        <Label Text="{Binding Message}"
+                                               x:DataType="pageModels:TwelvePageStaticModel"
+                                               BackgroundColor="Red"/>
+                                    </nalu:ViewBox>
+                                </DataTemplate>
+                            </nalu:VirtualScroll.HeaderTemplate>
 
-                    <!-- Item Template -->
-                    <nalu:VirtualScroll.ItemTemplate>
-                        <DataTemplate x:DataType="pageModels:TwelveCreditCard">
-                            <nalu:ViewBox>
-                                <Border Margin="8"
-                                        VerticalOptions="Center"
-                                        StrokeThickness="0"
-                                        StrokeShape="RoundRectangle 8"
-                                        Style="{StaticResource CardStyle}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
-                                        <Border Grid.Column="0"
-                                                HeightRequest="48"
-                                                WidthRequest="60"
-                                                Margin="4"
+                            <!-- Section Header Template -->
+                            <nalu:VirtualScroll.SectionHeaderTemplate>
+                                <DataTemplate x:DataType="pageModels:TwelveGroup">
+                                    <nalu:ViewBox>
+                                        <Grid BackgroundColor="#4A90E2"
+                                              Padding="16,12">
+                                            <Label Text="{Binding OwnerName}"
+                                                   FontSize="24"
+                                                   FontAttributes="Bold"
+                                                   TextColor="White"
+                                                   HorizontalOptions="Center"
+                                                   VerticalOptions="Center" />
+                                        </Grid>
+                                    </nalu:ViewBox>
+                                </DataTemplate>
+                            </nalu:VirtualScroll.SectionHeaderTemplate>
+
+                            <!-- Item Template -->
+                            <nalu:VirtualScroll.ItemTemplate>
+                                <DataTemplate x:DataType="pageModels:TwelveCreditCard">
+                                    <nalu:ViewBox>
+                                        <Border Margin="8"
+                                                VerticalOptions="Center"
                                                 StrokeThickness="0"
-                                                StrokeShape="RoundRectangle 8">
-                                            <!-- <maui:CachedImage Source="{Binding ImageSource}" -->
-                                            <!--                   Aspect="AspectFill" /> -->
-                                        </Border>
-                                        <VerticalStackLayout Grid.Column="1"
-                                                             VerticalOptions="Center">
-                                            <FlexLayout Direction="Row"
-                                                        Wrap="NoWrap">
-                                                <Label FontSize="16"
+                                                StrokeShape="RoundRectangle 8"
+                                                Style="{StaticResource CardStyle}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <Border Grid.Column="0"
+                                                        HeightRequest="48"
+                                                        WidthRequest="60"
+                                                        Margin="4"
+                                                        StrokeThickness="0"
+                                                        StrokeShape="RoundRectangle 8">
+                                                    <!-- <maui:CachedImage Source="{Binding ImageSource}" -->
+                                                    <!--                   Aspect="AspectFill" /> -->
+                                                </Border>
+                                                <VerticalStackLayout Grid.Column="1"
+                                                                     VerticalOptions="Center">
+                                                    <FlexLayout Direction="Row"
+                                                                Wrap="NoWrap">
+                                                        <Label FontSize="16"
+                                                               FontFamily="OpenSansSemibold"
+                                                               MaxLines="1"
+                                                               FlexLayout.Shrink="1"
+                                                               LineBreakMode="TailTruncation"
+                                                               Text="{Binding Name}" />
+                                                        <Image IsVisible="{Binding Starred}"
+                                                               Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
+                                                    </FlexLayout>
+                                                    <Label FontSize="12">
+                                                        <Label.FormattedText>
+                                                            <FormattedString>
+                                                                <Span Text="{Binding Type}" />
+                                                                <Span Text=" · " />
+                                                                <Span Text="{Binding Exp}" />
+                                                            </FormattedString>
+                                                        </Label.FormattedText>
+                                                    </Label>
+                                                </VerticalStackLayout>
+                                                <Label Grid.Column="2"
+                                                       FontSize="18"
+                                                       Background="{StaticResource Secondary}"
+                                                       TextColor="{StaticResource PrimaryDark}"
                                                        FontFamily="OpenSansSemibold"
-                                                       MaxLines="1"
-                                                       FlexLayout.Shrink="1"
-                                                       LineBreakMode="TailTruncation"
-                                                       Text="{Binding Name}" />
-                                                <Image IsVisible="{Binding Starred}"
-                                                       Source="{FontImageSource FontFamily=MaterialFilled, Size=16, Glyph='&#xf0ec;', Color={StaticResource Primary}}" />
-                                            </FlexLayout>
-                                            <Label FontSize="12">
-                                                <Label.FormattedText>
-                                                    <FormattedString>
-                                                        <Span Text="{Binding Type}"/>
-                                                        <Span Text=" · "/>
-                                                        <Span Text="{Binding Exp}"/>
-                                                    </FormattedString>
-                                                </Label.FormattedText>
-                                            </Label>
-                                        </VerticalStackLayout>
-                                        <Label Grid.Column="2"
-                                               FontSize="18"
-                                               Background="{StaticResource Secondary}"
-                                               TextColor="{StaticResource PrimaryDark}"
-                                               FontFamily="OpenSansSemibold"
-                                               Padding="8"
-                                               VerticalTextAlignment="Center"
-                                               Text="{Binding CreditDollar}">
-                                            <Label.GestureRecognizers>
-                                                <TapGestureRecognizer Command="{Binding StarUnstarCommand}" />
-                                            </Label.GestureRecognizers>
-                                        </Label>
-                                    </Grid>
-                                </Border>
-                            </nalu:ViewBox>
-                        </DataTemplate>
-                    </nalu:VirtualScroll.ItemTemplate>
+                                                       Padding="8"
+                                                       VerticalTextAlignment="Center"
+                                                       Text="{Binding CreditDollar}">
+                                                    <Label.GestureRecognizers>
+                                                        <TapGestureRecognizer Command="{Binding StarUnstarCommand}" />
+                                                    </Label.GestureRecognizers>
+                                                </Label>
+                                            </Grid>
+                                        </Border>
+                                    </nalu:ViewBox>
+                                </DataTemplate>
+                            </nalu:VirtualScroll.ItemTemplate>
                         </nalu:VirtualScroll>
                     </DataTemplate>
                 </nalu:ToggleTemplate.WhenFalse>
@@ -246,4 +256,3 @@
         </Grid>
     </ContentPage.Content>
 </ContentPage>
-

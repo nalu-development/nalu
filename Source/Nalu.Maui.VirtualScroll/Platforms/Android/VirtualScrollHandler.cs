@@ -353,6 +353,12 @@ public partial class VirtualScrollHandler
 
         void DoUpdateFadingEdge()
         {
+            if (recyclerView.Handle == IntPtr.Zero)
+            {
+                // This callback is asynchronous - the recycler view might have been disposed in the meantime
+                return;
+            }
+            
             if (virtualScroll.FadingEdgeLength <= 0)
             {
                 recyclerView.HorizontalFadingEdgeEnabled = false;
