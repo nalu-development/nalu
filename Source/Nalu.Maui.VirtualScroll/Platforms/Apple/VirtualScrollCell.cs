@@ -102,21 +102,14 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
         if (view is BindableObject bindable)
         {
-            if (item is null)
+            if (isRebinding && bindable.BindingContext == item)
             {
-                bindable.ClearValue(BindableObject.BindingContextProperty);
+                // One time bindings should be reapplied
+                ReapplyBindings(bindable);
             }
             else
             {
-                if (isRebinding && bindable.BindingContext == item)
-                {
-                    // One time bindings should be reapplied
-                    ReapplyBindings(bindable);
-                }
-                else
-                {
-                    bindable.BindingContext = item;
-                }
+                bindable.BindingContext = item;
             }
         }
 

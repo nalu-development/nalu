@@ -98,7 +98,10 @@ public partial class VirtualScrollHandler
         _swipeRefreshLayout = null;
         _rootLayout?.Dispose();
         _rootLayout = null;
+
         base.DisconnectHandler(platformView);
+
+        EnsureCreatedCellsCleanup();
     }
 
     internal VirtualScrollRecyclerView GetRecyclerView() => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");
@@ -191,7 +194,7 @@ public partial class VirtualScrollHandler
             var mauiContext = handler.MauiContext ?? throw new InvalidOperationException("MauiContext cannot be null when mapping the Adapter.");
             var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("VirtualScroll must implement IVirtualScrollLayoutInfo.");
             var flattenedAdapter = new VirtualScrollFlattenedAdapter(adapter, layoutInfo);
-            var recyclerViewAdapter = new VirtualScrollRecyclerViewAdapter(mauiContext, virtualScroll, flattenedAdapter);
+            var recyclerViewAdapter = new VirtualScrollRecyclerViewAdapter(mauiContext, recyclerView, virtualScroll, flattenedAdapter);
             recyclerView.SetAdapter(recyclerViewAdapter);
             handler._recyclerViewAdapter = recyclerViewAdapter;
             handler._flattenedAdapter = flattenedAdapter;
@@ -353,6 +356,12 @@ public partial class VirtualScrollHandler
 
         void DoUpdateFadingEdge()
         {
+            if (recyclerView.Handle == IntPtr.Zero)
+            {
+                // This callback is asynchronous - the recycler view might have been disposed in the meantime
+                return;
+            }
+            
             if (virtualScroll.FadingEdgeLength <= 0)
             {
                 recyclerView.HorizontalFadingEdgeEnabled = false;

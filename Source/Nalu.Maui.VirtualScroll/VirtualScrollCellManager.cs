@@ -4,7 +4,7 @@ internal sealed class VirtualScrollCellManager<T> : IDisposable
     where T : class
 {
     private readonly Func<T, IView?> _viewGetter;
-    private readonly List<T> _cells = new(32);
+    private readonly List<WeakReference<T>> _cells = new(32);
     
     public int Count => _cells.Count;
 
@@ -13,33 +13,36 @@ internal sealed class VirtualScrollCellManager<T> : IDisposable
         _viewGetter = viewGetter;
     }
 
-    public void TrackCell(T cell) => _cells.Add(cell);
+    public void TrackCell(T cell) => _cells.Add(new WeakReference<T>(cell));
 
     public void Dispose()
     {
-        foreach (var cell in _cells)
+        foreach (var weakCell in _cells)
         {
-            var view = _viewGetter(cell);
-            if (view is null)
+            if (weakCell.TryGetTarget(out var cell))
             {
-                continue;
-            }
+                var view = _viewGetter(cell);
+                if (view is null)
+                {
+                    continue;
+                }
 
-            view.DisconnectHandlers();
+                view.DisconnectHandlers();
 
-            if (view is Element { Parent: { } parent } element)
-            {
-                parent.RemoveLogicalChild(element);
-            }
+                if (view is Element { Parent: { } parent } element)
+                {
+                    parent.RemoveLogicalChild(element);
+                }
 
-            if (view is BindableObject bindableObject)
-            {
-                bindableObject.ClearValue(BindableObject.BindingContextProperty);
-            }
+                if (view is BindableObject bindableObject)
+                {
+                    bindableObject.BindingContext = null;
+                }
 
-            if (cell is IDisposable disposableCell)
-            {
-                disposableCell.Dispose();
+                if (cell is IDisposable disposableCell)
+                {
+                    disposableCell.Dispose();
+                }
             }
         }
         

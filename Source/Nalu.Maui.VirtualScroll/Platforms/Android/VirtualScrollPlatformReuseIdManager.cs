@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using AndroidX.RecyclerView.Widget;
 using Microsoft.Maui.Controls.Internals;
 
 namespace Nalu;
@@ -6,14 +7,16 @@ namespace Nalu;
 internal sealed class VirtualScrollPlatformReuseIdManager
 {
     private static readonly DataTemplate _defaultTemplate = new (() => new ContentView());
+    private readonly RecyclerView _recyclerView;
     private readonly Dictionary<string, int> _registeredIds = [];
     private readonly Dictionary<int, DataTemplate> _registeredTemplates = [];
     private int _idCounter;
 
     public int DefaultReuseId => 0;
 
-    public VirtualScrollPlatformReuseIdManager()
+    public VirtualScrollPlatformReuseIdManager(RecyclerView recyclerView)
     {
+        _recyclerView = recyclerView;
         _registeredIds.Add("DEFAULT", _idCounter++);
         _registeredTemplates.Add(DefaultReuseId, _defaultTemplate);
     }
@@ -30,6 +33,7 @@ internal sealed class VirtualScrollPlatformReuseIdManager
         {
             storedReuseId = _idCounter++;
             _registeredTemplates.Add(storedReuseId, template);
+            _recyclerView.GetRecycledViewPool().SetMaxRecycledViews(storedReuseId, 40);
         }
 
         return storedReuseId;

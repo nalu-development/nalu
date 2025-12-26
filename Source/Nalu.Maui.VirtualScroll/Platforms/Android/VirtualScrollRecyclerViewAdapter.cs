@@ -14,12 +14,12 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
     private readonly IVirtualScrollFlattenedAdapter _adapter;
     private readonly VirtualScrollPlatformReuseIdManager _reuseIdManager;
 
-    public VirtualScrollRecyclerViewAdapter(IMauiContext mauiContext, IVirtualScroll virtualScroll, IVirtualScrollFlattenedAdapter adapter)
+    public VirtualScrollRecyclerViewAdapter(IMauiContext mauiContext, RecyclerView recyclerView, IVirtualScroll virtualScroll, IVirtualScrollFlattenedAdapter adapter)
     {
         _mauiContext = mauiContext;
         _virtualScroll = virtualScroll;
         _adapter = adapter;
-        _reuseIdManager = new VirtualScrollPlatformReuseIdManager();
+        _reuseIdManager = new VirtualScrollPlatformReuseIdManager(recyclerView);
 
         HasStableIds = false;
     }
@@ -85,8 +85,13 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
         }
     }
 
+    // private readonly Dictionary<int, int> _countPerType = new();
+    
     public override RecyclerView.ViewHolder OnCreateViewHolder(ViewGroup parent, int viewType)
     {
+        // ref var count = ref CollectionsMarshal.GetValueRefOrAddDefault(_countPerType, viewType, out _);
+        // ++count;
+
         var template = _reuseIdManager.GetTemplateById(viewType);
         var view = (IView)template.CreateContent();
 

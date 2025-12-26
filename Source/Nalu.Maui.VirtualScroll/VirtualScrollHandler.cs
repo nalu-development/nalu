@@ -67,5 +67,22 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
         base.SetVirtualView(view);
         IsConnecting = false;
     }
+
+    private void EnsureCreatedCellsCleanup()
+    {
+        if (VirtualView is Element element)
+        {
+            static void ElementOnChildRemoved(object? sender, ElementEventArgs e)
+            {
+                var element = e.Element;
+                (element as View)?.DisconnectHandlers();
+                element.BindingContext = null;
+            }
+
+            element.ChildRemoved += ElementOnChildRemoved;
+            element.ClearLogicalChildren();
+            element.ChildRemoved -= ElementOnChildRemoved;
+        }
+    }
 }
 #endif

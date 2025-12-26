@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>UITests</RootNamespace>
+    <DefineConstants>$(DefineConstants);IOS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\UITests.Shared\**\*.cs" Exclude="..\UITests.Shared\obj\**;..\UITests.Shared\bin\**;" LinkBase="Shared" Visible="false" />
+  </ItemGroup>
+
+</Project>

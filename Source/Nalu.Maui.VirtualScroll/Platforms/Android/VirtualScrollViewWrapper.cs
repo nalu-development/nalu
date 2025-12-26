@@ -9,8 +9,14 @@ namespace Nalu;
 
 public class VirtualScrollViewWrapper : FrameLayout
 {
-    public IView? VirtualView { get; set; }
-    
+    private WeakReference<IView>? _virtualView;
+
+    public IView? VirtualView
+    {
+        get => _virtualView?.TryGetTarget(out var view) == true ? view : null;
+        set => _virtualView = value is null ? null : new WeakReference<IView>(value);
+    }
+
     protected VirtualScrollViewWrapper(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
     {
     }
