@@ -26,7 +26,7 @@ public partial class VirtualScrollHandler
     /// Gets the <see cref="UICollectionView"/> platform view.
     /// </summary>
     /// <exception cref="InvalidOperationException">when the handler is not connected.</exception>
-    protected UICollectionView CollectionView => _collectionView ?? throw new InvalidOperationException("CollectionView has not been created.");
+    public UICollectionView PlatformCollectionView => _collectionView ?? throw new InvalidOperationException("CollectionView has not been created.");
 
     /// <summary>
     /// Gets the range of currently visible items in the virtual scroll.
@@ -34,7 +34,7 @@ public partial class VirtualScrollHandler
     /// <returns>A <see cref="VirtualScrollRange"/> containing the first and last visible item positions, or <c>null</c> if no items are visible.</returns>
     public VirtualScrollRange? GetVisibleItemsRange()
     {
-        var collectionView = CollectionView;
+        var collectionView = PlatformCollectionView;
         var layoutInfo = VirtualView as IVirtualScrollLayoutInfo;
 
         (int Section, int Item)? start = null;
@@ -103,7 +103,7 @@ public partial class VirtualScrollHandler
     protected override UIView CreatePlatformView()
     {
         var layout = CreatePlatformLayout(this, VirtualView);
-        var collectionView = new VirtualScrollCollectionView(CGRect.Empty, layout);
+        var collectionView = new VirtualScrollCollectionView(CGRect.Empty, layout, (IVirtualScrollLayoutInfo)VirtualView);
         var reuseIdManager = new VirtualScrollPlatformReuseIdManager(collectionView);
 
         _reuseIdManager = reuseIdManager;
@@ -231,7 +231,7 @@ public partial class VirtualScrollHandler
         handler._notifier?.Dispose();
         handler._notifier = null;
 
-        var collectionView = handler.CollectionView;
+        var collectionView = handler.PlatformCollectionView;
 
         if (virtualScroll.Adapter is { } adapter)
         {
@@ -258,7 +258,7 @@ public partial class VirtualScrollHandler
         }
 
         var layout = CreatePlatformLayout(handler, virtualScroll);
-        var collectionView = handler.CollectionView;
+        var collectionView = handler.PlatformCollectionView;
         var animated = collectionView.Window is not null;
         collectionView.SetCollectionViewLayout(layout, animated);
         
@@ -301,7 +301,7 @@ public partial class VirtualScrollHandler
             return;
         }
 
-        var collectionView = handler.CollectionView;
+        var collectionView = handler.PlatformCollectionView;
         collectionView.PerformBatchUpdates(collectionView.ReloadData, null!);
     }
 
@@ -331,7 +331,7 @@ public partial class VirtualScrollHandler
     /// </summary>
     public static void MapBackground(VirtualScrollHandler handler, IView view)
     {
-        var collectionView = handler.CollectionView;
+        var collectionView = handler.PlatformCollectionView;
         if (view.Background.IsNullOrEmpty())
         {
             collectionView.RemoveBackgroundLayer();
@@ -409,13 +409,13 @@ public partial class VirtualScrollHandler
         if (refreshControl is not null)
         {
             refreshControl.Enabled = isRefreshEnabled;
-            if (isRefreshEnabled && !ReferenceEquals(handler.CollectionView.RefreshControl, refreshControl))
+            if (isRefreshEnabled && !ReferenceEquals(handler.PlatformCollectionView.RefreshControl, refreshControl))
             {
-                handler.CollectionView.RefreshControl = refreshControl;
+                handler.PlatformCollectionView.RefreshControl = refreshControl;
             }
-            else if (!isRefreshEnabled && ReferenceEquals(handler.CollectionView.RefreshControl, refreshControl))
+            else if (!isRefreshEnabled && ReferenceEquals(handler.PlatformCollectionView.RefreshControl, refreshControl))
             {
-                handler.CollectionView.RefreshControl = null;
+                handler.PlatformCollectionView.RefreshControl = null;
             }
         }
     }
@@ -482,7 +482,7 @@ public partial class VirtualScrollHandler
             return;
         }
 
-        var collectionView = handler.CollectionView;
+        var collectionView = handler.PlatformCollectionView;
         NSIndexPath indexPath;
         
         // If itemIndex is -1, scroll to section header (or first item if no header)

@@ -7,14 +7,14 @@ using AView = Android.Views.View;
 
 namespace Nalu;
 
-internal class VirtualScrollRecyclerView : RecyclerView, IOnApplyWindowInsetsListener
+public class VirtualScrollRecyclerView : RecyclerView, IOnApplyWindowInsetsListener
 {
     private VirtualScrollRecyclerViewScrollHelper? _scrollHelper;
     public ItemsLayoutOrientation Orientation { get; set; } = ItemsLayoutOrientation.Vertical;
     public Action? OnLayoutCallback { get; set; }
-    public VirtualScrollRecyclerViewScrollHelper ScrollHelper => _scrollHelper ??= new VirtualScrollRecyclerViewScrollHelper(this);
+    internal VirtualScrollRecyclerViewScrollHelper ScrollHelper => _scrollHelper ??= new VirtualScrollRecyclerViewScrollHelper(this);
 
-    protected VirtualScrollRecyclerView(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
+    public VirtualScrollRecyclerView(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
     {
     }
 

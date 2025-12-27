@@ -18,6 +18,8 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
 
         if (nativeCell is VirtualScrollCell virtualScrollCell)
         {
+            virtualScrollCell.SupplementaryType = null;
+            virtualScrollCell.IndexPath = indexPath;
             var scrollDirection = layout?.ScrollDirection ?? UICollectionViewScrollDirection.Vertical;
             virtualScrollCell.ScrollDirection = scrollDirection;
 
@@ -57,6 +59,8 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
 
         if (nativeCell is VirtualScrollCell virtualScrollCell)
         {
+            virtualScrollCell.SupplementaryType = elementKind;
+            virtualScrollCell.IndexPath = indexPath;
             var scrollDirection = layout?.ScrollDirection ?? UICollectionViewScrollDirection.Vertical;
             virtualScrollCell.ScrollDirection = scrollDirection;
 
