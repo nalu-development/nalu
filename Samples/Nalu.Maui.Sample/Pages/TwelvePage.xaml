@@ -112,11 +112,11 @@
                                             <Border Grid.Column="0"
                                                     Margin="4"
                                                     StrokeThickness="0"
-                                                    StrokeShape="RoundRectangle 8">
-                                                <maui:CachedImage Source="{Binding ImageSource}"
                                                                   HeightRequest="48"
                                                                   WidthRequest="60"
-                                                                  Aspect="AspectFill" />
+                                                    StrokeShape="RoundRectangle 8">
+                                                <!-- <maui:CachedImage Source="{Binding ImageSource}" -->
+                                                <!--                   Aspect="AspectFill" /> -->
                                             </Border>
                                             <VerticalStackLayout Grid.Column="1"
                                                                  VerticalOptions="Center">
@@ -203,11 +203,11 @@
                                                 <Border Grid.Column="0"
                                                         Margin="4"
                                                         StrokeThickness="0"
-                                                        StrokeShape="RoundRectangle 8">
-                                                    <maui:CachedImage Source="{Binding ImageSource}"
                                                                       HeightRequest="48"
                                                                       WidthRequest="60"
-                                                                      Aspect="AspectFill" />
+                                                        StrokeShape="RoundRectangle 8">
+                                                    <!-- <maui:CachedImage Source="{Binding ImageSource}" -->
+                                                    <!--                   Aspect="AspectFill" /> -->
                                                 </Border>
                                                 <VerticalStackLayout Grid.Column="1"
                                                                      VerticalOptions="Center">

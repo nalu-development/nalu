@@ -15,6 +15,8 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     private bool _readyForReuse = true;
     public UICollectionViewScrollDirection ScrollDirection { get; set; }
 
+    public NSString? SupplementaryType { get; set; }
+    public NSIndexPath? IndexPath { get; set; }
     public bool NeedsMeasure => _needsMeasure && !_readyForReuse && ContentView.NeedsMeasure;
     public uint UseCount => _useCount;
 
@@ -141,6 +143,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
             _needsMeasure = true;
             if (Superview is VirtualScrollCollectionView collectionView)
             {
+                // collectionView.InvalidateCell(this);
                 collectionView.SetNeedsCellsLayout();
             }
         }
@@ -160,6 +163,9 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     public override void PrepareForReuse()
     {
         base.PrepareForReuse();
+
+        IndexPath = null;
+        SupplementaryType = null;
 
         unchecked
         {

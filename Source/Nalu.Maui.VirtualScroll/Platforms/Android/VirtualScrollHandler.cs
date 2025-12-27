@@ -104,7 +104,11 @@ public partial class VirtualScrollHandler
         EnsureCreatedCellsCleanup();
     }
 
-    internal VirtualScrollRecyclerView GetRecyclerView() => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");
+    /// <summary>
+    /// Gets the underlying RecyclerView instance.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">when the handler is not connected.</exception>
+    public VirtualScrollRecyclerView PlatformRecyclerView => _recyclerView ?? throw new InvalidOperationException("RecyclerView has not been created.");
 
     /// <summary>
     /// Gets the range of currently visible items in the virtual scroll.
@@ -187,7 +191,7 @@ public partial class VirtualScrollHandler
         handler._notifier?.Dispose();
         handler._notifier = null;
 
-        var recyclerView = handler.GetRecyclerView();
+        var recyclerView = handler.PlatformRecyclerView;
 
         if (virtualScroll.Adapter is { } adapter)
         {
@@ -216,7 +220,7 @@ public partial class VirtualScrollHandler
     /// </summary>
     public static void MapLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
-        var recyclerView = handler.GetRecyclerView();
+        var recyclerView = handler.PlatformRecyclerView;
 
         switch (virtualScroll.ItemsLayout)
         {
