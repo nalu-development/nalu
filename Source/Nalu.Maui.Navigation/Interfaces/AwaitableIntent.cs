@@ -8,7 +8,7 @@ namespace Nalu;
 /// <typeparam name="T">The result type.</typeparam>
 public abstract class AwaitableIntent<T> : IAwaitableIntentController
 {
-    private readonly TaskCompletionSource<T> _tcs = new();
+    private readonly TaskCompletionSource<T> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private T _result = default!;
     private Exception? _exception;
 
@@ -48,7 +48,7 @@ public abstract class AwaitableIntent<T> : IAwaitableIntentController
 /// </summary>
 public abstract class AwaitableIntent : IAwaitableIntentController
 {
-    private readonly TaskCompletionSource _tcs = new();
+    private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Exception? _exception;
 
     /// <summary>
@@ -71,7 +71,7 @@ public abstract class AwaitableIntent : IAwaitableIntentController
     }
 
     /// <summary>
-    /// Gets an awaiter to await this <see cref="AwaitableIntent{T}"/>.
+    /// Gets an awaiter to await this <see cref="AwaitableIntent"/>.
     /// </summary>
     public TaskAwaiter GetAwaiter() => _tcs.Task.GetAwaiter();
 }

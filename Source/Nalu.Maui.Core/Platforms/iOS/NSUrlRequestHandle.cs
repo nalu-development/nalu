@@ -10,7 +10,7 @@ internal class NSUrlRequestHandle(
     bool isLostRequest = false
 )
 {
-    private readonly TaskCompletionSource _completedCompletionSource = new();
+    private readonly TaskCompletionSource _completedCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _completed;
     public TaskCompletionSource<HttpResponseMessage> ResponseCompletionSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task CompletedTask => _completedCompletionSource.Task;
