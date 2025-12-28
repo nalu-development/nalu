@@ -219,39 +219,54 @@ After measuring non-expanding items, divides the remaining space equally among e
 </nalu:HorizontalWrapLayout>
 ```
 
-### Performance Considerations
+### Performance/DevEx Considerations
 
-- Wrap layouts are optimized for performance with `struct`-based child tracking and `Span<T>` operations
-- Collapsed children (`Visibility="Collapsed"`) are skipped during layout
-- For very large numbers of items, consider using `VirtualScroll` instead
+If your goal is to create a single line of views where some of them expand, usually you would leverage `Grid` + `*`.
+
+In such case `HorizontalWrapLayout` + `ExpandMode` offers not only a simpler/faster definition,
+
+**Grid (`Auto` + `*`)**
+
+```xml
+<Grid ColumnSpacing="8"
+      ColumnDefinitions="*,*,Auto">
+    <Entry Grid.Column="0"
+           Placeholder="Username" />
+    <Entry Grid.Column="1"
+           Placeholder="Password"
+           IsPassword="True" />
+    <Button Grid.Column="2"
+            Text="Login" />
+</Grid>
+```
+
+**HorizontalWrapLayout (`ExpandMode=Divide`)**
+
+```xml
+<nalu:HorizontalWrapLayout HorizontalSpacing="8"
+                           ExpandMode="Divide">
+    <Entry Placeholder="Username"
+           nalu:WrapLayout.ExpandRatio="1" />
+    <Entry Placeholder="Password"
+           IsPassword="True"
+           nalu:WrapLayout.ExpandRatio="1" />
+    <Button Text="Login" />
+</nalu:HorizontalWrapLayout>
+```
+
+but it's also way faster (see our `BenchmarkDotNet` results).
+
+
+| Method                        | Mean     | Error     | StdDev    | Gen0     | Gen1   | Allocated |
+|------------------------------ |---------:|----------:|----------:|---------:|-------:|----------:|
+| Grid (constant size items)    | 2.762 ms | 0.0229 ms | 0.0203 ms | 410.1563 | 3.9063 |   3.28 MB |
+| Wrap (constant size items)    | 1.588 ms | 0.0218 ms | 0.0204 ms | 316.4063 |      - |   2.55 MB |
+| Grid (dynamic size items)     | 5.138 ms | 0.0858 ms | 0.0760 ms | 585.9375 | 7.8125 |   4.74 MB |
+| Wrap (dynamic size items)     | 1.823 ms | 0.0136 ms | 0.0120 ms | 593.7500 | 7.8125 |   4.74 MB |
 
 ### API Reference
 
-#### WrapLayout (Base Class)
-
-| Member | Type | Description |
-|--------|------|-------------|
-| `ExpandModeProperty` | `BindableProperty` | Bindable property for `ExpandMode` |
-| `HorizontalSpacingProperty` | `BindableProperty` | Bindable property for `HorizontalSpacing` |
-| `VerticalSpacingProperty` | `BindableProperty` | Bindable property for `VerticalSpacing` |
-| `ItemsAlignmentProperty` | `BindableProperty` | Bindable property for `ItemsAlignment` |
-| `ExpandRatioProperty` | `BindableProperty` | Attached property for child expand ratio |
-| `GetExpandRatio(BindableObject)` | `double` | Gets the expand ratio for a view |
-| `SetExpandRatio(BindableObject, double)` | `void` | Sets the expand ratio for a view |
-
-#### WrapLayoutExpandMode Enum
-
-| Value | Description |
-|-------|-------------|
-| `Distribute` | Adds remaining space equally among expanding items |
-| `DistributeProportionally` | Adds remaining space proportionally to item size |
-| `Divide` | Divides remaining space among expanding items |
-
-#### WrapLayoutItemsAlignment Enum
-
-| Value | Description |
-|-------|-------------|
-| `Start` | Items aligned to start (left/top) |
-| `Center` | Items centered in available space |
-| `End` | Items aligned to end (right/bottom) |
+- **HorizontalWrapLayout**: [API Reference](https://nalu-development.github.io/nalu/api/Nalu.HorizontalWrapLayout.html)
+- **VerticalWrapLayout**: [API Reference](https://nalu-development.github.io/nalu/api/Nalu.VerticalWrapLayout.html)
+- **WrapLayout (base)**: [API Reference](https://nalu-development.github.io/nalu/api/Nalu.WrapLayout.html)
 

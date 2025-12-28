@@ -6,6 +6,10 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <GenerateProgramFile>false</GenerateProgramFile>
+    <!-- This project lives under Tests/ but is not a test project (it has a real Program.Main). -->
+    <IsTestProject>false</IsTestProject>
+    <!-- Avoid generating additional entry points when test SDK packages are present via directory props. -->
+    <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
     </PropertyGroup>
 
     <ItemGroup>
@@ -18,6 +22,19 @@
       <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
       <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="4.14.0" />
     </ItemGroup>
+
+  <!-- This project lives under Tests/, but it is NOT a test project. Remove test-only packages imported via directory props. -->
+  <ItemGroup>
+    <PackageReference Remove="Microsoft.NET.Test.Sdk" />
+    <PackageReference Remove="xunit.v3" />
+    <PackageReference Remove="coverlet.msbuild" />
+    <PackageReference Remove="coverlet.collector" />
+    <PackageReference Remove="FactCheck" />
+    <PackageReference Remove="FluentAssertions" />
+    <PackageReference Remove="FluentAssertions.Analyzers" />
+    <PackageReference Remove="NSubstitute" />
+    <PackageReference Remove="NSubstitute.Analyzers.CSharp" />
+  </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\..\Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />

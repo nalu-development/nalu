@@ -26,14 +26,16 @@ public class VerticalWrapLayoutManager : LayoutManager
     /// <inheritdoc />
     public override Size Measure(double widthConstraint, double heightConstraint)
     {
-        var padding = Layout.Padding;
-        var horizontalSpacing = Layout.HorizontalSpacing;
-        var verticalSpacing = Layout.VerticalSpacing;
+        var layout = Layout;
+        var padding = layout.Padding;
+        var horizontalSpacing = layout.HorizontalSpacing;
+        var verticalSpacing = layout.VerticalSpacing;
 
         var paddingHorizontalThickness = padding.HorizontalThickness;
         var paddingVerticalThickness = padding.VerticalThickness;
 
         var availableHeight = heightConstraint - paddingVerticalThickness;
+        var canWrap = !double.IsPositiveInfinity(availableHeight);
 
         var childWidthConstraint = widthConstraint - paddingHorizontalThickness;
 
@@ -43,11 +45,11 @@ public class VerticalWrapLayoutManager : LayoutManager
         double currentColumnWidth = 0;
         var isFirstInColumn = true;
 
-        var childrenCount = Layout.Count;
+        var childrenCount = layout.Count;
 
         for (var n = 0; n < childrenCount; n++)
         {
-            var child = Layout[n];
+            var child = layout[n];
 
             if (child.Visibility == Visibility.Collapsed)
             {
@@ -63,7 +65,7 @@ public class VerticalWrapLayoutManager : LayoutManager
             // Check if we need to wrap to the next column
             var heightWithSpacing = isFirstInColumn ? childHeight : childHeight + verticalSpacing;
 
-            if (!double.IsPositiveInfinity(availableHeight) && !isFirstInColumn && currentColumnHeight + heightWithSpacing > availableHeight)
+            if (canWrap && !isFirstInColumn && currentColumnHeight + heightWithSpacing > availableHeight)
             {
                 // Wrap to next column
                 totalWidth += currentColumnWidth + horizontalSpacing;
@@ -91,7 +93,7 @@ public class VerticalWrapLayoutManager : LayoutManager
         var measuredWidth = totalWidth + paddingHorizontalThickness;
         var measuredHeight = maxColumnHeight + paddingVerticalThickness;
 
-        IView layoutView = Layout;
+        IView layoutView = layout;
         var finalHeight = ResolveConstraints(heightConstraint, layoutView.Height, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
         var finalWidth = ResolveConstraints(widthConstraint, layoutView.Width, measuredWidth, layoutView.MinimumWidth, layoutView.MaximumWidth);
 
@@ -101,11 +103,12 @@ public class VerticalWrapLayoutManager : LayoutManager
     /// <inheritdoc />
     public override Size ArrangeChildren(Rect bounds)
     {
-        var padding = Layout.Padding;
-        var horizontalSpacing = Layout.HorizontalSpacing;
-        var verticalSpacing = Layout.VerticalSpacing;
-        var expandMode = Layout.ExpandMode;
-        var itemsAlignment = Layout.ItemsAlignment;
+        var layout = Layout;
+        var padding = layout.Padding;
+        var horizontalSpacing = layout.HorizontalSpacing;
+        var verticalSpacing = layout.VerticalSpacing;
+        var expandMode = layout.ExpandMode;
+        var itemsAlignment = layout.ItemsAlignment;
 
         var left = bounds.Left + padding.Left;
         var top = bounds.Top + padding.Top;
@@ -137,8 +140,10 @@ public class VerticalWrapLayoutManager : LayoutManager
             // Calculate starting Y position based on alignment
             var yPosition = top + GetAlignmentOffset(remainingHeight, itemsAlignment);
 
-            foreach (var childInfo in column.Children)
+            var childrenSpan = CollectionsMarshal.AsSpan(column.Children);
+            for (var i = 0; i < childrenSpan.Length; i++)
             {
+                var childInfo = childrenSpan[i];
                 var destination = new Rect(xPosition, yPosition, column.Width, childInfo.ArrangeHeight);
                 childInfo.Child.Arrange(destination);
 
@@ -168,15 +173,17 @@ public class VerticalWrapLayoutManager : LayoutManager
 
     private List<ColumnInfo> OrganizeIntoColumns(double availableHeight, double verticalSpacing)
     {
+        var layout = Layout;
         var columns = new List<ColumnInfo>();
-        var currentColumn = new ColumnInfo();
+        var currentColumn = ColumnInfo.Create();
         var isFirstInColumn = true;
+        var canWrap = !double.IsPositiveInfinity(availableHeight);
 
-        var childrenCount = Layout.Count;
+        var childrenCount = layout.Count;
 
         for (var n = 0; n < childrenCount; n++)
         {
-            var child = Layout[n];
+            var child = layout[n];
 
             if (child.Visibility == Visibility.Collapsed)
             {
@@ -185,16 +192,16 @@ public class VerticalWrapLayoutManager : LayoutManager
 
             var desiredWidth = child.DesiredSize.Width;
             var desiredHeight = child.DesiredSize.Height;
-            var expandRatio = Layout.GetExpandRatio(child);
+            var expandRatio = layout.GetExpandRatio(child);
 
             var heightWithSpacing = isFirstInColumn ? desiredHeight : desiredHeight + verticalSpacing;
 
             // Check if we need to wrap to the next column
-            if (!double.IsPositiveInfinity(availableHeight) && !isFirstInColumn && currentColumn.TotalHeight + heightWithSpacing > availableHeight)
+            if (canWrap && !isFirstInColumn && currentColumn.TotalHeight + heightWithSpacing > availableHeight)
             {
                 // Finalize current column and start new one
                 columns.Add(currentColumn);
-                currentColumn = new ColumnInfo();
+                currentColumn = ColumnInfo.Create();
                 isFirstInColumn = true;
             }
 
@@ -289,24 +296,8 @@ public class VerticalWrapLayoutManager : LayoutManager
 
     private static void DivideRemainingSpace(ColumnInfo column, double remainingHeight)
     {
-        // Count items with expand ratio > 0
-        var expandingCount = 0;
         var childrenSpan = CollectionsMarshal.AsSpan(column.Children);
-
-        foreach (var childInfo in childrenSpan)
-        {
-            if (childInfo.ExpandRatio > 0)
-            {
-                expandingCount++;
-            }
-        }
-
-        if (expandingCount == 0)
-        {
-            return;
-        }
-
-        // Divide space equally among expanding items, weighted by expand ratio
+        // Divide remaining space among expanding items, weighted by expand ratio
         for (var i = 0; i < childrenSpan.Length; i++)
         {
             ref var childInfo = ref childrenSpan[i];
@@ -318,12 +309,14 @@ public class VerticalWrapLayoutManager : LayoutManager
         }
     }
 
-    private class ColumnInfo
+    private struct ColumnInfo
     {
-        public List<ChildInfo> Children { get; } = [];
+        public List<ChildInfo> Children { get; init; }
         public double TotalHeight { get; set; }
         public double Width { get; set; }
         public double TotalExpandRatio { get; set; }
+
+        public static ColumnInfo Create() => new() { Children = [] };
     }
 
     private struct ChildInfo

@@ -26,14 +26,16 @@ public class HorizontalWrapLayoutManager : LayoutManager
     /// <inheritdoc />
     public override Size Measure(double widthConstraint, double heightConstraint)
     {
-        var padding = Layout.Padding;
-        var horizontalSpacing = Layout.HorizontalSpacing;
-        var verticalSpacing = Layout.VerticalSpacing;
+        var layout = Layout;
+        var padding = layout.Padding;
+        var horizontalSpacing = layout.HorizontalSpacing;
+        var verticalSpacing = layout.VerticalSpacing;
 
         var paddingHorizontalThickness = padding.HorizontalThickness;
         var paddingVerticalThickness = padding.VerticalThickness;
 
         var availableWidth = widthConstraint - paddingHorizontalThickness;
+        var canWrap = !double.IsPositiveInfinity(availableWidth);
 
         var childHeightConstraint = heightConstraint - paddingVerticalThickness;
 
@@ -43,11 +45,11 @@ public class HorizontalWrapLayoutManager : LayoutManager
         double currentRowHeight = 0;
         var isFirstInRow = true;
 
-        var childrenCount = Layout.Count;
+        var childrenCount = layout.Count;
 
         for (var n = 0; n < childrenCount; n++)
         {
-            var child = Layout[n];
+            var child = layout[n];
 
             if (child.Visibility == Visibility.Collapsed)
             {
@@ -63,7 +65,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
             // Check if we need to wrap to the next line
             var widthWithSpacing = isFirstInRow ? childWidth : childWidth + horizontalSpacing;
 
-            if (!double.IsPositiveInfinity(availableWidth) && !isFirstInRow && currentRowWidth + widthWithSpacing > availableWidth)
+            if (canWrap && !isFirstInRow && currentRowWidth + widthWithSpacing > availableWidth)
             {
                 // Wrap to next line
                 totalHeight += currentRowHeight + verticalSpacing;
@@ -91,7 +93,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
         var measuredWidth = maxRowWidth + paddingHorizontalThickness;
         var measuredHeight = totalHeight + paddingVerticalThickness;
 
-        IView layoutView = Layout;
+        IView layoutView = layout;
         var finalHeight = ResolveConstraints(heightConstraint, layoutView.Height, measuredHeight, layoutView.MinimumHeight, layoutView.MaximumHeight);
         var finalWidth = ResolveConstraints(widthConstraint, layoutView.Width, measuredWidth, layoutView.MinimumWidth, layoutView.MaximumWidth);
 
@@ -101,11 +103,12 @@ public class HorizontalWrapLayoutManager : LayoutManager
     /// <inheritdoc />
     public override Size ArrangeChildren(Rect bounds)
     {
-        var padding = Layout.Padding;
-        var horizontalSpacing = Layout.HorizontalSpacing;
-        var verticalSpacing = Layout.VerticalSpacing;
-        var expandMode = Layout.ExpandMode;
-        var itemsAlignment = Layout.ItemsAlignment;
+        var layout = Layout;
+        var padding = layout.Padding;
+        var horizontalSpacing = layout.HorizontalSpacing;
+        var verticalSpacing = layout.VerticalSpacing;
+        var expandMode = layout.ExpandMode;
+        var itemsAlignment = layout.ItemsAlignment;
 
         var left = bounds.Left + padding.Left;
         var top = bounds.Top + padding.Top;
@@ -119,8 +122,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
 
         foreach (var row in rows)
         {
-            var rowChildren = row.Children;
-            if (rowChildren.Count == 0)
+            if (row.Children.Count == 0)
             {
                 continue;
             }
@@ -138,8 +140,10 @@ public class HorizontalWrapLayoutManager : LayoutManager
             // Calculate starting X position based on alignment
             var xPosition = left + GetAlignmentOffset(remainingWidth, itemsAlignment);
 
-            foreach (var childInfo in rowChildren)
+            var childrenSpan = CollectionsMarshal.AsSpan(row.Children);
+            for (var i = 0; i < childrenSpan.Length; i++)
             {
+                var childInfo = childrenSpan[i];
                 var destination = new Rect(xPosition, yPosition, childInfo.ArrangeWidth, row.Height);
                 childInfo.Child.Arrange(destination);
 
@@ -169,15 +173,17 @@ public class HorizontalWrapLayoutManager : LayoutManager
 
     private List<RowInfo> OrganizeIntoRows(double availableWidth, double horizontalSpacing)
     {
+        var layout = Layout;
         var rows = new List<RowInfo>();
-        var currentRow = new RowInfo();
+        var currentRow = RowInfo.Create();
         var isFirstInRow = true;
+        var canWrap = !double.IsPositiveInfinity(availableWidth);
 
-        var layoutCount = Layout.Count;
+        var layoutCount = layout.Count;
 
         for (var n = 0; n < layoutCount; n++)
         {
-            var child = Layout[n];
+            var child = layout[n];
 
             if (child.Visibility == Visibility.Collapsed)
             {
@@ -186,16 +192,16 @@ public class HorizontalWrapLayoutManager : LayoutManager
 
             var desiredWidth = child.DesiredSize.Width;
             var desiredHeight = child.DesiredSize.Height;
-            var expandRatio = Layout.GetExpandRatio(child);
+            var expandRatio = layout.GetExpandRatio(child);
 
             var widthWithSpacing = isFirstInRow ? desiredWidth : desiredWidth + horizontalSpacing;
 
             // Check if we need to wrap to the next line
-            if (!double.IsPositiveInfinity(availableWidth) && !isFirstInRow && currentRow.TotalWidth + widthWithSpacing > availableWidth)
+            if (canWrap && !isFirstInRow && currentRow.TotalWidth + widthWithSpacing > availableWidth)
             {
                 // Finalize current row and start new one
                 rows.Add(currentRow);
-                currentRow = new RowInfo();
+                currentRow = RowInfo.Create();
                 isFirstInRow = true;
             }
 
@@ -290,24 +296,8 @@ public class HorizontalWrapLayoutManager : LayoutManager
 
     private static void DivideRemainingSpace(RowInfo row, double remainingWidth)
     {
-        // Count items with expand ratio > 0
-        var expandingCount = 0;
         var childrenSpan = CollectionsMarshal.AsSpan(row.Children);
-
-        foreach (var childInfo in childrenSpan)
-        {
-            if (childInfo.ExpandRatio > 0)
-            {
-                expandingCount++;
-            }
-        }
-
-        if (expandingCount == 0)
-        {
-            return;
-        }
-
-        // Divide space equally among expanding items, weighted by expand ratio
+        // Divide remaining space among expanding items, weighted by expand ratio
         for (var i = 0; i < childrenSpan.Length; i++)
         {
             ref var childInfo = ref childrenSpan[i];
@@ -319,12 +309,14 @@ public class HorizontalWrapLayoutManager : LayoutManager
         }
     }
 
-    private class RowInfo
+    private struct RowInfo
     {
-        public List<ChildInfo> Children { get; } = [];
+        public List<ChildInfo> Children { get; init; }
         public double TotalWidth { get; set; }
         public double Height { get; set; }
         public double TotalExpandRatio { get; set; }
+
+        public static RowInfo Create() => new() { Children = [] };
     }
 
     private struct ChildInfo
