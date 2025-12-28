@@ -7,8 +7,11 @@ namespace Nalu;
 /// </summary>
 public class VirtualScrollGroupedListAdapter : IVirtualScrollAdapter
 {
+    private static readonly NoOpUnsubscriber _noOpUnsubscriber = new();
+
     private readonly IList _sections;
     private readonly Func<object, IList> _sectionItemsGetter;
+
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollGroupedListAdapter" /> class.
@@ -73,7 +76,7 @@ public class VirtualScrollGroupedListAdapter : IVirtualScrollAdapter
     }
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new NoOpUnsubscriber();
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => _noOpUnsubscriber;
 
     private sealed class NoOpUnsubscriber : IDisposable
     {

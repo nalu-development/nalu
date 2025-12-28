@@ -7,6 +7,8 @@ namespace Nalu;
 /// </summary>
 public class VirtualScrollListAdapter : IVirtualScrollAdapter
 {
+    private static readonly NoOpUnsubscriber _noOpUnsubscriber = new();
+
     private readonly IList _list;
 
     /// <summary>
@@ -30,7 +32,7 @@ public class VirtualScrollListAdapter : IVirtualScrollAdapter
     public object? GetItem(int sectionIndex, int itemIndex) => _list[itemIndex];
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new NoOpUnsubscriber();
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => _noOpUnsubscriber;
 
     private sealed class NoOpUnsubscriber : IDisposable
     {

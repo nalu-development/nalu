@@ -5,6 +5,7 @@ namespace Nalu;
 /// </summary>
 internal static class VirtualScrollFlattenedChangeFactory
 {
+    private static readonly VirtualScrollFlattenedChange _resetChange = new(VirtualScrollFlattenedChangeOperation.Reset, -1, -1);
     // ─────────────────────────────
     // Item-level factory methods
     // ─────────────────────────────
@@ -78,7 +79,7 @@ internal static class VirtualScrollFlattenedChangeFactory
     /// Creates a change for a full data set reset.
     /// Avoid unless absolutely necessary.
     /// </summary>
-    /// <returns>A new <see cref="VirtualScrollFlattenedChange"/> instance.</returns>
-    public static VirtualScrollFlattenedChange Reset() => new(VirtualScrollFlattenedChangeOperation.Reset, -1, -1);
+    /// <returns>A cached <see cref="VirtualScrollFlattenedChange"/> instance.</returns>
+    public static VirtualScrollFlattenedChange Reset() => _resetChange;
 }
 
