@@ -8,6 +8,8 @@ namespace Nalu;
 /// </summary>
 internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, IDisposable
 {
+    private static readonly VirtualScrollFlattenedChange[] _resetChangeArray = [VirtualScrollFlattenedChangeFactory.Reset()];
+
     private readonly IVirtualScrollAdapter _virtualScrollAdapter;
     private readonly IDisposable _subscription;
     private IVirtualScrollLayoutInfo _layoutInfo;
@@ -50,7 +52,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
         if (oldLength != _flattenedLength)
         {
-            NotifySubscribers(new VirtualScrollFlattenedChangeSet(new[] { VirtualScrollFlattenedChangeFactory.Reset() }));
+            NotifySubscribers(new VirtualScrollFlattenedChangeSet(_resetChangeArray));
         }
     }
 
@@ -105,7 +107,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         }
 
         var itemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
-        
+
         // Check if it's within items
         if (relativeIndex < itemCount)
         {
@@ -123,7 +125,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
     }
 
     public void Dispose() => _subscription.Dispose();
-    
+
     private void OnAdapterChanged(VirtualScrollChangeSet changeSet)
     {
         var flattenedChanges = new List<VirtualScrollFlattenedChange>();
@@ -144,7 +146,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         if (change.Operation == VirtualScrollChangeOperation.Reset)
         {
             RebuildOffsets();
-            return new[] { VirtualScrollFlattenedChangeFactory.Reset() };
+            return _resetChangeArray;
         }
 
         if (change.IsSectionChange)
@@ -157,8 +159,6 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
     private IEnumerable<VirtualScrollFlattenedChange> ConvertSectionChange(VirtualScrollChange change)
     {
-        var flattenedChanges = new List<VirtualScrollFlattenedChange>();
-
         switch (change.Operation)
         {
             case VirtualScrollChangeOperation.InsertSection:
@@ -168,8 +168,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
                     var itemsToInsert = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
                     UpdateOffsetsAfterSectionInsert(change.StartSectionIndex, sectionCount);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + itemsToInsert - 1));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + itemsToInsert - 1)];
                 }
 
             case VirtualScrollChangeOperation.RemoveSection:
@@ -180,8 +179,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     // Use cached offsets instead of querying the adapter, because sections may already be removed
                     var itemsToRemove = CalculateItemsForSectionsFromCachedOffsets(change.StartSectionIndex, sectionCount);
                     UpdateOffsetsAfterSectionRemove(change.StartSectionIndex, sectionCount);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRemove - 1));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRemove - 1)];
                 }
 
             case VirtualScrollChangeOperation.ReplaceSection:
@@ -192,16 +190,15 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
                     var itemsToReplace = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
-                    
+
                     if (itemsToReplace == 1)
                     {
-                        flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex));
+                        return [VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex)];
                     }
                     else
                     {
-                        flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + itemsToReplace - 1));
+                        return [VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + itemsToReplace - 1)];
                     }
-                    break;
                 }
 
             case VirtualScrollChangeOperation.MoveSection:
@@ -209,11 +206,11 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     // MoveSection: remove from old position, insert at new position
                     var fromSectionIndex = change.StartSectionIndex;
                     var toSectionIndex = change.EndSectionIndex;
-                    
+
                     // Calculate positions BEFORE any changes using cached offsets
                     var fromFlattenedIndex = GetCachedFlattenedIndexForSectionStart(fromSectionIndex);
                     var sectionSize = CalculateItemsForSectionsFromCachedOffsets(fromSectionIndex, 1);
-                    
+
                     // Calculate destination index
                     // If moving forward, destination shifts back after removal
                     // If moving backward, destination stays the same
@@ -222,7 +219,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     {
                         // Moving forward: calculate position AFTER the target section ends
                         // Then subtract sectionSize because removal shifts everything back
-                        var toSectionEnd = GetCachedFlattenedIndexForSectionStart(toSectionIndex) 
+                        var toSectionEnd = GetCachedFlattenedIndexForSectionStart(toSectionIndex)
                             + CalculateItemsForSectionsFromCachedOffsets(toSectionIndex, 1);
                         toFlattenedIndex = toSectionEnd - sectionSize;
                     }
@@ -231,48 +228,46 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                         // Moving backward: destination is the start of the target section
                         toFlattenedIndex = GetCachedFlattenedIndexForSectionStart(toSectionIndex);
                     }
-                    
+
                     // Update offsets to reflect the move
                     RebuildOffsets();
-                    
+
                     // Emit remove and insert changes
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(fromFlattenedIndex, fromFlattenedIndex + sectionSize - 1));
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItemRange(toFlattenedIndex, toFlattenedIndex + sectionSize - 1));
-                    break;
+                    return
+                        [
+                    VirtualScrollFlattenedChangeFactory.RemoveItemRange(fromFlattenedIndex, fromFlattenedIndex + sectionSize - 1),
+                    VirtualScrollFlattenedChangeFactory.InsertItemRange(toFlattenedIndex, toFlattenedIndex + sectionSize - 1)
+                    ];
                 }
 
             case VirtualScrollChangeOperation.RefreshSection:
                 {
                     var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
                     var itemsToRefresh = CalculateItemsForSections(change.StartSectionIndex, 1);
-                    
+
                     if (itemsToRefresh == 1)
                     {
-                        flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RefreshItem(startFlattenedIndex));
+                        return [VirtualScrollFlattenedChangeFactory.RefreshItem(startFlattenedIndex)];
                     }
                     else
                     {
-                        flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRefresh - 1));
+                        return [VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRefresh - 1)];
                     }
-                    break;
                 }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(change), "The value is not mapped.");
         }
-
-        return flattenedChanges;
     }
 
     private IEnumerable<VirtualScrollFlattenedChange> ConvertItemChange(VirtualScrollChange change)
     {
-        var flattenedChanges = new List<VirtualScrollFlattenedChange>();
-
         switch (change.Operation)
         {
             case VirtualScrollChangeOperation.InsertItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     UpdateOffsetsAfterItemInsert(change.StartSectionIndex);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItem(flattenedIndex));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.InsertItem(flattenedIndex)];
                 }
 
             case VirtualScrollChangeOperation.InsertItemRange:
@@ -280,16 +275,14 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
                     UpdateOffsetsAfterItemInsert(change.StartSectionIndex, count);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + count - 1));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + count - 1)];
                 }
 
             case VirtualScrollChangeOperation.RemoveItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     UpdateOffsetsAfterItemRemove(change.StartSectionIndex);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItem(flattenedIndex));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.RemoveItem(flattenedIndex)];
                 }
 
             case VirtualScrollChangeOperation.RemoveItemRange:
@@ -297,23 +290,20 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
                     UpdateOffsetsAfterItemRemove(change.StartSectionIndex, count);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + count - 1));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + count - 1)];
                 }
 
             case VirtualScrollChangeOperation.ReplaceItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItem(flattenedIndex));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.ReplaceItem(flattenedIndex)];
                 }
 
             case VirtualScrollChangeOperation.ReplaceItemRange:
                 {
                     var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + count - 1));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + count - 1)];
                 }
 
             case VirtualScrollChangeOperation.MoveItem:
@@ -326,25 +316,23 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                         UpdateOffsetsAfterItemRemove(change.StartSectionIndex);
                         UpdateOffsetsAfterItemInsert(change.EndSectionIndex);
                     }
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.MoveItem(fromFlattenedIndex, toFlattenedIndex));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.MoveItem(fromFlattenedIndex, toFlattenedIndex)];
                 }
 
             case VirtualScrollChangeOperation.RefreshItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
-                    flattenedChanges.Add(VirtualScrollFlattenedChangeFactory.RefreshItem(flattenedIndex));
-                    break;
+                    return [VirtualScrollFlattenedChangeFactory.RefreshItem(flattenedIndex)];
                 }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(change), "The value is not mapped.");
         }
-
-        return flattenedChanges;
     }
 
     private void RebuildOffsets()
     {
         _sectionCount = _virtualScrollAdapter.GetSectionCount();
-        
+
         // Ensure arrays are large enough (double capacity for growth)
         if (_sectionOffsets.Length < _sectionCount)
         {
@@ -367,9 +355,9 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         {
             // Store offset relative to after global header
             _sectionOffsets[sectionIndex] = _flattenedLength - globalHeaderOffset;
-            
+
             var itemCount = _virtualScrollAdapter.GetItemCount(sectionIndex);
-            
+
             // Section header & footer
             _flattenedLength += itemCount + _sectionFooterHeaderSize;
         }
@@ -425,7 +413,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         }
 
         var itemCount = _virtualScrollAdapter.GetItemCount(foundSectionIndex);
-        
+
         // Check if it's within items
         if (relativeIndex < itemCount)
         {
@@ -488,7 +476,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         }
 
         var itemCount = _virtualScrollAdapter.GetItemCount(foundSectionIndex);
-        
+
         // Check if it's within items
         if (relativeIndex < itemCount)
         {
@@ -528,7 +516,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         // Fallback calculation for sections beyond current count (e.g., during insert)
         var flattenedIndex = _hasGlobalHeader ? 1 : 0;
         var sectionsToIterate = Math.Min(sectionIndex, sectionCount);
-        
+
         for (var i = 0; i < sectionsToIterate; i++)
         {
             flattenedIndex += _virtualScrollAdapter.GetItemCount(i) + _sectionFooterHeaderSize;
@@ -607,7 +595,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         }
 
         var startOffset = _sectionOffsets[startSectionIndex];
-        
+
         // Calculate end offset
         int endOffset;
         if (endSectionIndex < _sectionCount - 1)
@@ -680,14 +668,14 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private int CalculateSectionSize(int sectionIndex)
     {
-         var size = _virtualScrollAdapter.GetItemCount(sectionIndex) + _sectionFooterHeaderSize;
-         return size;
+        var size = _virtualScrollAdapter.GetItemCount(sectionIndex) + _sectionFooterHeaderSize;
+        return size;
     }
 
     private void UpdateOffsetsAfterSectionInsert(int startSectionIndex, int insertedSectionCount)
     {
         var newSectionTotal = _virtualScrollAdapter.GetSectionCount();
-        
+
         // Ensure arrays are large enough
         if (_sectionOffsets.Length < newSectionTotal)
         {
@@ -702,7 +690,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         {
             insertOffset = _sectionOffsets[startSectionIndex - 1] + CalculateSectionSize(startSectionIndex - 1);
         }
-        
+
         // Shift existing offsets
         var oldSectionsToShift = _sectionCount - startSectionIndex;
         if (oldSectionsToShift > 0)
