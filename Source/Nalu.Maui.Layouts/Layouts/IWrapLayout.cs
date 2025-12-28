@@ -26,6 +26,10 @@ public enum WrapLayoutExpandMode
     /// <summary>
     /// After all items with no expand have been measured, divides the remaining space among all items with an expand ratio greater than 0.
     /// </summary>
+    /// <remarks>
+    /// <para>Items are still placed in rows/columns based on their measured size. If an item's measured size exceeds the available space, it will wrap to the next row/column.</para>
+    /// <para>When dividing space, items will never shrink below their measured size. If an item's share of the remaining space is less than its measured size, it keeps its measured size and the remaining space is redistributed among other expanding items.</para>
+    /// </remarks>
     Divide
 }
 
@@ -61,8 +65,8 @@ public interface IWrapLayout : ILayout
     /// <summary>
     /// Gets the expand ratio for the specified view.
     /// </summary>
-    /// <param name="view"></param>
-    /// <returns></returns>
+    /// <param name="view">The view to get the expand ratio from.</param>
+    /// <returns>The expand ratio value.</returns>
     double GetExpandRatio(IView view);
 }
 

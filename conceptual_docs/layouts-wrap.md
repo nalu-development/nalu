@@ -150,7 +150,14 @@ If 90px remains:
 
 #### Divide
 
-After measuring non-expanding items, divides the remaining space equally among expanding items (weighted by expand ratio). The key difference from `Distribute` is that `Divide` mode replaces the item's measured width rather than adding to it.
+After measuring non-expanding items, divides the remaining space equally among expanding items (weighted by expand ratio). The key difference from `Distribute` is that `Divide` mode replaces the item's measured size rather than adding to it.
+
+**Important behaviors:**
+
+- **Wrapping is based on measured size**: Items are still placed in rows/columns based on their measured (desired) size. If an item's measured size exceeds the available space in the current row, it will wrap to the next row.
+- **Items never shrink below their measured size**: When dividing the remaining space, if an item's calculated share is less than its measured size, it keeps its measured size. The remaining space is then redistributed among other expanding items that can still grow.
+
+This makes `Divide` ideal for scenarios like form layouts where you want equal-width fields, but you also want items to wrap gracefully when the container is too narrow.
 
 ### Practical Examples
 
@@ -223,34 +230,29 @@ After measuring non-expanding items, divides the remaining space equally among e
 
 If your goal is to create a single line of views where some of them expand, usually you would leverage `Grid` + `*`.
 
-In such case `HorizontalWrapLayout` + `ExpandMode` offers not only a simpler/faster definition,
+However, there's an important behavioral difference: **Grid constrains items to the row**, so `*` columns will shrink items if space is limited. In contrast, **WrapLayout respects item measured sizes** and wraps items to the next line instead of shrinking them.
+
+Additionally, `HorizontalWrapLayout` + `ExpandMode` offers not only a simpler/faster definition,
 
 **Grid (`Auto` + `*`)**
 
 ```xml
 <Grid ColumnSpacing="8"
-      ColumnDefinitions="*,*,Auto">
+      ColumnDefinitions="*,Auto">
     <Entry Grid.Column="0"
-           Placeholder="Username" />
-    <Entry Grid.Column="1"
-           Placeholder="Password"
-           IsPassword="True" />
-    <Button Grid.Column="2"
-            Text="Login" />
+           Placeholder="Search..." />
+    <Button Grid.Column="1"
+            Text="Search" />
 </Grid>
 ```
 
-**HorizontalWrapLayout (`ExpandMode=Divide`)**
+**HorizontalWrapLayout**
 
 ```xml
-<nalu:HorizontalWrapLayout HorizontalSpacing="8"
-                           ExpandMode="Divide">
-    <Entry Placeholder="Username"
+<nalu:HorizontalWrapLayout HorizontalSpacing="8">
+    <Entry Placeholder="Search..."
            nalu:WrapLayout.ExpandRatio="1" />
-    <Entry Placeholder="Password"
-           IsPassword="True"
-           nalu:WrapLayout.ExpandRatio="1" />
-    <Button Text="Login" />
+    <Button Text="Search" />
 </nalu:HorizontalWrapLayout>
 ```
 

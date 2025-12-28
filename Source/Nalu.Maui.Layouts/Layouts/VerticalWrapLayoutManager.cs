@@ -133,7 +133,7 @@ public class VerticalWrapLayoutManager : LayoutManager
 
             if (remainingHeight > 0 && column.TotalExpandRatio > 0)
             {
-                ApplyExpand(column, remainingHeight, expandMode);
+                ApplyExpand(column, remainingHeight, expandMode, availableHeight, verticalSpacing);
                 remainingHeight = 0;
             }
 
@@ -203,6 +203,8 @@ public class VerticalWrapLayoutManager : LayoutManager
                 columns.Add(currentColumn);
                 currentColumn = ColumnInfo.Create();
                 isFirstInColumn = true;
+                // Recalculate heightWithSpacing since isFirstInColumn changed
+                heightWithSpacing = desiredHeight;
             }
 
             var childInfo = new ChildInfo
@@ -213,10 +215,17 @@ public class VerticalWrapLayoutManager : LayoutManager
                 ExpandRatio = expandRatio
             };
 
+            // Track non-expanding items height for Divide mode
+            if (expandRatio == 0)
+            {
+                currentColumn.NonExpandingHeight += desiredHeight;
+            }
+
             currentColumn.Children.Add(childInfo);
-            currentColumn.TotalHeight += isFirstInColumn ? desiredHeight : desiredHeight + verticalSpacing;
+            currentColumn.TotalHeight += heightWithSpacing;
             currentColumn.Width = Math.Max(currentColumn.Width, desiredWidth);
             currentColumn.TotalExpandRatio += expandRatio;
+            
             isFirstInColumn = false;
         }
 
@@ -229,7 +238,7 @@ public class VerticalWrapLayoutManager : LayoutManager
         return columns;
     }
 
-    private static void ApplyExpand(ColumnInfo column, double remainingHeight, WrapLayoutExpandMode expandMode)
+    private static void ApplyExpand(ColumnInfo column, double remainingHeight, WrapLayoutExpandMode expandMode, double availableHeight, double verticalSpacing)
     {
         switch (expandMode)
         {
@@ -242,7 +251,7 @@ public class VerticalWrapLayoutManager : LayoutManager
                 break;
 
             case WrapLayoutExpandMode.Divide:
-                DivideRemainingSpace(column, remainingHeight);
+                DivideRemainingSpace(column, availableHeight, verticalSpacing);
                 break;
         }
     }
@@ -294,17 +303,69 @@ public class VerticalWrapLayoutManager : LayoutManager
         }
     }
 
-    private static void DivideRemainingSpace(ColumnInfo column, double remainingHeight)
+    private static void DivideRemainingSpace(ColumnInfo column, double availableHeight, double verticalSpacing)
     {
+        // Calculate remaining space: available height minus non-expanding items and total spacing
         var childrenSpan = CollectionsMarshal.AsSpan(column.Children);
+        var totalSpacing = childrenSpan.Length > 1 ? verticalSpacing * (childrenSpan.Length - 1) : 0;
+        var remainingSpace = availableHeight - column.NonExpandingHeight - totalSpacing;
+        
+        // If no remaining space or no expanding items, keep desired sizes
+        if (remainingSpace <= 0 || column.TotalExpandRatio <= 0)
+        {
+            return;
+        }
+        
         // Divide remaining space among expanding items, weighted by expand ratio
+        // Items should never shrink below their desired size
+        var activeExpandRatio = column.TotalExpandRatio;
+        var spaceToDistribute = remainingSpace;
+        
+        // Iteratively lock items that would shrink below desired size
+        bool lockedAny;
+        do
+        {
+            lockedAny = false;
+            for (var i = 0; i < childrenSpan.Length; i++)
+            {
+                ref var childInfo = ref childrenSpan[i];
+                // Skip non-expanding or already locked items (ArrangeHeight != DesiredHeight means locked)
+                if (childInfo.ExpandRatio <= 0 || childInfo.ArrangeHeight != childInfo.DesiredHeight)
+                {
+                    continue;
+                }
+                
+                var share = spaceToDistribute * (childInfo.ExpandRatio / activeExpandRatio);
+                if (share < childInfo.DesiredHeight)
+                {
+                    // Lock at desired size
+                    spaceToDistribute -= childInfo.DesiredHeight;
+                    activeExpandRatio -= childInfo.ExpandRatio;
+                    // Mark as locked by setting a sentinel value temporarily
+                    childInfo.ArrangeHeight = -1;
+                    lockedAny = true;
+                }
+            }
+        } while (lockedAny && activeExpandRatio > 0);
+        
+        // Assign final heights
         for (var i = 0; i < childrenSpan.Length; i++)
         {
             ref var childInfo = ref childrenSpan[i];
-            if (childInfo.ExpandRatio > 0)
+            if (childInfo.ExpandRatio <= 0)
             {
-                var extraHeight = remainingHeight * (childInfo.ExpandRatio / column.TotalExpandRatio);
-                childInfo.ArrangeHeight += extraHeight;
+                continue;
+            }
+            
+            if (childInfo.ArrangeHeight < 0)
+            {
+                // Locked item - restore desired height
+                childInfo.ArrangeHeight = childInfo.DesiredHeight;
+            }
+            else if (activeExpandRatio > 0)
+            {
+                // Unlocked item - gets its share
+                childInfo.ArrangeHeight = spaceToDistribute * (childInfo.ExpandRatio / activeExpandRatio);
             }
         }
     }
@@ -315,6 +376,7 @@ public class VerticalWrapLayoutManager : LayoutManager
         public double TotalHeight { get; set; }
         public double Width { get; set; }
         public double TotalExpandRatio { get; set; }
+        public double NonExpandingHeight { get; set; }
 
         public static ColumnInfo Create() => new() { Children = [] };
     }

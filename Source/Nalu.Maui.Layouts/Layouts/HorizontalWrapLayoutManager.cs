@@ -133,7 +133,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
 
             if (remainingWidth > 0 && row.TotalExpandRatio > 0)
             {
-                ApplyExpand(row, remainingWidth, expandMode);
+                ApplyExpand(row, remainingWidth, expandMode, availableWidth, horizontalSpacing);
                 remainingWidth = 0;
             }
 
@@ -203,6 +203,8 @@ public class HorizontalWrapLayoutManager : LayoutManager
                 rows.Add(currentRow);
                 currentRow = RowInfo.Create();
                 isFirstInRow = true;
+                // Recalculate widthWithSpacing since isFirstInRow changed
+                widthWithSpacing = desiredWidth;
             }
 
             var childInfo = new ChildInfo
@@ -213,10 +215,17 @@ public class HorizontalWrapLayoutManager : LayoutManager
                 ExpandRatio = expandRatio
             };
 
+            // Track non-expanding items width for Divide mode
+            if (expandRatio == 0)
+            {
+                currentRow.NonExpandingWidth += desiredWidth;
+            }
+
             currentRow.Children.Add(childInfo);
-            currentRow.TotalWidth += isFirstInRow ? desiredWidth : desiredWidth + horizontalSpacing;
+            currentRow.TotalWidth += widthWithSpacing;
             currentRow.Height = Math.Max(currentRow.Height, desiredHeight);
             currentRow.TotalExpandRatio += expandRatio;
+            
             isFirstInRow = false;
         }
 
@@ -229,7 +238,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
         return rows;
     }
 
-    private static void ApplyExpand(RowInfo row, double remainingWidth, WrapLayoutExpandMode expandMode)
+    private static void ApplyExpand(RowInfo row, double remainingWidth, WrapLayoutExpandMode expandMode, double availableWidth, double horizontalSpacing)
     {
         switch (expandMode)
         {
@@ -242,7 +251,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
                 break;
 
             case WrapLayoutExpandMode.Divide:
-                DivideRemainingSpace(row, remainingWidth);
+                DivideRemainingSpace(row, availableWidth, horizontalSpacing);
                 break;
         }
     }
@@ -258,6 +267,73 @@ public class HorizontalWrapLayoutManager : LayoutManager
             {
                 var extraWidth = remainingWidth * (childInfo.ExpandRatio / row.TotalExpandRatio);
                 childInfo.ArrangeWidth += extraWidth;
+            }
+        }
+    }
+    
+    private static void DivideRemainingSpace(RowInfo row, double availableWidth, double horizontalSpacing)
+    {
+        // Calculate remaining space: available width minus non-expanding items and total spacing
+        var childrenSpan = CollectionsMarshal.AsSpan(row.Children);
+        var totalSpacing = childrenSpan.Length > 1 ? horizontalSpacing * (childrenSpan.Length - 1) : 0;
+        var remainingSpace = availableWidth - row.NonExpandingWidth - totalSpacing;
+        
+        // If no remaining space or no expanding items, keep desired sizes
+        if (remainingSpace <= 0 || row.TotalExpandRatio <= 0)
+        {
+            return;
+        }
+        
+        // Divide remaining space among expanding items, weighted by expand ratio
+        // Items should never shrink below their desired size
+        var activeExpandRatio = row.TotalExpandRatio;
+        var spaceToDistribute = remainingSpace;
+        
+        // Iteratively lock items that would shrink below desired size
+        bool lockedAny;
+        do
+        {
+            lockedAny = false;
+            for (var i = 0; i < childrenSpan.Length; i++)
+            {
+                ref var childInfo = ref childrenSpan[i];
+                // Skip non-expanding or already locked items (ArrangeWidth != DesiredWidth means locked)
+                if (childInfo.ExpandRatio <= 0 || childInfo.ArrangeWidth != childInfo.DesiredWidth)
+                {
+                    continue;
+                }
+                
+                var share = spaceToDistribute * (childInfo.ExpandRatio / activeExpandRatio);
+                if (share < childInfo.DesiredWidth)
+                {
+                    // Lock at desired size
+                    spaceToDistribute -= childInfo.DesiredWidth;
+                    activeExpandRatio -= childInfo.ExpandRatio;
+                    // Mark as locked by setting a sentinel value temporarily
+                    childInfo.ArrangeWidth = -1;
+                    lockedAny = true;
+                }
+            }
+        } while (lockedAny && activeExpandRatio > 0);
+        
+        // Assign final widths
+        for (var i = 0; i < childrenSpan.Length; i++)
+        {
+            ref var childInfo = ref childrenSpan[i];
+            if (childInfo.ExpandRatio <= 0)
+            {
+                continue;
+            }
+            
+            if (childInfo.ArrangeWidth < 0)
+            {
+                // Locked item - restore desired width
+                childInfo.ArrangeWidth = childInfo.DesiredWidth;
+            }
+            else if (activeExpandRatio > 0)
+            {
+                // Unlocked item - gets its share
+                childInfo.ArrangeWidth = spaceToDistribute * (childInfo.ExpandRatio / activeExpandRatio);
             }
         }
     }
@@ -294,20 +370,6 @@ public class HorizontalWrapLayoutManager : LayoutManager
         }
     }
 
-    private static void DivideRemainingSpace(RowInfo row, double remainingWidth)
-    {
-        var childrenSpan = CollectionsMarshal.AsSpan(row.Children);
-        // Divide remaining space among expanding items, weighted by expand ratio
-        for (var i = 0; i < childrenSpan.Length; i++)
-        {
-            ref var childInfo = ref childrenSpan[i];
-            if (childInfo.ExpandRatio > 0)
-            {
-                var extraWidth = remainingWidth * (childInfo.ExpandRatio / row.TotalExpandRatio);
-                childInfo.ArrangeWidth += extraWidth;
-            }
-        }
-    }
 
     private struct RowInfo
     {
@@ -315,6 +377,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
         public double TotalWidth { get; set; }
         public double Height { get; set; }
         public double TotalExpandRatio { get; set; }
+        public double NonExpandingWidth { get; set; }
 
         public static RowInfo Create() => new() { Children = [] };
     }

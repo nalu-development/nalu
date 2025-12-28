@@ -696,6 +696,225 @@ public class HorizontalWrapLayoutManagerTests
         child2.Frame.Width.Should().Be(190); // 50 + 140
     }
 
+    [Fact(DisplayName = "ArrangeChildren Divide mode should not shrink items below desired size")]
+    public void ArrangeChildren_DivideMode_DoesNotShrinkItems()
+    {
+        // Arrange: Two items with desired sizes 60 and 100, equal expand ratio
+        // Available space 180 for both. Equal split would be 90 each, but 100 should not shrink.
+        var layout = new TestWrapLayout
+        {
+            ExpandMode = WrapLayoutExpandMode.Divide,
+            HorizontalSpacing = 0
+        };
+        var child1 = new TestView(60, 50);
+        var child2 = new TestView(100, 50);
+        layout.Add(child1);
+        layout.Add(child2);
+        layout.SetExpandRatio(child1, 1);
+        layout.SetExpandRatio(child2, 1);
+        var manager = CreateLayoutManager(layout);
+        manager.Measure(180, 500);
+
+        // Act
+        manager.ArrangeChildren(new Rect(0, 0, 180, 500));
+
+        // Assert: child2 keeps 100 (no shrink), child1 gets remaining 80
+        child1.Frame.Width.Should().Be(80);
+        child2.Frame.Width.Should().Be(100);
+    }
+
+    [Fact(DisplayName = "ArrangeChildren Divide mode with multiple items some would shrink")]
+    public void ArrangeChildren_DivideMode_MultipleItemsSomeWouldShrink()
+    {
+        // Arrange: Three items with different sizes and ratios
+        // Item1: 40, ratio 1 | Item2: 100, ratio 1 | Item3: 60, ratio 1
+        // Available: 220, spacing: 10 each = 20 total
+        // Space for expanding: 220 - 20 = 200
+        // Equal split: 200/3 ≈ 66.67 each
+        // Item2 (100) would shrink → lock at 100
+        // Remaining: 200 - 100 = 100 for Item1 and Item3
+        // Equal split: 50 each
+        // Item3 (60) would shrink → lock at 60
+        // Remaining: 100 - 60 = 40 for Item1
+        // Item1 (40) would shrink → lock at 40
+        // All items locked at desired sizes
+        var layout = new TestWrapLayout
+        {
+            ExpandMode = WrapLayoutExpandMode.Divide,
+            HorizontalSpacing = 10
+        };
+        var child1 = new TestView(40, 50);
+        var child2 = new TestView(100, 50);
+        var child3 = new TestView(60, 50);
+        layout.Add(child1);
+        layout.Add(child2);
+        layout.Add(child3);
+        layout.SetExpandRatio(child1, 1);
+        layout.SetExpandRatio(child2, 1);
+        layout.SetExpandRatio(child3, 1);
+        var manager = CreateLayoutManager(layout);
+        manager.Measure(220, 500);
+
+        // Act
+        manager.ArrangeChildren(new Rect(0, 0, 220, 500));
+
+        // Assert: All items keep their desired sizes (no shrinking)
+        child1.Frame.Width.Should().Be(40);
+        child2.Frame.Width.Should().Be(100);
+        child3.Frame.Width.Should().Be(60);
+    }
+
+    [Fact(DisplayName = "ArrangeChildren Divide mode with enough space expands all items")]
+    public void ArrangeChildren_DivideMode_WithEnoughSpaceExpandsAll()
+    {
+        // Arrange: Two items with sizes 60 and 100, equal ratio
+        // Available: 300, spacing: 0
+        // Space for expanding: 300
+        // Equal split: 150 each - both can grow
+        var layout = new TestWrapLayout
+        {
+            ExpandMode = WrapLayoutExpandMode.Divide,
+            HorizontalSpacing = 0
+        };
+        var child1 = new TestView(60, 50);
+        var child2 = new TestView(100, 50);
+        layout.Add(child1);
+        layout.Add(child2);
+        layout.SetExpandRatio(child1, 1);
+        layout.SetExpandRatio(child2, 1);
+        var manager = CreateLayoutManager(layout);
+        manager.Measure(300, 500);
+
+        // Act
+        manager.ArrangeChildren(new Rect(0, 0, 300, 500));
+
+        // Assert: Both items get equal share
+        child1.Frame.Width.Should().Be(150);
+        child2.Frame.Width.Should().Be(150);
+    }
+
+    [Fact(DisplayName = "ArrangeChildren Divide mode respects different ratios when no shrink needed")]
+    public void ArrangeChildren_DivideMode_RespectsRatiosNoShrink()
+    {
+        // Arrange: Two items, ratio 1:2, enough space
+        // Available: 300, Item1 size 50, Item2 size 50
+        // Item1 gets 100, Item2 gets 200
+        var layout = new TestWrapLayout
+        {
+            ExpandMode = WrapLayoutExpandMode.Divide,
+            HorizontalSpacing = 0
+        };
+        var child1 = new TestView(50, 50);
+        var child2 = new TestView(50, 50);
+        layout.Add(child1);
+        layout.Add(child2);
+        layout.SetExpandRatio(child1, 1);
+        layout.SetExpandRatio(child2, 2);
+        var manager = CreateLayoutManager(layout);
+        manager.Measure(300, 500);
+
+        // Act
+        manager.ArrangeChildren(new Rect(0, 0, 300, 500));
+
+        // Assert
+        child1.Frame.Width.Should().Be(100);
+        child2.Frame.Width.Should().Be(200);
+    }
+
+    [Fact(DisplayName = "ArrangeChildren Divide mode with 4 children mixed expanding and non-expanding")]
+    public void ArrangeChildren_DivideMode_FourChildrenMixed()
+    {
+        // Arrange: 4 children - 2 non-expanding (fixed), 2 expanding with different ratios
+        // Child1: 80 (no expand) | Child2: 40 (ratio 1) | Child3: 60 (no expand) | Child4: 100 (ratio 2)
+        // Available: 500, spacing: 10 each = 30 total
+        // Non-expanding total: 80 + 60 = 140
+        // Space for expanding: 500 - 140 - 30 = 330
+        // Ratio split: Child2 gets 330 * 1/3 = 110, Child4 gets 330 * 2/3 = 220
+        // Child2 (40) → 110 ✓ (grows)
+        // Child4 (100) → 220 ✓ (grows)
+        var layout = new TestWrapLayout
+        {
+            ExpandMode = WrapLayoutExpandMode.Divide,
+            HorizontalSpacing = 10
+        };
+        var child1 = new TestView(80, 50);
+        var child2 = new TestView(40, 50);
+        var child3 = new TestView(60, 50);
+        var child4 = new TestView(100, 50);
+        layout.Add(child1);
+        layout.Add(child2);
+        layout.Add(child3);
+        layout.Add(child4);
+        layout.SetExpandRatio(child1, 0);
+        layout.SetExpandRatio(child2, 1);
+        layout.SetExpandRatio(child3, 0);
+        layout.SetExpandRatio(child4, 2);
+        var manager = CreateLayoutManager(layout);
+        manager.Measure(500, 500);
+
+        // Act
+        manager.ArrangeChildren(new Rect(0, 0, 500, 500));
+
+        // Assert
+        child1.Frame.Width.Should().Be(80);   // Non-expanding, keeps desired
+        child2.Frame.Width.Should().Be(110);  // 330 * 1/3
+        child3.Frame.Width.Should().Be(60);   // Non-expanding, keeps desired
+        child4.Frame.Width.Should().Be(220);  // 330 * 2/3
+        
+        // Verify positions
+        child1.Frame.X.Should().Be(0);
+        child2.Frame.X.Should().Be(90);   // 80 + 10
+        child3.Frame.X.Should().Be(210);  // 90 + 110 + 10
+        child4.Frame.X.Should().Be(280);  // 210 + 60 + 10
+    }
+
+    [Fact(DisplayName = "ArrangeChildren Divide mode with 4 children some would shrink")]
+    public void ArrangeChildren_DivideMode_FourChildrenSomeWouldShrink()
+    {
+        // Arrange: 4 expanding children with different sizes
+        // Child1: 30 (ratio 1) | Child2: 120 (ratio 1) | Child3: 50 (ratio 1) | Child4: 80 (ratio 1)
+        // Available: 320, spacing: 10 each = 30 total
+        // Space for expanding: 320 - 30 = 290
+        // Equal split: 290 / 4 = 72.5 each
+        // Child2 (120) would shrink → lock at 120
+        // Remaining: 290 - 120 = 170 for 3 items
+        // Equal split: 170 / 3 ≈ 56.67 each
+        // Child4 (80) would shrink → lock at 80
+        // Remaining: 170 - 80 = 90 for 2 items
+        // Equal split: 90 / 2 = 45 each
+        // Child3 (50) would shrink → lock at 50
+        // Remaining: 90 - 50 = 40 for Child1
+        // Child1 (30) gets 40 ✓ (grows)
+        var layout = new TestWrapLayout
+        {
+            ExpandMode = WrapLayoutExpandMode.Divide,
+            HorizontalSpacing = 10
+        };
+        var child1 = new TestView(30, 50);
+        var child2 = new TestView(120, 50);
+        var child3 = new TestView(50, 50);
+        var child4 = new TestView(80, 50);
+        layout.Add(child1);
+        layout.Add(child2);
+        layout.Add(child3);
+        layout.Add(child4);
+        layout.SetExpandRatio(child1, 1);
+        layout.SetExpandRatio(child2, 1);
+        layout.SetExpandRatio(child3, 1);
+        layout.SetExpandRatio(child4, 1);
+        var manager = CreateLayoutManager(layout);
+        manager.Measure(320, 500);
+
+        // Act
+        manager.ArrangeChildren(new Rect(0, 0, 320, 500));
+
+        // Assert
+        child1.Frame.Width.Should().Be(40);   // Gets remaining space
+        child2.Frame.Width.Should().Be(120);  // Locked at desired (would shrink)
+        child3.Frame.Width.Should().Be(50);   // Locked at desired (would shrink)
+        child4.Frame.Width.Should().Be(80);   // Locked at desired (would shrink)
+    }
+
     #endregion
 
     #region ArrangeChildren Tests - Expand Per Row
