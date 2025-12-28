@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 410">
+  <defs>
+    <linearGradient id="eboxGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="eboxGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#0891b2"/>
+    </linearGradient>
+    <linearGradient id="eboxGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <linearGradient id="expandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#22c55e;stop-opacity:0.3"/>
+    </linearGradient>
+    <linearGradient id="divideGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#a855f7;stop-opacity:0.3"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Title -->
+  <text x="250" y="22" fill="#1f2937" font-family="system-ui" font-size="14" text-anchor="middle" font-weight="bold">Expand Modes Comparison</text>
+  <text x="250" y="38" fill="#6b7280" font-family="system-ui" font-size="11" text-anchor="middle">Container width: 450px, Spacing: 10px</text>
+  
+  <!-- Container: x=20, width=460, inner from x=25 to x=475 (450px usable) -->
+  <!-- Items: 60 + 120 + 80 = 260px, Spacing: 2x10 = 20px, Total: 280px, Remaining: 170px -->
+  
+  <!-- No Expand (Original) -->
+  <text x="20" y="55" fill="#4b5563" font-family="system-ui" font-size="11" font-weight="600">No Expand (ExpandRatio = 0)</text>
+  <rect x="20" y="65" width="460" height="50" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+  <rect x="25" y="70" width="60" height="40" rx="4" fill="url(#eboxGrad1)"/>
+  <text x="55" y="95" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">60px</text>
+  <rect x="95" y="70" width="120" height="40" rx="4" fill="url(#eboxGrad2)"/>
+  <text x="155" y="95" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">120px</text>
+  <rect x="225" y="70" width="80" height="40" rx="4" fill="url(#eboxGrad3)"/>
+  <text x="265" y="95" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">80px</text>
+  <!-- Remaining: from 305 to 475 = 170px -->
+  <rect x="305" y="70" width="170" height="40" rx="4" fill="#f3f4f6" stroke="#d1d5db" stroke-dasharray="4,2"/>
+  <text x="390" y="95" fill="#9ca3af" font-family="system-ui" font-size="10" text-anchor="middle">170px remaining</text>
+  
+  <!-- Distribute Mode: 170px / 3 = ~57px each -->
+  <!-- Item1: 60+57=117, Item2: 120+57=177, Item3: 80+56=136 -->
+  <text x="20" y="140" fill="#4b5563" font-family="system-ui" font-size="11" font-weight="600">Distribute (ExpandRatio = 1, 1, 1)</text>
+  <rect x="20" y="150" width="460" height="50" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+  <!-- Item 1: x=25, base=60, extra=57, total=117 -->
+  <rect x="25" y="155" width="60" height="40" rx="4" fill="url(#eboxGrad1)"/>
+  <rect x="85" y="155" width="57" height="40" rx="0 4 4 0" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="80" y="180" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">+57</text>
+  <!-- Item 2: x=152, base=120, extra=57, total=177 -->
+  <rect x="152" y="155" width="120" height="40" rx="4" fill="url(#eboxGrad2)"/>
+  <rect x="272" y="155" width="57" height="40" rx="0 4 4 0" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="236" y="180" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">+57</text>
+  <!-- Item 3: x=339, base=80, extra=56, total=136 (to x=475) -->
+  <rect x="339" y="155" width="80" height="40" rx="4" fill="url(#eboxGrad3)"/>
+  <rect x="419" y="155" width="56" height="40" rx="0 4 4 0" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="393" y="180" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">+56</text>
+  
+  <!-- Distribute Proportionally: 170px distributed by size ratio -->
+  <!-- Item1: 60 + (60/260)*170 = 60+39=99, Item2: 120 + (120/260)*170 = 120+78=198, Item3: 80 + (80/260)*170 = 80+53=133 -->
+  <text x="20" y="225" fill="#4b5563" font-family="system-ui" font-size="11" font-weight="600">DistributeProportionally (ExpandRatio = 1, 1, 1)</text>
+  <rect x="20" y="235" width="460" height="50" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+  <!-- Item 1: x=25, base=60, extra=39, total=99 -->
+  <rect x="25" y="240" width="60" height="40" rx="4" fill="url(#eboxGrad1)"/>
+  <rect x="85" y="240" width="39" height="40" rx="0 4 4 0" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="80" y="265" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">+39</text>
+  <!-- Item 2: x=134, base=120, extra=78, total=198 -->
+  <rect x="134" y="240" width="120" height="40" rx="4" fill="url(#eboxGrad2)"/>
+  <rect x="254" y="240" width="78" height="40" rx="0 4 4 0" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="228" y="265" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">+78</text>
+  <!-- Item 3: x=342, base=80, extra=53, total=133 (to x=475) -->
+  <rect x="342" y="240" width="80" height="40" rx="4" fill="url(#eboxGrad3)"/>
+  <rect x="422" y="240" width="53" height="40" rx="0 4 4 0" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="396" y="265" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">+53</text>
+  
+  <!-- Divide Mode: Item2 fixed at 120, remaining 450-120-20=310px split between items 1&3 = 155px each -->
+  <text x="20" y="310" fill="#4b5563" font-family="system-ui" font-size="11" font-weight="600">Divide (ExpandRatio = 1, 0, 1) — only items 1 and 3 expand</text>
+  <rect x="20" y="320" width="460" height="50" rx="6" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+  <!-- Item 1: x=25, width=155 -->
+  <rect x="25" y="325" width="155" height="40" rx="4" fill="url(#divideGrad)" stroke="#a855f7" stroke-width="1"/>
+  <text x="102" y="350" fill="#7c3aed" font-family="system-ui" font-size="10" text-anchor="middle" font-weight="bold">155px</text>
+  <!-- Item 2: x=190, width=120 (fixed, no expand) -->
+  <rect x="190" y="325" width="120" height="40" rx="4" fill="url(#eboxGrad2)"/>
+  <text x="250" y="350" fill="white" font-family="system-ui" font-size="10" text-anchor="middle">120px</text>
+  <!-- Item 3: x=320, width=155 (to x=475) -->
+  <rect x="320" y="325" width="155" height="40" rx="4" fill="url(#divideGrad)" stroke="#a855f7" stroke-width="1"/>
+  <text x="397" y="350" fill="#7c3aed" font-family="system-ui" font-size="10" text-anchor="middle" font-weight="bold">155px</text>
+  
+  <!-- Legend -->
+  <rect x="20" y="382" width="16" height="12" rx="2" fill="url(#expandGrad)" stroke="#22c55e" stroke-width="1"/>
+  <text x="42" y="392" fill="#6b7280" font-family="system-ui" font-size="10">= Extra space added</text>
+  <rect x="180" y="382" width="16" height="12" rx="2" fill="url(#divideGrad)" stroke="#a855f7" stroke-width="1"/>
+  <text x="202" y="392" fill="#6b7280" font-family="system-ui" font-size="10">= Space divided (replaces measured size)</text>
+</svg>

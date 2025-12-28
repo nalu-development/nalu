@@ -6,6 +6,19 @@
   href: controls.md
 - name: Layouts
   href: layouts.md
+  items:
+    - name: Overview
+      href: layouts.md
+    - name: ViewBox & Templates
+      href: layouts-viewbox.md
+    - name: ExpanderViewBox
+      href: layouts-expander.md
+    - name: Wrap Layouts
+      href: layouts-wrap.md
+    - name: Popups
+      href: layouts-popup.md
+    - name: Magnet
+      href: layouts-magnet.md
 - name: VirtualScroll
   href: virtualscroll.md
   items:

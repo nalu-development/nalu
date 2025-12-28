@@ -87,10 +87,35 @@ public class VirtualScrollListTests : ContentPage
         
         configure?.Invoke(virtualScroll);
 
+        var positionEntry = new Entry { Placeholder = "Position", AutomationId = "PositionEntry", MinimumWidthRequest = 50, Keyboard = Keyboard.Numeric };
+        WrapLayout.SetExpandRatio(positionEntry, 1);
+        var extraEntry = new Entry { Placeholder = "Extra", AutomationId = "ExtraEntry", MinimumWidthRequest = 100 };
+        WrapLayout.SetExpandRatio(extraEntry, 1);
+
+        var addItemButton = new Button { Text = "Add", AutomationId = "AddItemButton" };
+        var removeItemButton = new Button { Text = "Remove", AutomationId = "RemoveItemButton" };
+        var moveItemToButton = new Button { Text = "Move", AutomationId = "SwapItemButton" };
+        var scrollToItemButton = new Button { Text = "Scroll to", AutomationId = "ScrollToItemButton" };
+
+        var controlsLayout = new HorizontalWrapLayout
+                             {
+                                 positionEntry,
+                                 extraEntry,
+                                 addItemButton,
+                                 removeItemButton,
+                                 moveItemToButton,
+                                 scrollToItemButton,
+                             };
+        controlsLayout.BackgroundColor = Colors.White;
+        controlsLayout.HorizontalSpacing = 8;
+        controlsLayout.VerticalSpacing = 8;
+        controlsLayout.Padding = new Thickness(16, 8);
+        
         var grid = new Grid
                    {
                        RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
                    };
+        grid.Add(controlsLayout);
         grid.Add(virtualScroll, 0, 1);
         
         Content = grid;

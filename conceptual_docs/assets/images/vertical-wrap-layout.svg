@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 220">
+  <defs>
+    <linearGradient id="vboxGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="vboxGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06b6d4"/>
+      <stop offset="100%" style="stop-color:#0891b2"/>
+    </linearGradient>
+    <linearGradient id="vboxGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <linearGradient id="vboxGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <linearGradient id="vboxGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Container -->
+  <rect x="10" y="10" width="330" height="200" rx="8" fill="none" stroke="#374151" stroke-width="2" stroke-dasharray="6,4"/>
+  
+  <!-- Column 1 -->
+  <rect x="20" y="20" width="80" height="45" rx="6" fill="url(#vboxGrad1)"/>
+  <text x="60" y="47" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">1</text>
+  
+  <rect x="20" y="73" width="80" height="60" rx="6" fill="url(#vboxGrad2)"/>
+  <text x="60" y="108" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">2</text>
+  
+  <rect x="20" y="141" width="80" height="55" rx="6" fill="url(#vboxGrad3)"/>
+  <text x="60" y="173" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">3</text>
+  
+  <!-- Column 2 -->
+  <rect x="110" y="20" width="90" height="70" rx="6" fill="url(#vboxGrad4)"/>
+  <text x="155" y="60" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">4</text>
+  
+  <rect x="110" y="98" width="90" height="90" rx="6" fill="url(#vboxGrad5)"/>
+  <text x="155" y="148" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">5</text>
+  
+  <!-- Column 3 -->
+  <rect x="210" y="20" width="70" height="40" rx="6" fill="url(#vboxGrad1)"/>
+  <text x="245" y="45" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">6</text>
+  
+  <rect x="210" y="68" width="70" height="55" rx="6" fill="url(#vboxGrad2)"/>
+  <text x="245" y="100" fill="white" font-family="system-ui" font-size="12" text-anchor="middle" font-weight="bold">7</text>
+  
+  <!-- Arrows showing flow -->
+  <path d="M 60 200 L 60 210 Q 60 220 75 220 L 95 220 Q 110 220 110 205 L 110 20" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="107,20 110,12 113,20" fill="#9ca3af"/>
+  
+  <!-- Direction indicator -->
+  <text x="85" y="235" fill="#6b7280" font-family="system-ui" font-size="10" text-anchor="middle">wrap</text>
+</svg>
+

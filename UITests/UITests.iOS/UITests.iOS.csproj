@@ -7,6 +7,7 @@
     <IsTestProject>true</IsTestProject>
     <RootNamespace>UITests</RootNamespace>
     <DefineConstants>$(DefineConstants);IOS</DefineConstants>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
   </PropertyGroup>
 
   <ItemGroup>
