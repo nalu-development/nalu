@@ -66,7 +66,7 @@ public partial class OnePageModel(
 
         await Task.Delay(2000);
         _ = SendRequestAsync(CreateTestLongRequest(5000, "MySuperDuperRequestId-" + Guid.NewGuid()));
-        await Task.Delay(1000);
+        await Task.Delay(500);
 
         throw new InvalidOperationException("Crashing the app on purpose");
     }
