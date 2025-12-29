@@ -5,7 +5,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Web;
 using CoreFoundation;
 using Foundation;
 using Microsoft.Extensions.Logging;
@@ -20,7 +19,9 @@ namespace Nalu;
 /// </summary>
 internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownloadDelegate
 {
+    // ReSharper disable once InconsistentNaming
     private const string SetCookieHeaderKey = "Set-Cookie";
+    // ReSharper disable once InconsistentNaming
     private const string CookieHeaderKey = "Cookie";
 
     /// <summary>
@@ -37,15 +38,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     private NSUrlSession? _nsUrlSession;
     private Action? _processingInBackgroundCompletionHandler;
     private long _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
-    private ILogger? _logger;
 
     private ILogger Logger
     {
         get
         {
-            _logger ??= GetLoggerFromApplicationServiceProvider();
-
-            return _logger ?? _emptyLogger;
+            field ??= GetLoggerFromApplicationServiceProvider();
+            return field ?? _emptyLogger;
         }
     }
 
@@ -60,6 +59,10 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             {
                 var config = NSUrlSessionConfiguration.CreateBackgroundSessionConfiguration(SessionIdentifier);
                 config.SessionSendsLaunchEvents = true;
+
+                // Disable iOS automatic cookie handling - we manage cookies per-request via CookieContainer
+                config.HttpCookieStorage = null;
+                config.HttpCookieAcceptPolicy = NSHttpCookieAcceptPolicy.Never;
 
                 // We want, by default, the timeout from HttpClient to have precedence over the one from NSUrlSession
                 // Double.MaxValue does not work, so default to 24 hours
@@ -318,21 +321,60 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         // https://developer.apple.com/documentation/foundation/urlsessiondownloaddelegate/1411575-urlsession/
-        // Because the file is temporary, you must either open the file for reading or move it to a permanent location in your app’s sandbox container directory before returning from this delegate method.
+        // Because the file is temporary, you must either open the file for reading or move it to a permanent location in your app's sandbox container directory before returning from this delegate method.
         // We should be good with a temporary file path considering we're going to read it right away.
-        var locationPath = location.Path;
         handle.ResponseContentFile = Path.Combine(Path.GetTempPath(), ToSafeUnixFileName(requestIdentifier) + ".nsresponse");
+
+        FileStream fileStream;
+
+        var targetResponseContentFilePath = handle.ResponseContentFile;
+        var targetResponseContentDir = Path.GetDirectoryName(targetResponseContentFilePath)!;
 
         try
         {
-            if (!File.Exists(handle.ResponseContentFile))
+            // Use NSFileManager to move the file - this handles iOS sandbox and symbolic link quirks
+            // that can cause .NET's File.Move to fail (e.g., /.nofollow/ prefix in paths)
+            // Example: IO_FileNotFound_FileName, /.nofollow/private/var/mobile/Containers/Data/Application/<app guid here>/Library/Caches/com.apple.nsurlsessiond/Downloads/<app id here>/CFNetworkDownload_JfXk68.tmp
+            var fileManager = NSFileManager.DefaultManager;
+            var destinationUrl = NSUrl.FromFilename(targetResponseContentFilePath);
+
+            // Ensure destination directory exists (iOS may purge /tmp under memory pressure)
+            // Example: IO_PathNotFound_Path, /private/var/mobile/Containers/Data/Application/<app guid here>/tmp/3ba00ae620ee4dd18dcbd3fd90787fad.nsresponse
+            var isDirectory = false;
+            if (!fileManager.FileExists(targetResponseContentDir, ref isDirectory) || !isDirectory)
             {
-                File.Move(locationPath!, handle.ResponseContentFile, true);
+                if (!fileManager.CreateDirectory(targetResponseContentDir, true, (NSDictionary?)null, out var dirError))
+                {
+                    var dirErrorMessage = dirError?.LocalizedDescription ?? "Unknown error";
+                    throw new IOException($"Failed to create temp directory: {dirErrorMessage}. Path: {targetResponseContentDir}");
+                }
             }
+
+            // Remove existing file if present (NSFileManager.Move doesn't overwrite)
+            if (fileManager.FileExists(targetResponseContentFilePath) && !fileManager.Remove(targetResponseContentFilePath, out var removeError))
+            {
+                var removeErrorMessage = removeError?.LocalizedDescription ?? "Unknown error";
+                throw new IOException($"NSFileManager.Remove failed: {removeErrorMessage}. Path: {targetResponseContentFilePath}");
+            }
+
+            if (!fileManager.Move(location, destinationUrl, out var moveError))
+            {
+                var errorMessage = moveError?.LocalizedDescription ?? "Unknown error";
+                throw new IOException($"NSFileManager.Move failed: {errorMessage}. Source: {location.Path}, Destination: {targetResponseContentFilePath}");
+            }
+
+            fileStream = new FileStream(targetResponseContentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }
         catch (Exception ex)
         {
-            handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Temporary response file is not found on `location`", ex));
+            Logger.LogError(ex, "Failed to process downloaded file for {RequestIdentifier}. Source: {Source}, Destination: {Destination}, DestExists: {DestExists}",
+                requestIdentifier,
+                location.Path,
+                targetResponseContentFilePath,
+                File.Exists(targetResponseContentFilePath));
+
+            handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Failed to process downloaded file", ex));
+            CompleteAndRemoveHandle(handle);
 
             return;
         }
@@ -346,8 +388,6 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                                   {
                                       RequestMessage = CreateHttpRequestMessage(task.CurrentRequest ?? task.OriginalRequest)
                                   };
-
-        var fileStream = new FileStream(handle.ResponseContentFile, FileMode.Open, FileAccess.Read, FileShare.Read);
         httpResponseMessage.Content = new AcknowledgingStreamContent(this, handle, fileStream);
         ApplyResponseHeaders(httpResponseMessage, response, handle.CookieContainer);
         Logger.LogDebug("DidFinishDownloading set response for {RequestIdentifier}", requestIdentifier);
@@ -465,6 +505,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     private void ApplyResponseHeaders(HttpResponseMessage httpResponseMessage, NSHttpUrlResponse response, CookieContainer? cookieContainer)
     {
+        List<string>? setCookieValues = null;
+
         foreach (var header in response.AllHeaderFields)
         {
             if (header.Value is null || header.Key is null)
@@ -473,13 +515,21 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             }
 
             var key = header.Key.ToString();
+            var value = header.Value.ToString();
 
-            if (key == SetCookieHeaderKey)
+            // Collect Set-Cookie headers for cookie container processing
+            if (string.Equals(key, SetCookieHeaderKey, StringComparison.OrdinalIgnoreCase))
             {
+                if (cookieContainer is not null)
+                {
+                    setCookieValues ??= [];
+                    setCookieValues.Add(value);
+                }
+
+                httpResponseMessage.Headers.TryAddWithoutValidation(SetCookieHeaderKey, value);
+
                 continue;
             }
-
-            var value = header.Value.ToString();
 
             var added =
                 httpResponseMessage.Headers.TryAddWithoutValidation(key, value) ||
@@ -491,29 +541,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             }
         }
 
-        if (Session.Configuration.HttpCookieStorage is { } cookieStorage && cookieContainer is not null)
+        // Update managed cookie container from Set-Cookie headers
+        if (setCookieValues is { Count: > 0 } && cookieContainer is not null && response.Url?.AbsoluteString is { } absoluteUrl)
         {
-            var responseUrl = response.Url;
-            var absoluteUri = new Uri(responseUrl.AbsoluteString!);
-            var cookies = cookieStorage.CookiesForUrl(responseUrl);
-            UpdateManagedCookieContainer(cookieContainer, absoluteUri, cookies);
+            var absoluteUri = new Uri(absoluteUrl);
 
-            for (var index = 0; index < cookies.Length; index++)
-            {
-                httpResponseMessage.Headers.TryAddWithoutValidation(SetCookieHeaderKey, cookies[index].GetHeaderValue());
-            }
-        }
-    }
-
-    private static void UpdateManagedCookieContainer(CookieContainer cookieContainer, Uri absoluteUri, NSHttpCookie[] cookies)
-    {
-        if (cookies.Length > 0)
-        {
             lock (cookieContainer)
             {
-                // As per docs: The contents of an HTTP set-cookie header as returned by an HTTP server, with Cookie instances delimited by commas.
-                var cookiesContents = Array.ConvertAll(cookies, static cookie => cookie.GetHeaderValue());
-                cookieContainer.SetCookies(absoluteUri, string.Join(',', cookiesContents));
+                // CookieContainer.SetCookies expects comma-delimited Set-Cookie values
+                cookieContainer.SetCookies(absoluteUri, string.Join(',', setCookieValues));
             }
         }
     }
@@ -543,21 +579,18 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             enumeratedHeaders.Select(object (h) => h.Key).ToArray()
         );
 
-        // set header cookies if needed from the managed cookie container if we do use Cookies
-        if (Session.Configuration.HttpCookieStorage is not null && cookieContainer is not null)
+        // Set header cookies if needed from the managed cookie container
+        if (cookieContainer is not null)
         {
-            // As per docs: An HTTP cookie header, with strings representing Cookie instances delimited by semicolons.
-            var cookies = cookieContainer.GetCookieHeader(request.RequestUri!);
-
-            if (!string.IsNullOrEmpty(cookies))
+            lock (cookieContainer)
             {
-#pragma warning disable CS0618
-                var cookiePtr = NSString.CreateNative(CookieHeaderKey);
-                var cookiesPtr = NSString.CreateNative(cookies);
-#pragma warning restore CS0618
-                nativeHeaders.LowlevelSetObject(cookiesPtr, cookiePtr);
-                NSString.ReleaseNative(cookiePtr);
-                NSString.ReleaseNative(cookiesPtr);
+                // As per docs: An HTTP cookie header, with strings representing Cookie instances delimited by semicolons.
+                var cookies = cookieContainer.GetCookieHeader(request.RequestUri!);
+
+                if (!string.IsNullOrEmpty(cookies))
+                {
+                    nativeHeaders[CookieHeaderKey] = new NSString(cookies);
+                }
             }
         }
 

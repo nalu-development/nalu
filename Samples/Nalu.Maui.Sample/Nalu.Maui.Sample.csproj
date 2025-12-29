@@ -37,8 +37,8 @@
     </PropertyGroup>
 
     <PropertyGroup Condition="$(TargetFramework.Contains('-ios'))">
-        <UseInterpreter>true</UseInterpreter>
-        <MtouchInterpreter>-all,Svg.Skia,ShimSkiaSharp,SkiaSharp</MtouchInterpreter>
+        <!-- https://github.com/dotnet/macios/blob/main/docs/building-apps/build-properties.md?plain=1#L875-L909 -->
+        <MtouchInterpreter>Svg.Skia,ShimSkiaSharp</MtouchInterpreter>
         <MtouchExtraArgs>$(MtouchExtraArgs) --linkskip=Svg.Skia --linkskip=ShimSkiaSharp</MtouchExtraArgs>
     </PropertyGroup>
 
@@ -67,7 +67,7 @@
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
         <PackageReference Include="SkiaSharp" Version="3.119.1" />
-        <PackageReference Include="Svg.Skia" Version="3.2.1" PrivateAssets="All" />
+        <PackageReference Include="Svg.Skia" Version="3.2.1" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.11"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0"/>

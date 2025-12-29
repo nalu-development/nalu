@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Nalu.Maui.Sample.PageModels;
 using Nalu.Maui.Sample.Pages;
 
 namespace Nalu.Maui.Sample;
@@ -8,7 +7,7 @@ namespace Nalu.Maui.Sample;
 public partial class AppShell : NaluShell
 {
     public AppShell(INavigationService navigationService)
-        : base(navigationService, typeof(TwelvePage))
+        : base(navigationService, typeof(OnePage))
     {
         InitializeComponent();
         CustomMenuItem.Command = new Command(() =>
