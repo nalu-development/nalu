@@ -132,6 +132,13 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
         foreach (var change in changeSet.Changes)
         {
+            if (change.Operation == VirtualScrollChangeOperation.Reset)
+            {
+                // Reset overrides all other changes
+                NotifySubscribers(new VirtualScrollFlattenedChangeSet(ConvertChange(change)));
+                return;
+            }
+
             flattenedChanges.AddRange(ConvertChange(change));
         }
 

@@ -95,6 +95,12 @@ public partial class ElevenPageModel : ObservableObject
             group.Items.Move(fromIndex, toIndex);
         }
     }
+
+    [RelayCommand]
+    private void ClearGroups()
+    {
+        Groups.Clear();
+    }
 }
 
 /// <summary>

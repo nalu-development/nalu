@@ -1,9 +1,60 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 
 namespace Nalu.Maui.Sample.PageModels;
+
+public class ReplaceableObservableCollection<T> : ObservableCollection<T>
+{
+    public ReplaceableObservableCollection(IEnumerable<T> items) : base(items)
+    {
+    }
+
+    private static readonly FieldInfo? _itemsField = typeof(ObservableCollection<T>).GetField("_items", BindingFlags.NonPublic | BindingFlags.Instance);
+    
+    private List<T> GetItemsList()
+    {
+        if (_itemsField?.GetValue(this) is List<T> items)
+        {
+            return items;
+        }
+        
+        // Fallback: use protected Items property via reflection
+        var itemsProperty = typeof(ObservableCollection<T>).GetProperty("Items", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (itemsProperty?.GetValue(this) is List<T> protectedItems)
+        {
+            return protectedItems;
+        }
+        
+        throw new InvalidOperationException("Unable to access internal Items list");
+    }
+    
+    public void ReplaceAll(IEnumerable<T> items)
+    {
+        if (items == null)
+        {
+            throw new ArgumentNullException(nameof(items));
+        }
+        
+        var itemsList = GetItemsList();
+        
+        // Replace the underlying list
+        itemsList.Clear();
+        foreach (var item in items)
+        {
+            itemsList.Add(item);
+        }
+        
+        // Trigger a single Clear/Reset notification
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        OnPropertyChanged(new PropertyChangedEventArgs(nameof(Count)));
+        OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+    }
+}
 
 public partial class TenPageModel : ObservableObject, ILeavingAware
 {
@@ -16,12 +67,12 @@ public partial class TenPageModel : ObservableObject, ILeavingAware
 
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
     
-    public ObservableCollection<TenItem> Items { get; }
+    public ReplaceableObservableCollection<TenItem> Items { get; }
 
     public TenPageModel(IMessenger messenger)
     {
         _messenger = messenger;
-        Items = new(Enumerable.Range(1, 30).Select(i => new TenItem($"Item {i}")));
+        Items = new ReplaceableObservableCollection<TenItem>(Enumerable.Range(1, 30).Select(i => new TenItem($"Item {i}")));
         _idCounter = Items.Count;
     }
 
@@ -47,6 +98,21 @@ public partial class TenPageModel : ObservableObject, ILeavingAware
             var randomIndex = Random.Shared.Next(Items.Count);
             Items.RemoveAt(randomIndex);
         }
+    }
+
+    [RelayCommand]
+    private void ClearItems()
+    {
+        Items.Clear();
+    }
+
+    [RelayCommand]
+    private void ReplaceItems()
+    {
+        var newItems = Enumerable.Range(1, Random.Shared.Next(10, 40))
+            .Select(i => new TenItem($"Replaced Item {i}"));
+        Items.ReplaceAll(newItems);
+        _idCounter = Items.Count;
     }
 
     [RelayCommand]

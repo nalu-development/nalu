@@ -23,7 +23,7 @@
                        TextColor="Black" />
 
                 <!-- Toolbar with action buttons -->
-                <Grid ColumnDefinitions="*,*,*,*,*"
+                <Grid ColumnDefinitions="*,*,*,*,*,*"
                       Padding="16,8"
                       ColumnSpacing="8">
                     <Button Grid.Column="0"
@@ -46,6 +46,10 @@
                             Text="Move"
                             FontSize="12"
                             Command="{Binding MoveItemCommand}" />
+                    <Button Grid.Column="5"
+                            Text="Clear"
+                            FontSize="12"
+                            Command="{Binding ClearGroupsCommand}" />
                 </Grid>
             </VerticalStackLayout>
 

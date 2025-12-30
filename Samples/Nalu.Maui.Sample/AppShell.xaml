@@ -42,6 +42,9 @@
         <ShellContent nalu:Navigation.PageType="pages:NinePage"
                       Title="Page Nine"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8b9;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:DynamicDataPage"
+                      Title="Dynamic Data"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
         <ShellContent nalu:Navigation.PageType="pages:TenPage"
                       Title="Page Ten"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
