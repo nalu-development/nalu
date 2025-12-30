@@ -204,7 +204,7 @@ public partial class VirtualScrollHandler
             handler._flattenedAdapter = flattenedAdapter;
             
             // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
-            handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, flattenedAdapter);
+            handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, recyclerView, flattenedAdapter);
         }
         else
         {
