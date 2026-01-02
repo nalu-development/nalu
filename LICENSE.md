@@ -2,6 +2,11 @@ MIT License
 
 Copyright (c) 2024 Alberto Aldegheri
 
+**IMPORTANT:** This license does NOT apply to the `Nalu.Maui.VirtualScroll` package
+(located in `Source/Nalu.Maui.VirtualScroll/`), which is released under a separate
+**Non-Commercial License**. See `Source/Nalu.Maui.VirtualScroll/LICENSE-VirtualScroll.md`
+for details.
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
