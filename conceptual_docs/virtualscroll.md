@@ -10,7 +10,9 @@ A high-performance virtualized scrolling view designed to replace the traditiona
 >
 > I'm evaluating whether to relicense VirtualScroll under **MIT (including commercial use)** in the future, based on the level of **community support and donations**.
 
-If this library is valuable to your work, consider supporting its continued development and maintenance: [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/albyrock87)
+If this library is valuable to your work, consider supporting its continued development and maintenance ❤️
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github&style=for-the-badge)](https://github.com/sponsors/albyrock87)
 
 ### Getting Started
 

@@ -2,7 +2,9 @@
 
 `Nalu.Maui` provides a set of classes to help you with everyday challenges encountered while working with .NET MAUI.
 
-If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance: [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github)](https://github.com/sponsors/albyrock87)
+If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance ❤️
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github&style=for-the-badge)](https://github.com/sponsors/albyrock87)
 
 ---
 
