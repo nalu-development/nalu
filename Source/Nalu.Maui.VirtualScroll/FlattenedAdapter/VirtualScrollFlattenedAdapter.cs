@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace Nalu;
 
@@ -128,6 +129,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
     private void OnAdapterChanged(VirtualScrollChangeSet changeSet)
     {
+        System.Diagnostics.Debug.WriteLine("OnAdapterChanged: " + JsonSerializer.Serialize(changeSet));
         var flattenedChanges = new List<VirtualScrollFlattenedChange>();
 
         foreach (var change in changeSet.Changes)
@@ -186,6 +188,13 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     // Use cached offsets instead of querying the adapter, because sections may already be removed
                     var itemsToRemove = CalculateItemsForSectionsFromCachedOffsets(change.StartSectionIndex, sectionCount);
                     UpdateOffsetsAfterSectionRemove(change.StartSectionIndex, sectionCount);
+
+                    // If section was already empty (all items removed), skip the notification
+                    if (itemsToRemove <= 0 || startFlattenedIndex < 0)
+                    {
+                        return [];
+                    }
+
                     return [VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + itemsToRemove - 1)];
                 }
 
@@ -287,14 +296,26 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
             case VirtualScrollChangeOperation.RemoveItem:
                 {
-                    var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    // Use cached offsets because the item/section may have already been removed from the adapter
+                    var flattenedIndex = GetCachedFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    if (flattenedIndex < 0)
+                    {
+                        // Section no longer exists in cache - skip this notification
+                        return [];
+                    }
                     UpdateOffsetsAfterItemRemove(change.StartSectionIndex);
                     return [VirtualScrollFlattenedChangeFactory.RemoveItem(flattenedIndex)];
                 }
 
             case VirtualScrollChangeOperation.RemoveItemRange:
                 {
-                    var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    // Use cached offsets because the items/section may have already been removed from the adapter
+                    var startFlattenedIndex = GetCachedFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    if (startFlattenedIndex < 0)
+                    {
+                        // Section no longer exists in cache - skip this notification
+                        return [];
+                    }
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
                     UpdateOffsetsAfterItemRemove(change.StartSectionIndex, count);
                     return [VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + count - 1)];
@@ -303,12 +324,22 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.ReplaceItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    if (flattenedIndex < 0)
+                    {
+                        // Section/item no longer exists - skip this notification
+                        return [];
+                    }
                     return [VirtualScrollFlattenedChangeFactory.ReplaceItem(flattenedIndex)];
                 }
 
             case VirtualScrollChangeOperation.ReplaceItemRange:
                 {
                     var startFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    if (startFlattenedIndex < 0)
+                    {
+                        // Section/item no longer exists - skip this notification
+                        return [];
+                    }
                     var count = change.EndItemIndex - change.StartItemIndex + 1;
                     return [VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + count - 1)];
                 }
@@ -317,6 +348,11 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                 {
                     var fromFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
                     var toFlattenedIndex = GetFlattenedIndexForItem(change.EndSectionIndex, change.EndItemIndex);
+                    if (fromFlattenedIndex < 0 || toFlattenedIndex < 0)
+                    {
+                        // Source or destination section/item no longer exists - skip this notification
+                        return [];
+                    }
                     // Note: MoveItem doesn't change offsets if within same section, but we need to rebuild offsets if cross-section
                     if (change.StartSectionIndex != change.EndSectionIndex)
                     {
@@ -329,6 +365,11 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.RefreshItem:
                 {
                     var flattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    if (flattenedIndex < 0)
+                    {
+                        // Section/item no longer exists - skip this notification
+                        return [];
+                    }
                     return [VirtualScrollFlattenedChangeFactory.RefreshItem(flattenedIndex)];
                 }
             default:
@@ -632,6 +673,37 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
         var offset = _sectionOffsets[sectionIndex];
         return _hasGlobalHeader ? offset + 1 : offset;
+    }
+
+    /// <summary>
+    /// Gets the flattened index for an item using cached offsets.
+    /// This is used for remove operations where the item/section may have already been removed from the adapter.
+    /// </summary>
+    private int GetCachedFlattenedIndexForItem(int sectionIndex, int itemIndex)
+    {
+        if (sectionIndex < 0 || sectionIndex >= _sectionCount)
+        {
+            return -1;
+        }
+
+        if (itemIndex < 0)
+        {
+            return -1;
+        }
+
+        var flattenedIndex = GetCachedFlattenedIndexForSectionStart(sectionIndex);
+        if (flattenedIndex < 0)
+        {
+            return -1;
+        }
+
+        // Add section header offset to get to items
+        if (_hasSectionHeader)
+        {
+            flattenedIndex++;
+        }
+
+        return flattenedIndex + itemIndex;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AndroidX.RecyclerView.Widget;
 
 namespace Nalu;
@@ -32,6 +33,7 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
             return;
         }
 
+        System.Diagnostics.Debug.WriteLine("OnAdapterChanged (Flattened): " + JsonSerializer.Serialize(changeSet));
         // If RecyclerView is currently computing layout, defer notifications until after layout completes
         // This prevents IndexOutOfBoundsException when adapter changes occur during layout validation
         if (_recyclerView.IsComputingLayout)

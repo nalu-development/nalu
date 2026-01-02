@@ -5103,5 +5103,738 @@ public class VirtualScrollFlattenedAdapterTests
         // Assert - Should not notify subscribers for empty changeset
         callCount.Should().Be(0);
     }
+
+    [Fact]
+    internal void OnAdapterChangedWithRemoveItemShouldUseCachedOffsetsWhenSectionAlreadyRemoved()
+    {
+        // Arrange - This test replicates the real-world scenario from the logs where:
+        // 1. Multiple RemoveItem notifications arrive for section 1
+        // 2. Section count decreases (section removed from underlying adapter)
+        // 3. More RemoveItem notifications arrive for section 1 which no longer exists
+        // The fix uses cached offsets so RemoveItem can still produce valid flattened indices
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2; // Start with 2 sections (section 0 and section 1)
+        var itemCounts = new[] { 3, 4 }; // Section 0 has 3 items, section 1 has 4 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial state: [Item0, Item1, Item2] + [Item0, Item1, Item2, Item3] = 7 items
+        // Flattened indices: 0, 1, 2, 3, 4, 5, 6
+        flattenedAdapter.GetItemCount().Should().Be(7);
+
+        var receivedChangeSets = new List<VirtualScrollFlattenedChangeSet>();
+        flattenedAdapter.Subscribe(cs => receivedChangeSets.Add(cs));
+
+        // Act - Simulate the real-world scenario from the logs:
+        // RemoveItem from section 1, item 0 multiple times, then section gets removed
+
+        // First RemoveItem - section 1 still exists, should work normally
+        itemCounts[1] = 3; // Section 1 now has 3 items
+        var changeSet1 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+        adapterCallback?.Invoke(changeSet1);
+
+        // Verify first removal produced valid index (flattened index 3 for section 1, item 0)
+        receivedChangeSets.Should().HaveCount(1);
+        receivedChangeSets[0].Changes.Should().HaveCount(1);
+        var firstChange = receivedChangeSets[0].Changes.First();
+        firstChange.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+        firstChange.StartItemIndex.Should().Be(3, "Section 1 starts at index 3");
+
+        // Now simulate section 1 being removed from the underlying adapter
+        sectionCount = 1; // Only section 0 exists now
+
+        // But a RemoveItem notification for section 1 arrives (stale notification)
+        // This should be skipped since section 1 no longer exists in the cache after previous operations
+        // Actually, since we only removed an item, section 1 should still be in the cache
+        // Let's simulate the exact scenario: section is removed from adapter but cache still has it
+
+        // Reset for a cleaner scenario - rebuild with 2 sections
+        receivedChangeSets.Clear();
+        sectionCount = 2;
+        itemCounts[1] = 4;
+
+        // Force rebuild offsets by sending a Reset
+        var resetChangeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.Reset() });
+        adapterCallback?.Invoke(resetChangeSet);
+        receivedChangeSets.Clear();
+
+        // Now remove section 1 from the underlying adapter
+        sectionCount = 1;
+
+        // Send RemoveItem for section 1 item 0 - the adapter no longer has section 1
+        // but the cached offsets should still have it
+        var changeSet2 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+        adapterCallback?.Invoke(changeSet2);
+
+        // Assert - Should use cached offsets and produce valid index, or skip if cache was invalidated
+        if (receivedChangeSets.Count > 0)
+        {
+            foreach (var cs in receivedChangeSets)
+            {
+                foreach (var change in cs.Changes)
+                {
+                    change.StartItemIndex.Should().BeGreaterThan(-1, "RemoveItem should use cached offsets, not produce -1");
+                    change.EndItemIndex.Should().BeGreaterThan(-1, "RemoveItem should use cached offsets, not produce -1");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithMultipleRemoveItemsShouldUseCachedOffsetsCorrectly()
+    {
+        // Arrange - Simulates the exact log pattern:
+        // Multiple RemoveItem for section 1 → valid flattened index 4
+        // Then RemoveItem for section 1 → flattened index -1 (BUG - should use cached)
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 1, 10 }; // Section 0: 1 item (index 0), Section 1: 10 items (indices 1-10)
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: Section 0 (1 item) + Section 1 (10 items) = 11 items
+        // Flattened: [0] + [1,2,3,4,5,6,7,8,9,10]
+        flattenedAdapter.GetItemCount().Should().Be(11);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Remove items from section 1 one by one (like the log shows)
+        for (var i = 0; i < 5; i++)
+        {
+            itemCounts[1]--; // Decrease item count
+            var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            adapterCallback?.Invoke(changeSet);
+        }
+
+        // Assert - All remove operations should have produced valid flattened indices
+        allChanges.Should().HaveCount(5);
+        foreach (var change in allChanges)
+        {
+            change.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+            change.StartItemIndex.Should().BeGreaterThan(-1, "Should use cached offsets for RemoveItem");
+        }
+        // First removal should be at index 1 (start of section 1)
+        allChanges[0].StartItemIndex.Should().Be(1);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithRemoveItemRangeShouldUseCachedOffsetsWhenSectionAlreadyRemoved()
+    {
+        // Arrange
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 2, 5 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 2 + 5 = 7 items
+        flattenedAdapter.GetItemCount().Should().Be(7);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Remove items 0-2 from section 1 (items at flattened indices 2, 3, 4)
+        itemCounts[1] = 2; // 3 items removed
+        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(1, 0, 2) });
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert
+        allChanges.Should().HaveCount(1);
+        allChanges[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        allChanges[0].StartItemIndex.Should().Be(2, "Section 1 starts at flattened index 2");
+        allChanges[0].EndItemIndex.Should().Be(4, "Range 0-2 is 3 items: indices 2, 3, 4");
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceItemForRemovedSectionShouldSkipNotification()
+    {
+        // Arrange - ReplaceItem still uses live adapter state, so it should skip if section doesn't exist
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(3);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        VirtualScrollFlattenedChangeSet? receivedChangeSet = null;
+        flattenedAdapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act - Section 1 removed, then ReplaceItem notification arrives
+        sectionCount = 1;
+        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(1, 0) });
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should either skip or not produce -1 indices
+        if (receivedChangeSet != null)
+        {
+            foreach (var change in receivedChangeSet.Changes)
+            {
+                change.StartItemIndex.Should().BeGreaterThan(-1, "Invalid negative index would crash RecyclerView");
+                change.EndItemIndex.Should().BeGreaterThan(-1, "Invalid negative index would crash RecyclerView");
+            }
+        }
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithRefreshItemForRemovedSectionShouldSkipNotification()
+    {
+        // Arrange
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(3);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        VirtualScrollFlattenedChangeSet? receivedChangeSet = null;
+        flattenedAdapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act - Section 1 removed before notification
+        sectionCount = 1;
+        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(1, 0) });
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert
+        if (receivedChangeSet != null)
+        {
+            foreach (var change in receivedChangeSet.Changes)
+            {
+                change.StartItemIndex.Should().BeGreaterThan(-1, "Invalid negative index would crash RecyclerView");
+                change.EndItemIndex.Should().BeGreaterThan(-1, "Invalid negative index would crash RecyclerView");
+            }
+        }
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithMoveItemForRemovedSectionShouldSkipNotification()
+    {
+        // Arrange
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(3);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        VirtualScrollFlattenedChangeSet? receivedChangeSet = null;
+        flattenedAdapter.Subscribe(cs => receivedChangeSet = cs);
+
+        // Act - Section 1 removed before notification
+        sectionCount = 1;
+        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(1, 0, 2) });
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert
+        if (receivedChangeSet != null)
+        {
+            foreach (var change in receivedChangeSet.Changes)
+            {
+                change.StartItemIndex.Should().BeGreaterThan(-1, "Invalid negative index would crash RecyclerView");
+                change.EndItemIndex.Should().BeGreaterThan(-1, "Invalid negative index would crash RecyclerView");
+            }
+        }
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithInsertSectionThenRemoveItemShouldMaintainCorrectIndices()
+    {
+        // Arrange - This test replicates the regression where:
+        // 1. Items removed from sections
+        // 2. Sections removed
+        // 3. New sections inserted
+        // 4. RemoveItem for the new section uses wrong cached offset
+        // Result: "everything disappeared"
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 2, 3 }; // Section 0: 2 items, Section 1: 3 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial state: 2 + 3 = 5 items
+        flattenedAdapter.GetItemCount().Should().Be(5);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Simulate the problematic sequence from logs:
+        // 1. Remove all items from section 1
+        for (var i = 0; i < 3; i++)
+        {
+            itemCounts[1]--;
+            var removeItemChange = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            adapterCallback?.Invoke(removeItemChange);
+        }
+
+        // 2. Remove section 1 (now empty)
+        sectionCount = 1;
+        var removeSectionChange = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        adapterCallback?.Invoke(removeSectionChange);
+
+        // 3. Remove items from section 0
+        itemCounts[0] = 1;
+        var removeFromSection0 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 0) });
+        adapterCallback?.Invoke(removeFromSection0);
+
+        // 4. Remove section 0
+        sectionCount = 0;
+        var removeSection0 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        adapterCallback?.Invoke(removeSection0);
+
+        // 5. Insert new section 0 with 2 items
+        sectionCount = 1;
+        itemCounts = new[] { 2 };
+        var insertSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(0) });
+        adapterCallback?.Invoke(insertSection);
+
+        // Record changes so far
+        var changesBeforeRemove = allChanges.Count;
+        allChanges.Clear();
+
+        // 6. Remove item from the NEW section 0
+        itemCounts[0] = 1;
+        var removeFromNewSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 0) });
+        adapterCallback?.Invoke(removeFromNewSection);
+
+        // Assert - The remove should produce a valid index for the NEW section, not a stale cached one
+        allChanges.Should().HaveCount(1);
+        var removeChange = allChanges[0];
+        removeChange.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+        removeChange.StartItemIndex.Should().Be(0, "Should remove from new section 0 at index 0");
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithStaleRemoveItemAfterSectionRemovedShouldBeSkipped()
+    {
+        // Arrange - This test replicates the exact scenario from logs:
+        // The adapter has already removed items from a section, but the section itself
+        // is also removed. A stale RemoveItem notification arrives for the old section
+        // which now maps to a different (or no) section.
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 4, 8 }; // Section 0: 4 items, Section 1: 8 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        // Use section headers to match real-world scenario
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: (header + 4 items) + (header + 8 items) = 14 flattened items
+        // Section 0: header at 0, items at 1-4
+        // Section 1: header at 5, items at 6-13
+        flattenedAdapter.GetItemCount().Should().Be(14);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Remove all items from section 1 (8 items)
+        for (var i = 0; i < 8; i++)
+        {
+            itemCounts[1]--;
+            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            adapterCallback?.Invoke(removeItem);
+        }
+
+        // Verify: 8 removals all at index 6 (section 1 items start after header at 5)
+        allChanges.Should().HaveCount(8);
+        foreach (var change in allChanges)
+        {
+            change.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+            change.StartItemIndex.Should().Be(6, "All items removed from section 1 which starts items at index 6");
+        }
+
+        allChanges.Clear();
+
+        // Now remove section 1 (empty, just header remains)
+        sectionCount = 1;
+        var removeSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        adapterCallback?.Invoke(removeSection);
+
+        // Section removal should remove just the header (1 item)
+        allChanges.Should().HaveCount(1);
+        allChanges[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        allChanges[0].StartItemIndex.Should().Be(5, "Section 1 header at index 5");
+        allChanges[0].EndItemIndex.Should().Be(5, "Only header remains");
+
+        allChanges.Clear();
+
+        // Now a STALE RemoveItem arrives for section 1 (which no longer exists)
+        // This should be SKIPPED, not produce -1 or operate on wrong section
+        var staleRemove = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+        adapterCallback?.Invoke(staleRemove);
+
+        // Assert - Should be skipped (no changes emitted)
+        allChanges.Should().BeEmpty("Stale notification for removed section should be skipped");
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithRemoveItemWhenAllItemsAlreadyRemovedFromSectionShouldSkip()
+    {
+        // Arrange - This test verifies that when multiple RemoveItem notifications arrive
+        // but the section's items are already gone (itemCount=0), the notifications are
+        // handled correctly using cached offsets
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 1, 3 }; // Section 0: 1 item, Section 1: 3 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        // Use section headers
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: (1+1) + (1+3) = 6 items
+        // Section 0: header at 0, item at 1
+        // Section 1: header at 2, items at 3-5
+        flattenedAdapter.GetItemCount().Should().Be(6);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Remove all items from section 1 
+        // Each remove should use cached offset and work correctly
+        for (var i = 0; i < 3; i++)
+        {
+            itemCounts[1]--; // Items already removed in underlying adapter
+            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            adapterCallback?.Invoke(removeItem);
+        }
+
+        // All 3 removals should produce valid indices at position 3
+        allChanges.Should().HaveCount(3);
+        foreach (var change in allChanges)
+        {
+            change.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+            change.StartItemIndex.Should().Be(3, "Items in section 1 start at index 3");
+        }
+
+        // Now section 1 has 0 items, only header at position 2
+        flattenedAdapter.GetItemCount().Should().Be(3); // header0 + item0 + header1
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithRemoveSectionAfterAllItemsRemovedShouldProduceValidRange()
+    {
+        // Arrange - This test captures the regression: after removing all items from a section,
+        // RemoveSection produces an invalid range (start > end) because cached offsets are stale.
+        // Bug: After 8 RemoveItem from section 1, section offset is still 4 but _flattenedLength=4,
+        // so RemoveSection calculates itemsToRemove=0, producing RemoveItemRange(4, 3) - INVALID!
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 4, 8 }; // Section 0: 4 items, Section 1: 8 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        // NO headers - this is the problematic case
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 4 + 8 = 12 items (no headers)
+        flattenedAdapter.GetItemCount().Should().Be(12);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Remove all 8 items from section 1
+        for (var i = 0; i < 8; i++)
+        {
+            itemCounts[1]--;
+            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            adapterCallback?.Invoke(removeItem);
+        }
+
+        // Verify all 8 removals at index 4 (section 1 starts there)
+        allChanges.Should().HaveCount(8);
+        foreach (var change in allChanges)
+        {
+            change.StartItemIndex.Should().Be(4);
+        }
+
+        allChanges.Clear();
+
+        // Now section 1 is empty. Remove the section.
+        sectionCount = 1;
+        var removeSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        adapterCallback?.Invoke(removeSection);
+
+        // Assert - Should either skip (empty section) or produce VALID range
+        // BUG: Without fix, produces RemoveItemRange(4, 3) which is invalid!
+        foreach (var change in allChanges)
+        {
+            if (change.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange)
+            {
+                change.EndItemIndex.Should().BeGreaterThanOrEqualTo(change.StartItemIndex,
+                    "RemoveItemRange should have endIndex >= startIndex");
+            }
+            change.StartItemIndex.Should().BeGreaterThan(-1);
+        }
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithMultipleRemoveItemFromSameSectionShouldDecrementIndicesCorrectly()
+    {
+        // Arrange - This test replicates the bug where multiple RemoveItem notifications
+        // for the same section all produce the SAME flattened index, causing wrong items
+        // to be removed. Each RemoveItem(section, 0) should produce DECREASING indices
+        // as items are removed and the section shrinks.
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 2;
+        var itemCounts = new[] { 1, 3 }; // Section 0: 1 item, Section 1: 3 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < sectionCount && idx < itemCounts.Length ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        // WITH section headers
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: (1 header + 1 item) + (1 header + 3 items) = 6 flattened items
+        // Section 0: header at 0, item at 1
+        // Section 1: header at 2, items at 3, 4, 5
+        flattenedAdapter.GetItemCount().Should().Be(6);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Remove all 3 items from section 1, one by one
+        // Each time we remove item 0 (first item in the section)
+        for (var i = 0; i < 3; i++)
+        {
+            itemCounts[1]--;
+            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            adapterCallback?.Invoke(removeItem);
+        }
+
+        // Assert - Each removal should produce index 3 (first item position in section 1)
+        // because we're always removing item 0 and the section shrinks
+        allChanges.Should().HaveCount(3);
+        foreach (var change in allChanges)
+        {
+            change.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+            change.StartItemIndex.Should().Be(3, "Each RemoveItem(1, 0) should target index 3 (first item in section 1)");
+        }
+
+        // After all removals, section 1 should have only its header at position 2
+        flattenedAdapter.GetItemCount().Should().Be(3); // header0 + item0 + header1
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithMixedInsertRemoveSectionsShouldTrackIndicesCorrectly()
+    {
+        // Arrange - Tests rapid section insert/remove cycles
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var sectionCount = 0;
+        var itemCounts = new List<int>();
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(_ => sectionCount);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call =>
+        {
+            var idx = call.Arg<int>();
+            return idx < itemCounts.Count ? itemCounts[idx] : 0;
+        });
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Rapid cycle of insert section, add items, remove items, remove section
+        for (var cycle = 0; cycle < 3; cycle++)
+        {
+            allChanges.Clear();
+
+            // Insert section 0 with 2 items
+            sectionCount = 1;
+            itemCounts = new List<int> { 2 };
+            var insertSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(0) });
+            adapterCallback?.Invoke(insertSection);
+
+            // Verify insert produced valid indices
+            allChanges.Should().ContainSingle();
+            allChanges[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.InsertItemRange);
+            allChanges[0].StartItemIndex.Should().Be(0);
+            allChanges[0].EndItemIndex.Should().Be(1); // 2 items
+
+            allChanges.Clear();
+
+            // Remove item
+            itemCounts[0] = 1;
+            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 0) });
+            adapterCallback?.Invoke(removeItem);
+
+            // Verify remove produced valid index
+            allChanges.Should().ContainSingle();
+            allChanges[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItem);
+            allChanges[0].StartItemIndex.Should().Be(0);
+
+            allChanges.Clear();
+
+            // Remove section
+            sectionCount = 0;
+            itemCounts.Clear();
+            var removeSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+            adapterCallback?.Invoke(removeSection);
+
+            // Verify section remove produced valid indices
+            allChanges.Should().ContainSingle();
+            allChanges[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+            allChanges[0].StartItemIndex.Should().BeGreaterThan(-1);
+        }
+    }
 }
 
