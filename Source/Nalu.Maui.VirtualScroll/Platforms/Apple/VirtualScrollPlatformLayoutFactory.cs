@@ -27,22 +27,24 @@ internal static class VirtualScrollPlatformLayoutFactory
     /// <param name="layoutInfo">Information about headers and footers in the layout.</param>
     /// <returns>A UICollectionViewLayout configured for a list layout.</returns>
     public static UICollectionViewLayout CreateList(LinearVirtualScrollLayout linearLayout, IVirtualScrollLayoutInfo layoutInfo)
-    {
-        var scrollDirection = linearLayout.Orientation == ItemsLayoutOrientation.Vertical
-            ? UICollectionViewScrollDirection.Vertical
-            : UICollectionViewScrollDirection.Horizontal;
-
-        return CreateListLayout(scrollDirection, layoutInfo);
-    }
+        => CreateListLayout(linearLayout, layoutInfo);
 
     private static NSCollectionLayoutBoundarySupplementaryItem[] CreateGlobalSupplementaryItems(
         IVirtualScrollLayoutInfo layoutInfo, UICollectionViewScrollDirection scrollDirection,
-        NSCollectionLayoutDimension width, NSCollectionLayoutDimension height)
+        LinearVirtualScrollLayout linearLayout)
     {
         var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
 
         if (layoutInfo.HasGlobalHeader)
         {
+            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
+                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedHeaderSize);
+
+            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedHeaderSize)
+                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
+            
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
                           NSCollectionLayoutSize.Create(width, height),
                           ElementKindGlobalHeader,
@@ -53,6 +55,14 @@ internal static class VirtualScrollPlatformLayoutFactory
 
         if (layoutInfo.HasGlobalFooter)
         {
+            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
+                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedFooterSize);
+
+            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedFooterSize)
+                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
+
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
                           NSCollectionLayoutSize.Create(width, height),
                           ElementKindGlobalFooter,
@@ -66,12 +76,20 @@ internal static class VirtualScrollPlatformLayoutFactory
 
     private static NSCollectionLayoutBoundarySupplementaryItem[] CreateSectionSupplementaryItems(
         IVirtualScrollLayoutInfo layoutInfo, UICollectionViewScrollDirection scrollDirection,
-        NSCollectionLayoutDimension width, NSCollectionLayoutDimension height)
+        LinearVirtualScrollLayout linearLayout)
     {
         var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
 
         if (layoutInfo.HasSectionHeader)
         {
+            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
+                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionHeaderSize);
+
+            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionHeaderSize)
+                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
+            
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
                           NSCollectionLayoutSize.Create(width, height),
                           ElementKindSectionHeader,
@@ -82,6 +100,14 @@ internal static class VirtualScrollPlatformLayoutFactory
 
         if (layoutInfo.HasSectionFooter)
         {
+            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
+                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionFooterSize);
+
+            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
+                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionFooterSize)
+                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
+            
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
                           NSCollectionLayoutSize.Create(width, height),
                           ElementKindSectionFooter,
@@ -94,26 +120,21 @@ internal static class VirtualScrollPlatformLayoutFactory
     }
 
     private static UICollectionViewLayout CreateListLayout(
-        UICollectionViewScrollDirection scrollDirection,
+        LinearVirtualScrollLayout linearLayout,
         IVirtualScrollLayoutInfo layoutInfo)
     {
+        var scrollDirection = linearLayout.Orientation == ItemsLayoutOrientation.Vertical
+            ? UICollectionViewScrollDirection.Vertical
+            : UICollectionViewScrollDirection.Horizontal;
+
         var layoutConfiguration = new UICollectionViewCompositionalLayoutConfiguration();
         layoutConfiguration.ScrollDirection = scrollDirection;
 
         // Create global header and footer
-        var groupWidth = scrollDirection == UICollectionViewScrollDirection.Vertical
-            ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-            : NSCollectionLayoutDimension.CreateEstimated(44.0f);
-
-        var groupHeight = scrollDirection == UICollectionViewScrollDirection.Vertical
-            ? NSCollectionLayoutDimension.CreateEstimated(44.0f)
-            : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-
         layoutConfiguration.BoundarySupplementaryItems = CreateGlobalSupplementaryItems(
             layoutInfo,
             scrollDirection,
-            groupWidth,
-            groupHeight);
+            linearLayout);
 
         // ReSharper disable UnusedParameter.Local
         var layout = new VirtualScrollCollectionViewLayout((sectionIndex, environment) => 
@@ -123,27 +144,27 @@ internal static class VirtualScrollPlatformLayoutFactory
             // - For horizontal: estimated width, full height
             var itemWidth = scrollDirection == UICollectionViewScrollDirection.Vertical
                 ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : NSCollectionLayoutDimension.CreateEstimated(44.0f); // Estimated width for horizontal
+                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedItemSize);
 
             var itemHeight = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateEstimated(44.0f) // Estimated height for vertical
+                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedItemSize)
                 : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
 
             var itemSize = NSCollectionLayoutSize.Create(itemWidth, itemHeight);
             var item = NSCollectionLayoutItem.Create(layoutSize: itemSize);
 
+            // Create the group (one layout item per group, it's a depth level we don't use)
+            // Section
+            //     ├─ Group
+            //     │   ├─ Item
+            //     ├─ Group
+            //     │   ├─ Item
+
             // Group dimensions: match item dimensions
-            var sectionGroupWidth = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : itemWidth;
-
-            var sectionGroupHeight = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? itemHeight
-                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-
+            var sectionGroupWidth = itemWidth;
+            var sectionGroupHeight = itemHeight;
             var groupSize = NSCollectionLayoutSize.Create(sectionGroupWidth, sectionGroupHeight);
 
-            // Create the group
             // For vertical list: group layouts horizontally (single column, items stack vertically)
             // For horizontal list: group layouts vertically (single row, items stack horizontally)
             var group = scrollDirection == UICollectionViewScrollDirection.Vertical
@@ -158,8 +179,7 @@ internal static class VirtualScrollPlatformLayoutFactory
             section.BoundarySupplementaryItems = CreateSectionSupplementaryItems(
                 layoutInfo,
                 scrollDirection,
-                sectionGroupWidth,
-                sectionGroupHeight);
+                linearLayout);
 
             return section;
         }, layoutConfiguration)

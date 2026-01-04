@@ -43,7 +43,7 @@
 
             <nalu:VirtualScroll Grid.Row="1"
                                 x:Name="VirtualScroll"
-                                Adapter="{Binding Items}"
+                                ItemsSource="{Binding Items}"
                                 IsRefreshEnabled="True"
                                 FadingEdgeLength="32"
                                 RefreshCommand="{Binding RefreshCommand}"

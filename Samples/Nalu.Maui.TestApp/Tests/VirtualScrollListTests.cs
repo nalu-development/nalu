@@ -44,7 +44,7 @@ public class VirtualScrollListTests : ContentPage
 
         var virtualScroll = new VirtualScroll
                             {
-                                Adapter = items,
+                                ItemsSource = items,
                                 
                                 HeaderTemplate = new DataTemplate(() =>
                                     {

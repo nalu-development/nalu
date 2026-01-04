@@ -64,18 +64,13 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
 
         if (holder is VirtualScrollViewHolder { ViewWrapper.VirtualView: BindableObject bindable })
         {
-            var itemValue = item.Type is VirtualScrollFlattenedPositionType.GlobalFooter or VirtualScrollFlattenedPositionType.GlobalHeader
-                ? (_virtualScroll as BindableObject)?.BindingContext
-                : item.Value;
-
-            if (bindable.BindingContext == itemValue)
+            if (item.Type is VirtualScrollFlattenedPositionType.GlobalFooter or VirtualScrollFlattenedPositionType.GlobalHeader)
             {
-                // One time bindings should be reapplied
-                ReapplyBindings(bindable);
+                bindable.ClearValue(BindableObject.BindingContextProperty);
             }
             else
             {
-                bindable.BindingContext = itemValue;
+                bindable.BindingContext = item.Value;
             }
 
             if (_virtualScroll is Element virtualScrollElement && bindable is Element { Parent: null } viewElement)

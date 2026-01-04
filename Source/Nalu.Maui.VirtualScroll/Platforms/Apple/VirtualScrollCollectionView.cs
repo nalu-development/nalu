@@ -203,7 +203,11 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
 
     void IPlatformMeasureInvalidationController.InvalidateAncestorsMeasuresWhenMovedToWindow() => _invalidateParentWhenMovedToWindow = true;
 
-    bool IPlatformMeasureInvalidationController.InvalidateMeasure(bool isPropagating) => !isPropagating;
+    bool IPlatformMeasureInvalidationController.InvalidateMeasure(bool isPropagating)
+    {
+        SetNeedsLayout();
+        return !isPropagating;
+    }
 
     /// <inheritdoc/>
     public override void MovedToWindow()

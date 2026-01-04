@@ -32,7 +32,7 @@ public partial class SoftKeyboardManagerPage : ContentPage
 		});
 		var cv = new VirtualScroll {
 			AutomationId = "CV",
-			Adapter = new List<Items>
+			ItemsSource = new List<Items>
 			{
 				new(15),
 				new(3),

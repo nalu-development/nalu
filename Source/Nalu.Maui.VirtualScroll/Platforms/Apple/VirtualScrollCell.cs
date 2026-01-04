@@ -8,6 +8,9 @@ namespace Nalu;
 
 internal sealed class VirtualScrollCell : UICollectionViewCell
 {
+    // ReSharper disable once InconsistentNaming
+    public static readonly object InheritedBindingContext = new();
+    
     private WeakReference<IView>? _weakVirtualView;
     private UIView? _nativeView;
     private uint _useCount;
@@ -104,14 +107,23 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
         if (view is BindableObject bindable)
         {
-            if (isRebinding && bindable.BindingContext == item)
+            if (isRebinding)
             {
-                // One time bindings should be reapplied
-                ReapplyBindings(bindable);
+                if (ReferenceEquals(InheritedBindingContext, item))
+                {
+                    bindable.ClearValue(BindableObject.BindingContextProperty);
+                }
+                else
+                {
+                    bindable.BindingContext = item;
+                }
             }
             else
             {
-                bindable.BindingContext = item;
+                if (!ReferenceEquals(InheritedBindingContext, item))
+                {
+                    bindable.BindingContext = item;
+                }
             }
         }
 
@@ -143,7 +155,6 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
             _needsMeasure = true;
             if (Superview is VirtualScrollCollectionView collectionView)
             {
-                // collectionView.InvalidateCell(this);
                 collectionView.SetNeedsCellsLayout();
             }
         }

@@ -77,7 +77,7 @@ public class MainPage : ContentPage
 
         var virtualScroll = new VirtualScroll
                             {
-                                Adapter = testPages,
+                                ItemsSource = testPages,
                                 ItemTemplate = new DataTemplate(() =>
                                     {
                                         var openTestPageButton = new Button

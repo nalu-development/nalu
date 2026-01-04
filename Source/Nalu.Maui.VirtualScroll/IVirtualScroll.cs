@@ -10,37 +10,37 @@ public interface IVirtualScroll : IView
     /// <summary>
     /// The adapter that provides data to the virtual scroll.
     /// </summary>
-    IVirtualScrollAdapter? Adapter { get; set; }
+    IVirtualScrollAdapter? Adapter { get; }
 
     /// <summary>
     /// Gets or sets the layout for the virtual scroll.
     /// </summary>
-    IVirtualScrollLayout ItemsLayout { get; set; }
+    IVirtualScrollLayout ItemsLayout { get; }
     
     /// <summary>
     /// Gets or sets the template used to display each item.
     /// </summary>
-    DataTemplate? ItemTemplate { get; set; }
+    DataTemplate? ItemTemplate { get; }
     
     /// <summary>
     /// Gets or sets the template used to display section headers.
     /// </summary>
-    DataTemplate? SectionHeaderTemplate { get; set; }
+    DataTemplate? SectionHeaderTemplate { get; }
     
     /// <summary>
     /// Gets or sets the template used to display section footers.
     /// </summary>
-    DataTemplate? SectionFooterTemplate { get; set; }
+    DataTemplate? SectionFooterTemplate { get; }
     
     /// <summary>
     /// Gets or sets the template used to display the header at the top of the scroll view.
     /// </summary>
-    DataTemplate? HeaderTemplate { get; set; }
+    DataTemplate? HeaderTemplate { get; }
     
     /// <summary>
     /// Gets or sets the template used to display the footer at the bottom of the scroll view.
     /// </summary>
-    DataTemplate? FooterTemplate { get; set; }
+    DataTemplate? FooterTemplate { get; }
     
     /// <summary>
     /// Gets the appropriate item template for the given item.
@@ -70,24 +70,24 @@ public interface IVirtualScroll : IView
     /// <summary>
     /// Gets or sets the command to execute when the user requests a refresh.
     /// </summary>
-    ICommand? RefreshCommand { get; set; }
+    ICommand? RefreshCommand { get; }
     
     /// <summary>
     /// Gets or sets a value indicating whether pull-to-refresh is enabled.
     /// </summary>
-    bool IsRefreshEnabled { get; set; }
+    bool IsRefreshEnabled { get; }
     
     /// <summary>
     /// Gets or sets the accent color for the refresh indicator.
     /// </summary>
-    Color? RefreshAccentColor { get; set; }
+    Color? RefreshAccentColor { get; }
     
     /// <summary>
     /// Gets or sets a value indicating whether the refresh indicator is currently showing.
     /// Setting this to true programmatically will trigger the refresh indicator.
     /// Setting this to false will stop the refresh indicator.
     /// </summary>
-    bool IsRefreshing { get; set; }
+    bool IsRefreshing { get; }
 
     /// <summary>
     /// Gets or sets the length of the fading edge effect in device-independent units.

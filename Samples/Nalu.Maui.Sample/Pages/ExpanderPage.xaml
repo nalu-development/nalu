@@ -29,7 +29,7 @@
 
             <nalu:VirtualScroll Grid.Row="1"
                                 x:Name="VirtualScroll"
-                                Adapter="{Binding Items}"
+                                ItemsSource="{Binding Items}"
                                 FadingEdgeLength="32"
                                 Background="LightBlue">
                 <nalu:VirtualScroll.HeaderTemplate>

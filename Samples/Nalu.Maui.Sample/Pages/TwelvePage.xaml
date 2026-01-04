@@ -162,17 +162,8 @@
                 </nalu:ToggleTemplate.WhenTrue>
                 <nalu:ToggleTemplate.WhenFalse>
                     <DataTemplate x:DataType="pageModels:TwelvePageModel">
-                        <nalu:VirtualScroll Adapter="{Binding Adapter}">
-                            <nalu:VirtualScroll.HeaderTemplate>
-                                <DataTemplate x:DataType="pageModels:TwelvePageModel">
-                                    <nalu:ViewBox ContentBindingContext="{x:Static pageModels:TwelvePageStaticModel.Instance}">
-                                        <Label Text="{Binding Message}"
-                                               x:DataType="pageModels:TwelvePageStaticModel"
-                                               BackgroundColor="Red"/>
-                                    </nalu:ViewBox>
-                                </DataTemplate>
-                            </nalu:VirtualScroll.HeaderTemplate>
-
+                        <nalu:VirtualScroll ItemsSource="{Binding Adapter}"
+                                            ItemsLayout="{nalu:VerticalVirtualScrollLayout EstimatedItemSize=72, EstimatedSectionHeaderSize=57}">
                             <!-- Section Header Template -->
                             <nalu:VirtualScroll.SectionHeaderTemplate>
                                 <DataTemplate x:DataType="pageModels:TwelveGroup">

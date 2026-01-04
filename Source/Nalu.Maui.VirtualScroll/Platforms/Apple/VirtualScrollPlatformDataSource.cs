@@ -37,7 +37,7 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
         var supplementaryType = elementKind.ToString();
         var section = supplementaryType switch
         {
-            VirtualScrollPlatformLayoutFactory.ElementKindGlobalFooter or VirtualScrollPlatformLayoutFactory.ElementKindGlobalHeader => null,
+            VirtualScrollPlatformLayoutFactory.ElementKindGlobalFooter or VirtualScrollPlatformLayoutFactory.ElementKindGlobalHeader => VirtualScrollCell.InheritedBindingContext,
             _ => virtualScrollAdapter.GetSection(sectionIndex)
         };
 

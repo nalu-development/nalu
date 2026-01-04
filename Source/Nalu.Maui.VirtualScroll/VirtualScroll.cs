@@ -20,34 +20,17 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     private bool _hasSectionFooter;
 
     /// <summary>
-    /// Bindable property for <see cref="Adapter"/>.
+    /// Bindable property for <see cref="ItemsSource"/>.
     /// </summary>
-    public static readonly BindableProperty AdapterProperty = BindableProperty.Create(
-        nameof(Adapter),
+    public static readonly BindableProperty ItemsSourceProperty = BindableProperty.Create(
+        nameof(ItemsSource),
         typeof(object),
         typeof(VirtualScroll),
         null,
-        coerceValue: (_, value) =>
+        propertyChanged: (bindable, _, value) =>
         {
-            if (value is null or IVirtualScrollAdapter)
-            {
-                return value;
-            }
-
-            // Check if it's an ObservableCollection<T> or inherits from it
-            var valueType = value.GetType();
-            if (FindObservableCollectionListType(valueType) is not null)
-            {
-                var adapterType = typeof(VirtualScrollObservableCollectionAdapter<>).MakeGenericType(valueType);
-                return Activator.CreateInstance(adapterType, value);
-            }
-
-            if (value is IEnumerable enumerable)
-            {
-                return new VirtualScrollListAdapter(enumerable);
-            }
-            
-            throw new NotSupportedException($"{value.GetType()} is not supported as an adapter for VirtualScroll. Please provide an IVirtualScrollAdapter or a supported enumerable.");
+            var virtualScroll = (VirtualScroll)bindable;
+            virtualScroll._adapter = CoerceAdapter(value);
         }
     );
 
@@ -122,7 +105,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         nameof(ItemsLayout),
         typeof(IVirtualScrollLayout),
         typeof(VirtualScroll),
-        LinearVirtualScrollLayout.Vertical
+        defaultValueCreator: _ => new VerticalVirtualScrollLayout()
     );
 
     /// <summary>
@@ -177,17 +160,13 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// <summary>
     /// The adapter that provides data to the virtual scroll.
     /// </summary>
-    public object? Adapter
+    public object? ItemsSource
     {
-        get => (object?)GetValue(AdapterProperty);
-        set => SetValue(AdapterProperty, value);
+        get => (object?)GetValue(ItemsSourceProperty);
+        set => SetValue(ItemsSourceProperty, value);
     }
 
-    IVirtualScrollAdapter? IVirtualScroll.Adapter
-    {
-        get => (IVirtualScrollAdapter?)Adapter;
-        set => Adapter = value;
-    }
+    IVirtualScrollAdapter? IVirtualScroll.Adapter => _adapter;
 
     /// <summary>
     /// Gets or sets the layout for the virtual scroll.
@@ -300,6 +279,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     public event EventHandler<RefreshEventArgs>? OnRefresh;
 
     private int _onScrolledSubscriberCount;
+    private IVirtualScrollAdapter? _adapter;
 
     /// <summary>
     /// Bindable property for <see cref="ScrolledCommand"/>.
@@ -385,22 +365,6 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
 
     /// <inheritdoc/>
     public DataTemplate? GetGlobalFooterTemplate() => GlobalFooterTemplate;
-
-    /// <summary>
-    /// Verifies whether the type implements <see cref="IList"/> and <see cref="INotifyCollectionChanged"/>.
-    /// </summary>
-    /// <param name="type">The type to check.</param>
-    /// <returns>The type itself if it implements both interfaces; otherwise, <c>null</c>.</returns>
-    private static Type? FindObservableCollectionListType(Type type)
-    {
-        // Check if the type implements both IList and INotifyCollectionChanged
-        if (typeof(IList).IsAssignableFrom(type) && typeof(INotifyCollectionChanged).IsAssignableFrom(type))
-        {
-            return type;
-        }
-
-        return null;
-    }
 
     bool IVirtualScrollLayoutInfo.HasGlobalHeader => _hasGlobalHeader;
 
@@ -489,7 +453,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// <inheritdoc/>
     public void ScrollTo(object itemOrSection, ScrollToPosition position = ScrollToPosition.MakeVisible, bool animated = true)
     {
-        if (Adapter is not IVirtualScrollAdapter adapter)
+        if (ItemsSource is not IVirtualScrollAdapter adapter)
         {
             return;
         }
@@ -523,6 +487,33 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
             }
         }
     }
+
+    private static IVirtualScrollAdapter? CoerceAdapter(object value)
+    {
+        if (value is null or IVirtualScrollAdapter)
+        {
+            return (IVirtualScrollAdapter?)value;
+        }
+
+        // Check if it's an ObservableCollection<T> or inherits from it
+        var valueType = value.GetType();
+        if (IsObservableCollectionType(valueType))
+        {
+            var adapterType = typeof(VirtualScrollObservableCollectionAdapter<>).MakeGenericType(valueType);
+
+            return (IVirtualScrollAdapter?)Activator.CreateInstance(adapterType, value);
+        }
+
+        if (value is IEnumerable enumerable)
+        {
+            return new VirtualScrollListAdapter(enumerable);
+        }
+            
+        throw new NotSupportedException($"{value.GetType()} is not supported as an adapter for VirtualScroll. Please provide an IVirtualScrollAdapter or a supported enumerable.");
+    }
+
+    private static bool IsObservableCollectionType(Type type)
+        => typeof(IList).IsAssignableFrom(type) && typeof(INotifyCollectionChanged).IsAssignableFrom(type);
 
     /// <summary>
     /// Creates a virtual scroll adapter for the specified observable collection.

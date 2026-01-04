@@ -58,7 +58,7 @@
                                 FadingEdgeLength="32"
                                 Background="LightGoldenrodYellow"
                                 x:Name="VirtualScroll"
-                                Adapter="{Binding Adapter}"
+                                ItemsSource="{Binding Adapter}"
                                 OnScrolled="VirtualScroll_OnScrolled">
 
                 <!-- Global Header -->

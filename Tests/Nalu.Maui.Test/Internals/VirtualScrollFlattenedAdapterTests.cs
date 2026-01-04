@@ -232,7 +232,7 @@ public class VirtualScrollFlattenedAdapterTests
         var subscription = flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -264,7 +264,7 @@ public class VirtualScrollFlattenedAdapterTests
         subscription.Dispose();
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -334,7 +334,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -365,7 +365,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -396,7 +396,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -427,7 +427,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(0, 1, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(0, 1, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -459,7 +459,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -490,7 +490,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -522,7 +522,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.Reset() });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.Reset()]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -561,7 +561,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Update adapter to have 2 sections after insert
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -603,7 +603,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Update adapter to have 1 section after remove
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -636,7 +636,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -726,7 +726,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -767,7 +767,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove sections 0 and 1
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -799,7 +799,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -833,7 +833,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Move section 0 to position 2 (forward)
         // Original: [Sec0(0-1), Sec1(2-3), Sec2(4-5)]
         // After: [Sec1(0-1), Sec2(2-3), Sec0(4-5)]
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -875,7 +875,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert a section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Verify items are correctly positioned
@@ -919,7 +919,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -975,7 +975,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove section at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1024,7 +1024,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1073,7 +1073,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove 2 sections starting at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1122,7 +1122,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1177,7 +1177,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1232,7 +1232,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove section at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1281,7 +1281,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove section at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1330,7 +1330,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1379,7 +1379,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1428,7 +1428,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove 2 sections starting at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1477,7 +1477,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove 2 sections starting at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1526,7 +1526,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1581,7 +1581,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1636,7 +1636,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1692,7 +1692,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove section at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1742,7 +1742,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove section at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1792,7 +1792,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1842,7 +1842,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1892,7 +1892,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove 2 sections starting at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1942,7 +1942,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove 2 sections starting at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -1979,7 +1979,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove items at indices 1 and 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2011,7 +2011,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace items at indices 1 and 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2043,7 +2043,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace sections 0 and 1 (4 items total at indices 0-3)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2076,7 +2076,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Move item from section 0, index 1 to section 1, index 2
         // Note: This creates a custom change since MoveItem factory only supports same section
-        var changeSet = new VirtualScrollChangeSet(new[] { new VirtualScrollChange(VirtualScrollChangeOperation.MoveItem, 0, 1, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([new VirtualScrollChange(VirtualScrollChangeOperation.MoveItem, 0, 1, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2111,7 +2111,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2143,7 +2143,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2178,7 +2178,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2213,7 +2213,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 0 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2248,7 +2248,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 1 in section 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(1, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(1, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2281,7 +2281,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove items at indices 1 and 2 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2314,7 +2314,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2346,7 +2346,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move item from index 0 to index 3 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(0, 0, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(0, 0, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2379,7 +2379,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh item at index 2 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2411,7 +2411,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert 2 items at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2444,7 +2444,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace items at indices 1-3 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItemRange(0, 1, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItemRange(0, 1, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2484,7 +2484,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2516,7 +2516,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove item at index 2 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2554,7 +2554,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2586,7 +2586,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2624,7 +2624,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2656,7 +2656,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove item at index 2 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2688,7 +2688,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace item at index 0 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(0, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(0, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2720,7 +2720,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move item from index 0 to index 3 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(0, 0, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(0, 0, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2753,7 +2753,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2785,7 +2785,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert 2 items at index 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2818,7 +2818,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove items at indices 1-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2851,7 +2851,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace items at indices 0-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2899,7 +2899,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 1 section at index 1
         sectionCount = 2;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2947,7 +2947,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove section at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -2995,7 +2995,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Insert 2 sections at index 1
         sectionCount = 3;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSectionRange(1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSectionRange(1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3043,7 +3043,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Remove 2 sections starting at index 0
         sectionCount = 1;
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3084,7 +3084,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3115,7 +3115,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3150,7 +3150,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove item at index 1 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3182,7 +3182,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace item at index 0 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(0, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(0, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3214,7 +3214,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move item from index 0 to index 3 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(0, 0, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(0, 0, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3247,7 +3247,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh item at index 2 in section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3279,7 +3279,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert 2 items at index 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3312,7 +3312,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove items at indices 1-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3345,7 +3345,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace items at indices 0-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3382,7 +3382,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace section 0 (1 header + 2 items = 3 items)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3414,7 +3414,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace section 0 (2 items + 1 footer = 3 items)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3446,7 +3446,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace section 0 (2 items)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3478,7 +3478,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace section 0 (header + 2 items + footer = 4 items)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3514,7 +3514,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace sections 0 and 1 (2 * (1 header + 2 items) = 6 items)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3546,7 +3546,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace sections 0 and 1 (2 * (1 header + 2 items + 1 footer) = 8 items)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3584,7 +3584,7 @@ public class VirtualScrollFlattenedAdapterTests
         // Act - Move section 2 to position 0 (backward)
         // Original: [Sec0(0-1), Sec1(2-3), Sec2(4-5)]
         // After: [Sec2(0-1), Sec0(2-3), Sec1(4-5)]
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(2, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(2, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3625,7 +3625,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move section 0 to position 2 (forward)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3666,7 +3666,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move section 0 to position 2 (forward)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3708,7 +3708,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace item at index 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3739,7 +3739,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move item from index 0 to index 3
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(0, 0, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(0, 0, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3771,7 +3771,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh item at index 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3802,7 +3802,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert 2 items at index 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3834,7 +3834,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove items at indices 1-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3866,7 +3866,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace items at indices 0-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3902,7 +3902,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace item at index 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3933,7 +3933,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move item from index 0 to index 3
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(0, 0, 3) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(0, 0, 3)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3965,7 +3965,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh item at index 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -3996,7 +3996,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Insert 2 items at index 1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4028,7 +4028,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Remove items at indices 1-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(0, 1, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4060,7 +4060,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace items at indices 0-2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItemRange(0, 0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4096,7 +4096,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit ReplaceItemRange (structure unchanged, just content)
@@ -4131,7 +4131,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace sections 0-1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit ReplaceItemRange (structure unchanged, just content)
@@ -4166,7 +4166,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace sections 0-1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit ReplaceItemRange (structure unchanged, just content)
@@ -4201,7 +4201,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Replace sections 0-1
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit ReplaceItemRange (structure unchanged, just content)
@@ -4236,7 +4236,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move section from index 0 to index 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit RemoveItemRange followed by InsertItemRange
@@ -4274,7 +4274,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move section from index 0 to index 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit RemoveItemRange followed by InsertItemRange
@@ -4312,7 +4312,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Move section from index 0 to index 2
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveSection(0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveSection(0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should emit RemoveItemRange followed by InsertItemRange
@@ -4350,7 +4350,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4384,7 +4384,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4418,7 +4418,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4452,7 +4452,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Refresh section 0
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4508,10 +4508,10 @@ public class VirtualScrollFlattenedAdapterTests
         // 1. Section 0 is removed from the underlying collection (2 items)
         // 2. sectionCount changes BEFORE the callback is invoked
         sectionCount = 2;
-        itemsPerSection = new[] { 3, 4, 0 }; // Now section 0 has what was section 1 (3 items)
+        itemsPerSection = [3, 4, 0]; // Now section 0 has what was section 1 (3 items)
         
         // 3. The change notification arrives (but the data is already modified!)
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should have removed the correct number of items (2) using cached offsets
@@ -4560,9 +4560,9 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Simulate removing sections 0 and 1 (2 + 3 = 5 items)
         sectionCount = 2;
-        itemsPerSection = new[] { 4, 5, 0, 0 }; // Now has what was sections 2 and 3
+        itemsPerSection = [4, 5, 0, 0]; // Now has what was sections 2 and 3
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSectionRange(0, 1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSectionRange(0, 1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4612,9 +4612,9 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Remove section 0 (which has header + 3 items + footer = 5 elements)
         sectionCount = 1;
-        itemsPerSection = new[] { 4, 0 }; // Now section 0 has what was section 1
+        itemsPerSection = [4, 0]; // Now section 0 has what was section 1
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4665,9 +4665,9 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Remove section 1 (the middle one with 5 items)
         sectionCount = 2;
-        itemsPerSection = new[] { 2, 3, 0 }; // Sections 0 and 2 (now called 1) remain
+        itemsPerSection = [2, 3, 0]; // Sections 0 and 2 (now called 1) remain
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(1)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4717,9 +4717,9 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Remove section 2 (the last one with 4 items)
         sectionCount = 2;
-        itemsPerSection = new[] { 2, 3, 0 };
+        itemsPerSection = [2, 3, 0];
         
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4759,12 +4759,13 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Send a batch with multiple item inserts at valid indices
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.InsertItem(0, 0),
             VirtualScrollChangeFactory.InsertItem(0, 2),
             VirtualScrollChangeFactory.InsertItem(0, 4)
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should produce 3 flattened changes
@@ -4800,12 +4801,13 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Send a batch with mixed operations
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.ReplaceItem(0, 0),
             VirtualScrollChangeFactory.RefreshItem(0, 2),
             VirtualScrollChangeFactory.ReplaceItem(0, 4)
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should produce 3 flattened changes
@@ -4844,11 +4846,12 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Send a batch with insert then remove
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.InsertItem(0, 0),  // Insert at 0
             VirtualScrollChangeFactory.RemoveItem(0, 3)   // Remove at 3
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4888,12 +4891,13 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Send a batch with operations in different sections
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.ReplaceItem(0, 0), // Section 0, Item 0 -> flattened 0
             VirtualScrollChangeFactory.ReplaceItem(1, 1), // Section 1, Item 1 -> flattened 3
             VirtualScrollChangeFactory.ReplaceItem(2, 0)  // Section 2, Item 0 -> flattened 4
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -4926,22 +4930,21 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Send a batch with a Reset in the middle
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
-            VirtualScrollChangeFactory.InsertItem(0, 0),
-            VirtualScrollChangeFactory.Reset(),
-            VirtualScrollChangeFactory.InsertItem(0, 1) // This should still be processed after reset
-        });
+        var changeSet = new VirtualScrollChangeSet(
+            [
+                VirtualScrollChangeFactory.InsertItem(0, 0),
+                VirtualScrollChangeFactory.Reset(),
+                VirtualScrollChangeFactory.InsertItem(0, 1) // This should still be processed after reset
+            ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert - All changes should be converted
         receivedChangeSet.Should().NotBeNull();
-        receivedChangeSet!.Changes.Should().HaveCount(3);
+        receivedChangeSet!.Changes.Should().HaveCount(1);
         
         var changes = receivedChangeSet.Changes.ToList();
-        changes[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.InsertItem);
-        changes[1].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.Reset);
-        changes[2].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.InsertItem);
+        changes[0].Operation.Should().Be(VirtualScrollFlattenedChangeOperation.Reset);
     }
 
     [Fact]
@@ -4973,11 +4976,12 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Simulate: insert a section, then replace another section
         sectionCount = 3;
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.InsertSection(2),   // Insert section at end
             VirtualScrollChangeFactory.ReplaceSection(0)   // Replace first section
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -5009,12 +5013,13 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Send a batch with range operations
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.InsertItemRange(0, 0, 2),   // Insert 3 items at start
             VirtualScrollChangeFactory.ReplaceItemRange(0, 5, 7),  // Replace items 5-7
             VirtualScrollChangeFactory.RemoveItemRange(0, 8, 9)    // Remove items 8-9
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -5059,11 +5064,12 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
 
         // Act - Batch with operations in both sections
-        var changeSet = new VirtualScrollChangeSet(new[]
-        {
+        var changeSet = new VirtualScrollChangeSet(
+        [
             VirtualScrollChangeFactory.ReplaceItem(0, 0), // Section 0, Item 0 -> flattened 2
             VirtualScrollChangeFactory.ReplaceItem(1, 1)  // Section 1, Item 1 -> flattened 6
-        });
+        ]
+        );
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -5097,7 +5103,7 @@ public class VirtualScrollFlattenedAdapterTests
         flattenedAdapter.Subscribe(_ => callCount++);
 
         // Act - Send an empty batch
-        var changeSet = new VirtualScrollChangeSet(Array.Empty<VirtualScrollChange>());
+        var changeSet = new VirtualScrollChangeSet([]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should not notify subscribers for empty changeset
@@ -5146,7 +5152,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // First RemoveItem - section 1 still exists, should work normally
         itemCounts[1] = 3; // Section 1 now has 3 items
-        var changeSet1 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+        var changeSet1 = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
         adapterCallback?.Invoke(changeSet1);
 
         // Verify first removal produced valid index (flattened index 3 for section 1, item 0)
@@ -5170,7 +5176,7 @@ public class VirtualScrollFlattenedAdapterTests
         itemCounts[1] = 4;
 
         // Force rebuild offsets by sending a Reset
-        var resetChangeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.Reset() });
+        var resetChangeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.Reset()]);
         adapterCallback?.Invoke(resetChangeSet);
         receivedChangeSets.Clear();
 
@@ -5179,7 +5185,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Send RemoveItem for section 1 item 0 - the adapter no longer has section 1
         // but the cached offsets should still have it
-        var changeSet2 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+        var changeSet2 = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
         adapterCallback?.Invoke(changeSet2);
 
         // Assert - Should use cached offsets and produce valid index, or skip if cache was invalidated
@@ -5235,7 +5241,7 @@ public class VirtualScrollFlattenedAdapterTests
         for (var i = 0; i < 5; i++)
         {
             itemCounts[1]--; // Decrease item count
-            var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
             adapterCallback?.Invoke(changeSet);
         }
 
@@ -5284,7 +5290,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Remove items 0-2 from section 1 (items at flattened indices 2, 3, 4)
         itemCounts[1] = 2; // 3 items removed
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItemRange(1, 0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItemRange(1, 0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -5320,7 +5326,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Section 1 removed, then ReplaceItem notification arrives
         sectionCount = 1;
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.ReplaceItem(1, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceItem(1, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert - Should either skip or not produce -1 indices
@@ -5360,7 +5366,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Section 1 removed before notification
         sectionCount = 1;
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RefreshItem(1, 0) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RefreshItem(1, 0)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -5400,7 +5406,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Act - Section 1 removed before notification
         sectionCount = 1;
-        var changeSet = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.MoveItem(1, 0, 2) });
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.MoveItem(1, 0, 2)]);
         adapterCallback?.Invoke(changeSet);
 
         // Assert
@@ -5456,29 +5462,29 @@ public class VirtualScrollFlattenedAdapterTests
         for (var i = 0; i < 3; i++)
         {
             itemCounts[1]--;
-            var removeItemChange = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            var removeItemChange = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
             adapterCallback?.Invoke(removeItemChange);
         }
 
         // 2. Remove section 1 (now empty)
         sectionCount = 1;
-        var removeSectionChange = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        var removeSectionChange = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(1)]);
         adapterCallback?.Invoke(removeSectionChange);
 
         // 3. Remove items from section 0
         itemCounts[0] = 1;
-        var removeFromSection0 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 0) });
+        var removeFromSection0 = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 0)]);
         adapterCallback?.Invoke(removeFromSection0);
 
         // 4. Remove section 0
         sectionCount = 0;
-        var removeSection0 = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+        var removeSection0 = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
         adapterCallback?.Invoke(removeSection0);
 
         // 5. Insert new section 0 with 2 items
         sectionCount = 1;
-        itemCounts = new[] { 2 };
-        var insertSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(0) });
+        itemCounts = [2];
+        var insertSection = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(0)]);
         adapterCallback?.Invoke(insertSection);
 
         // Record changes so far
@@ -5487,7 +5493,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // 6. Remove item from the NEW section 0
         itemCounts[0] = 1;
-        var removeFromNewSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 0) });
+        var removeFromNewSection = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 0)]);
         adapterCallback?.Invoke(removeFromNewSection);
 
         // Assert - The remove should produce a valid index for the NEW section, not a stale cached one
@@ -5539,7 +5545,7 @@ public class VirtualScrollFlattenedAdapterTests
         for (var i = 0; i < 8; i++)
         {
             itemCounts[1]--;
-            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            var removeItem = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
             adapterCallback?.Invoke(removeItem);
         }
 
@@ -5555,7 +5561,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Now remove section 1 (empty, just header remains)
         sectionCount = 1;
-        var removeSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        var removeSection = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(1)]);
         adapterCallback?.Invoke(removeSection);
 
         // Section removal should remove just the header (1 item)
@@ -5568,7 +5574,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Now a STALE RemoveItem arrives for section 1 (which no longer exists)
         // This should be SKIPPED, not produce -1 or operate on wrong section
-        var staleRemove = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+        var staleRemove = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
         adapterCallback?.Invoke(staleRemove);
 
         // Assert - Should be skipped (no changes emitted)
@@ -5617,7 +5623,7 @@ public class VirtualScrollFlattenedAdapterTests
         for (var i = 0; i < 3; i++)
         {
             itemCounts[1]--; // Items already removed in underlying adapter
-            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            var removeItem = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
             adapterCallback?.Invoke(removeItem);
         }
 
@@ -5673,7 +5679,7 @@ public class VirtualScrollFlattenedAdapterTests
         for (var i = 0; i < 8; i++)
         {
             itemCounts[1]--;
-            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            var removeItem = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
             adapterCallback?.Invoke(removeItem);
         }
 
@@ -5688,7 +5694,7 @@ public class VirtualScrollFlattenedAdapterTests
 
         // Now section 1 is empty. Remove the section.
         sectionCount = 1;
-        var removeSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(1) });
+        var removeSection = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(1)]);
         adapterCallback?.Invoke(removeSection);
 
         // Assert - Should either skip (empty section) or produce VALID range
@@ -5747,7 +5753,7 @@ public class VirtualScrollFlattenedAdapterTests
         for (var i = 0; i < 3; i++)
         {
             itemCounts[1]--;
-            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(1, 0) });
+            var removeItem = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(1, 0)]);
             adapterCallback?.Invoke(removeItem);
         }
 
@@ -5800,8 +5806,8 @@ public class VirtualScrollFlattenedAdapterTests
 
             // Insert section 0 with 2 items
             sectionCount = 1;
-            itemCounts = new List<int> { 2 };
-            var insertSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.InsertSection(0) });
+            itemCounts = [2];
+            var insertSection = new VirtualScrollChangeSet([VirtualScrollChangeFactory.InsertSection(0)]);
             adapterCallback?.Invoke(insertSection);
 
             // Verify insert produced valid indices
@@ -5814,7 +5820,7 @@ public class VirtualScrollFlattenedAdapterTests
 
             // Remove item
             itemCounts[0] = 1;
-            var removeItem = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveItem(0, 0) });
+            var removeItem = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveItem(0, 0)]);
             adapterCallback?.Invoke(removeItem);
 
             // Verify remove produced valid index
@@ -5827,7 +5833,7 @@ public class VirtualScrollFlattenedAdapterTests
             // Remove section
             sectionCount = 0;
             itemCounts.Clear();
-            var removeSection = new VirtualScrollChangeSet(new[] { VirtualScrollChangeFactory.RemoveSection(0) });
+            var removeSection = new VirtualScrollChangeSet([VirtualScrollChangeFactory.RemoveSection(0)]);
             adapterCallback?.Invoke(removeSection);
 
             // Verify section remove produced valid indices
