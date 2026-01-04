@@ -1,14 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
     <Product>Nalu.Maui.VirtualScroll</Product>
-    <Description>High-performance virtualized scrolling for .NET MAUI. Non-commercial use only - contact author for commercial licensing.</Description>
+    <Description>
+      High-performance virtualized scrolling for .NET MAUI.
+      Free for non-commercial use (MIT License).
+      Commercial use requires an active GitHub Sponsors subscription (https://github.com/sponsors/albyrock87); no services or support are included.
+      By installing this package, you agree to the terms outlined in the LICENSE.md.
+    </Description>
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <!-- Override license for this project - Non-Commercial License -->
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <!-- Override license for this project - Dual License MIT and Sponsor License -->
     <PackageLicenseExpression></PackageLicenseExpression>
-    <PackageLicenseFile>LICENSE-VirtualScroll.md</PackageLicenseFile>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">
@@ -67,6 +72,6 @@
   </ItemGroup>
 
   <ItemGroup Label="Files">
-    <None Include="LICENSE-VirtualScroll.md" Pack="true" PackagePath="\" />
+    <None Include="LICENSE.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
