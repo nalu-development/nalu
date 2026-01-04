@@ -138,7 +138,7 @@ A **high-performance** virtualized scrolling view designed to replace the tradit
 - Header, footer, and section templates
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Items}">
+<nalu:VirtualScroll ItemsSource="{Binding Items}">
     <nalu:VirtualScroll.ItemTemplate>
         <DataTemplate x:DataType="models:MyItem">
             <nalu:ViewBox>

@@ -166,7 +166,10 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         set => SetValue(ItemsSourceProperty, value);
     }
 
-    IVirtualScrollAdapter? IVirtualScroll.Adapter => _adapter;
+    /// <summary>
+    /// Gets the <see cref="ItemsSource"/> underlying adapter that provides data to the virtual scroll.
+    /// </summary>
+    public IVirtualScrollAdapter? Adapter => _adapter;
 
     /// <summary>
     /// Gets or sets the layout for the virtual scroll.

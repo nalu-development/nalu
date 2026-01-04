@@ -42,7 +42,7 @@ The `ScrollToPosition` options are:
 Bind a command that executes whenever the scroll position changes:
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Items}"
+<nalu:VirtualScroll ItemsSource="{Binding Items}"
                     ScrolledCommand="{Binding ScrollCommand}">
     ...
 </nalu:VirtualScroll>
@@ -181,7 +181,7 @@ private void SelectAllVisibleItems()
     }
     
     var r = range.Value;
-    var adapter = VirtualScroll.Adapter as IVirtualScrollAdapter;
+    var adapter = VirtualScroll.Adapter;
     if (adapter is null)
     {
         return;

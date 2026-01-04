@@ -30,7 +30,7 @@ builder
 The simplest way to use `VirtualScroll` is to bind it to an `ObservableCollection<T>`:
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Items}">
+<nalu:VirtualScroll ItemsSource="{Binding Items}">
     <nalu:VirtualScroll.ItemTemplate>
         <DataTemplate x:DataType="models:MyItem">
             <nalu:ViewBox>
@@ -41,7 +41,7 @@ The simplest way to use `VirtualScroll` is to bind it to an `ObservableCollectio
 </nalu:VirtualScroll>
 ```
 
-The `Adapter` property accepts:
+The `ItemsSource` property accepts:
 - **`ObservableCollection<T>`**: Automatically wrapped with full change notification support (add, remove, move, replace, reset)
 - **`IEnumerable`**: Static lists are supported but won't react to changes
 - **`IVirtualScrollAdapter`**: Custom adapters for advanced scenarios like sectioned data
@@ -138,7 +138,7 @@ The template used to display each item in the collection:
 Display content at the very beginning and end of the scroll view:
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Items}">
+<nalu:VirtualScroll ItemsSource="{Binding Items}">
     <nalu:VirtualScroll.HeaderTemplate>
         <DataTemplate x:DataType="pageModels:MyPageModel">
             <VerticalStackLayout>
@@ -196,11 +196,25 @@ The `ItemsLayout` property controls how items are arranged. Currently, `VirtualS
 
 ```xml
 <!-- Vertical scrolling (default) -->
-<nalu:VirtualScroll ItemsLayout="{x:Static nalu:LinearVirtualScrollLayout.Vertical}" ... />
+<nalu:VirtualScroll ItemsLayout="{nalu:VerticalVirtualScrollLayout}" ... />
 
 <!-- Horizontal scrolling -->
-<nalu:VirtualScroll ItemsLayout="{x:Static nalu:LinearVirtualScrollLayout.Horizontal}" ... />
+<nalu:VirtualScroll ItemsLayout="{nalu:HorizontalVirtualScrollLayout}" ... />
 ```
+
+You can also configure estimated sizes for better performance on iOS:
+
+```xml
+<!-- Vertical layout with custom estimated sizes -->
+<nalu:VirtualScroll ItemsLayout="{nalu:VerticalVirtualScrollLayout EstimatedItemSize=72, EstimatedSectionHeaderSize=57}" ... />
+```
+
+The estimated size properties help reduce layout calculations on iOS, especially while `UICollectionView` estimates the total content size:
+- `EstimatedItemSize`: Estimated size of each item (default: 64)
+- `EstimatedHeaderSize`: Estimated size of the global header (default: 64)
+- `EstimatedFooterSize`: Estimated size of the global footer (default: 64)
+- `EstimatedSectionHeaderSize`: Estimated size of section headers (default: 64)
+- `EstimatedSectionFooterSize`: Estimated size of section footers (default: 64)
 
 ### Scroll To Item
 
@@ -219,7 +233,7 @@ Get the range of currently visible items (including headers and footers). See [S
 Enable pull-to-refresh functionality with the following properties:
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Items}"
+<nalu:VirtualScroll ItemsSource="{Binding Items}"
                     IsRefreshEnabled="True"
                     RefreshCommand="{Binding RefreshCommand}"
                     RefreshAccentColor="CornflowerBlue"
@@ -274,15 +288,15 @@ virtualScroll.OnRefresh += async (sender, args) =>
 
 ```xml
 <!-- Vertical scrolling with fading edge -->
-<nalu:VirtualScroll Adapter="{Binding Items}"
-                    ItemsLayout="{x:Static nalu:LinearVirtualScrollLayout.Vertical}"
+<nalu:VirtualScroll ItemsSource="{Binding Items}"
+                    ItemsLayout="{nalu:VerticalVirtualScrollLayout}"
                     FadingEdgeLength="16">
     ...
 </nalu:VirtualScroll>
 
 <!-- Horizontal scrolling with fading edge -->
-<nalu:VirtualScroll Adapter="{Binding Items}"
-                    ItemsLayout="{x:Static nalu:LinearVirtualScrollLayout.Horizontal}"
+<nalu:VirtualScroll ItemsSource="{Binding Items}"
+                    ItemsLayout="{nalu:HorizontalVirtualScrollLayout}"
                     FadingEdgeLength="24">
     ...
 </nalu:VirtualScroll>
@@ -358,7 +372,7 @@ Here's a complete example demonstrating `VirtualScroll` with header, footer, dyn
         <!-- VirtualScroll -->
         <nalu:VirtualScroll Grid.Row="1"
                             x:Name="VirtualScroll"
-                            Adapter="{Binding Items}"
+                            ItemsSource="{Binding Items}"
                             IsRefreshEnabled="True"
                             RefreshCommand="{Binding RefreshCommand}">
 

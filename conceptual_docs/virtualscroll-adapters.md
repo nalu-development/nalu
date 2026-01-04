@@ -58,7 +58,7 @@ This adapter:
 **XAML usage:**
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Adapter}">
+<nalu:VirtualScroll ItemsSource="{Binding Adapter}">
     <nalu:VirtualScroll.SectionHeaderTemplate>
         <DataTemplate x:DataType="models:CategoryGroup">
             <Label Text="{Binding Name}" FontAttributes="Bold" />
@@ -292,7 +292,7 @@ public class SQLiteSectionedAdapter : IVirtualScrollAdapter
 **XAML usage with section templates:**
 
 ```xml
-<nalu:VirtualScroll Adapter="{Binding Adapter}">
+<nalu:VirtualScroll ItemsSource="{Binding Adapter}">
     <nalu:VirtualScroll.SectionHeaderTemplate>
         <DataTemplate x:DataType="models:GroupInfo">
             <Label Text="{Binding GroupName}"
