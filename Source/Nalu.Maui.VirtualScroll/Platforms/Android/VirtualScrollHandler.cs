@@ -47,10 +47,10 @@ public partial class VirtualScrollHandler
         _swipeRefreshLayout.SetOnRefreshListener(new SwipeRefreshListener(() =>
         {
             // User pulled to refresh - sync platform state to IsRefreshing first
-            if (VirtualView is { } virtualScroll && _swipeRefreshLayout is not null)
+            if (VirtualView is VirtualScroll virtualScroll && _swipeRefreshLayout is not null)
             {
                 _isUpdatingIsRefreshingFromPlatform = true;
-                virtualScroll.IsRefreshing = _swipeRefreshLayout.Refreshing;
+                virtualScroll.SetValueFromRenderer(VirtualScroll.IsRefreshingProperty, _swipeRefreshLayout.Refreshing);
                 _isUpdatingIsRefreshingFromPlatform = false;
             }
             

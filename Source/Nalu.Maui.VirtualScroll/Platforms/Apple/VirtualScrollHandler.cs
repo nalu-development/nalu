@@ -449,7 +449,7 @@ public partial class VirtualScrollHandler
             handler._isUpdatingIsRefreshingFromPlatform = true;
             if (virtualScroll is VirtualScroll vs)
             {
-                vs.IsRefreshing = handler._refreshControl.Refreshing;
+                vs.SetValueFromRenderer(VirtualScroll.IsRefreshingProperty, handler._refreshControl.Refreshing);
             }
             handler._isUpdatingIsRefreshingFromPlatform = false;
         }
