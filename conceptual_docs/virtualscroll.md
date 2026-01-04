@@ -4,11 +4,11 @@ A high-performance virtualized scrolling view designed to replace the traditiona
 
 `VirtualScroll` provides a more efficient implementation tailored specifically for Android and iOS platforms, offering smooth scrolling, dynamic item sizing, and proper support for observable collections.
 
-> VirtualScroll is the result of significant platform-level work and performance learnings—including **over a year of hands-on experience** gained by contributing improvements to **.NET MAUI core** as a community contributor.
+> VirtualScroll is the result of over a year of platform-level engineering and performance optimizations derived from my experience contributing core improvements to **.NET MAUI**.
 >
-> **Note:** This package uses a **Non-Commercial License**. Please refer to the [LICENSE-VirtualScroll.md](https://github.com/nalu-development/nalu/blob/main/Source/Nalu.Maui.VirtualScroll/LICENSE-VirtualScroll.md) for details.
->
-> I'm evaluating whether to relicense VirtualScroll under **MIT (including commercial use)** in the future, based on the level of **community support and donations**.
+> **Licensing:** This package is available under a **Dual License**. It is free for non-commercial use (MIT), while commercial use requires an active **[GitHub Sponsors subscription](https://github.com/sponsors/albyrock87)**. This model allows me to continue maintaining and improving high-performance components for the MAUI ecosystem. 
+> 
+> Please refer to the [LICENSE.md](https://github.com/albyrock87/nalu/blob/main/Source/Nalu.Maui.VirtualScroll/LICENSE.md) for full terms.
 
 If this library is valuable to your work, consider supporting its continued development and maintenance ❤️
 

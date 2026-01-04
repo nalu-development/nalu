@@ -23,8 +23,10 @@ If `Nalu.Maui` is valuable to your work, consider supporting its continued devel
 *   **Controls** [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
     *   Includes useful cross-platform controls like `InteractableCanvasView` (a `SKCanvasView` with enhanced touch support) and `DurationWheel` (a `TimeSpan?` editor).
 *   **VirtualScroll** [![Nalu.Maui.VirtualScroll NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.VirtualScroll.svg)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.VirtualScroll)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/)
-    *   A high-performance virtualized scrolling view designed as an alternative to the .NET MAUI `CollectionView`. Optimized for Android (`RecyclerView`) and iOS (`UICollectionView`), with full `ObservableCollection<T>` support, dynamic item sizing, pull-to-refresh, and section templates.
-    *   ⚠️ **Non-Commercial License**: VirtualScroll is **free for non-commercial use only** (personal projects, education, non-commercial open source). **Commercial use is strictly prohibited** without prior authorization. If you wish to use VirtualScroll in a commercial context, please [reach out to me](https://github.com/albyrock87) to discuss your situation.
-    *   VirtualScroll is the result of significant platform-level work and performance learnings—including **over a year of hands-on experience** gained by contributing improvements to **.NET MAUI core** as a community contributor. I'm evaluating whether to move it to **MIT (including commercial use)** in the future based on the level of **community support and donations**.
+    * A high-performance alternative to the .NET MAUI `CollectionView`, leveraging native `RecyclerView` (Android) and `UICollectionView` (iOS). Supports dynamic sizing, `ObservableCollection<T>`, pull-to-refresh, and section templates.
+    * ⚖️ **Dual Licensed**: 
+        * **Non-Commercial:** Free under the MIT License (personal, educational, or non-commercial open-source use).
+        * **Commercial:** Requires an active [GitHub Sponsors subscription](https://github.com/sponsors/albyrock87).
+    * By installing this package, you agree to the terms in the `LICENSE.md`. Commercial use includes for-profit entities, internal tools, and contract work.
 
 We encourage you to explore the [full documentation](https://nalu-development.github.io/nalu/) for detailed information on how to integrate and utilize these features in your projects.
