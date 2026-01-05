@@ -31,6 +31,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         {
             var virtualScroll = (VirtualScroll)bindable;
             virtualScroll._adapter = CoerceAdapter(value);
+            virtualScroll.Handler?.UpdateValue(nameof(Adapter));
         }
     );
 
