@@ -197,7 +197,9 @@ public class HorizontalWrapLayoutManager : LayoutManager
             var widthWithSpacing = isFirstInRow ? desiredWidth : desiredWidth + horizontalSpacing;
 
             // Check if we need to wrap to the next line
-            if (canWrap && !isFirstInRow && currentRow.TotalWidth + widthWithSpacing > availableWidth)
+            // Note: we use a small epsilon to avoid floating-point precision issues across platforms
+            const double epsilon = 0.001;
+            if (canWrap && !isFirstInRow && currentRow.TotalWidth + widthWithSpacing > availableWidth + epsilon)
             {
                 // Finalize current row and start new one
                 rows.Add(currentRow);

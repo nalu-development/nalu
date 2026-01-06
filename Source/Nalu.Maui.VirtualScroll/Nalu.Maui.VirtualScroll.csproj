@@ -42,7 +42,7 @@
       <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="Microsoft.Maui.Controls.XmlnsDefinition">
-      <_Parameter1>https://nalu-development.github.com/nalu/layouts</_Parameter1>
+      <_Parameter1>https://nalu-development.github.com/nalu/virtualscroll</_Parameter1>
       <_Parameter2>$(RootNamespace)</_Parameter2>
     </AssemblyAttribute>
   </ItemGroup>

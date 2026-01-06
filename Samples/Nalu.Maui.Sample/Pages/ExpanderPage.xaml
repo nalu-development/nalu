@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              x:Class="Nalu.Maui.Sample.Pages.ExpanderPage"
              x:DataType="pageModels:ExpanderPageModel"
              Title="Expander VirtualScroll">
@@ -27,12 +28,12 @@
                         Command="{Binding RemoveItemCommand}" />
             </Grid>
 
-            <nalu:VirtualScroll Grid.Row="1"
+            <vs:VirtualScroll Grid.Row="1"
                                 x:Name="VirtualScroll"
                                 ItemsSource="{Binding Items}"
                                 FadingEdgeLength="32"
                                 Background="LightBlue">
-                <nalu:VirtualScroll.HeaderTemplate>
+                <vs:VirtualScroll.HeaderTemplate>
                     <DataTemplate x:DataType="pageModels:ExpanderPageModel">
                         <VerticalStackLayout Padding="16">
                             <Image Source="banner.png"
@@ -52,9 +53,9 @@
                                    Margin="0,8,0,0" />
                         </VerticalStackLayout>
                     </DataTemplate>
-                </nalu:VirtualScroll.HeaderTemplate>
+                </vs:VirtualScroll.HeaderTemplate>
 
-                <nalu:VirtualScroll.FooterTemplate>
+                <vs:VirtualScroll.FooterTemplate>
                     <DataTemplate x:DataType="pageModels:ExpanderPageModel">
                         <VerticalStackLayout Padding="16,24" Background="LightBlue">
                             <Label Text="{Binding InstanceCount, StringFormat='Page Instance: {0}'}"
@@ -66,9 +67,9 @@
                                    TextColor="DarkGray" />
                         </VerticalStackLayout>
                     </DataTemplate>
-                </nalu:VirtualScroll.FooterTemplate>
+                </vs:VirtualScroll.FooterTemplate>
 
-                <nalu:VirtualScroll.ItemTemplate>
+                <vs:VirtualScroll.ItemTemplate>
                     <DataTemplate x:DataType="pageModels:ExpanderItem">
                         <nalu:ViewBox Padding="16,8">
                             <Border StrokeShape="RoundRectangle 12"
@@ -93,8 +94,8 @@
                             </Border>
                         </nalu:ViewBox>
                     </DataTemplate>
-                </nalu:VirtualScroll.ItemTemplate>
-            </nalu:VirtualScroll>
+                </vs:VirtualScroll.ItemTemplate>
+            </vs:VirtualScroll>
         </Grid>
     </ContentPage.Content>
 </ContentPage>

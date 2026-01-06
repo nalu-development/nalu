@@ -3,8 +3,9 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
-             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              xmlns:maui="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              x:Class="Nalu.Maui.Sample.Pages.TwelvePage"
              x:DataType="pageModels:TwelvePageModel"
              Title="Credit Cards Comparison">
@@ -162,10 +163,10 @@
                 </nalu:ToggleTemplate.WhenTrue>
                 <nalu:ToggleTemplate.WhenFalse>
                     <DataTemplate x:DataType="pageModels:TwelvePageModel">
-                        <nalu:VirtualScroll ItemsSource="{Binding Adapter}"
-                                            ItemsLayout="{nalu:VerticalVirtualScrollLayout EstimatedItemSize=72, EstimatedSectionHeaderSize=57}">
+                        <vs:VirtualScroll ItemsSource="{Binding Adapter}"
+                                            ItemsLayout="{vs:VerticalVirtualScrollLayout EstimatedItemSize=72, EstimatedSectionHeaderSize=57}">
                             <!-- Section Header Template -->
-                            <nalu:VirtualScroll.SectionHeaderTemplate>
+                            <vs:VirtualScroll.SectionHeaderTemplate>
                                 <DataTemplate x:DataType="pageModels:TwelveGroup">
                                     <nalu:ViewBox>
                                         <Grid BackgroundColor="#4A90E2"
@@ -179,10 +180,10 @@
                                         </Grid>
                                     </nalu:ViewBox>
                                 </DataTemplate>
-                            </nalu:VirtualScroll.SectionHeaderTemplate>
+                            </vs:VirtualScroll.SectionHeaderTemplate>
 
                             <!-- Item Template -->
-                            <nalu:VirtualScroll.ItemTemplate>
+                            <vs:VirtualScroll.ItemTemplate>
                                 <DataTemplate x:DataType="pageModels:TwelveCreditCard">
                                     <nalu:ViewBox>
                                         <Border Margin="8"
@@ -239,8 +240,8 @@
                                         </Border>
                                     </nalu:ViewBox>
                                 </DataTemplate>
-                            </nalu:VirtualScroll.ItemTemplate>
-                        </nalu:VirtualScroll>
+                            </vs:VirtualScroll.ItemTemplate>
+                        </vs:VirtualScroll>
                     </DataTemplate>
                 </nalu:ToggleTemplate.WhenFalse>
             </nalu:ToggleTemplate>

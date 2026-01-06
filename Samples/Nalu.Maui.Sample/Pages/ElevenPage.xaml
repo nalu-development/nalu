@@ -3,6 +3,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.ElevenPage"
              x:DataType="pageModels:ElevenPageModel"
@@ -54,7 +55,7 @@
             </VerticalStackLayout>
 
             <!-- Grouped VirtualScroll -->
-            <nalu:VirtualScroll Grid.Row="1"
+            <vs:VirtualScroll Grid.Row="1"
                                 FadingEdgeLength="32"
                                 Background="LightGoldenrodYellow"
                                 x:Name="VirtualScroll"
@@ -62,7 +63,7 @@
                                 OnScrolled="VirtualScroll_OnScrolled">
 
                 <!-- Global Header -->
-                <nalu:VirtualScroll.HeaderTemplate>
+                <vs:VirtualScroll.HeaderTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenPageModel">
                         <VerticalStackLayout Padding="16">
                             <Image Source="banner.png"
@@ -82,10 +83,10 @@
                                    Margin="0,8,0,0" />
                         </VerticalStackLayout>
                     </DataTemplate>
-                </nalu:VirtualScroll.HeaderTemplate>
+                </vs:VirtualScroll.HeaderTemplate>
 
                 <!-- Global Footer -->
-                <nalu:VirtualScroll.FooterTemplate>
+                <vs:VirtualScroll.FooterTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenPageModel">
                         <VerticalStackLayout Padding="16,24" Background="LightGoldenrodYellow">
                             <Label Text="{Binding InstanceCount, StringFormat='Page Instance: {0}'}"
@@ -97,10 +98,10 @@
                                    TextColor="DarkGray" />
                         </VerticalStackLayout>
                     </DataTemplate>
-                </nalu:VirtualScroll.FooterTemplate>
+                </vs:VirtualScroll.FooterTemplate>
 
                 <!-- Section Header Template -->
-                <nalu:VirtualScroll.SectionHeaderTemplate>
+                <vs:VirtualScroll.SectionHeaderTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenGroup">
                         <Grid BackgroundColor="#FF6B6B"
                               Padding="16,12">
@@ -111,10 +112,10 @@
                                    VerticalOptions="Center" />
                         </Grid>
                     </DataTemplate>
-                </nalu:VirtualScroll.SectionHeaderTemplate>
+                </vs:VirtualScroll.SectionHeaderTemplate>
 
                 <!-- Section Footer Template -->
-                <nalu:VirtualScroll.SectionFooterTemplate>
+                <vs:VirtualScroll.SectionFooterTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenGroup">
                         <nalu:ViewBox>
                             <Grid BackgroundColor="#FFE5E5"
@@ -126,10 +127,10 @@
                             </Grid>
                         </nalu:ViewBox>
                     </DataTemplate>
-                </nalu:VirtualScroll.SectionFooterTemplate>
+                </vs:VirtualScroll.SectionFooterTemplate>
 
                 <!-- Item Template -->
-                <nalu:VirtualScroll.ItemTemplate>
+                <vs:VirtualScroll.ItemTemplate>
                     <DataTemplate x:DataType="pageModels:ElevenItem">
                         <nalu:ViewBox BackgroundColor="White">
                             <Border Shadow="{Shadow Radius=4, Opacity=0.15, Offset='1,1'}"
@@ -146,9 +147,9 @@
                             </Border>
                         </nalu:ViewBox>
                     </DataTemplate>
-                </nalu:VirtualScroll.ItemTemplate>
+                </vs:VirtualScroll.ItemTemplate>
 
-            </nalu:VirtualScroll>
+            </vs:VirtualScroll>
         </Grid>
     </ContentPage.Content>
 </ContentPage>
