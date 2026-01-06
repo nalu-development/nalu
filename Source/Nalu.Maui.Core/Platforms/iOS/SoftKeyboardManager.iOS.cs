@@ -23,6 +23,7 @@ namespace Nalu;
 [SuppressMessage("Style", "IDE0022:Use expression body for method")]
 public static partial class SoftKeyboardManager
 {
+    // private static bool _textViewScrollable;
     private static Action? _windowBackgroundColorReset;
     private static CGRect _textViewBounds;
     private static nfloat _lastPan;
@@ -129,7 +130,7 @@ public static partial class SoftKeyboardManager
             if (targetHeight != 0)
             {
                 var window = pageView.Window ?? GetApplicationWindow() ?? throw new InvalidOperationException("Could not find application window.");
-
+#pragma warning disable CA1416 // Dereference of a possibly null reference.
                 if ((OperatingSystem.IsIOSVersionAtLeast(13) || OperatingSystem.IsMacCatalystVersionAtLeast(13)) && window.WindowScene is { } windowScene)
                 {
                     // Account for split-over
@@ -196,12 +197,12 @@ public static partial class SoftKeyboardManager
                 _animationDuration,
                 () =>
                 {
+                    State.IsVisible = _shown;
                     _rootView?.Transform = transform;
                     ApplicationWindow.LayoutIfNeeded();
                 }
             );
         }
-
     }
 
     private static void DidUITextBeginEditing(NSNotification notification)
@@ -210,13 +211,23 @@ public static partial class SoftKeyboardManager
         _textView = notification.Object as UIView ?? throw new InvalidOperationException("Notification object is not a UIView.");
         _textViewBounds = _textView.Bounds;
 
+        // if (_textView is UIScrollView scrollableTextView)
+        // {
+        //     _textViewScrollable = scrollableTextView.ScrollEnabled;
+        //     if (_textView.FindPlatformResponder<UIScrollView>() is not null)
+        //     {
+        //         scrollableTextView.ScrollEnabled = false;
+        //     }
+        // }
+
         if (!_textViewBoundsWatcher)
         {
             _textViewBoundsWatcherTimer!.Resume();
             _textViewBoundsWatcher = true;
         }
 
-        var pageViewController = _textView.GetContainerPlatformViewController() ?? throw new InvalidOperationException("Could not find container view controller.");
+        // If we cannot find a page view controller, we just fake one to avoid forks in the code
+        var pageViewController = _textView.GetContainerPlatformViewController() ?? new UIViewController();
         if (_pageViewController is not null && !ReferenceEquals(_pageViewController, pageViewController))
         {
             // Reset previous page controller insets
@@ -272,6 +283,11 @@ public static partial class SoftKeyboardManager
     private static void DidUITextViewEndEditing(NSNotification notification)
     {
         DumpNotification(notification);
+        
+        // if (_textView is UIScrollView scrollableTextView)
+        // {
+        //     scrollableTextView.ScrollEnabled = _textViewScrollable;
+        // }
 
         if (_textViewBoundsWatcher)
         {
@@ -297,7 +313,6 @@ public static partial class SoftKeyboardManager
     {
         DumpNotification(notification);
         _shown = true;
-        State.IsVisible = true;
 
         if (notification.UserInfo is { } userInfo)
         {
@@ -309,7 +324,6 @@ public static partial class SoftKeyboardManager
     {
         DumpNotification(notification);
         _shown = false;
-        State.IsVisible = false;
         
         if (notification.UserInfo is { } userInfo)
         {
@@ -396,21 +410,6 @@ public static partial class SoftKeyboardManager
         var selectedTextRange = textInput?.SelectedTextRange;
 
         return selectedTextRange is not null ? textInput?.GetCaretRectForPosition(selectedTextRange.Start) : null;
-    }
-
-    private static UIScrollView? FindParentVerticalScroll(UIScrollView? view)
-    {
-        while (view is not null)
-        {
-            if (view.ScrollEnabled && view.Frame.Height < view.ContentSize.Height + view.AdjustedContentInset.Bottom + view.AdjustedContentInset.Top)
-            {
-                return view;
-            }
-
-            view = view.FindPlatformResponder<UIScrollView>();
-        }
-
-        return null;
     }
 
     private static CGRect? FindCursorPosition()
