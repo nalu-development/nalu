@@ -24,6 +24,7 @@ namespace Nalu;
 public static partial class SoftKeyboardManager
 {
     // private static bool _textViewScrollable;
+    private static readonly UIViewController _fakeViewController = new();
     private static Action? _windowBackgroundColorReset;
     private static CGRect _textViewBounds;
     private static nfloat _lastPan;
@@ -227,7 +228,7 @@ public static partial class SoftKeyboardManager
         }
 
         // If we cannot find a page view controller, we just fake one to avoid forks in the code
-        var pageViewController = _textView.GetContainerPlatformViewController() ?? new UIViewController();
+        var pageViewController = _textView.GetContainerPlatformViewController() ?? _fakeViewController;
         if (_pageViewController is not null && !ReferenceEquals(_pageViewController, pageViewController))
         {
             // Reset previous page controller insets
