@@ -5842,5 +5842,977 @@ public class VirtualScrollFlattenedAdapterTests
             allChanges[0].StartItemIndex.Should().BeGreaterThan(-1);
         }
     }
+
+    // ─────────────────────────────
+    // Bug fix tests: ReplaceSection with different item counts
+    // ─────────────────────────────
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWhenNewSectionHasFewerItemsShouldEmitReplaceAndRemove()
+    {
+        // Arrange - Section with 70 items replaced by section with 1 item
+        // Expected: Replace 1 item (or none if no items in common), Remove 69 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 70 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 section with 70 items
+        flattenedAdapter.GetItemCount().Should().Be(70);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced, adapter now returns 1 item
+        itemsPerSection[0] = 1;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Replace for the 1 common item and Remove for the 69 excess items
+        allChanges.Should().HaveCount(2);
+
+        // First change should be replace for the common items
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(0); // Only 1 item to replace
+
+        // Second change should be remove for excess items
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(1); // Start after the replaced item
+        removeChange.EndItemIndex.Should().Be(69); // 69 items to remove (indices 1-69)
+
+        // Final count should be 1
+        flattenedAdapter.GetItemCount().Should().Be(1);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWhenNewSectionHasMoreItemsShouldEmitReplaceAndInsert()
+    {
+        // Arrange - Section with 1 item replaced by section with 70 items
+        // Expected: Replace 1 item, Insert 69 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 1 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 section with 1 item
+        flattenedAdapter.GetItemCount().Should().Be(1);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced, adapter now returns 70 items
+        itemsPerSection[0] = 70;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Replace for the 1 common item and Insert for the 69 new items
+        allChanges.Should().HaveCount(2);
+
+        // First change should be replace for the common items
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(0); // Only 1 item to replace
+
+        // Second change should be insert for new items
+        var insertChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.InsertItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.InsertItemRange);
+        insertChange.StartItemIndex.Should().Be(1); // Start after the replaced item
+        insertChange.EndItemIndex.Should().Be(69); // 69 items to insert (indices 1-69)
+
+        // Final count should be 70
+        flattenedAdapter.GetItemCount().Should().Be(70);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWhenNewSectionIsEmptyShouldEmitRemoveOnly()
+    {
+        // Arrange - Section with 5 items replaced by empty section
+        // Expected: Remove 5 items (no replace since no common items)
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 5 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 section with 5 items
+        flattenedAdapter.GetItemCount().Should().Be(5);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with empty section
+        itemsPerSection[0] = 0;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Remove for all 5 items
+        allChanges.Should().HaveCount(1);
+        var removeChange = allChanges[0];
+        removeChange.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(0);
+        removeChange.EndItemIndex.Should().Be(4); // 5 items to remove (indices 0-4)
+
+        // Final count should be 0
+        flattenedAdapter.GetItemCount().Should().Be(0);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWhenOldSectionWasEmptyShouldEmitInsertOnly()
+    {
+        // Arrange - Empty section replaced by section with 5 items
+        // Expected: Insert 5 items (no replace since old section was empty)
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 0 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 section with 0 items
+        flattenedAdapter.GetItemCount().Should().Be(0);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with 5 items
+        itemsPerSection[0] = 5;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Insert for all 5 items
+        allChanges.Should().HaveCount(1);
+        var insertChange = allChanges[0];
+        insertChange.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.InsertItemRange);
+        insertChange.StartItemIndex.Should().Be(0);
+        insertChange.EndItemIndex.Should().Be(4); // 5 items to insert (indices 0-4)
+
+        // Final count should be 5
+        flattenedAdapter.GetItemCount().Should().Be(5);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithSectionHeaderWhenItemCountChangesShouldAccountForHeader()
+    {
+        // Arrange - Section with header + 10 items replaced by section with header + 2 items
+        // Expected: Replace header + 2 items, Remove 8 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 10 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 header + 10 items = 11 flattened items
+        flattenedAdapter.GetItemCount().Should().Be(11);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with 2 items
+        itemsPerSection[0] = 2;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Replace for header + 2 items, Remove for 8 items
+        allChanges.Should().HaveCount(2);
+
+        // Replace for header + 2 items (indices 0-2)
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(2); // Header + 2 items
+
+        // Remove for 8 items (indices 3-10)
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(3);
+        removeChange.EndItemIndex.Should().Be(10);
+
+        // Final count: header + 2 items = 3
+        flattenedAdapter.GetItemCount().Should().Be(3);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithAllHeadersFootersWhenItemCountChangesShouldAccountForAll()
+    {
+        // Arrange - Section with globalHeader + sectionHeader + 10 items + sectionFooter + globalFooter
+        // Replaced by section with only 2 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 10 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasGlobalHeader: true, hasGlobalFooter: true, hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 globalHeader + 1 sectionHeader + 10 items + 1 sectionFooter + 1 globalFooter = 14
+        flattenedAdapter.GetItemCount().Should().Be(14);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with 2 items
+        itemsPerSection[0] = 2;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - The section portion changes from (sectionHeader + 10 + sectionFooter = 12) to (sectionHeader + 2 + sectionFooter = 4)
+        // Replace the common portion (4 items), Remove the excess (8 items)
+        allChanges.Should().HaveCount(2);
+
+        // Replace for sectionHeader + 2 items + sectionFooter (indices 1-4, after global header)
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(1); // After global header
+        replaceChange.EndItemIndex.Should().Be(4); // sectionHeader + 2 items + sectionFooter
+
+        // Remove for 8 excess items
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(5);
+        removeChange.EndItemIndex.Should().Be(12);
+
+        // Final count: 1 + 1 + 2 + 1 + 1 = 6
+        flattenedAdapter.GetItemCount().Should().Be(6);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionRangeWhenNewSectionsHaveFewerItemsShouldEmitReplaceAndRemove()
+    {
+        // Arrange - 2 sections with 30 items each replaced by 2 sections with 5 items each
+        // Old total: 60 items, New total: 10 items
+        // Expected: Replace 10 items, Remove 50 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 30, 30, 10 }; // 3 sections
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(3);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 30 + 30 + 10 = 70 items
+        flattenedAdapter.GetItemCount().Should().Be(70);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Sections 0 and 1 are replaced with 5 items each
+        itemsPerSection[0] = 5;
+        itemsPerSection[1] = 5;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Replace for 10 items, Remove for 50 items
+        allChanges.Should().HaveCount(2);
+
+        // Replace for 10 items (indices 0-9)
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(9); // 10 items
+
+        // Remove for 50 items (indices 10-59)
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(10);
+        removeChange.EndItemIndex.Should().Be(59);
+
+        // Final count: 5 + 5 + 10 = 20
+        flattenedAdapter.GetItemCount().Should().Be(20);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionRangeWhenNewSectionsHaveMoreItemsShouldEmitReplaceAndInsert()
+    {
+        // Arrange - 2 sections with 5 items each replaced by 2 sections with 30 items each
+        // Old total: 10 items, New total: 60 items
+        // Expected: Replace 10 items, Insert 50 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 5, 5, 10 }; // 3 sections
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(3);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 5 + 5 + 10 = 20 items
+        flattenedAdapter.GetItemCount().Should().Be(20);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Sections 0 and 1 are replaced with 30 items each
+        itemsPerSection[0] = 30;
+        itemsPerSection[1] = 30;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Replace for 10 items, Insert for 50 items
+        allChanges.Should().HaveCount(2);
+
+        // Replace for 10 items (indices 0-9)
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(9); // 10 items
+
+        // Insert for 50 items (indices 10-59)
+        var insertChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.InsertItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.InsertItemRange);
+        insertChange.StartItemIndex.Should().Be(10);
+        insertChange.EndItemIndex.Should().Be(59);
+
+        // Final count: 30 + 30 + 10 = 70
+        flattenedAdapter.GetItemCount().Should().Be(70);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionInMiddleWhenItemCountChangesShouldCalculateCorrectIndices()
+    {
+        // Arrange - 3 sections: [10, 20, 5], replace section 1 (20 items) with 3 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 10, 20, 5 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(3);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 10 + 20 + 5 = 35 items
+        flattenedAdapter.GetItemCount().Should().Be(35);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section 1 (at flattened index 10-29) is replaced with 3 items
+        itemsPerSection[1] = 3;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(1)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit Replace for 3 items (10-12), Remove for 17 items (13-29)
+        allChanges.Should().HaveCount(2);
+
+        // Replace for 3 items starting at index 10
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(10);
+        replaceChange.EndItemIndex.Should().Be(12);
+
+        // Remove for 17 items (indices 13-29)
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(13);
+        removeChange.EndItemIndex.Should().Be(29);
+
+        // Final count: 10 + 3 + 5 = 18
+        flattenedAdapter.GetItemCount().Should().Be(18);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWhenSameItemCountShouldOnlyEmitReplace()
+    {
+        // Arrange - Section with 10 items replaced by section with 10 items (same count)
+        // Expected: Just Replace, no Insert/Remove
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 10 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns((object?)null);
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo();
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 10 items
+        flattenedAdapter.GetItemCount().Should().Be(10);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with same item count (content changed, not structure)
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Should emit just one Replace for all 10 items
+        allChanges.Should().HaveCount(1);
+        var replaceChange = allChanges[0];
+        replaceChange.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(9);
+
+        // Final count should still be 10
+        flattenedAdapter.GetItemCount().Should().Be(10);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithSectionFooterOnlyWhenItemCountDecreasesShouldAccountForFooter()
+    {
+        // Arrange - Section with footer + 10 items replaced by section with footer + 2 items
+        // Old flattened: 10 items + 1 footer = 11
+        // New flattened: 2 items + 1 footer = 3
+        // Expected: Replace 3 items (2 items + footer), Remove 8 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 10 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 10 items + 1 footer = 11
+        flattenedAdapter.GetItemCount().Should().Be(11);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with 2 items
+        itemsPerSection[0] = 2;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 3 (2 items + footer), Remove 8
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(2); // 2 items + footer
+
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(3);
+        removeChange.EndItemIndex.Should().Be(10); // 8 items removed
+
+        // Final: 2 items + footer = 3
+        flattenedAdapter.GetItemCount().Should().Be(3);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithSectionHeaderAndFooterWhenItemCountIncreasesShouldAccountForBoth()
+    {
+        // Arrange - Section with header + 2 items + footer replaced by header + 10 items + footer
+        // Old flattened: 1 header + 2 items + 1 footer = 4
+        // New flattened: 1 header + 10 items + 1 footer = 12
+        // Expected: Replace 4 items, Insert 8 items
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 2 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: header + 2 items + footer = 4
+        flattenedAdapter.GetItemCount().Should().Be(4);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with 10 items
+        itemsPerSection[0] = 10;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 4 (header + 2 items + footer), Insert 8
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(3); // header + 2 items + footer
+
+        var insertChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.InsertItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.InsertItemRange);
+        insertChange.StartItemIndex.Should().Be(4);
+        insertChange.EndItemIndex.Should().Be(11); // 8 items inserted
+
+        // Final: header + 10 items + footer = 12
+        flattenedAdapter.GetItemCount().Should().Be(12);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithSectionHeaderWhenSectionBecomesEmptyShouldRemoveItemsButKeepHeader()
+    {
+        // Arrange - Section with header + 5 items replaced by header + 0 items
+        // Old flattened: 1 header + 5 items = 6
+        // New flattened: 1 header + 0 items = 1
+        // Expected: Replace 1 (header only), Remove 5
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 5 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: header + 5 items = 6
+        flattenedAdapter.GetItemCount().Should().Be(6);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section becomes empty
+        itemsPerSection[0] = 0;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 1 (header), Remove 5
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(0); // Just header
+
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(1);
+        removeChange.EndItemIndex.Should().Be(5); // 5 items removed
+
+        // Final: header only = 1
+        flattenedAdapter.GetItemCount().Should().Be(1);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithSectionFooterWhenSectionBecomesEmptyShouldRemoveItemsButKeepFooter()
+    {
+        // Arrange - Section with 5 items + footer replaced by 0 items + footer
+        // Old flattened: 5 items + 1 footer = 6
+        // New flattened: 0 items + 1 footer = 1
+        // Expected: Replace 1 (footer only), Remove 5
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 5 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 5 items + footer = 6
+        flattenedAdapter.GetItemCount().Should().Be(6);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section becomes empty
+        itemsPerSection[0] = 0;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 1 (footer), Remove 5
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(0); // Just footer
+
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(1);
+        removeChange.EndItemIndex.Should().Be(5); // 5 items removed
+
+        // Final: footer only = 1
+        flattenedAdapter.GetItemCount().Should().Be(1);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithHeaderFooterWhenEmptySectionGetsItemsShouldInsertItems()
+    {
+        // Arrange - Empty section with header + footer gets 5 items
+        // Old flattened: 1 header + 0 items + 1 footer = 2
+        // New flattened: 1 header + 5 items + 1 footer = 7
+        // Expected: Replace 2 (header + footer), Insert 5
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 0 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: header + 0 items + footer = 2
+        flattenedAdapter.GetItemCount().Should().Be(2);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section gets 5 items
+        itemsPerSection[0] = 5;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 2 (header + footer), Insert 5
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(1); // header + footer
+
+        var insertChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.InsertItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.InsertItemRange);
+        insertChange.StartItemIndex.Should().Be(2);
+        insertChange.EndItemIndex.Should().Be(6); // 5 items inserted
+
+        // Final: header + 5 items + footer = 7
+        flattenedAdapter.GetItemCount().Should().Be(7);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionRangeWithSectionHeadersFootersWhenItemCountsChangeShouldAccountForAll()
+    {
+        // Arrange - 2 sections each with header + items + footer
+        // Section 0: header + 10 items + footer = 12
+        // Section 1: header + 10 items + footer = 12
+        // Total: 24
+        // Replace both sections: section 0 -> 2 items, section 1 -> 3 items
+        // New section 0: header + 2 items + footer = 4
+        // New section 1: header + 3 items + footer = 5
+        // New total: 9
+        // Expected: Replace 9, Remove 15
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 10, 10 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(2);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 2 sections * 12 = 24
+        flattenedAdapter.GetItemCount().Should().Be(24);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Replace both sections with fewer items
+        itemsPerSection[0] = 2;
+        itemsPerSection[1] = 3;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSectionRange(0, 1)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 9 (new total), Remove 15 (difference)
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(8); // 9 items (4 + 5)
+
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(9);
+        removeChange.EndItemIndex.Should().Be(23); // 15 items removed
+
+        // Final: 4 + 5 = 9
+        flattenedAdapter.GetItemCount().Should().Be(9);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionInSecondSectionWithHeadersFootersWhenItemCountChangesShouldCalculateCorrectIndices()
+    {
+        // Arrange - 2 sections each with header + items + footer
+        // Section 0: header + 5 items + footer = 7 (unchanged)
+        // Section 1: header + 10 items + footer = 12 -> header + 2 items + footer = 4
+        // Total: 7 + 12 = 19 -> 7 + 4 = 11
+        // Expected: Replace 4 (at indices 7-10), Remove 8 (at indices 11-18)
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 5, 10 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(2);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 7 + 12 = 19
+        flattenedAdapter.GetItemCount().Should().Be(19);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Replace section 1 with 2 items
+        itemsPerSection[1] = 2;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(1)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 4 (indices 7-10), Remove 8 (indices 11-18)
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(7); // Section 1 starts at index 7
+        replaceChange.EndItemIndex.Should().Be(10); // header + 2 items + footer = 4 items
+
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(11);
+        removeChange.EndItemIndex.Should().Be(18); // 8 items removed
+
+        // Final: 7 + 4 = 11
+        flattenedAdapter.GetItemCount().Should().Be(11);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithGlobalAndSectionHeadersFootersWhenItemCountDecreasesShouldAccountForAll()
+    {
+        // Arrange - Full configuration: globalHeader + sectionHeader + 20 items + sectionFooter + globalFooter
+        // Old flattened: 1 + 1 + 20 + 1 + 1 = 24
+        // Replace section with 3 items
+        // New flattened: 1 + 1 + 3 + 1 + 1 = 7
+        // Section portion old: 1 + 20 + 1 = 22
+        // Section portion new: 1 + 3 + 1 = 5
+        // Expected: Replace 5 (at indices 1-5), Remove 17 (at indices 6-22)
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 20 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasGlobalHeader: true, hasGlobalFooter: true, hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: 1 + 1 + 20 + 1 + 1 = 24
+        flattenedAdapter.GetItemCount().Should().Be(24);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Replace section with 3 items
+        itemsPerSection[0] = 3;
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Replace 5 (indices 1-5), Remove 17 (indices 6-22)
+        allChanges.Should().HaveCount(2);
+
+        var replaceChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(1); // After global header
+        replaceChange.EndItemIndex.Should().Be(5); // sectionHeader + 3 items + sectionFooter
+
+        var removeChange = allChanges.First(c => c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItem ||
+                                                  c.Operation == VirtualScrollFlattenedChangeOperation.RemoveItemRange);
+        removeChange.StartItemIndex.Should().Be(6);
+        removeChange.EndItemIndex.Should().Be(22); // 17 items removed
+
+        // Final: 1 + 1 + 3 + 1 + 1 = 7
+        flattenedAdapter.GetItemCount().Should().Be(7);
+    }
+
+    [Fact]
+    internal void OnAdapterChangedWithReplaceSectionWithSectionHeadersFootersWhenSameItemCountShouldOnlyEmitReplace()
+    {
+        // Arrange - Section with header + 5 items + footer replaced by same count
+        // This tests backward compatibility - when item count doesn't change, behavior should be the same
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemsPerSection = new[] { 5 };
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(1);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemsPerSection[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"Item{call.ArgAt<int>(0)}-{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+
+        var layoutInfo = CreateLayoutInfo(hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+
+        // Initial: header + 5 items + footer = 7
+        flattenedAdapter.GetItemCount().Should().Be(7);
+
+        var allChanges = new List<VirtualScrollFlattenedChange>();
+        flattenedAdapter.Subscribe(cs => allChanges.AddRange(cs.Changes));
+
+        // Act - Section is replaced with same count (content changed, structure same)
+        var changeSet = new VirtualScrollChangeSet([VirtualScrollChangeFactory.ReplaceSection(0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert - Just one replace for all 7 items
+        allChanges.Should().HaveCount(1);
+        var replaceChange = allChanges[0];
+        replaceChange.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.ReplaceItemRange);
+        replaceChange.StartItemIndex.Should().Be(0);
+        replaceChange.EndItemIndex.Should().Be(6);
+
+        // Final count unchanged
+        flattenedAdapter.GetItemCount().Should().Be(7);
+    }
 }
 

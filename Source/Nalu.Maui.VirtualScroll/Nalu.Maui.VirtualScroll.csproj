@@ -18,6 +18,7 @@
 
   <PropertyGroup Label="Build">
     <TargetFrameworks>$(AllTargetFrameworks)</TargetFrameworks>
+<!-- <TargetFrameworks>net9.0;net9.0-android;net9.0-ios</TargetFrameworks> -->
 
     <SingleProject>true</SingleProject>
     <OutputType>Library</OutputType>

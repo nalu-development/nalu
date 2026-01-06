@@ -1,6 +1,3 @@
-using System.Text.Json;
-using AndroidX.RecyclerView.Widget;
-
 namespace Nalu;
 
 /// <summary>
@@ -9,7 +6,6 @@ namespace Nalu;
 internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
 {
     private readonly VirtualScrollRecyclerViewAdapter _adapter;
-    private readonly RecyclerView _recyclerView;
     private readonly IDisposable _subscription;
     private bool _disposed;
 
@@ -17,12 +13,10 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
     /// Initializes a new instance of the <see cref="VirtualScrollPlatformFlattenedAdapterNotifier" /> class.
     /// </summary>
     /// <param name="adapter">The RecyclerView adapter to update.</param>
-    /// <param name="recyclerView">The RecyclerView that owns the adapter.</param>
     /// <param name="flattenedAdapter">The flattened adapter to subscribe to.</param>
-    public VirtualScrollPlatformFlattenedAdapterNotifier(VirtualScrollRecyclerViewAdapter adapter, RecyclerView recyclerView, IVirtualScrollFlattenedAdapter flattenedAdapter)
+    public VirtualScrollPlatformFlattenedAdapterNotifier(VirtualScrollRecyclerViewAdapter adapter, IVirtualScrollFlattenedAdapter flattenedAdapter)
     {
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
-        _recyclerView = recyclerView ?? throw new ArgumentNullException(nameof(recyclerView));
         _subscription = flattenedAdapter.Subscribe(OnAdapterChanged);
     }
 
@@ -33,23 +27,13 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
             return;
         }
 
-        System.Diagnostics.Debug.WriteLine("OnAdapterChanged (Flattened): " + JsonSerializer.Serialize(changeSet));
-        // If RecyclerView is currently computing layout, defer notifications until after layout completes
-        // This prevents IndexOutOfBoundsException when adapter changes occur during layout validation
-        if (_recyclerView.IsComputingLayout)
+        if (Android.OS.Looper.MyLooper() != Android.OS.Looper.MainLooper)
         {
-            _recyclerView.Post(() =>
-            {
-                if (!_disposed)
-                {
-                    ApplyChanges(changeSet);
-                }
-            });
+            throw new InvalidOperationException("Changes on the data source must be applied and notified on the main thread.");
         }
-        else
-        {
-            ApplyChanges(changeSet);
-        }
+
+        // System.Diagnostics.Debug.WriteLine("OnAdapterChanged (Flattened): " + JsonSerializer.Serialize(changeSet, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() }}));
+        ApplyChanges(changeSet);
     }
 
     private void ApplyChanges(VirtualScrollFlattenedChangeSet changeSet)
@@ -115,4 +99,3 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
         }
     }
 }
-

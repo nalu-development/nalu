@@ -73,6 +73,7 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
                 bindable.BindingContext = item.Value;
             }
 
+            // ReSharper disable once SuspiciousTypeConversion.Global
             if (_virtualScroll is Element virtualScrollElement && bindable is Element { Parent: null } viewElement)
             {
                 virtualScrollElement.AddLogicalChild(viewElement);

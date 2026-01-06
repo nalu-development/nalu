@@ -29,9 +29,14 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
 
     private void OnAdapterChanged(VirtualScrollChangeSet changeSet)
     {
-        if (_disposed || _collectionView.Window is null)
+        if (_disposed)
         {
             return;
+        }
+        
+        if (!NSThread.Current.IsMainThread)
+        {
+            throw new InvalidOperationException("Changes on the data source must be applied and notified on the main thread.");
         }
 
         var changes = changeSet.Changes.ToList();

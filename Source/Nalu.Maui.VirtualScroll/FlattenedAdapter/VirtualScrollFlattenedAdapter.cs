@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 
 namespace Nalu;
 
@@ -129,7 +128,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
     private void OnAdapterChanged(VirtualScrollChangeSet changeSet)
     {
-        System.Diagnostics.Debug.WriteLine("OnAdapterChanged: " + JsonSerializer.Serialize(changeSet));
+        // System.Diagnostics.Debug.WriteLine("OnAdapterChanged: " + JsonSerializer.Serialize(changeSet, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() }}));
         var flattenedChanges = new List<VirtualScrollFlattenedChange>();
 
         foreach (var change in changeSet.Changes)
@@ -201,20 +200,21 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
             case VirtualScrollChangeOperation.ReplaceSection:
             case VirtualScrollChangeOperation.ReplaceSectionRange:
                 {
-                    // ReplaceSection(Range) means content changed but structure is the same
-                    // Emit ReplaceItemRange for the affected items
-                    var startFlattenedIndex = GetFlattenedIndexForSectionStart(change.StartSectionIndex);
+                    // ReplaceSection(Range) may change the item count within the section(s)
+                    // We need to compare old vs new counts and emit appropriate changes
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
-                    var itemsToReplace = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
 
-                    if (itemsToReplace == 1)
-                    {
-                        return [VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex)];
-                    }
-                    else
-                    {
-                        return [VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + itemsToReplace - 1)];
-                    }
+                    // Get the OLD flattened count from cached offsets (before adapter was updated)
+                    var startFlattenedIndex = GetCachedFlattenedIndexForSectionStart(change.StartSectionIndex);
+                    var oldFlattenedCount = CalculateItemsForSectionsFromCachedOffsets(change.StartSectionIndex, sectionCount);
+
+                    // Get the NEW flattened count from the adapter (already updated)
+                    var newFlattenedCount = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
+
+                    // Update cached offsets to reflect the change
+                    UpdateOffsetsAfterSectionReplace(change.StartSectionIndex, sectionCount, newFlattenedCount - oldFlattenedCount);
+
+                    return ConvertReplaceSectionToFlattenedChanges(startFlattenedIndex, oldFlattenedCount, newFlattenedCount);
                 }
 
             case VirtualScrollChangeOperation.MoveSection:
@@ -856,6 +856,105 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
         // Update total length
         _flattenedLength -= count;
+    }
+
+    private void UpdateOffsetsAfterSectionReplace(int startSectionIndex, int sectionCount, int itemCountDelta)
+    {
+        if (itemCountDelta == 0)
+        {
+            return;
+        }
+
+        // Update offsets for sections after the replaced range
+        var endSectionIndex = startSectionIndex + sectionCount;
+        for (var i = endSectionIndex; i < _sectionCount; i++)
+        {
+            _sectionOffsets[i] += itemCountDelta;
+        }
+
+        // Update total length
+        _flattenedLength += itemCountDelta;
+    }
+
+    private static IEnumerable<VirtualScrollFlattenedChange> ConvertReplaceSectionToFlattenedChanges(
+        int startFlattenedIndex,
+        int oldFlattenedCount,
+        int newFlattenedCount)
+    {
+        if (oldFlattenedCount == newFlattenedCount)
+        {
+            // Same count - just replace all items
+            if (oldFlattenedCount == 0)
+            {
+                return [];
+            }
+
+            if (oldFlattenedCount == 1)
+            {
+                return [VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex)];
+            }
+
+            return [VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + oldFlattenedCount - 1)];
+        }
+
+        if (oldFlattenedCount > newFlattenedCount)
+        {
+            // Section shrunk - replace common items, then remove excess
+            var commonCount = newFlattenedCount;
+            var removeCount = oldFlattenedCount - newFlattenedCount;
+
+            if (commonCount == 0)
+            {
+                // Old section had items, new section is empty - just remove all
+                if (removeCount == 1)
+                {
+                    return [VirtualScrollFlattenedChangeFactory.RemoveItem(startFlattenedIndex)];
+                }
+
+                return [VirtualScrollFlattenedChangeFactory.RemoveItemRange(startFlattenedIndex, startFlattenedIndex + removeCount - 1)];
+            }
+
+            // Replace common items, then remove excess
+            var replaceChange = commonCount == 1
+                ? VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex)
+                : VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + commonCount - 1);
+
+            var removeStartIndex = startFlattenedIndex + commonCount;
+            var removeChange = removeCount == 1
+                ? VirtualScrollFlattenedChangeFactory.RemoveItem(removeStartIndex)
+                : VirtualScrollFlattenedChangeFactory.RemoveItemRange(removeStartIndex, removeStartIndex + removeCount - 1);
+
+            return [replaceChange, removeChange];
+        }
+        else
+        {
+            // Section grew - replace common items, then insert new
+            var commonCount = oldFlattenedCount;
+            var insertCount = newFlattenedCount - oldFlattenedCount;
+
+            if (commonCount == 0)
+            {
+                // Old section was empty, new section has items - just insert all
+                if (insertCount == 1)
+                {
+                    return [VirtualScrollFlattenedChangeFactory.InsertItem(startFlattenedIndex)];
+                }
+
+                return [VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + insertCount - 1)];
+            }
+
+            // Replace common items, then insert new
+            var replaceChange = commonCount == 1
+                ? VirtualScrollFlattenedChangeFactory.ReplaceItem(startFlattenedIndex)
+                : VirtualScrollFlattenedChangeFactory.ReplaceItemRange(startFlattenedIndex, startFlattenedIndex + commonCount - 1);
+
+            var insertStartIndex = startFlattenedIndex + commonCount;
+            var insertChange = insertCount == 1
+                ? VirtualScrollFlattenedChangeFactory.InsertItem(insertStartIndex)
+                : VirtualScrollFlattenedChangeFactory.InsertItemRange(insertStartIndex, insertStartIndex + insertCount - 1);
+
+            return [replaceChange, insertChange];
+        }
     }
 
     private void NotifySubscribers(VirtualScrollFlattenedChangeSet changeSet)
