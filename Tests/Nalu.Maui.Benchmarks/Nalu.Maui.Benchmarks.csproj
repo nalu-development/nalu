@@ -6,14 +6,20 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <GenerateProgramFile>false</GenerateProgramFile>
-    <!-- This project lives under Tests/ but is not a test project (it has a real Program.Main). -->
-    <IsTestProject>false</IsTestProject>
-    <!-- Avoid generating additional entry points when test SDK packages are present via directory props. -->
-    <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
+        <!-- This project lives under Tests/ but is not a test project (it has a real Program.Main). -->
+        <IsTestProject>false</IsTestProject>
+        <!-- Avoid generating additional entry points when test SDK packages are present via directory props. -->
+        <GenerateTestingPlatformEntryPoint>false</GenerateTestingPlatformEntryPoint>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
+        <RuntimeHostConfigurationOption Include="System.Diagnostics.Metrics.Meter.IsSupported" Value="false"/>
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+      <PackageReference Include="System.Numerics.Tensors" Version="10.0.0-preview.4.25258.110" />
       <PackageReference Include="Microsoft.CodeAnalysis" Version="4.14.0" />
       <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.14.0" />
       <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />

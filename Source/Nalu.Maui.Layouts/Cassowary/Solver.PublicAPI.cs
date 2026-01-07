@@ -235,7 +235,6 @@ public partial class Solver
         }
 
         // Otherwise update each row where the error variables exist.
-        // Need to iterate over a copy of the keys to avoid modifying the collection during iteration
         foreach (ref var entry in rows)
         {
             var basicRow = entry.Value;

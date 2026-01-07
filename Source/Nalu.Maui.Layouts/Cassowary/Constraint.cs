@@ -9,6 +9,9 @@ namespace Nalu.Cassowary;
 /// </summary>
 public class Constraint
 {
+    private static long _idCounter;
+    private readonly long _id;
+    
     /// <summary>
     /// Initializes a new instance of the <see cref="Constraint" /> struct.
     /// </summary>
@@ -17,9 +20,30 @@ public class Constraint
     /// <param name="strength">The strength.</param>
     public Constraint(Expression expression, RelationalOperator @operator, double strength)
     {
+        _id = Interlocked.Increment(ref _idCounter);
         Expression = expression;
         Operator = @operator;
         Strength = strength;
+    }
+
+    /// <inheritdoc />
+    public override bool Equals(object? obj)
+    {
+        if (obj is Constraint other)
+        {
+            return _id == other._id;
+        }
+
+        return false;
+    }
+
+    /// <inheritdoc />
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            return (int)_id;
+        }
     }
 
     /// <summary>

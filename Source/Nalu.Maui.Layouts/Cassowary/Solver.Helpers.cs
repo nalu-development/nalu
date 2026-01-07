@@ -131,13 +131,9 @@ public partial class Solver
         // 1) The first symbol representing an external variable.
         // 2) A negative slack or error tag variable.
         // If a subject cannot be found, an invalid symbol will be returned.
-
-        foreach (ref var pair in row.Cells)
+        if (row.GetFirstExternalSymbol() is { Type: not SymbolType.Invalid } external)
         {
-            if (pair.Key.Type == SymbolType.External)
-            {
-                return pair.Key;
-            }
+            return external;
         }
 
         if (tag.Marker.Type is SymbolType.Slack or SymbolType.Error && row.CoefficientFor(tag.Marker) < 0.0)
@@ -179,7 +175,7 @@ public partial class Solver
                 return success;
             }
 
-            var entering = AnyPivotableSymbol(basicRow);
+            var entering = basicRow.GetAnyPivotableSymbol();
 
             if (entering.Type == SymbolType.Invalid)
             {
@@ -204,25 +200,6 @@ public partial class Solver
         _objective.RemoveSymbol(art);
 
         return success;
-    }
-
-    /// <summary>
-    /// Get the first Slack or Error symbol in the row.
-    /// If no such symbol is present, an invalid symbol will be returned.
-    /// </summary>
-    private Symbol AnyPivotableSymbol(Row row)
-    {
-        foreach (ref var pair in row.Cells)
-        {
-            var type = pair.Key.Type;
-
-            if (type is SymbolType.Slack or SymbolType.Error)
-            {
-                return pair.Key;
-            }
-        }
-
-        return Symbol.InvalidSymbol;
     }
 
     /// <summary>

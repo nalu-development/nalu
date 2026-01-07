@@ -13,7 +13,7 @@ public partial class Solver
 
         while (iterations < MaxIterations)
         {
-            var entering = GetEnteringSymbol(objective);
+            var entering = objective.GetEnteringSymbol();
 
             if (entering.Type == SymbolType.Invalid)
             {
@@ -68,7 +68,7 @@ public partial class Solver
 
             if (_rowMap.TryGetValue(leaving, out var row) && row.Constant() < 0.0)
             {
-                var entering = GetDualEnteringSymbol(row);
+                var entering = row.GetDualEnteringSymbol(_objective);
 
                 if (entering.Type == SymbolType.Invalid)
                 {
@@ -109,73 +109,6 @@ public partial class Solver
 
         _objective.Substitute(symbol, row);
         _artificial?.Substitute(symbol, row);
-    }
-
-    /// <summary>
-    /// Compute the entering variable for a pivot operation.
-    /// This method will return first symbol in the objective function which
-    /// is non-dummy and has a coefficient less than zero. If no symbol meets
-    /// the criteria, it means the objective function is at a minimum, and an
-    /// invalid symbol is returned.
-    /// </summary>
-    private Symbol GetEnteringSymbol(Row objective)
-    {
-        // This method will return first symbol in the objective function which
-        // is non-dummy and has a coefficient less than zero. If no symbol meets
-        // the criteria, it means the objective function is at a minimum, and an
-        // invalid symbol is returned.
-
-        foreach (ref var pair in objective.Cells)
-        {
-            var symbol = pair.Key;
-
-            if (pair.Value < 0.0 && symbol.Type != SymbolType.Dummy)
-            {
-                return symbol;
-            }
-        }
-
-        return Symbol.InvalidSymbol;
-    }
-
-    /// <summary>
-    /// Compute the entering symbol for the dual optimize operation.
-    /// This method will return the symbol in the row which has a positive
-    /// coefficient and yields the minimum ratio for its respective symbol
-    /// in the objective function. The provided row *must* be infeasible.
-    /// If no symbol is found which meats the criteria, an invalid symbol
-    /// is returned.
-    /// </summary>
-    private Symbol GetDualEnteringSymbol(Row row)
-    {
-        // This method will return the symbol in the row which has a positive
-        // coefficient and yields the minimum ratio for its respective symbol
-        // in the objective function. The provided row *must* be infeasible.
-        // If no symbol is found which meats the criteria, an invalid symbol
-        // is returned.
-
-        var ratio = double.MaxValue;
-        var entering = Symbol.InvalidSymbol;
-
-        foreach (ref var pair in row.Cells)
-        {
-            var symbol = pair.Key;
-            var c = pair.Value;
-
-            if (c > 0.0 && symbol.Type != SymbolType.Dummy)
-            {
-                var coeff = _objective.CoefficientFor(symbol);
-                var r = coeff / c;
-
-                if (r < ratio)
-                {
-                    ratio = r;
-                    entering = symbol;
-                }
-            }
-        }
-
-        return entering;
     }
 
     /// <summary>
