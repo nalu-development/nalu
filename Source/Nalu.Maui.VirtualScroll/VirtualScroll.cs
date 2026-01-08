@@ -36,6 +36,16 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     );
 
     /// <summary>
+    /// Bindable property for <see cref="DragHandler"/>.
+    /// </summary>
+    public static readonly BindableProperty DragHandlerProperty = BindableProperty.Create(
+        nameof(DragHandler),
+        typeof(IVirtualScrollDragHandler),
+        typeof(VirtualScroll),
+        null
+    );
+
+    /// <summary>
     /// Bindable property for <see cref="ItemTemplate"/>.
     /// </summary>
     public static readonly BindableProperty ItemTemplateProperty = BindableProperty.Create(
@@ -159,12 +169,31 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         0.0);
 
     /// <summary>
-    /// The adapter that provides data to the virtual scroll.
+    /// Gets or sets the data source for the virtual scroll.
     /// </summary>
+    /// <remarks>
+    /// Providing an <see cref="IVirtualScrollAdapter"/> directly is recommended for optimal functionality,
+    /// otherwise, common collection types such as <see cref="ObservableCollection{T}"/> or any <see cref="IEnumerable"/> will be automatically
+    /// wrapped in a suitable adapter.
+    /// </remarks>
     public object? ItemsSource
     {
         get => (object?)GetValue(ItemsSourceProperty);
         set => SetValue(ItemsSourceProperty, value);
+    }
+    
+    /// <summary>
+    /// Gets or sets the drag handler for the virtual scroll.
+    /// </summary>
+    /// <remarks>
+    /// Drag and drop is enabled only when a drag handler is provided.
+    /// Adapter created via <see cref="CreateObservableCollectionAdapter{T}(ObservableCollection{T})"/> can be used as drag handler.
+    /// It's also possible to customize its behavior by inheriting from <see cref="VirtualScrollObservableCollectionAdapter{TItemCollection}"/>. 
+    /// </remarks>
+    public IVirtualScrollDragHandler? DragHandler
+    {
+        get => (IVirtualScrollDragHandler?)GetValue(DragHandlerProperty);
+        set => SetValue(DragHandlerProperty, value);
     }
 
     /// <summary>
@@ -522,49 +551,49 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// <summary>
     /// Creates a virtual scroll adapter for the specified observable collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateObservableCollectionAdapter<T>(ObservableCollection<T> collection)
+    public static IReorderableVirtualScrollAdapter CreateObservableCollectionAdapter<T>(ObservableCollection<T> collection)
         => new VirtualScrollObservableCollectionAdapter<ObservableCollection<T>>(collection);
     
     /// <summary>
     /// Creates a virtual scroll adapter for the specified observable collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateObservableCollectionAdapter<T>(ReadOnlyObservableCollection<T> collection)
+    public static IReorderableVirtualScrollAdapter CreateObservableCollectionAdapter<T>(ReadOnlyObservableCollection<T> collection)
         => new VirtualScrollObservableCollectionAdapter<ReadOnlyObservableCollection<T>>(collection);
     
     /// <summary>
     /// Creates a grouped virtual scroll adapter for the specified observable collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ObservableCollection<TSection> collection, Func<TSection, ObservableCollection<TItem>> sectionItemsGetter)
+    public static IReorderableVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ObservableCollection<TSection> collection, Func<TSection, ObservableCollection<TItem>> sectionItemsGetter)
         => new VirtualScrollGroupedObservableCollectionAdapter<ObservableCollection<TSection>, ObservableCollection<TItem>>(collection, section => sectionItemsGetter((TSection)section));
     
     /// <summary>
     /// Creates a grouped virtual scroll adapter for the specified observable collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ObservableCollection<TSection> collection, Func<TSection, ReadOnlyObservableCollection<TItem>> sectionItemsGetter)
+    public static IReorderableVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ObservableCollection<TSection> collection, Func<TSection, ReadOnlyObservableCollection<TItem>> sectionItemsGetter)
         => new VirtualScrollGroupedObservableCollectionAdapter<ObservableCollection<TSection>, ReadOnlyObservableCollection<TItem>>(collection, section => sectionItemsGetter((TSection)section));
     
     /// <summary>
     /// Creates a grouped virtual scroll adapter for the specified observable collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ReadOnlyObservableCollection<TSection> collection, Func<TSection, ObservableCollection<TItem>> sectionItemsGetter)
+    public static IReorderableVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ReadOnlyObservableCollection<TSection> collection, Func<TSection, ObservableCollection<TItem>> sectionItemsGetter)
         => new VirtualScrollGroupedObservableCollectionAdapter<ReadOnlyObservableCollection<TSection>, ObservableCollection<TItem>>(collection, section => sectionItemsGetter((TSection)section));
 
     
     /// <summary>
     /// Creates a grouped virtual scroll adapter for the specified observable collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ReadOnlyObservableCollection<TSection> collection, Func<TSection, ReadOnlyObservableCollection<TItem>> sectionItemsGetter)
+    public static IReorderableVirtualScrollAdapter CreateObservableCollectionAdapter<TSection, TItem>(ReadOnlyObservableCollection<TSection> collection, Func<TSection, ReadOnlyObservableCollection<TItem>> sectionItemsGetter)
         => new VirtualScrollGroupedObservableCollectionAdapter<ReadOnlyObservableCollection<TSection>, ReadOnlyObservableCollection<TItem>>(collection, section => sectionItemsGetter((TSection)section));
     
     /// <summary>
     /// Creates a virtual scroll adapter for the specified static collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateStaticCollectionAdapter<T>(IEnumerable<T> collection)
+    public static IReorderableVirtualScrollAdapter CreateStaticCollectionAdapter<T>(IEnumerable<T> collection)
         => new VirtualScrollListAdapter(collection);
     
     /// <summary>
     /// Creates a grouped virtual scroll adapter for the specified static collection.
     /// </summary>
-    public static IVirtualScrollAdapter CreateStaticCollectionAdapter<TSection, TItem>(IEnumerable<TSection> collection, Func<TSection, IEnumerable<TItem>> sectionItemsGetter)
+    public static IReorderableVirtualScrollAdapter CreateStaticCollectionAdapter<TSection, TItem>(IEnumerable<TSection> collection, Func<TSection, IEnumerable<TItem>> sectionItemsGetter)
         => new VirtualScrollGroupedListAdapter(collection, section => sectionItemsGetter((TSection)section));
 }

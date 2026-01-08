@@ -57,6 +57,7 @@
             <!-- Grouped VirtualScroll -->
             <vs:VirtualScroll Grid.Row="1"
                                 FadingEdgeLength="32"
+                                DragHandler="{Binding Adapter}"
                                 Background="LightGoldenrodYellow"
                                 x:Name="VirtualScroll"
                                 ItemsSource="{Binding Adapter}"

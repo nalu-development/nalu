@@ -83,4 +83,35 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
         var count = virtualScrollAdapter.GetSectionCount();
         return count;
     }
+
+    public override void MoveItem(UICollectionView collectionView, NSIndexPath sourceIndexPath, NSIndexPath destinationIndexPath)
+    {
+        var dragHandler = virtualScroll.DragHandler ?? throw new InvalidOperationException("DragHandler should not be null when MoveItem is called.");
+        var sourceSectionIndex = sourceIndexPath.Section;
+        var sourceItemIndex = sourceIndexPath.Item.ToInt32();
+        var destinationSectionIndex = destinationIndexPath.Section;
+        var destinationItemIndex = destinationIndexPath.Item.ToInt32();
+        var item = virtualScrollAdapter.GetItem(sourceSectionIndex, sourceItemIndex);
+        var info = new VirtualScrollDragMoveInfo(item, sourceSectionIndex, sourceItemIndex, destinationSectionIndex, destinationItemIndex);
+        dragHandler.MoveItem(info);
+        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragMoved(sourceIndexPath, destinationIndexPath);
+    }
+
+    public override bool CanMoveItem(UICollectionView collectionView, NSIndexPath indexPath)
+    {
+        var dragHandler = virtualScroll.DragHandler ?? throw new InvalidOperationException("DragHandler should not be null when CanMoveItem is called.");
+        var sectionIndex = indexPath.Section;
+        var itemIndex = indexPath.Item.ToInt32();
+
+        var item = virtualScrollAdapter.GetItem(sectionIndex, itemIndex);
+        var info = new VirtualScrollDragInfo(item, sectionIndex, itemIndex);
+        var canDragItem = dragHandler.CanDragItem(info);
+
+        if (canDragItem)
+        {
+            ((VirtualScrollDelegate) collectionView.Delegate).ItemDragStarted(indexPath);
+        }
+
+        return canDragItem;
+    }
 }

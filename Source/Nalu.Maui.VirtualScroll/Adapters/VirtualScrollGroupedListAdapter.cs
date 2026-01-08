@@ -5,13 +5,12 @@ namespace Nalu;
 /// <summary>
 /// An adapter that wraps a grouped list for use with <see cref="VirtualScroll"/>.
 /// </summary>
-public class VirtualScrollGroupedListAdapter : IVirtualScrollAdapter
+public class VirtualScrollGroupedListAdapter : IReorderableVirtualScrollAdapter
 {
     private static readonly NoOpUnsubscriber _noOpUnsubscriber = new();
 
     private readonly IList _sections;
     private readonly Func<object, IList> _sectionItemsGetter;
-
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollGroupedListAdapter" /> class.
@@ -77,6 +76,59 @@ public class VirtualScrollGroupedListAdapter : IVirtualScrollAdapter
 
     /// <inheritdoc/>
     public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => _noOpUnsubscriber;
+
+    /// <inheritdoc/>
+    public virtual bool CanDragItem(VirtualScrollDragInfo dragInfo)
+    {
+        AssertDragSupport(dragInfo.SectionIndex);
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+    {
+        AssertDragSupport(dragMoveInfo.CurrentSectionIndex);
+        AssertDragSupport(dragMoveInfo.DestinationSectionIndex);
+        
+        var sourceSection = GetSection(dragMoveInfo.CurrentSectionIndex) ?? throw new InvalidOperationException($"Source section at index {dragMoveInfo.CurrentSectionIndex} is null.");
+        var sourceItems = _sectionItemsGetter(sourceSection);
+        
+        var destinationSection = GetSection(dragMoveInfo.DestinationSectionIndex) ?? throw new InvalidOperationException($"Destination section at index {dragMoveInfo.DestinationSectionIndex} is null.");
+        var destinationItems = _sectionItemsGetter(destinationSection);
+        
+        var item = sourceItems[dragMoveInfo.CurrentItemIndex];
+        sourceItems.RemoveAt(dragMoveInfo.CurrentItemIndex);
+        destinationItems.Insert(dragMoveInfo.DestinationItemIndex, item);
+    }
+
+    /// <inheritdoc/>
+    public virtual bool CanDropItemAt(VirtualScrollDragDropInfo dragDropInfo) => true;
+
+    /// <inheritdoc/>
+    public virtual void OnDragStarted(VirtualScrollDragInfo dragInfo)
+    {
+    }
+
+    /// <inheritdoc/>
+    public virtual void OnDragCanceled(VirtualScrollDragInfo dragInfo)
+    {
+    }
+
+    /// <inheritdoc/>
+    public virtual void OnDragEnded(VirtualScrollDragInfo dragInfo)
+    {
+    }
+
+    private void AssertDragSupport(int sectionIndex)
+    {
+        var section = GetSection(sectionIndex) ?? throw new InvalidOperationException($"Section at index {sectionIndex} is null.");
+        var items = _sectionItemsGetter(section);
+        
+        if (items.IsFixedSize || items.IsReadOnly)
+        {
+            throw new InvalidOperationException($"Drag and drop is not supported for the underlying collection type: {items.GetType().Name}. The collection must not be fixed-size or read-only.");
+        }
+    }
 
     private sealed class NoOpUnsubscriber : IDisposable
     {
