@@ -17,6 +17,11 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IReorde
     private bool _dragging;
 
     /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected TItemCollection Collection => _collection;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollObservableCollectionAdapter{TObservableCollection}" /> class based on the specified observable collection.
     /// </summary>
     public VirtualScrollObservableCollectionAdapter(TItemCollection collection)
@@ -82,6 +87,11 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IReorde
 
     /// <inheritdoc/>
     public virtual void OnDragStarted(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
+    /// <inheritdoc/>
+    public virtual void OnDragInitiating(VirtualScrollDragInfo dragInfo)
     {
     }
     

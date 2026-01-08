@@ -10,13 +10,18 @@ public class VirtualScrollListAdapter : IReorderableVirtualScrollAdapter
     private static readonly NoOpUnsubscriber _noOpUnsubscriber = new();
 
     private readonly IList _list;
+    
+    /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected IList Collection => _list;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollListAdapter" /> class based on the specified enumerable.
     /// </summary>
     public VirtualScrollListAdapter(IEnumerable enumerable)
     {
-        _list = enumerable is IList list ? list : enumerable.Cast<object>().ToArray();
+        _list = enumerable as IList ?? enumerable.Cast<object>().ToArray();
     }
 
     /// <inheritdoc/>
@@ -55,6 +60,11 @@ public class VirtualScrollListAdapter : IReorderableVirtualScrollAdapter
 
     /// <inheritdoc/>
     public virtual void OnDragStarted(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
+    /// <inheritdoc/>
+    public virtual void OnDragInitiating(VirtualScrollDragInfo dragInfo)
     {
     }
 

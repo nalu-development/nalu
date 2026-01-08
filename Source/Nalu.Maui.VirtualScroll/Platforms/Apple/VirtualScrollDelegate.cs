@@ -34,6 +34,21 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
     private NSIndexPath? _checkedDestinationIndexPath;
     private NSIndexPath? _checkedFinalIndexPath;
     
+    public VirtualScrollDragInfo? ItemDragInitiating(NSIndexPath indexPath)
+    {
+        if (_virtualScroll?.DragHandler is { } dragHandler)
+        {
+            var sectionIndex = indexPath.Section;
+            var itemIndex = indexPath.Item.ToInt32();
+            var item = _virtualScroll.Adapter?.GetItem(sectionIndex, itemIndex);
+            var dragInfo = new VirtualScrollDragInfo(item, sectionIndex, itemIndex);
+            dragHandler.OnDragInitiating(dragInfo);
+            return dragInfo;
+        }
+        
+        return null;
+    }
+    
     public void ItemDragStarted(NSIndexPath indexPath)
     {
         if (_virtualScroll?.DragHandler is { } dragHandler)

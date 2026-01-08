@@ -19,6 +19,11 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     private bool _dragging;
 
     /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected TSectionCollection Sections => _sections;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollGroupedObservableCollectionAdapter{TSectionCollection, TItemCollection}" /> class.
     /// </summary>
     /// <param name="sections">The collection of sections.</param>
@@ -126,6 +131,11 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     /// <inheritdoc/>
     public virtual bool CanDropItemAt(VirtualScrollDragDropInfo dragDropInfo) => true;
 
+    /// <inheritdoc/>
+    public virtual void OnDragInitiating(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
     /// <inheritdoc/>
     public virtual void OnDragStarted(VirtualScrollDragInfo dragInfo)
     {

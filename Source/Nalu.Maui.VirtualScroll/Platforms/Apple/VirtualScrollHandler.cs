@@ -107,7 +107,7 @@ public partial class VirtualScrollHandler
         var collectionView = new VirtualScrollCollectionView(CGRect.Empty, layout, (IVirtualScrollLayoutInfo)VirtualView);
         var reuseIdManager = new VirtualScrollPlatformReuseIdManager(collectionView);
 
-        _dragGestureRecognizer = CreateDragGestureRecognizer(collectionView);
+        _dragGestureRecognizer = CreateDragGestureRecognizer(VirtualView, collectionView);
 
         _reuseIdManager = reuseIdManager;
         _collectionView = collectionView;
@@ -166,7 +166,7 @@ public partial class VirtualScrollHandler
         return containerView;
     }
 
-    private static UILongPressGestureRecognizer CreateDragGestureRecognizer(VirtualScrollCollectionView collectionView)
+    private static UILongPressGestureRecognizer CreateDragGestureRecognizer(IVirtualScroll virtualView, VirtualScrollCollectionView collectionView)
         => new(gesture =>
             {
                 switch (gesture.State)
@@ -175,9 +175,14 @@ public partial class VirtualScrollHandler
                     {
                         var location = gesture.LocationInView(collectionView);
                         var indexPath = collectionView.IndexPathForItemAtPoint(location);
-                        if (indexPath is not null)
+                        if (indexPath is not null && collectionView.CellForItem(indexPath) is { } cell)
                         {
-                            collectionView.BeginInteractiveMovementForItem(indexPath);
+                            ((VirtualScrollDelegate)collectionView.Delegate).ItemDragInitiating(indexPath);
+                            indexPath = collectionView.IndexPathForCell(cell);
+                            if (indexPath is not null)
+                            {
+                                collectionView.BeginInteractiveMovementForItem(indexPath);
+                            }
                         }
 
                         break;

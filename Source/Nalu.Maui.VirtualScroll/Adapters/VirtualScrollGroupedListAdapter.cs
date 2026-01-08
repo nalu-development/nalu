@@ -11,6 +11,11 @@ public class VirtualScrollGroupedListAdapter : IReorderableVirtualScrollAdapter
 
     private readonly IList _sections;
     private readonly Func<object, IList> _sectionItemsGetter;
+    
+    /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected IList Sections => _sections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollGroupedListAdapter" /> class.
@@ -116,6 +121,11 @@ public class VirtualScrollGroupedListAdapter : IReorderableVirtualScrollAdapter
 
     /// <inheritdoc/>
     public virtual void OnDragEnded(VirtualScrollDragInfo dragInfo)
+    {
+    }
+
+    /// <inheritdoc/>
+    public virtual void OnDragInitiating(VirtualScrollDragInfo dragInfo)
     {
     }
 

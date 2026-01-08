@@ -37,6 +37,11 @@ public interface IVirtualScrollDragHandler
     /// Called when a drag operation ended.
     /// </summary>
     void OnDragEnded(VirtualScrollDragInfo virtualScrollDragInfo);
+
+    /// <summary>
+    /// Called when a drag operation is initiating (before it starts).
+    /// </summary>
+    void OnDragInitiating(VirtualScrollDragInfo dragInfo);
 }
 
 /// <summary>
