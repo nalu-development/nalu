@@ -320,6 +320,21 @@ virtualScroll.OnRefresh += async (sender, args) =>
 
 > **Note:** The fading edge feature is optimized for Android and iOS platforms. On Android, it uses native `RecyclerView` fading edge support. On iOS, it uses a custom gradient mask implementation.
 
+### Drag & Drop
+
+`VirtualScroll` supports drag and drop operations, allowing users to reorder items by dragging them to new positions. All built-in adapters support drag and drop out of the box.
+
+To enable drag and drop, bind the `DragHandler` property to your adapter:
+
+```xml
+<vs:VirtualScroll ItemsSource="{Binding Adapter}"
+                  DragHandler="{Binding Adapter}">
+    <!-- Templates -->
+</vs:VirtualScroll>
+```
+
+Drag and drop works with both single collections and grouped collections, supporting moves within sections and between sections. See [Drag & Drop](virtualscroll-dragdrop.md) for complete documentation including custom behavior, lifecycle hooks, and advanced scenarios.
+
 ### Custom Adapters
 
 For advanced scenarios requiring sectioned data or direct data source access, implement `IVirtualScrollAdapter`. See [Custom Adapters](virtualscroll-adapters.md) for complete documentation.
@@ -489,4 +504,5 @@ Windows support is not currently available.
 
 - 📘 [Scrolling](virtualscroll-scrolling.md) - Scroll to item, scroll events, and visible items range
 - 📘 [Custom Adapters](virtualscroll-adapters.md) - Creating custom adapters for sectioned data and database-backed lists
+- 📘 [Drag & Drop](virtualscroll-dragdrop.md) - Reordering items with drag and drop, custom behavior, and lifecycle hooks
 - 📘 [Performance](virtualscroll-performance.md) - Performance benchmarks and optimization tips

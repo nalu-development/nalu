@@ -28,6 +28,8 @@
       href: virtualscroll-scrolling.md
     - name: Adapters
       href: virtualscroll-adapters.md
+    - name: Drag & Drop
+      href: virtualscroll-dragdrop.md
     - name: Performance
       href: virtualscroll-performance.md
 - name: Navigation
