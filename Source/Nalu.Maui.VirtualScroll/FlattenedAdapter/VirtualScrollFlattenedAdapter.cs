@@ -126,7 +126,7 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
     public void Dispose() => _subscription.Dispose();
 
-    private void OnAdapterChanged(VirtualScrollChangeSet changeSet)
+    public void OnAdapterChanged(VirtualScrollChangeSet changeSet)
     {
         // System.Diagnostics.Debug.WriteLine("OnAdapterChanged: " + JsonSerializer.Serialize(changeSet, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() }}));
         var flattenedChanges = new List<VirtualScrollFlattenedChange>();

@@ -54,4 +54,9 @@ internal interface IVirtualScrollFlattenedAdapter : IDisposable
     /// <param name="changeCallback">The callback to invoke when changes occur.</param>
     /// <returns>A disposable that unsubscribes from change notifications when disposed.</returns>
     IDisposable Subscribe(Action<VirtualScrollFlattenedChangeSet> changeCallback);
+
+    /// <summary>
+    /// Forcefully triggers a change notification.
+    /// </summary>
+    void OnAdapterChanged(VirtualScrollChangeSet changeSet);
 }
