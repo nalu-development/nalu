@@ -64,6 +64,7 @@ internal class VirtualScrollTouchHelperCallback : ItemTouchHelper.Callback
         }
 
         var dragInfo = new VirtualScrollDragInfo(adapter.GetItem(sectionIndex, itemIndex), sectionIndex, itemIndex);
+        dragHander.OnDragInitiating(dragInfo);
         if (!dragHandler.CanDragItem(dragInfo))
         {
             return MakeMovementFlags(0, 0);
