@@ -68,13 +68,16 @@ public partial class TenPageModel : ObservableObject, ILeavingAware
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
     
     public ReplaceableObservableCollection<TenItem> Items { get; }
+    public IReorderableVirtualScrollAdapter Adapter { get; }
 
     public TenPageModel(IMessenger messenger)
     {
         _messenger = messenger;
         Items = new ReplaceableObservableCollection<TenItem>(Enumerable.Range(1, 30).Select(i => new TenItem($"Item {i}")));
+        Adapter = VirtualScroll.CreateObservableCollectionAdapter(Items);
         _idCounter = Items.Count;
     }
+
 
     [RelayCommand]
     private void AddItem()

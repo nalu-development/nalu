@@ -13,6 +13,15 @@ public interface IVirtualScroll : IView
     IVirtualScrollAdapter? Adapter { get; }
 
     /// <summary>
+    /// The drag handler for the virtual scroll.
+    /// </summary>
+    /// <remarks>
+    /// Drag and drop is enabled only when a drag handler is provided.
+    /// All provided adapter implementations support drag and drop.
+    /// </remarks>
+    IVirtualScrollDragHandler? DragHandler { get; }
+
+    /// <summary>
     /// Gets or sets the layout for the virtual scroll.
     /// </summary>
     IVirtualScrollLayout ItemsLayout { get; }

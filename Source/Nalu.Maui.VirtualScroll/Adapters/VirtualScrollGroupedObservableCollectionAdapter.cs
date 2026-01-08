@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Specialized;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Nalu;
 
@@ -8,12 +9,19 @@ namespace Nalu;
 /// </summary>
 /// <typeparam name="TSectionCollection">The type of the sections' collection.</typeparam>
 /// <typeparam name="TItemCollection">The type of the items collection within each section.</typeparam>
-public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection, TItemCollection> : IVirtualScrollAdapter
+public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection, TItemCollection> : IReorderableVirtualScrollAdapter
     where TSectionCollection : IList, INotifyCollectionChanged
     where TItemCollection : IList, INotifyCollectionChanged
 {
     private readonly TSectionCollection _sections;
     private readonly Func<object, TItemCollection> _sectionItemsGetter;
+    private Action<VirtualScrollDragMoveInfo>? _move;
+    private bool _dragging;
+
+    /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected TSectionCollection Sections => _sections;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollGroupedObservableCollectionAdapter{TSectionCollection, TItemCollection}" /> class.
@@ -24,6 +32,37 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     {
         _sections = sections ?? throw new ArgumentNullException(nameof(sections));
         _sectionItemsGetter = sectionItemsGetter ?? throw new ArgumentNullException(nameof(sectionItemsGetter));
+        SetupDragHandler();
+    }
+
+    private void SetupDragHandler()
+    {
+        var itemType = VirtualScrollObservableCollectionHelper.GetObservableCollectionItemType(typeof(TItemCollection));
+        if (itemType != null)
+        {
+            var typedMove = VirtualScrollObservableCollectionHelper.CreateMoveInObservableCollectionMethodInfo(itemType);
+
+            _move = info =>
+            {
+                _dragging = true;
+
+                try
+                {
+                    var sourceSection = GetSection(info.CurrentSectionIndex) ?? throw new InvalidOperationException($"Source section at index {info.CurrentSectionIndex} is null.");
+                    var sourceCollection = _sectionItemsGetter(sourceSection);
+
+                    var destinationSection = GetSection(info.DestinationSectionIndex) ??
+                                             throw new InvalidOperationException($"Destination section at index {info.DestinationSectionIndex} is null.");
+
+                    var destinationCollection = _sectionItemsGetter(destinationSection);
+                    typedMove.Invoke(null, [sourceCollection, destinationCollection, info]);
+                }
+                finally
+                {
+                    _dragging = false;
+                }
+            };
+        }
     }
 
     /// <inheritdoc/>
@@ -73,21 +112,71 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     }
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new GroupedObservableCollectionAdapterSubscription(_sections, _sectionItemsGetter, changeCallback);
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new GroupedObservableCollectionAdapterSubscription(_sections, _sectionItemsGetter, changeCallback, IsDragging);
 
+    /// <inheritdoc/>
+    public virtual bool CanDragItem(VirtualScrollDragInfo dragInfo)
+    {
+        AssertDragSupport();
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+    {
+        AssertDragSupport();
+        _move(dragMoveInfo);
+    }
+
+    /// <inheritdoc/>
+    public virtual bool CanDropItemAt(VirtualScrollDragDropInfo dragDropInfo) => true;
+
+    /// <inheritdoc/>
+    public virtual void OnDragInitiating(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
+    /// <inheritdoc/>
+    public virtual void OnDragStarted(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
+    /// <inheritdoc/>
+    public virtual void OnDragEnded(VirtualScrollDragInfo dragInfo)
+    {
+    }
+
+    private bool IsDragging() => _dragging;
+    
+    [MemberNotNull(nameof(_move))]
+    private void AssertDragSupport()
+    {
+        if (_move is null)
+        {
+            throw new InvalidOperationException($"Drag and drop is not supported for the underlying collection type: {typeof(TItemCollection).Name}.");
+        }
+    }
+    
     private sealed class GroupedObservableCollectionAdapterSubscription : IDisposable
     {
         private readonly TSectionCollection _sections;
         private readonly Func<object, TItemCollection> _sectionItemsGetter;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
+        private readonly Func<bool> _isDragging;
         private readonly List<ItemCollectionSubscription> _itemCollectionSubscriptions = [];
         private bool _disposed;
 
-        public GroupedObservableCollectionAdapterSubscription(TSectionCollection sections, Func<object, TItemCollection> sectionItemsGetter, Action<VirtualScrollChangeSet> changeCallback)
+        public GroupedObservableCollectionAdapterSubscription(
+            TSectionCollection sections,
+            Func<object, TItemCollection> sectionItemsGetter,
+            Action<VirtualScrollChangeSet> changeCallback,
+            Func<bool> isDragging
+        )
         {
             _sections = sections;
             _sectionItemsGetter = sectionItemsGetter;
             _changeCallback = changeCallback;
+            _isDragging = isDragging;
             _sections.CollectionChanged += OnSectionsCollectionChanged;
             
             // Subscribe to all existing sections' item collections
@@ -114,7 +203,7 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
 
         private void OnSectionsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (_disposed)
+            if (_disposed || _isDragging())
             {
                 return;
             }
@@ -334,7 +423,7 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
 
         private void OnItemCollectionChanged(int sectionIndex, NotifyCollectionChangedEventArgs e)
         {
-            if (_disposed)
+            if (_disposed || _isDragging())
             {
                 return;
             }

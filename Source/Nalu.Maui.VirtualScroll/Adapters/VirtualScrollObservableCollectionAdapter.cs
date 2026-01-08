@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Specialized;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Nalu;
 
@@ -7,11 +8,18 @@ namespace Nalu;
 /// An adapter that wraps an observable collection for use with <see cref="VirtualScroll"/>.
 /// </summary>
 /// <typeparam name="TItemCollection">The type of the observable collection.</typeparam>
-public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtualScrollAdapter
+public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IReorderableVirtualScrollAdapter
     where TItemCollection : IList, INotifyCollectionChanged
 {
     private readonly TItemCollection _collection;
+    private Action<VirtualScrollDragMoveInfo>? _move;
     private const int _sectionIndex = 0;
+    private bool _dragging;
+
+    /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected TItemCollection Collection => _collection;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollObservableCollectionAdapter{TObservableCollection}" /> class based on the specified observable collection.
@@ -19,6 +27,30 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
     public VirtualScrollObservableCollectionAdapter(TItemCollection collection)
     {
         _collection = collection ?? throw new ArgumentNullException(nameof(collection));
+        SetupDragHandler();
+    }
+
+    private void SetupDragHandler()
+    {
+        var itemType = VirtualScrollObservableCollectionHelper.GetObservableCollectionItemType(typeof(TItemCollection));
+        if (itemType != null)
+        {
+            var typedMove = VirtualScrollObservableCollectionHelper.CreateMoveInObservableCollectionMethodInfo(itemType);
+
+            _move = info =>
+            {
+                _dragging = true;
+
+                try
+                {
+                    typedMove.Invoke(null, [_collection, _collection, info]);
+                }
+                finally
+                {
+                    _dragging = false;
+                }
+            };
+        }
     }
 
     /// <inheritdoc/>
@@ -34,26 +66,71 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
     public object? GetItem(int sectionIndex, int itemIndex) => _collection[itemIndex];
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new ObservableCollectionAdapterSubscription(_collection, changeCallback);
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new ObservableCollectionAdapterSubscription(_collection, changeCallback, IsDragging);
 
+    /// <inheritdoc/>
+    public virtual bool CanDragItem(VirtualScrollDragInfo dragInfo)
+    {
+        AssertDragSupport();
+        return true;
+    }
+
+    /// <inheritdoc/>
+    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+    {
+        AssertDragSupport();
+        _move(dragMoveInfo);
+    }
+
+    /// <inheritdoc/>
+    public virtual bool CanDropItemAt(VirtualScrollDragDropInfo dragDropInfo) => true;
+
+    /// <inheritdoc/>
+    public virtual void OnDragStarted(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
+    /// <inheritdoc/>
+    public virtual void OnDragInitiating(VirtualScrollDragInfo dragInfo)
+    {
+    }
+    
+    /// <inheritdoc/>
+    public virtual void OnDragEnded(VirtualScrollDragInfo dragInfo)
+    {
+    }
+
+    private bool IsDragging() => _dragging;
+    
+    [MemberNotNull(nameof(_move))]
+    private void AssertDragSupport()
+    {
+        if (_move is null)
+        {
+            throw new InvalidOperationException($"Drag and drop is not supported for the underlying collection type: {typeof(TItemCollection).Name}.");
+        }
+    }
+    
     private sealed class ObservableCollectionAdapterSubscription : IDisposable
     {
         private readonly TItemCollection _collection;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
+        private readonly Func<bool> _isDragging;
         private bool _disposed;
         private bool _isEmpty;
 
-        public ObservableCollectionAdapterSubscription(TItemCollection collection, Action<VirtualScrollChangeSet> changeCallback)
+        public ObservableCollectionAdapterSubscription(TItemCollection collection, Action<VirtualScrollChangeSet> changeCallback, Func<bool> isDragging)
         {
             _collection = collection;
             _changeCallback = changeCallback;
+            _isDragging = isDragging;
             _isEmpty = _collection.Count == 0;
             _collection.CollectionChanged += OnCollectionChanged;
         }
 
         private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (_disposed)
+            if (_disposed || _isDragging())
             {
                 return;
             }
@@ -248,4 +325,3 @@ public class VirtualScrollObservableCollectionAdapter<TItemCollection> : IVirtua
         }
     }
 }
-

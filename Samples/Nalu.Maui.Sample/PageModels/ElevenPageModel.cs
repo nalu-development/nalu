@@ -16,17 +16,18 @@ public partial class ElevenPageModel : ObservableObject
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
 
     public ObservableCollection<ElevenGroup> Groups { get; }
-
-    public IVirtualScrollAdapter Adapter { get; }
+    
+    public IReorderableVirtualScrollAdapter Adapter { get; set; }
 
     public ElevenPageModel()
     {
         Groups = new ObservableCollection<ElevenGroup>(
-            Enumerable.Range(1, 5).Select(i => CreateGroup())
+            Enumerable.Range(1, 5).Select(_ => CreateGroup())
         );
 
         Adapter = VirtualScroll.CreateObservableCollectionAdapter(Groups, g => g.Items);
     }
+
 
     private ElevenGroup CreateGroup()
     {

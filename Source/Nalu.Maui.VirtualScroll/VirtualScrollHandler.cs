@@ -31,6 +31,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             [nameof(IVirtualScroll.IsRefreshEnabled)] = MapIsRefreshEnabled,
             [nameof(IVirtualScroll.RefreshAccentColor)] = MapRefreshAccentColor,
             [nameof(IVirtualScroll.IsRefreshing)] = MapIsRefreshing,
+            [nameof(IVirtualScroll.DragHandler)] = MapDragHandler,
             [nameof(VirtualScroll.FadingEdgeLength)] = MapFadingEdgeLength,
 #if IOS || MACCATALYST
             [nameof(IVirtualScroll.Background)] = MapBackground,

@@ -21,6 +21,7 @@ public partial class VirtualScrollHandler
     private bool _isUpdatingIsRefreshingFromPlatform;
     private VirtualScrollCollectionView? _collectionView;
     private VirtualScrollContainerView? _containerView;
+    private UILongPressGestureRecognizer? _dragGestureRecognizer;
 
     /// <summary>
     /// Gets the <see cref="UICollectionView"/> platform view.
@@ -106,6 +107,8 @@ public partial class VirtualScrollHandler
         var collectionView = new VirtualScrollCollectionView(CGRect.Empty, layout, (IVirtualScrollLayoutInfo)VirtualView);
         var reuseIdManager = new VirtualScrollPlatformReuseIdManager(collectionView);
 
+        _dragGestureRecognizer = CreateDragGestureRecognizer(VirtualView, collectionView);
+
         _reuseIdManager = reuseIdManager;
         _collectionView = collectionView;
 
@@ -133,14 +136,13 @@ public partial class VirtualScrollHandler
         collectionView.RefreshControl = _refreshControl;
 
         // Always create delegate (but scroll events are enabled/disabled via SetScrollEventsEnabled)
-        var controller = VirtualView as IVirtualScrollController ?? throw new InvalidOperationException("VirtualView must implement IVirtualScrollController.");
         var virtualScroll = VirtualView as VirtualScroll ?? throw new InvalidOperationException("VirtualView must be a VirtualScroll instance.");
         
         var scrollDirection = layout is VirtualScrollCollectionViewLayout virtualScrollLayout
             ? virtualScrollLayout.ScrollDirection
             : UICollectionViewScrollDirection.Vertical;
         
-        _delegate = new VirtualScrollDelegate(controller, scrollDirection, virtualScroll.FadingEdgeLength);
+        _delegate = new VirtualScrollDelegate(virtualScroll, scrollDirection, virtualScroll.FadingEdgeLength);
         collectionView.Delegate = _delegate;
 
         // Wrap collection view in a container view for fading edge support
@@ -163,6 +165,50 @@ public partial class VirtualScrollHandler
 
         return containerView;
     }
+
+    private static UILongPressGestureRecognizer CreateDragGestureRecognizer(IVirtualScroll virtualView, VirtualScrollCollectionView collectionView)
+        => new(gesture =>
+            {
+                switch (gesture.State)
+                {
+                    case UIGestureRecognizerState.Began:
+                    {
+                        var location = gesture.LocationInView(collectionView);
+                        var indexPath = collectionView.IndexPathForItemAtPoint(location);
+                        if (indexPath is not null && collectionView.CellForItem(indexPath) is { } cell)
+                        {
+                            ((VirtualScrollDelegate)collectionView.Delegate).ItemDragInitiating(indexPath);
+                            indexPath = collectionView.IndexPathForCell(cell);
+                            if (indexPath is not null)
+                            {
+                                collectionView.BeginInteractiveMovementForItem(indexPath);
+                            }
+                        }
+
+                        break;
+                    }
+                    case UIGestureRecognizerState.Changed:
+                    {
+                        var location = gesture.LocationInView(collectionView);
+                        collectionView.UpdateInteractiveMovement(location);
+
+                        break;
+                    }
+                    case UIGestureRecognizerState.Ended:
+                    {
+                        collectionView.EndInteractiveMovement();
+                        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragEnded();
+                        break;
+                    }
+                    default:
+                    {
+                        collectionView.CancelInteractiveMovement();
+                        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragEnded();
+                        break;
+                    }
+                }
+            }
+        );
 
     private void OnFadingEdgeBoundsChanged(object? s, EventArgs e)
     {
@@ -210,9 +256,10 @@ public partial class VirtualScrollHandler
         
         _delegate?.Dispose();
         _delegate = null;
-        
+
         _collectionView?.Dispose();
         _collectionView = null;
+        _dragGestureRecognizer?.Dispose();
         _containerView?.Dispose();
         _containerView = null;
         _reuseIdManager = null;
@@ -220,6 +267,26 @@ public partial class VirtualScrollHandler
         base.DisconnectHandler(platformView);
 
         EnsureCreatedCellsCleanup();
+    }
+
+    /// <summary>
+    /// Maps the drag handler property from the virtual scroll to the platform collection view.
+    /// </summary>
+    public static void MapDragHandler(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        var collectionView = handler.PlatformCollectionView;
+        var isDragEnabled = virtualScroll.DragHandler is not null;
+        var dragGestureRecognizer = handler._dragGestureRecognizer ?? throw new InvalidOperationException("Drag gesture recognizer is not initialized.");
+
+        if (isDragEnabled)
+        {
+            
+            collectionView.AddGestureRecognizer(dragGestureRecognizer);
+        }
+        else
+        {
+            collectionView.RemoveGestureRecognizer(dragGestureRecognizer);
+        }
     }
 
     /// <summary>

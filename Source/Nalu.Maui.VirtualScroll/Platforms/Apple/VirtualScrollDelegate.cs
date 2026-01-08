@@ -1,3 +1,4 @@
+using Foundation;
 using UIKit;
 
 namespace Nalu;
@@ -7,15 +8,17 @@ namespace Nalu;
 /// </summary>
 internal class VirtualScrollDelegate : UICollectionViewDelegate
 {
+    private IVirtualScroll? _virtualScroll;
     private IVirtualScrollController? _controller;
     private bool _scrollEventsEnabled;
     private readonly FadingEdgeController _fadingEdgeController = new();
     private ItemsLayoutOrientation _orientation;
     private double _fadingEdgeLength;
 
-    public VirtualScrollDelegate(IVirtualScrollController controller, UICollectionViewScrollDirection scrollDirection, double fadingEdgeLength)
+    public VirtualScrollDelegate(IVirtualScroll virtualScroll, UICollectionViewScrollDirection scrollDirection, double fadingEdgeLength)
     {
-        _controller = controller;
+        _virtualScroll = virtualScroll;
+        _controller = virtualScroll as IVirtualScrollController ?? throw new InvalidOperationException("VirtualView must implement IVirtualScrollController.");
         
         // Cache initial orientation from scroll direction
         _orientation = scrollDirection == UICollectionViewScrollDirection.Vertical
@@ -24,6 +27,116 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
         
         // Cache initial fading edge length
         _fadingEdgeLength = fadingEdgeLength;
+    }
+    
+    private object? _currentDragItem;
+    private NSIndexPath? _currentDragIndexPath;
+    private NSIndexPath? _checkedDestinationIndexPath;
+    private NSIndexPath? _checkedFinalIndexPath;
+    
+    public VirtualScrollDragInfo? ItemDragInitiating(NSIndexPath indexPath)
+    {
+        if (_virtualScroll?.DragHandler is { } dragHandler)
+        {
+            var sectionIndex = indexPath.Section;
+            var itemIndex = indexPath.Item.ToInt32();
+            var item = _virtualScroll.Adapter?.GetItem(sectionIndex, itemIndex);
+            var dragInfo = new VirtualScrollDragInfo(item, sectionIndex, itemIndex);
+            dragHandler.OnDragInitiating(dragInfo);
+            return dragInfo;
+        }
+        
+        return null;
+    }
+    
+    public void ItemDragStarted(NSIndexPath indexPath)
+    {
+        if (_virtualScroll?.DragHandler is { } dragHandler)
+        {
+            var sectionIndex = indexPath.Section;
+            var itemIndex = indexPath.Item.ToInt32();
+            _currentDragItem = _virtualScroll.Adapter?.GetItem(sectionIndex, itemIndex);
+            _currentDragIndexPath = indexPath;
+            dragHandler.OnDragStarted(new VirtualScrollDragInfo(_currentDragItem, sectionIndex, itemIndex));
+        }
+    }
+    
+#pragma warning disable IDE0060 // Remove unused parameter warning
+    public void ItemDragMoved(NSIndexPath sourceIndexPath, NSIndexPath destinationIndexPath)
+#pragma warning restore IDE0060
+        => _currentDragIndexPath = destinationIndexPath;
+    
+    public void ItemDragEnded()
+    {
+        if (_virtualScroll?.DragHandler is { } dragHandler && _currentDragItem is not null && _currentDragIndexPath is not null)
+        {
+            var sectionIndex = _currentDragIndexPath.Section;
+            var itemIndex = _currentDragIndexPath.Item.ToInt32();
+            dragHandler.OnDragEnded(new VirtualScrollDragInfo(_currentDragItem, sectionIndex, itemIndex));
+        }
+
+        _currentDragItem = null;
+        _currentDragIndexPath = null;
+    }
+
+    /// <inheritdoc/>
+    public override NSIndexPath GetTargetIndexPathForMove(UICollectionView collectionView, NSIndexPath originalIndexPath, NSIndexPath proposedIndexPath)
+    {
+        if (proposedIndexPath == _checkedDestinationIndexPath && _checkedFinalIndexPath is not null)
+        {
+            return _checkedFinalIndexPath;
+        }
+        
+        if (_virtualScroll?.DragHandler is { } dragHandler && _currentDragIndexPath is not null)
+        {
+            var originalSectionIndex = originalIndexPath.Section;
+            var originalItemIndex = originalIndexPath.Item.ToInt32();
+            var currentSectionIndex = _currentDragIndexPath.Section;
+            var currentItemIndex = _currentDragIndexPath.Item.ToInt32();
+            var destinationSectionIndex = proposedIndexPath.Section;
+            var destinationItemIndex = proposedIndexPath.Item.ToInt32();
+            var info = new VirtualScrollDragDropInfo(_currentDragItem, originalSectionIndex, originalItemIndex, currentSectionIndex, currentItemIndex, destinationSectionIndex, destinationItemIndex);
+            var canDrop = dragHandler.CanDropItemAt(info);
+            _checkedDestinationIndexPath = proposedIndexPath;
+            _checkedFinalIndexPath = canDrop ? proposedIndexPath : _currentDragIndexPath;
+            return _checkedFinalIndexPath;
+        }
+
+#pragma warning disable CA1422
+        return base.GetTargetIndexPathForMove(collectionView, originalIndexPath, proposedIndexPath);
+#pragma warning restore CA1422
+    }
+
+    public override NSIndexPath GetTargetIndexPathForMoveOfItemFromOriginalIndexPath(
+        UICollectionView collectionView,
+        NSIndexPath originalIndexPath,
+        NSIndexPath currentIndexPath,
+        NSIndexPath proposedIndexPath
+    )
+    {
+        if (proposedIndexPath == _checkedDestinationIndexPath && _checkedFinalIndexPath is not null)
+        {
+            return _checkedFinalIndexPath;
+        }
+
+        if (_virtualScroll?.DragHandler is { } dragHandler)
+        {
+            var originalSectionIndex = originalIndexPath.Section;
+            var originalItemIndex = originalIndexPath.Item.ToInt32();
+            var currentSectionIndex = currentIndexPath.Section;
+            var currentItemIndex = currentIndexPath.Item.ToInt32();
+            var destinationSectionIndex = proposedIndexPath.Section;
+            var destinationItemIndex = proposedIndexPath.Item.ToInt32();
+            var info = new VirtualScrollDragDropInfo(_currentDragItem, originalSectionIndex, originalItemIndex, currentSectionIndex, currentItemIndex, destinationSectionIndex, destinationItemIndex);
+            var canDrop = dragHandler.CanDropItemAt(info);
+            _checkedDestinationIndexPath = proposedIndexPath;
+            _checkedFinalIndexPath = canDrop ? proposedIndexPath : currentIndexPath;
+            return _checkedFinalIndexPath;
+        }
+        
+#pragma warning disable CA1416
+        return base.GetTargetIndexPathForMoveOfItemFromOriginalIndexPath(collectionView, originalIndexPath, currentIndexPath, proposedIndexPath);
+#pragma warning restore CA1416
     }
 
     /// <summary>
@@ -89,7 +202,9 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
         if (disposing)
         {
             _controller = null;
+            _virtualScroll = null;
         }
+
         base.Dispose(disposing);
     }
 }

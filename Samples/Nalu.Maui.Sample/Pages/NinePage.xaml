@@ -3,28 +3,157 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:pages="clr-namespace:Nalu.Maui.Sample.Pages"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="Nalu.Maui.Sample.Pages.NinePage"
              x:DataType="pageModels:NinePageModel"
-             Title="Page Nine">
-    <ScrollView Padding="16" Background="LightGreen">
-        <VerticalStackLayout Spacing="16" VerticalOptions="Center">
-            <Image Source="banner.png"
-                   HeightRequest="128"
-                   Aspect="AspectFit"
-                   Margin="0,16,0,24" />
-            
-            <Label Text="Page Nine"
-                   FontSize="32"
-                   FontAttributes="Bold"
-                   HorizontalOptions="Center" />
-            
-            <Label Text="{Binding Message}"
-                   FontSize="18"
-                   HorizontalOptions="Center" />
-            
-            <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
-                   HorizontalOptions="Center" />
-        </VerticalStackLayout>
-    </ScrollView>
+             Title="Friends Groups">
+    
+    <ContentPage.Resources>
+        <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+        <!-- Group Header Template -->
+        <DataTemplate x:Key="GroupHeaderTemplate" x:DataType="pageModels:FriendGroupHeader">
+            <nalu:ViewBox>
+                <Grid Padding="16,20,16,8" ColumnDefinitions="*,Auto" BackgroundColor="Beige">
+                    <!-- View Mode -->
+                    <Label Grid.Column="0"
+                           Text="{Binding GroupName}"
+                           FontSize="22"
+                           FontAttributes="Bold"
+                           TextColor="#1a1a2e"
+                           VerticalOptions="Center"
+                           IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding StartEditingCommand}" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    
+                    <!-- Edit Mode -->
+                    <Grid Grid.Column="0" 
+                          ColumnDefinitions="*,Auto" 
+                          ColumnSpacing="8"
+                          IsVisible="{Binding IsEditing}">
+                        <Entry Grid.Column="0"
+                               Text="{Binding GroupName}"
+                               FontSize="20"
+                               FontAttributes="Bold"
+                               BackgroundColor="White"
+                               VerticalOptions="Center" />
+                        <Button Grid.Column="1"
+                                Text="✓"
+                                FontSize="16"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                BackgroundColor="#4CAF50"
+                                TextColor="White"
+                                CornerRadius="22"
+                                Command="{Binding SaveGroupNameCommand}" />
+                    </Grid>
+                </Grid>
+            </nalu:ViewBox>
+        </DataTemplate>
+        
+        <!-- Friend Item Template -->
+        <DataTemplate x:Key="FriendItemTemplate" x:DataType="pageModels:FriendItem">
+            <nalu:ViewBox>
+                <Border Margin="12,4"
+                        Padding="12,10"
+                        BackgroundColor="White"
+                        StrokeShape="RoundRectangle 12"
+                        Stroke="#e0e0e0"
+                        StrokeThickness="1">
+                    <Border.Shadow>
+                        <Shadow Radius="4" Opacity="0.08" Offset="0,2" />
+                    </Border.Shadow>
+                    
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <!-- Checkbox -->
+                        <CheckBox Grid.Column="0"
+                                  IsChecked="{Binding IsSelected}"
+                                  Color="#6366f1"
+                                  VerticalOptions="Center" />
+                        
+                        <!-- View Mode: Tappable Name -->
+                        <Label Grid.Column="1"
+                               Text="{Binding Name}"
+                               FontSize="16"
+                               TextColor="#333"
+                               VerticalOptions="Center"
+                               IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding StartEditingCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                        
+                        <!-- Edit Mode: Entry with Save Button -->
+                        <Grid Grid.Column="1"
+                              ColumnDefinitions="*,Auto"
+                              ColumnSpacing="8"
+                              IsVisible="{Binding IsEditing}">
+                            <Entry Grid.Column="0"
+                                   Text="{Binding Name}"
+                                   FontSize="16"
+                                   BackgroundColor="#f5f5f5"
+                                   VerticalOptions="Center" />
+                            <Button Grid.Column="1"
+                                    Text="✓"
+                                    FontSize="14"
+                                    WidthRequest="36"
+                                    HeightRequest="36"
+                                    Padding="0"
+                                    BackgroundColor="#4CAF50"
+                                    TextColor="White"
+                                    CornerRadius="18"
+                                    Command="{Binding SaveNameCommand}" />
+                        </Grid>
+                        
+                        <!-- Remove Button -->
+                        <Button Grid.Column="2"
+                                Text="−"
+                                FontSize="20"
+                                FontAttributes="Bold"
+                                WidthRequest="36"
+                                HeightRequest="36"
+                                Padding="0"
+                                BackgroundColor="#ff6b6b"
+                                TextColor="White"
+                                CornerRadius="18"
+                                Command="{Binding RemoveCommand}"
+                                IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}" />
+                    </Grid>
+                </Border>
+            </nalu:ViewBox>
+        </DataTemplate>
+        
+        <!-- Add Friend Button Template -->
+        <DataTemplate x:Key="AddFriendButtonTemplate" x:DataType="pageModels:AddFriendButton">
+            <nalu:ViewBox>
+                <Button Margin="12,8,12,16"
+                        Padding="16,12"
+                        Text="+ Add entry"
+                        FontSize="15"
+                        TextColor="#6366f1"
+                        BackgroundColor="#f0f0ff"
+                        BorderColor="#6366f1"
+                        BorderWidth="1"
+                        CornerRadius="10"
+                        Command="{Binding AddFriendCommand}" />
+            </nalu:ViewBox>
+        </DataTemplate>
+        
+        <!-- DataTemplateSelector -->
+        <pages:FriendListTemplateSelector x:Key="FriendListTemplateSelector"
+                                          GroupHeaderTemplate="{StaticResource GroupHeaderTemplate}"
+                                          FriendItemTemplate="{StaticResource FriendItemTemplate}"
+                                          AddFriendButtonTemplate="{StaticResource AddFriendButtonTemplate}" />
+    </ContentPage.Resources>
+    
+    <Grid IgnoreSafeArea="True" BackgroundColor="#f8f9fa">
+        <vs:VirtualScroll ItemsSource="{Binding Adapter}"
+                          DragHandler="{Binding Adapter}"
+                          ItemTemplate="{StaticResource FriendListTemplateSelector}">
+        </vs:VirtualScroll>
+    </Grid>
 </ContentPage>
-

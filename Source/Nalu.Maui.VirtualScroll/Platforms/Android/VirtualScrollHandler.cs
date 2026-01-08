@@ -10,12 +10,13 @@ namespace Nalu;
 
 #pragma warning disable IDE0060
 // ReSharper disable UnusedParameter.Local
-
 /// <summary>
 /// Handler for the <see cref="VirtualScroll" /> view on Android.
 /// </summary>
 public partial class VirtualScrollHandler
 {
+    private ItemTouchHelper? _itemTouchHelper;
+    private VirtualScrollTouchHelperCallback? _touchHelperCallback;
     private VirtualScrollRecyclerView? _recyclerView;
     private VirtualScrollRecyclerViewAdapter? _recyclerViewAdapter;
     private VirtualScrollPlatformFlattenedAdapterNotifier? _notifier;
@@ -32,6 +33,8 @@ public partial class VirtualScrollHandler
 
         var recyclerView = new VirtualScrollRecyclerView(context);
         _recyclerView = recyclerView;
+        
+        _touchHelperCallback = new VirtualScrollTouchHelperCallback(VirtualView);
 
         // Scroll listener will be set up when needed via MapSetScrollEventEnabled
 
@@ -92,6 +95,11 @@ public partial class VirtualScrollHandler
         
         _recyclerViewAdapter?.Dispose();
         _recyclerViewAdapter = null;
+        _touchHelperCallback?.Dispose();
+        _touchHelperCallback = null;
+        _itemTouchHelper?.AttachToRecyclerView(null);
+        _itemTouchHelper?.Dispose();
+        _itemTouchHelper = null;
         _recyclerView?.Dispose();
         _recyclerView = null;
         _swipeRefreshLayout?.Dispose();
@@ -202,6 +210,7 @@ public partial class VirtualScrollHandler
             recyclerView.SetAdapter(recyclerViewAdapter);
             handler._recyclerViewAdapter = recyclerViewAdapter;
             handler._flattenedAdapter = flattenedAdapter;
+            handler._touchHelperCallback?.SetAdapter(flattenedAdapter);
             
             // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
             handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, flattenedAdapter);
@@ -212,6 +221,30 @@ public partial class VirtualScrollHandler
             handler._recyclerViewAdapter?.Dispose();
             handler._recyclerViewAdapter = null;
             handler._flattenedAdapter = null;
+            handler._touchHelperCallback?.SetAdapter(null);
+        }
+    }
+
+    /// <summary>
+    /// Maps the drag handler property from the virtual scroll to the platform collection view.
+    /// </summary>
+    public static void MapDragHandler(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        var recyclerView = handler.PlatformRecyclerView;
+        if (virtualScroll.DragHandler is not null)
+        {
+            if (handler._touchHelperCallback is null)
+            {
+                throw new InvalidOperationException("TouchHelperCallback must be created before mapping the DragHandler.");
+            }
+
+            handler._itemTouchHelper = new ItemTouchHelper(handler._touchHelperCallback);
+            handler._itemTouchHelper.AttachToRecyclerView(recyclerView);
+        }
+        else
+        {
+            handler._itemTouchHelper?.AttachToRecyclerView(null);
+            handler._itemTouchHelper?.Dispose();
         }
     }
 

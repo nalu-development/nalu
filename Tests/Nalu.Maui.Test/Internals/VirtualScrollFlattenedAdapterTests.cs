@@ -6814,5 +6814,53 @@ public class VirtualScrollFlattenedAdapterTests
         // Final count unchanged
         flattenedAdapter.GetItemCount().Should().Be(7);
     }
+
+    [Fact]
+    internal void OnAdapterChangedWithMoveItemCrossSectionWithAllHeadersFootersShouldAccountForAll()
+    {
+        // Arrange
+        Action<VirtualScrollChangeSet>? adapterCallback = null;
+        var itemCounts = new[] { 3, 3 }; // Section 0: 3 items, Section 1: 3 items
+        var adapter = Substitute.For<IVirtualScrollAdapter>();
+        adapter.GetSectionCount().Returns(2);
+        adapter.GetItemCount(Arg.Any<int>()).Returns(call => itemCounts[call.Arg<int>()]);
+        adapter.GetItem(Arg.Any<int>(), Arg.Any<int>()).Returns(call => $"S{call.ArgAt<int>(0)}I{call.ArgAt<int>(1)}");
+        adapter.GetSection(Arg.Any<int>()).Returns(call => $"Section{call.Arg<int>()}");
+        adapter.Subscribe(Arg.Any<Action<VirtualScrollChangeSet>>())
+            .Returns(call =>
+            {
+                adapterCallback = call.Arg<Action<VirtualScrollChangeSet>>();
+                return Substitute.For<IDisposable>();
+            });
+        
+        var layoutInfo = CreateLayoutInfo(hasGlobalHeader: true, hasGlobalFooter: true, hasSectionHeader: true, hasSectionFooter: true);
+        var flattenedAdapter = CreateAdapter(adapter, layoutInfo);
+        
+        // Layout with all headers/footers:
+        // GlobalHeader(0) + Section0[SectionHeader(1), Item0(2), Item1(3), Item2(4), SectionFooter(5)] 
+        // + Section1[SectionHeader(6), Item0(7), Item1(8), Item2(9), SectionFooter(10)] + GlobalFooter(11)
+        // Total: 12 items
+        flattenedAdapter.GetItemCount().Should().Be(12);
+        
+        VirtualScrollFlattenedChangeSet? receivedChangeSet = null;
+        flattenedAdapter.Subscribe(changeSet => receivedChangeSet = changeSet);
+
+        // Act - Move item from last position of section 0 (index 2) to first position of section 1 (index 0)
+        // After move: Section 0 has 2 items, Section 1 has 4 items
+        itemCounts[0] = 2;
+        itemCounts[1] = 4;
+        var changeSet = new VirtualScrollChangeSet([new VirtualScrollChange(VirtualScrollChangeOperation.MoveItem, 0, 2, 1, 0)]);
+        adapterCallback?.Invoke(changeSet);
+
+        // Assert
+        receivedChangeSet.Should().NotBeNull();
+        receivedChangeSet!.Changes.Should().HaveCount(1);
+        var change = receivedChangeSet.Changes.First();
+        change.Operation.Should().Be(VirtualScrollFlattenedChangeOperation.MoveItem);
+        // Source: GlobalHeader(1) + SectionHeader(1) + sourceItemIndex(2) = 4
+        change.StartItemIndex.Should().Be(4);
+        // Destination: GlobalHeader(1) + Section0(SectionHeader + 3 items + SectionFooter = 5) + SectionHeader(1) + destItemIndex(0) = 7
+        change.EndItemIndex.Should().Be(7);
+    }
 }
 
