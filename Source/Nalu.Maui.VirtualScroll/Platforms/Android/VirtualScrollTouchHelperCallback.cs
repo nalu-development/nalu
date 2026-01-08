@@ -46,9 +46,9 @@ internal class VirtualScrollTouchHelperCallback : ItemTouchHelper.Callback
             destinationItemIndex
         );
 
-        dragHandler.CanDropItemAt(dragMoveInfo);
-        
-        return true;
+        var canDropItemAt = dragHandler.CanDropItemAt(dragMoveInfo);
+
+        return canDropItemAt;
     }
 
     private object? GetItemWithCache(IVirtualScrollAdapter adapter, int sourceSectionIndex, int sourceItemIndex) => _draggingItem?.TryGetTarget(out var cachedItem) is true ? cachedItem : adapter.GetItem(sourceSectionIndex, sourceItemIndex);

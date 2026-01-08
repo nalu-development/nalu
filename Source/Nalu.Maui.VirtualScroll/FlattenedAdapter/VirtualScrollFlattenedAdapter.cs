@@ -346,8 +346,9 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
 
             case VirtualScrollChangeOperation.MoveItem:
                 {
-                    var fromFlattenedIndex = GetFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
-                    var toFlattenedIndex = GetFlattenedIndexForItem(change.EndSectionIndex, change.EndItemIndex);
+                    // Use cached offsets because the item has already been moved in the adapter
+                    var fromFlattenedIndex = GetCachedFlattenedIndexForItem(change.StartSectionIndex, change.StartItemIndex);
+                    var toFlattenedIndex = GetCachedFlattenedIndexForItem(change.EndSectionIndex, change.EndItemIndex);
                     if (fromFlattenedIndex < 0 || toFlattenedIndex < 0)
                     {
                         // Source or destination section/item no longer exists - skip this notification
@@ -639,7 +640,6 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
         if (endSectionIndex >= _sectionCount)
         {
             endSectionIndex = _sectionCount - 1;
-            sectionCount = endSectionIndex - startSectionIndex + 1;
         }
 
         var startOffset = _sectionOffsets[startSectionIndex];
