@@ -65,19 +65,6 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
     public void ItemDragMoved(NSIndexPath sourceIndexPath, NSIndexPath destinationIndexPath)
 #pragma warning restore IDE0060
         => _currentDragIndexPath = destinationIndexPath;
-
-    public void ItemDragCanceled()
-    {
-        if (_virtualScroll?.DragHandler is { } dragHandler && _currentDragItem is not null && _currentDragIndexPath is not null)
-        {
-            var sectionIndex = _currentDragIndexPath.Section;
-            var itemIndex = _currentDragIndexPath.Item.ToInt32();
-            dragHandler.OnDragCanceled(new VirtualScrollDragInfo(_currentDragItem, sectionIndex, itemIndex));
-        }
-
-        _currentDragItem = null;
-        _currentDragIndexPath = null;
-    }
     
     public void ItemDragEnded()
     {

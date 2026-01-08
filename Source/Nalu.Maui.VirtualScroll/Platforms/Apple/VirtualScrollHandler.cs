@@ -203,7 +203,7 @@ public partial class VirtualScrollHandler
                     default:
                     {
                         collectionView.CancelInteractiveMovement();
-                        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragCanceled();
+                        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragEnded();
                         break;
                     }
                 }

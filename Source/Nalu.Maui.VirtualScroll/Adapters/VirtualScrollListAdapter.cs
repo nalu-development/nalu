@@ -69,11 +69,6 @@ public class VirtualScrollListAdapter : IReorderableVirtualScrollAdapter
     }
 
     /// <inheritdoc/>
-    public virtual void OnDragCanceled(VirtualScrollDragInfo dragInfo)
-    {
-    }
-
-    /// <inheritdoc/>
     public virtual void OnDragEnded(VirtualScrollDragInfo dragInfo)
     {
     }
