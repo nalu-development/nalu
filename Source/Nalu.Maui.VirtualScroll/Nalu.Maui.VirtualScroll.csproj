@@ -12,13 +12,13 @@
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <IsAotCompatible>true</IsAotCompatible>
     <!-- Override license for this project - Dual License MIT and Sponsor License -->
     <PackageLicenseExpression></PackageLicenseExpression>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">
     <TargetFrameworks>$(AllTargetFrameworks)</TargetFrameworks>
-<!-- <TargetFrameworks>net9.0;net9.0-android;net9.0-ios</TargetFrameworks> -->
 
     <SingleProject>true</SingleProject>
     <OutputType>Library</OutputType>

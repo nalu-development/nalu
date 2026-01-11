@@ -7,14 +7,10 @@ namespace Nalu;
 /// A DataTemplateSelector that selects a <see cref="DataTemplate"/> based on the <see cref="DataTemplate"/> provided as the item.
 /// It also ensures that the <see cref="BindableObject.BindingContext"/> of the created <see cref="View"/> is set to the <see cref="BindableObject.BindingContext"/> of the container.
 /// </summary>
-public class TemplateSourceSelector : DataTemplateSelector
+public partial class TemplateSourceSelector : DataTemplateSelector
 {
-    private static readonly Type _setterSpecificityType = typeof(BindableObject).Assembly.GetType("Microsoft.Maui.Controls.SetterSpecificity")!;
-    private static readonly object _triggerSpecificity = _setterSpecificityType.GetField("Trigger")!.GetValue(null)!;
-    private static readonly MethodInfo _setBindingSpecificityMethod = typeof(BindableObject).GetMethod("SetBinding", BindingFlags.NonPublic | BindingFlags.Instance, [typeof(BindableProperty), typeof(BindingBase), _setterSpecificityType])!;
-    
     private readonly ConditionalWeakTable<DataTemplate, DataTemplate> _dataTemplates = new();
-
+    
     /// <inheritdoc />
     protected override DataTemplate OnSelectTemplate(object item, BindableObject container)
     {
@@ -30,8 +26,7 @@ public class TemplateSourceSelector : DataTemplateSelector
                     throw new InvalidOperationException("DataTemplate must create a View");
                 }
 
-                var binding = new Binding(BindableObject.BindingContextProperty.PropertyName, source: container);
-                _setBindingSpecificityMethod.Invoke(view, [BindableObject.BindingContextProperty, binding, _triggerSpecificity]);
+                view.SetBinding(BindableObject.BindingContextProperty, static (BindableObject container) => container.BindingContext, source: container);
                 
                 return view;
             });
@@ -41,4 +36,6 @@ public class TemplateSourceSelector : DataTemplateSelector
         
         return cachedTemplate;
     }
+
+    
 }

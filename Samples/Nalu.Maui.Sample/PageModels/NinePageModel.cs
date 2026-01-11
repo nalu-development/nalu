@@ -7,7 +7,7 @@ namespace Nalu.Maui.Sample.PageModels;
 /// <summary>
 /// Base class for all items in the flattened friends list.
 /// </summary>
-public abstract partial class FriendListItemBase : ObservableObject
+public abstract class FriendListItemBase : ObservableObject
 {
     /// <summary>
     /// Reference to the parent group for operations.
@@ -142,7 +142,7 @@ public class FriendGroup
     }
 }
 
-public sealed class FriendListAdapter : VirtualScrollObservableCollectionAdapter<ObservableCollection<FriendListItemBase>>
+public sealed class FriendListAdapter : VirtualScrollObservableCollectionAdapter<FriendListItemBase>
 {
     public FriendListAdapter(ObservableCollection<FriendListItemBase> collection) : base(collection)
     {

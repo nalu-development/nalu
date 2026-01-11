@@ -1,11 +1,18 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Nalu.Internals;
 
-internal static class GenericBindableProperty<TBindable>
+internal static class GenericBindableProperty<[DynamicallyAccessedMembers(DeclaringTypeMembers)]TBindable>
     where TBindable : BindableObject
 {
+    // ReSharper disable once InconsistentNaming
+    private const DynamicallyAccessedMemberTypes DeclaringTypeMembers = DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods;
+    // ReSharper disable once InconsistentNaming
+    private const DynamicallyAccessedMemberTypes ReturnTypeMembers = DynamicallyAccessedMemberTypes.PublicParameterlessConstructor;
+    
     public delegate void PropertyChangeDelegate<in TValue>(TValue oldValue, TValue newValue);
 
-    public static BindableProperty Create<TValue>(
+    public static BindableProperty Create<[DynamicallyAccessedMembers(ReturnTypeMembers)]TValue>(
         string propertyName,
         TValue defaultValue = default!,
         BindingMode defaultBindingMode = BindingMode.OneWay,

@@ -1,14 +1,34 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Nalu;
 
-internal static class NavigationHelper
+internal static partial class NavigationHelper
 {
     private static readonly MethodInfo _sendEnteringWithIntentAsyncMethod =
         typeof(NavigationHelper).GetMethod(nameof(SendEnteringWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     private static readonly MethodInfo _sendAppearingWithIntentAsyncMethod =
         typeof(NavigationHelper).GetMethod(nameof(SendAppearingWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
+
+
+    private static MethodInfo? GetImplementedLifecycleMethod(
+        Regex methodRegex, 
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] Type targetType,
+        Type intentType)
+    {
+        var methodInfo = targetType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                                   .Where(m => methodRegex.IsMatch(m.Name) && m.ReturnType == typeof(ValueTask))
+                                   .FirstOrDefault(m =>
+                                       {
+                                           var parameters = m.GetParameters();
+                                           return parameters.Length == 1 && parameters[0].ParameterType == intentType;
+                                       }
+                                   );
+
+        return methodInfo;
+    }
 
     public static ValueTask SendEnteringAsync(IShellProxy shell, Page page, object? intent, INavigationConfiguration configuration)
     {
@@ -25,9 +45,12 @@ internal static class NavigationHelper
         if (intent is not null)
         {
             var intentType = intent.GetType();
-            var enteringWithIntentType = typeof(IEnteringAware<>).MakeGenericType(intentType);
+            
+#pragma warning disable IL2072 // All page models have been registered with NavigationConfigurator.DynamicallyAccessedPageModelMembers
+            var enteringWithIntentMethod = GetImplementedLifecycleMethod(OnEnteringAsyncRegex(), target.GetType(), intentType);
+#pragma warning restore IL2072
 
-            if (enteringWithIntentType.IsInstanceOfType(target))
+            if (enteringWithIntentMethod is not null)
             {
 #if DEBUG
                 Console.WriteLine($"Entering {target.GetType().FullName} with intent {intent.GetType().FullName}");
@@ -36,7 +59,7 @@ internal static class NavigationHelper
                     new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.HandledWithIntent, intent)
                 );
 
-                return (ValueTask) _sendEnteringWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
+                return (ValueTask) enteringWithIntentMethod.Invoke(target, [intent])!;
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
@@ -107,9 +130,11 @@ internal static class NavigationHelper
         if (intent is not null)
         {
             var intentType = intent.GetType();
-            var appearingWithIntentType = typeof(IAppearingAware<>).MakeGenericType(intentType);
+#pragma warning disable IL2072 // All page models have been registered with NavigationConfigurator.DynamicallyAccessedPageModelMembers
+            var appearingWithIntentMethod = GetImplementedLifecycleMethod(OnAppearingAsyncRegex(), target.GetType(), intentType);
+#pragma warning restore IL2072
 
-            if (appearingWithIntentType.IsInstanceOfType(target))
+            if (appearingWithIntentMethod is not null)
             {
 #if DEBUG
                 Console.WriteLine($"Appearing {target.GetType().FullName} with intent {intent.GetType().FullName}");
@@ -118,7 +143,7 @@ internal static class NavigationHelper
                     new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.HandledWithIntent, intent)
                 );
 
-                return (ValueTask) _sendAppearingWithIntentAsyncMethod.MakeGenericMethod(intentType).Invoke(null, [target, intent])!;
+                return (ValueTask) appearingWithIntentMethod.Invoke(target, [intent])!;
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
@@ -207,24 +232,24 @@ internal static class NavigationHelper
         }
 
         var intentType = intent.GetType();
-        var enteringWithIntentType = typeof(IEnteringAware<>).MakeGenericType(intentType);
 
-        if (enteringWithIntentType.IsAssignableFrom(pageModelType))
+#pragma warning disable IL2072 // All page models have been registered with NavigationConfigurator.DynamicallyAccessedPageModelMembers
+        if (GetImplementedLifecycleMethod(OnEnteringAsyncRegex(), pageModelType, intentType) is not null)
         {
             return;
         }
 
-        var appearingWithIntentType = typeof(IAppearingAware<>).MakeGenericType(intentType);
-
-        if (appearingWithIntentType.IsAssignableFrom(pageModelType))
+        if (GetImplementedLifecycleMethod(OnAppearingAsyncRegex(), pageModelType, intentType) is not null)
         {
             return;
         }
+#pragma warning restore IL2072
 
         onFailure?.Invoke();
 
+        var intentTypeFullName = intentType.FullName;
         throw new InvalidOperationException(
-            $"{pageModelType.FullName} must implement either {enteringWithIntentType.FullName} or {appearingWithIntentType.FullName} to receive intent."
+            $"{pageModelType.FullName} must implement either IEnteringAware<{intentTypeFullName}> or IAppearingAware<{intentTypeFullName}> to receive intent."
         );
     }
 
@@ -250,4 +275,10 @@ internal static class NavigationHelper
 
     private static ValueTask SendEnteringWithIntentAsync<TIntent>(IEnteringAware<TIntent> target, TIntent intent) => target.OnEnteringAsync(intent);
     private static ValueTask SendAppearingWithIntentAsync<TIntent>(IAppearingAware<TIntent> target, TIntent intent) => target.OnAppearingAsync(intent);
+    
+    [GeneratedRegex("^(Nalu\\.IEnteringAware<.+>\\.|^)OnEnteringAsync$")]
+    private static partial Regex OnEnteringAsyncRegex();
+    
+    [GeneratedRegex("^(Nalu\\.IAppearingAware<.+>\\.|^)OnAppearingAsync$")]
+    private static partial Regex OnAppearingAsyncRegex();
 }

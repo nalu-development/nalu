@@ -10,7 +10,6 @@ public class TemplateContentPresenter : ViewBox
     /// </summary>
     public TemplateContentPresenter()
     {
-        var binding = new Binding(nameof(TemplateBox.TemplateContent), source: new RelativeBindingSource(RelativeBindingSourceMode.FindAncestor, typeof(TemplateBoxBase)));
-        SetBinding(ContentProperty, binding);
+        this.SetBinding(ContentProperty, static (TemplateBox templateBox) => templateBox.TemplateContent, source: new RelativeBindingSource(RelativeBindingSourceMode.FindAncestor, typeof(TemplateBoxBase)));
     }
 }

@@ -215,6 +215,27 @@ public partial class NavigationServiceTests
 
     private class Page9(IPage9Model model) : BaseTestPage(model);
 
+    public class Page10Model : IAppearingAware<OddIntent>, IEnteringAware<OddIntent>
+    {
+        public bool AppearingInvoked { get; private set; }
+
+        ValueTask IAppearingAware<OddIntent>.OnAppearingAsync(OddIntent intent)
+        {
+            AppearingInvoked = true;
+            return ValueTask.CompletedTask;
+        }
+
+        public bool EnteringInvoked { get; private set; }
+
+        ValueTask IEnteringAware<OddIntent>.OnEnteringAsync(OddIntent intent)
+        {
+            EnteringInvoked = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+    
+    private class Page10(Page10Model model) : BaseTestPage(model);
+
     /// <summary>
     /// Configures the test with the specified shell contents.
     /// </summary>
@@ -246,6 +267,7 @@ public partial class NavigationServiceTests
         mapping.Add(typeof(IPage7Model), typeof(Page7));
         mapping.Add(typeof(IPage8Model), typeof(Page8));
         mapping.Add(typeof(IPage9Model), typeof(Page9));
+        mapping.Add(typeof(Page10Model), typeof(Page10));
 
         serviceCollection.AddScoped<IPage1Model>(_ => Substitute.For<IPage1Model>());
         serviceCollection.AddScoped<Page1>();
@@ -265,6 +287,8 @@ public partial class NavigationServiceTests
         serviceCollection.AddScoped<Page8>();
         serviceCollection.AddScoped<IPage9Model>(_ => Substitute.For<IPage9Model>());
         serviceCollection.AddScoped<Page9>();
+        serviceCollection.AddScoped<Page10Model>();
+        serviceCollection.AddScoped<Page10>();
 
         serviceCollection.AddSingleton<INavigationService, NavigationService>();
         _serviceLocator.Value = _serviceProvider = serviceCollection.BuildServiceProvider();

@@ -10,7 +10,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     public void Constructor_WithNullCollection_ShouldThrowArgumentNullException()
     {
         // Act & Assert
-        var action = () => new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(null!);
+        var action = () => new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(null!);
         action.Should().Throw<ArgumentNullException>().WithParameterName("collection");
     }
 
@@ -21,7 +21,7 @@ public class VirtualScrollObservableCollectionAdapterTests
         var collection = new ObservableCollection<string> { "A", "B", "C" };
 
         // Act
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Assert
         adapter.Should().NotBeNull();
@@ -36,7 +36,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var count = adapter.GetSectionCount();
@@ -50,7 +50,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var count = adapter.GetSectionCount();
@@ -68,7 +68,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C", "D", "E" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var count = adapter.GetItemCount(0);
@@ -82,7 +82,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var count = adapter.GetItemCount(0);
@@ -100,7 +100,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var section = adapter.GetSection(0);
@@ -118,7 +118,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var item = adapter.GetItem(0, 1);
@@ -132,7 +132,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "First", "Second", "Third" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var item = adapter.GetItem(0, 0);
@@ -146,7 +146,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "First", "Second", "Last" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         var item = adapter.GetItem(0, 2);
@@ -164,7 +164,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -185,7 +185,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -204,7 +204,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -225,7 +225,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -245,7 +245,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -263,7 +263,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -285,7 +285,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -305,7 +305,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -327,7 +327,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C", "D" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -348,7 +348,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C", "D" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -372,7 +372,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -394,7 +394,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var callCount = 0;
         var subscription = adapter.Subscribe(_ => callCount++);
 
@@ -411,7 +411,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var subscription = adapter.Subscribe(_ => { });
 
         // Act & Assert
@@ -432,7 +432,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var callCount1 = 0;
         var callCount2 = 0;
         using var subscription1 = adapter.Subscribe(_ => callCount1++);
@@ -451,7 +451,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var callCount1 = 0;
         var callCount2 = 0;
         var subscription1 = adapter.Subscribe(_ => callCount1++);
@@ -475,7 +475,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         collection.Add("C");
@@ -490,7 +490,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C", "D" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         collection.RemoveAt(0);
@@ -505,7 +505,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         collection[1] = "X";
@@ -519,7 +519,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
 
         // Act
         collection.Clear();
@@ -539,7 +539,7 @@ public class VirtualScrollObservableCollectionAdapterTests
         var item1 = new TestItem { Id = 1, Name = "First" };
         var item2 = new TestItem { Id = 2, Name = "Second" };
         var collection = new ObservableCollection<TestItem> { item1, item2 };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<TestItem>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<TestItem>>(collection);
 
         // Act
         var result = adapter.GetItem(0, 1) as TestItem;
@@ -565,7 +565,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -595,7 +595,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -615,7 +615,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var changeSets = new List<VirtualScrollChangeSet>();
         using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
 
@@ -645,7 +645,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -675,7 +675,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -695,7 +695,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -725,7 +725,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var changeSets = new List<VirtualScrollChangeSet>();
         using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
 
@@ -749,7 +749,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -767,7 +767,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -790,7 +790,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B", "C" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -811,7 +811,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         VirtualScrollChangeSet? receivedChangeSet = null;
         using var subscription = adapter.Subscribe(cs => receivedChangeSet = cs);
 
@@ -833,7 +833,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var changeSets = new List<VirtualScrollChangeSet>();
         using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
 
@@ -864,7 +864,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string>();
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var changeSets = new List<VirtualScrollChangeSet>();
         using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
 
@@ -894,7 +894,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A", "B" };
-        var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<string>>(collection);
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
         var changeSets = new List<VirtualScrollChangeSet>();
         using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
 
