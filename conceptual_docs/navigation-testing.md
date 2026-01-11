@@ -432,7 +432,7 @@ public partial class AppShell : Shell
     .AddPage<MainPageModel, MainPage>()
 )
 
-// Or auto-discovery
+// Or auto-discovery (⚠️ not AOT-compatible - use AddPage for each page instead)
 .UseNaluNavigation<App>(nav => nav.AddPages())
 ```
 
@@ -553,7 +553,7 @@ public static WeakReference<Page>? CurrentPageRef { get; set; }
 
 ```csharp
 .UseNaluNavigation<App>(nav => nav
-    .AddPages()
+    .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
     .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
 )
 ```
@@ -793,7 +793,7 @@ public ValueTask OnEnteringAsync()
 1. **Ensure ViewModels are registered**
 
 ```csharp
-// ✅ Automatic registration
+// ✅ Automatic registration (⚠️ not AOT-compatible - use AddPage for each page instead)
 .UseNaluNavigation<App>(nav => nav.AddPages())
 
 // ✅ Manual registration
@@ -817,7 +817,7 @@ public ValueTask OnEnteringAsync()
 3. **Verify ViewModel is in scanned assembly**
 
 ```csharp
-// Scans the App assembly
+// Scans the App assembly (⚠️ not AOT-compatible - use AddPage for each page instead)
 .UseNaluNavigation<App>(nav => nav.AddPages())
 
 // If ViewModel is in different assembly, register manually

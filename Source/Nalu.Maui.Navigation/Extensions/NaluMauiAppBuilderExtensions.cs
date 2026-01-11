@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Nalu;
 
 // ReSharper disable once CheckNamespace
@@ -35,6 +36,7 @@ public static class NaluMauiAppBuilderExtensions
     /// </remarks>
     /// <typeparam name="TApplication">Application type.</typeparam>
     /// <param name="builder">Maui app builder.</param>
+    [RequiresUnreferencedCode("This method uses reflection to scan page types in assemblies, which is not trim-compatible. Use the configuration builder with AddPage method for each page instead.")]
     public static MauiAppBuilder UseNaluNavigation<TApplication>(this MauiAppBuilder builder)
         where TApplication : IApplication
         => builder.UseNaluNavigation<TApplication>(configurator => configurator.AddPages());

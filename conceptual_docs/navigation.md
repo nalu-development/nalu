@@ -35,7 +35,7 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .UseNaluNavigation<App>(nav => nav
-                .AddPages() // Automatically discovers MainPage => MainPageModel
+                .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
                 .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             );
         
@@ -45,10 +45,10 @@ public static class MauiProgram
 ```
 
 **Configuration options:**
-- `.AddPages()` - Auto-discover pages with naming convention
-- `.AddPages(pageType => ...)` - Custom naming convention
-- `.AddPage<MainPageModel, MainPage>()` - Manual registration
-- `.AddPage<IMainPageModel, MainPageModel, MainPage>()` - With interface (better for testing)
+- `.AddPages()` - Auto-discover pages with naming convention ⚠️ **Not AOT/trim-compatible** - use `AddPage` for each page instead
+- `.AddPages(pageType => ...)` - Custom naming convention ⚠️ **Not AOT/trim-compatible** - use `AddPage` for each page instead
+- `.AddPage<MainPageModel, MainPage>()` - Manual registration ✅ **AOT-compatible**
+- `.AddPage<IMainPageModel, MainPageModel, MainPage>()` - With interface (better for testing) ✅ **AOT-compatible**
 
 > **Without MVVM?** You can use Nalu without ViewModels - just register pages as `Scoped` services and use page types in navigation.
 

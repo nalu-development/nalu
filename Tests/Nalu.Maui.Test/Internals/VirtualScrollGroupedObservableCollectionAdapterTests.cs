@@ -12,7 +12,7 @@ public class VirtualScrollGroupedObservableCollectionAdapterTests
         public ObservableCollection<string> Items { get; set; } = new();
     }
 
-    private static VirtualScrollGroupedObservableCollectionAdapter<ObservableCollection<TestSection>, ObservableCollection<string>> CreateAdapter(
+    private static VirtualScrollGroupedNotifyCollectionChangedAdapter<ObservableCollection<TestSection>, ObservableCollection<string>> CreateAdapter(
         ObservableCollection<TestSection> sections)
         => new(sections, section => ((TestSection)section).Items);
 
@@ -24,7 +24,7 @@ public class VirtualScrollGroupedObservableCollectionAdapterTests
     public void Constructor_WithNullSections_ShouldThrowArgumentNullException()
     {
         // Act & Assert
-        var action = () => new VirtualScrollGroupedObservableCollectionAdapter<ObservableCollection<TestSection>, ObservableCollection<string>>(
+        var action = () => new VirtualScrollGroupedNotifyCollectionChangedAdapter<ObservableCollection<TestSection>, ObservableCollection<string>>(
             null!,
             section => ((TestSection)section).Items);
         action.Should().Throw<ArgumentNullException>().WithParameterName("sections");
@@ -37,7 +37,7 @@ public class VirtualScrollGroupedObservableCollectionAdapterTests
         var sections = new ObservableCollection<TestSection>();
 
         // Act & Assert
-        var action = () => new VirtualScrollGroupedObservableCollectionAdapter<ObservableCollection<TestSection>, ObservableCollection<string>>(
+        var action = () => new VirtualScrollGroupedNotifyCollectionChangedAdapter<ObservableCollection<TestSection>, ObservableCollection<string>>(
             sections,
             null!);
         action.Should().Throw<ArgumentNullException>().WithParameterName("sectionItemsGetter");

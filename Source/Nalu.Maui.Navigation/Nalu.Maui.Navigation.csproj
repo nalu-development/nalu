@@ -5,6 +5,7 @@
     <PackageTags>MAUI</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <NoWarn>NU5129</NoWarn>
+    <IsAotCompatible>true</IsAotCompatible>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

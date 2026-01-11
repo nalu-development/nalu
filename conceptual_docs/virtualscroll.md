@@ -42,9 +42,9 @@ The simplest way to use `VirtualScroll` is to bind it to an `ObservableCollectio
 ```
 
 The `ItemsSource` property accepts:
-- **`ObservableCollection<T>`**: Automatically wrapped with full change notification support (add, remove, move, replace, reset)
-- **`IEnumerable`**: Static lists are supported but won't react to changes
-- **`IVirtualScrollAdapter`**: Custom adapters for advanced scenarios like sectioned data
+- **`IVirtualScrollAdapter`**: The standard adapter interface returned by factory methods (e.g., `CreateObservableCollectionAdapter`, `CreateStaticCollectionAdapter`) or implemented for custom scenarios ✅ **AOT-compatible** (recommended for AOT)
+- **`ObservableCollection<T>`**, **`ReadOnlyObservableCollection<T>`**: Automatically wrapped with full change notification support (add, remove, move, replace, reset) ⚠️ **Not AOT-compatible** - use `IVirtualScrollAdapter` instead when using AOT
+- **`IEnumerable`**: Static lists are supported but won't react to changes ✅ **AOT-compatible**
 
 ### Factory Methods
 
@@ -68,6 +68,8 @@ var adapter = VirtualScroll.CreateObservableCollectionAdapter(
 ```
 
 The factory methods support various combinations of `ObservableCollection<T>` and `ReadOnlyObservableCollection<T>` for both sections and items.
+
+> **⚠️ AOT Compatibility:** When using AOT (Ahead-of-Time compilation), you must use these factory methods or create adapters explicitly. Automatic adapter creation from `INotifyCollectionChanged` collections is not supported in AOT mode and will throw a `NotSupportedException`. Always provide an `IVirtualScrollAdapter` when using AOT.
 
 #### Static Collection Adapters
 
@@ -202,7 +204,7 @@ The `ItemsLayout` property controls how items are arranged. Currently, `VirtualS
 <nalu:VirtualScroll ItemsLayout="{nalu:HorizontalVirtualScrollLayout}" ... />
 ```
 
-You can also configure estimated sizes for better performance on iOS:
+You can also configure estimated sizes for better performance and UX on iOS:
 
 ```xml
 <!-- Vertical layout with custom estimated sizes -->

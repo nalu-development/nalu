@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Nalu;
@@ -8,6 +9,11 @@ namespace Nalu;
 /// </summary>
 public class NavigationConfigurator : INavigationConfiguration
 {
+    // ReSharper disable once InconsistentNaming
+    private const DynamicallyAccessedMemberTypes DynamicallyAccessedPageModelMembers =
+        DynamicallyAccessedMemberTypes.PublicConstructors |
+        DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods;
+
     private readonly IServiceCollection _services;
     private readonly Type _applicationType;
     private readonly Dictionary<Type, Type> _mapping;
@@ -59,7 +65,7 @@ public class NavigationConfigurator : INavigationConfiguration
     /// <summary>
     /// Sets back navigation image.
     /// </summary>
-    /// <param name="imageSource">Image to use for back navigation button.</param>
+    /// <param name="imageSource">Image to use for the back navigation button.</param>
     public NavigationConfigurator WithMenuImage(ImageSource imageSource)
     {
         MenuImage = imageSource;
@@ -68,7 +74,7 @@ public class NavigationConfigurator : INavigationConfiguration
     }
 
     /// <summary>
-    /// Defines how lifecycle events should be handled when an intent is detected.
+    /// Defines how lifecycle events should be handled when intent is detected.
     /// </summary>
     /// <param name="behavior">The behavior to use.</param>
     public NavigationConfigurator WithNavigationIntentBehavior(NavigationIntentBehavior behavior)
@@ -84,11 +90,11 @@ public class NavigationConfigurator : INavigationConfiguration
     /// </summary>
     /// <typeparam name="TPageModel">Type of the page model.</typeparam>
     /// <typeparam name="TPage">Type of the page.</typeparam>
-    public NavigationConfigurator AddPage<TPageModel, TPage>()
+    public NavigationConfigurator AddPage<[DynamicallyAccessedMembers(DynamicallyAccessedPageModelMembers)] TPageModel, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TPage>()
         where TPage : ContentPage
         where TPageModel : class, INotifyPropertyChanged
         => AddPage(typeof(TPageModel), typeof(TPage));
-
+    
     /// <summary>
     /// Registers <typeparamref name="TPage" /> as the view for <typeparamref name="TPageModel" />.
     /// Adds <typeparamref name="TPage" /> and <typeparamref name="TPageModel" /> as scoped services.
@@ -96,7 +102,7 @@ public class NavigationConfigurator : INavigationConfiguration
     /// <typeparam name="TPageModel">Type of the page model.</typeparam>
     /// <typeparam name="TPageModelImplementation">Type of the page model implementation.</typeparam>
     /// <typeparam name="TPage">Type of the page.</typeparam>
-    public NavigationConfigurator AddPage<TPageModel, TPageModelImplementation, TPage>()
+    public NavigationConfigurator AddPage<TPageModel, [DynamicallyAccessedMembers(DynamicallyAccessedPageModelMembers)] TPageModelImplementation, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TPage>()
         where TPage : ContentPage
         where TPageModel : class, INotifyPropertyChanged
         where TPageModelImplementation : TPageModel
@@ -108,7 +114,9 @@ public class NavigationConfigurator : INavigationConfiguration
     /// </summary>
     /// <param name="pageModelType">Type of the page model.</param>
     /// <param name="pageType">Type of the page.</param>
-    public NavigationConfigurator AddPage(Type pageModelType, Type pageType)
+    public NavigationConfigurator AddPage(
+        [DynamicallyAccessedMembers(DynamicallyAccessedPageModelMembers)] Type pageModelType, 
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type pageType)
     {
         if (_mapping.TryAdd(pageModelType, pageType))
         {
@@ -127,7 +135,11 @@ public class NavigationConfigurator : INavigationConfiguration
     /// <param name="pageModelType">Type of the page model interface.</param>
     /// <param name="pageModelImplementationType">Type of the page model implementation.</param>
     /// <param name="pageType">Type of the page.</param>
-    public NavigationConfigurator AddPage(Type pageModelType, Type pageModelImplementationType, Type pageType)
+    public NavigationConfigurator AddPage(
+        Type pageModelType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedPageModelMembers)] Type pageModelImplementationType,
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type pageType
+    )
     {
         if (_mapping.TryAdd(pageModelType, pageType))
         {
@@ -144,6 +156,7 @@ public class NavigationConfigurator : INavigationConfiguration
     /// `MyPage => MyPageModel` naming convention and adds them all as scoped services.
     /// </summary>
     /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
+    [RequiresUnreferencedCode("This method uses reflection to scan types in assemblies, which is not trim-compatible. Use AddPage method for each page instead.")]
     public NavigationConfigurator AddPages(params Assembly[] otherAssemblies)
         => AddPages(pageName => $"{pageName}Model", otherAssemblies);
 
@@ -151,9 +164,10 @@ public class NavigationConfigurator : INavigationConfiguration
     /// Registers all <see cref="ContentPage" />s matching a page model via provided
     /// `<paramref name="pageToModelNameConvention" />` naming convention and adds them all as scoped services.
     /// </summary>
-    /// <remarks>If corresponding interface is found `IMyPageModel` the view model will be registered through the interface.</remarks>
+    /// <remarks>If a corresponding interface is found `IMyPageModel` the view model will be registered through the interface.</remarks>
     /// <param name="pageToModelNameConvention">Given a page class name returns the corresponding page model class name.</param>
     /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
+    [RequiresUnreferencedCode("This method uses reflection to scan types in assemblies, which is not trim-compatible. Use AddPage method for each page instead.")]
     public NavigationConfigurator AddPages(Func<string, string> pageToModelNameConvention, params Assembly[] otherAssemblies)
     {
         var assemblies = new[] { _applicationType.Assembly }.Concat(otherAssemblies).Distinct();

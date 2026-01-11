@@ -22,7 +22,7 @@ This feature also solves the issues `Shell` has with pages under the iOS `More` 
 builder
     .UseMauiApp<App>()
     // Optional: Only if using Nalu navigation
-    .UseNaluNavigation<App>(nav => nav.AddPages())
+    .UseNaluNavigation<App>(nav => nav.AddPage<MainPageModel, MainPage>()) // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
     .UseNaluTabBar()  // Works with both standard Shell and NaluShell
 ```
 

@@ -8,18 +8,20 @@ VirtualScroll provides built-in adapters for common scenarios. You can create th
 
 ### VirtualScrollObservableCollectionAdapter
 
-For flat lists backed by an `ObservableCollection<T>` or any collection implementing `IList` and `INotifyCollectionChanged`:
+For flat lists backed by an `ObservableCollection<T>`:
 
 ```csharp
-// Simple usage - VirtualScroll auto-wraps ObservableCollection
+// Simple usage - VirtualScroll auto-wraps ObservableCollection (⚠️ not AOT-compatible - see below)
 public ObservableCollection<ItemInfo> Items { get; } = new();
 
 // Or explicit adapter creation
-var adapter = new VirtualScrollObservableCollectionAdapter<ObservableCollection<ItemInfo>>(Items);
+var adapter = new VirtualScrollObservableCollectionAdapter<ItemInfo>(Items);
 
 // Or use factory method (recommended)
 var adapter = VirtualScroll.CreateObservableCollectionAdapter(Items);
 ```
+
+> **⚠️ AOT Compatibility Note:** When using AOT (Ahead-of-Time compilation), automatic adapter creation for `INotifyCollectionChanged` collections is not supported. You must explicitly provide an `IVirtualScrollAdapter` instead. Use the factory methods or create adapters explicitly for AOT compatibility.
 
 The adapter automatically subscribes to `CollectionChanged` events and notifies the VirtualScroll of additions, removals, replacements, moves, and resets.
 

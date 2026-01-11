@@ -3,6 +3,7 @@
     <Product>Nalu.Maui.Core</Product>
     <Description>.NET MAUI developer utilities</Description>
     <PackageTags>MAUI</PackageTags>
+    <IsAotCompatible>true</IsAotCompatible>
     <RootNamespace>Nalu</RootNamespace>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

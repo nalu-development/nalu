@@ -108,7 +108,7 @@ Only intent-aware methods are called when an intent is provided:
 ```csharp
 // With this configuration (default):
 .UseNaluNavigation<App>(nav => nav
-    .AddPages()
+    .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
     .WithNavigationIntentBehavior(NavigationIntentBehavior.Strict)
 )
 
@@ -128,7 +128,7 @@ Both methods are called:
 ```csharp
 // With this configuration:
 .UseNaluNavigation<App>(nav => nav
-    .AddPages()
+    .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
     .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
 )
 

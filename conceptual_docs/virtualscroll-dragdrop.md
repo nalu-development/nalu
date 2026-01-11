@@ -140,7 +140,7 @@ You can customize drag behavior by creating a custom adapter that implements `IR
 Override `CanDragItem` to conditionally allow dragging:
 
 ```csharp
-public class CustomAdapter : VirtualScrollObservableCollectionAdapter<ObservableCollection<MyItem>>
+public class CustomAdapter : VirtualScrollObservableCollectionAdapter<MyItem>
 {
     public CustomAdapter(ObservableCollection<MyItem> collection) 
         : base(collection)
@@ -328,7 +328,7 @@ public partial class TaskItem : ObservableObject
 
 **Custom Adapter:**
 ```csharp
-public class TaskListAdapter : VirtualScrollObservableCollectionAdapter<ObservableCollection<TaskItem>>
+public class TaskListAdapter : VirtualScrollObservableCollectionAdapter<TaskItem>
 {
     public TaskListAdapter(ObservableCollection<TaskItem> collection) 
         : base(collection)
