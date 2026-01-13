@@ -148,14 +148,25 @@ public partial class TwelvePageModel : ObservableObject, IDisposable
     private TwelveCreditCard CreateCreditCard(int cardNumber)
     {
         var rand = Random.Shared;
+        var credit = rand.Next(100, 5000);
+        var monthlySpending = rand.Next(50, (int)(credit * 0.8));
+        var availableCredit = credit - monthlySpending;
+        
         return new TwelveCreditCard
         {
             Name = rand.Next(0, 2) == 1 ? $"Regular card {cardNumber}" : $"Premium card {cardNumber}",
             Type = cardNumber % 2 == 0 ? "Visa" : "MasterCard",
             Exp = $"{rand.Next(1, 13):D2}/{rand.Next(24, 30)}",
-            Credit = rand.Next(100, 5000),
+            Credit = credit,
             Starred = rand.Next(0, 2) == 1,
-            ImageSource = _cardImageSources[rand.Next(_cardImageSources.Length)]
+            ImageSource = _cardImageSources[rand.Next(_cardImageSources.Length)],
+            CardNumber = $"**** **** **** {rand.Next(1000, 9999)}",
+            Cvv = $"{rand.Next(100, 999)}",
+            BankName = new[] { "Chase Bank", "Bank of America", "Wells Fargo", "Citibank", "Capital One" }[rand.Next(5)],
+            AccountHolder = _ownerNames[rand.Next(_ownerNames.Length)],
+            TransactionCount = rand.Next(5, 50),
+            MonthlySpending = monthlySpending,
+            AvailableCredit = availableCredit
         };
     }
 
@@ -223,9 +234,80 @@ public partial class TwelveCreditCard : ObservableObject
 
     [ObservableProperty]
     public partial ImageSource? ImageSource { get; set; }
+
+    [ObservableProperty]
+    public partial string CardNumber { get; set; }
+
+    [ObservableProperty]
+    public partial string Cvv { get; set; }
+
+    [ObservableProperty]
+    public partial string BankName { get; set; }
+
+    [ObservableProperty]
+    public partial string AccountHolder { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsCreditEditing { get; set; }
+
+    [ObservableProperty]
+    public partial string CreditEditText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial int TransactionCount { get; set; }
+
+    [ObservableProperty]
+    public partial double MonthlySpending { get; set; }
+
+    [ObservableProperty]
+    public partial double AvailableCredit { get; set; }
     
     public string CreditDollar => Credit.ToString("C2");
 
+    public string AvailableCreditDollar => AvailableCredit.ToString("C2");
+
+    public string MonthlySpendingDollar => MonthlySpending.ToString("C2");
+
     [RelayCommand]
     public void StarUnstar() => Starred = !Starred;
+
+    [RelayCommand]
+    public void ToggleCreditEdit()
+    {
+        if (IsCreditEditing)
+        {
+            // Save the edited value
+            if (double.TryParse(CreditEditText, out var newCredit))
+            {
+                Credit = newCredit;
+            }
+            IsCreditEditing = false;
+            CreditEditText = string.Empty;
+        }
+        else
+        {
+            // Start editing
+            CreditEditText = Credit.ToString("F2");
+            IsCreditEditing = true;
+        }
+    }
+
+    [RelayCommand]
+    public void CancelCreditEdit()
+    {
+        IsCreditEditing = false;
+        CreditEditText = string.Empty;
+    }
+
+    [RelayCommand]
+    public void ShareCard() { }
+
+    [RelayCommand]
+    public void DeleteCard() { }
+
+    [RelayCommand]
+    public void EditCard() { }
+
+    [RelayCommand]
+    public void ShowCardInfo() { }
 }
