@@ -246,7 +246,13 @@ public class NaluShellItemRenderer(IShellContext shellContext) : UIViewControlle
         if (_tabBar is not null)
         {
             var isTabBarVisible = _displayedPage?.GetValue(Shell.TabBarIsVisibleProperty) as bool? ?? true;
-            _tabBar.Hidden = !isTabBarVisible;
+            var hidden = !isTabBarVisible;
+            if (_tabBar.Hidden != hidden)
+            {
+                _tabBar.Hidden = !isTabBarVisible;
+                _tabBar.SetNeedsLayout();
+                View!.SetNeedsLayout();
+            }
         }
     }
 
