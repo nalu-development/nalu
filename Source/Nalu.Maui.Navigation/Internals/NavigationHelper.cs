@@ -23,7 +23,7 @@ internal static partial class NavigationHelper
                                    .FirstOrDefault(m =>
                                        {
                                            var parameters = m.GetParameters();
-                                           return parameters.Length == 1 && parameters[0].ParameterType == intentType;
+                                           return parameters.Length == 1 && intentType.IsAssignableTo(parameters[0].ParameterType);
                                        }
                                    );
 
