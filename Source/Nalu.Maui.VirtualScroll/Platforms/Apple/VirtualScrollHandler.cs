@@ -103,30 +103,33 @@ public partial class VirtualScrollHandler
     /// <inheritdoc />
     protected override UIView CreatePlatformView()
     {
-        var layout = CreatePlatformLayout(this, VirtualView);
-        var collectionView = new VirtualScrollCollectionView(CGRect.Empty, layout, (IVirtualScrollLayoutInfo)VirtualView);
+        var virtualScroll = VirtualView;
+        var layoutSetup = CreatePlatformLayout(this, virtualScroll);
+        var collectionView = new VirtualScrollCollectionView(CGRect.Empty, layoutSetup.Layout, (IVirtualScrollLayoutInfo)virtualScroll);
         var reuseIdManager = new VirtualScrollPlatformReuseIdManager(collectionView);
 
-        _dragGestureRecognizer = CreateDragGestureRecognizer(VirtualView, collectionView);
+        layoutSetup.ConfigureCollectionView(collectionView);
+
+        _dragGestureRecognizer = CreateDragGestureRecognizer(virtualScroll, collectionView);
 
         _reuseIdManager = reuseIdManager;
         _collectionView = collectionView;
 
         // Create refresh control
         _refreshControl = new UIRefreshControl();
-        _refreshControl.Enabled = VirtualView.IsRefreshEnabled;
+        _refreshControl.Enabled = virtualScroll.IsRefreshEnabled;
         _refreshControl.AddTarget((s, a) =>
         {
             // User pulled to refresh - sync platform state to IsRefreshing first
-            if (VirtualView is VirtualScroll virtualScroll && _refreshControl is not null)
+            if (virtualScroll is VirtualScroll virtualScrollElement && _refreshControl is not null)
             {
                 _isUpdatingIsRefreshingFromPlatform = true;
-                virtualScroll.IsRefreshing = _refreshControl.Refreshing;
+                virtualScrollElement.SetValueFromRenderer(VirtualScroll.IsRefreshEnabledProperty, _refreshControl.Refreshing);
                 _isUpdatingIsRefreshingFromPlatform = false;
             }
             
             // Then call Refresh() which will fire RefreshCommand/OnRefresh
-            if (VirtualView is IVirtualScrollController controller)
+            if (virtualScroll is IVirtualScrollController controller)
             {
                 controller.Refresh(() => { /* Completion handled by IsRefreshing property */ });
             }
@@ -134,11 +137,8 @@ public partial class VirtualScrollHandler
 
         collectionView.AlwaysBounceVertical = true;
         collectionView.RefreshControl = _refreshControl;
-
-        // Always create delegate (but scroll events are enabled/disabled via SetScrollEventsEnabled)
-        var virtualScroll = VirtualView as VirtualScroll ?? throw new InvalidOperationException("VirtualView must be a VirtualScroll instance.");
         
-        var scrollDirection = layout is VirtualScrollCollectionViewLayout virtualScrollLayout
+        var scrollDirection = layoutSetup.Layout is VirtualScrollCollectionViewLayout virtualScrollLayout
             ? virtualScrollLayout.ScrollDirection
             : UICollectionViewScrollDirection.Vertical;
         
@@ -324,13 +324,14 @@ public partial class VirtualScrollHandler
             return;
         }
 
-        var layout = CreatePlatformLayout(handler, virtualScroll);
+        var layoutSetup = CreatePlatformLayout(handler, virtualScroll);
         var collectionView = handler.PlatformCollectionView;
         var animated = collectionView.Window is not null;
-        collectionView.SetCollectionViewLayout(layout, animated);
+        collectionView.SetCollectionViewLayout(layoutSetup.Layout, animated);
+        layoutSetup.ConfigureCollectionView(collectionView);
         
         // Update cached orientation and fading edge when layout changes (orientation might have changed)
-        var scrollDirection = layout is VirtualScrollCollectionViewLayout virtualScrollLayout
+        var scrollDirection = layoutSetup.Layout is VirtualScrollCollectionViewLayout virtualScrollLayout
             ? virtualScrollLayout.ScrollDirection
             : UICollectionViewScrollDirection.Vertical;
         
@@ -341,13 +342,14 @@ public partial class VirtualScrollHandler
         }
     }
     
-    private static UICollectionViewLayout CreatePlatformLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    private static VirtualScrollCollectionViewLayoutSetup CreatePlatformLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("The provided IVirtualScroll does not implement IVirtualScrollLayoutInfo interface.");
 
         return virtualScroll.ItemsLayout switch
         {
             LinearVirtualScrollLayout linearLayout => VirtualScrollPlatformLayoutFactory.CreateList(linearLayout, layoutInfo),
+            CarouselVirtualScrollLayout carouselLayout => VirtualScrollPlatformLayoutFactory.CreateCarousel(carouselLayout, layoutInfo),
             _ => throw new NotSupportedException($"Layout type {virtualScroll.ItemsLayout.GetType().Name} is not supported.")
         };
     }

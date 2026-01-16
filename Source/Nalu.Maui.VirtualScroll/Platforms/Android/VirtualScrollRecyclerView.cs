@@ -3,6 +3,7 @@ using Android.Runtime;
 using Android.Util;
 using AndroidX.Core.View;
 using AndroidX.RecyclerView.Widget;
+using Google.Android.Material.Carousel;
 using AView = Android.Views.View;
 
 namespace Nalu;

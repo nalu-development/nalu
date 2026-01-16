@@ -3,6 +3,12 @@ using UIKit;
 
 namespace Nalu;
 
+internal class VirtualScrollCollectionViewLayoutSetup
+{
+    public required UICollectionViewLayout Layout { get; init; }
+    public required Action<UICollectionView> ConfigureCollectionView { get; init; }
+}
+
 /// <summary>
 /// Factory for creating platform-specific layouts for virtual scroll.
 /// </summary>
@@ -20,33 +26,147 @@ internal static class VirtualScrollPlatformLayoutFactory
     public static readonly NSString NSElementKindSectionFooter = new(ElementKindSectionFooter);
     // ReSharper restore InconsistentNaming
     
+    private class CellSizingInfo
+    {
+        public required NSCollectionLayoutDimension ItemWidth { get; init; }
+        public required NSCollectionLayoutDimension ItemHeight { get; init; }
+        public required NSCollectionLayoutDimension HeaderWidth { get; init; }
+        public required NSCollectionLayoutDimension HeaderHeight { get; init; }
+        public required NSCollectionLayoutDimension FooterWidth { get; init; }
+        public required NSCollectionLayoutDimension FooterHeight { get; init; }
+        public required NSCollectionLayoutDimension SectionHeaderWidth { get; init; }
+        public required NSCollectionLayoutDimension SectionHeaderHeight { get; init; }
+        public required NSCollectionLayoutDimension SectionFooterWidth { get; init; }
+        public required NSCollectionLayoutDimension SectionFooterHeight { get; init; }
+    }
+    
     /// <summary>
     /// Creates a list layout for the specified linear layout.
     /// </summary>
-    /// <param name="linearLayout">The linear layout configuration.</param>
-    /// <param name="layoutInfo">Information about headers and footers in the layout.</param>
-    /// <returns>A UICollectionViewLayout configured for a list layout.</returns>
-    public static UICollectionViewLayout CreateList(LinearVirtualScrollLayout linearLayout, IVirtualScrollLayoutInfo layoutInfo)
-        => CreateListLayout(linearLayout, layoutInfo);
+    public static VirtualScrollCollectionViewLayoutSetup CreateList(LinearVirtualScrollLayout linearLayout, IVirtualScrollLayoutInfo layoutInfo)
+    {
+        if (linearLayout.Orientation == ItemsLayoutOrientation.Horizontal)
+        {
+            var horizontalLayout = CreateListLayout(
+                UICollectionViewScrollDirection.Horizontal,
+                layoutInfo,
+                new CellSizingInfo
+                {
+                    ItemWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedItemSize),
+                    ItemHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                    HeaderWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedHeaderSize),
+                    HeaderHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                    FooterWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedFooterSize),
+                    FooterHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                    SectionHeaderWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedHeaderSize),
+                    SectionHeaderHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                    SectionFooterWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedFooterSize),
+                    SectionFooterHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f)
+                }
+            );
+
+            return new VirtualScrollCollectionViewLayoutSetup
+                   {
+                       Layout =  horizontalLayout,
+                       ConfigureCollectionView = collectionView =>
+                       {
+                           if (OperatingSystem.IsIOSVersionAtLeast(17, 4))
+                           {
+                               collectionView.BouncesHorizontally = true;
+                               collectionView.BouncesVertically = false;
+                           }
+                           collectionView.PagingEnabled = false;
+                           collectionView.DirectionalLockEnabled = true;
+                       }
+                   };
+        }
+
+        var verticalLayout = CreateListLayout(
+            UICollectionViewScrollDirection.Vertical,
+            layoutInfo,
+            new CellSizingInfo
+            {
+                ItemWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                ItemHeight = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedItemSize),
+                HeaderWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                HeaderHeight = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedHeaderSize),
+                FooterWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                FooterHeight = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedFooterSize),
+                SectionHeaderWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                SectionHeaderHeight = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedSectionHeaderSize),
+                SectionFooterWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                SectionFooterHeight = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedSectionFooterSize)
+            }
+        );
+
+        return new VirtualScrollCollectionViewLayoutSetup
+               {
+                   Layout =  verticalLayout,
+                   ConfigureCollectionView = collectionView =>
+                   {
+                       if (OperatingSystem.IsIOSVersionAtLeast(17, 4))
+                       {
+                           collectionView.BouncesHorizontally = false;
+                           collectionView.BouncesVertically = true;
+                       }
+
+                       collectionView.DirectionalLockEnabled = true;
+                       collectionView.PagingEnabled = false;
+                   }
+               };
+    }
+
+    public static VirtualScrollCollectionViewLayoutSetup CreateCarousel(CarouselVirtualScrollLayout carouselLayout, IVirtualScrollLayoutInfo layoutInfo)
+    {
+        var scrollDirection = carouselLayout.Orientation == ItemsLayoutOrientation.Horizontal
+            ? UICollectionViewScrollDirection.Horizontal
+            : UICollectionViewScrollDirection.Vertical;
+
+        var layout = CreateListLayout(
+            scrollDirection,
+            layoutInfo,
+            new CellSizingInfo
+            {
+                ItemWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                ItemHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                HeaderWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                HeaderHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                FooterWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                FooterHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                SectionHeaderWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                SectionHeaderHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
+                SectionFooterWidth = NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                SectionFooterHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f)
+            }
+        );
+
+        return new VirtualScrollCollectionViewLayoutSetup
+               {
+                   Layout = layout,
+                   ConfigureCollectionView = collectionView =>
+                   {
+                       if (OperatingSystem.IsIOSVersionAtLeast(17, 4))
+                       {
+                           collectionView.BouncesHorizontally = scrollDirection == UICollectionViewScrollDirection.Horizontal;
+                           collectionView.BouncesVertically = scrollDirection == UICollectionViewScrollDirection.Vertical;
+                       }
+                       collectionView.DirectionalLockEnabled = true;
+                       collectionView.PagingEnabled = true;
+                   }
+               };
+    }
 
     private static NSCollectionLayoutBoundarySupplementaryItem[] CreateGlobalSupplementaryItems(
-        IVirtualScrollLayoutInfo layoutInfo, UICollectionViewScrollDirection scrollDirection,
-        LinearVirtualScrollLayout linearLayout)
+        IVirtualScrollLayoutInfo layoutInfo,
+        UICollectionViewScrollDirection scrollDirection,
+        CellSizingInfo sizingInfo)
     {
         var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
 
         if (layoutInfo.HasGlobalHeader)
         {
-            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedHeaderSize);
-
-            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedHeaderSize)
-                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-            
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                          NSCollectionLayoutSize.Create(width, height),
+                          NSCollectionLayoutSize.Create(sizingInfo.HeaderWidth, sizingInfo.HeaderHeight),
                           ElementKindGlobalHeader,
                           scrollDirection == UICollectionViewScrollDirection.Vertical
                               ? NSRectAlignment.Top
@@ -55,16 +175,8 @@ internal static class VirtualScrollPlatformLayoutFactory
 
         if (layoutInfo.HasGlobalFooter)
         {
-            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedFooterSize);
-
-            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedFooterSize)
-                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                          NSCollectionLayoutSize.Create(width, height),
+                          NSCollectionLayoutSize.Create(sizingInfo.FooterWidth, sizingInfo.FooterHeight),
                           ElementKindGlobalFooter,
                           scrollDirection == UICollectionViewScrollDirection.Vertical
                               ? NSRectAlignment.Bottom
@@ -76,22 +188,14 @@ internal static class VirtualScrollPlatformLayoutFactory
 
     private static NSCollectionLayoutBoundarySupplementaryItem[] CreateSectionSupplementaryItems(
         IVirtualScrollLayoutInfo layoutInfo, UICollectionViewScrollDirection scrollDirection,
-        LinearVirtualScrollLayout linearLayout)
+        CellSizingInfo sizingInfo)
     {
         var items = new List<NSCollectionLayoutBoundarySupplementaryItem>();
 
         if (layoutInfo.HasSectionHeader)
         {
-            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionHeaderSize);
-
-            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionHeaderSize)
-                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-            
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                          NSCollectionLayoutSize.Create(width, height),
+                          NSCollectionLayoutSize.Create(sizingInfo.SectionHeaderWidth, sizingInfo.SectionHeaderHeight),
                           ElementKindSectionHeader,
                           scrollDirection == UICollectionViewScrollDirection.Vertical
                               ? NSRectAlignment.Top
@@ -100,16 +204,8 @@ internal static class VirtualScrollPlatformLayoutFactory
 
         if (layoutInfo.HasSectionFooter)
         {
-            var width = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionFooterSize);
-
-            var height = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedSectionFooterSize)
-                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-            
             items.Add(NSCollectionLayoutBoundarySupplementaryItem.Create(
-                          NSCollectionLayoutSize.Create(width, height),
+                          NSCollectionLayoutSize.Create(sizingInfo.SectionFooterWidth, sizingInfo.SectionFooterHeight),
                           ElementKindSectionFooter,
                           scrollDirection == UICollectionViewScrollDirection.Vertical
                               ? NSRectAlignment.Bottom
@@ -120,13 +216,10 @@ internal static class VirtualScrollPlatformLayoutFactory
     }
 
     private static UICollectionViewLayout CreateListLayout(
-        LinearVirtualScrollLayout linearLayout,
-        IVirtualScrollLayoutInfo layoutInfo)
+        UICollectionViewScrollDirection scrollDirection,
+        IVirtualScrollLayoutInfo layoutInfo,
+        CellSizingInfo sizingInfo)
     {
-        var scrollDirection = linearLayout.Orientation == ItemsLayoutOrientation.Vertical
-            ? UICollectionViewScrollDirection.Vertical
-            : UICollectionViewScrollDirection.Horizontal;
-
         var layoutConfiguration = new UICollectionViewCompositionalLayoutConfiguration();
         layoutConfiguration.ScrollDirection = scrollDirection;
 
@@ -134,23 +227,12 @@ internal static class VirtualScrollPlatformLayoutFactory
         layoutConfiguration.BoundarySupplementaryItems = CreateGlobalSupplementaryItems(
             layoutInfo,
             scrollDirection,
-            linearLayout);
+            sizingInfo);
 
         // ReSharper disable UnusedParameter.Local
         var layout = new VirtualScrollCollectionViewLayout((sectionIndex, environment) => 
         {
-            // Item dimensions:
-            // - For vertical: full width, estimated height
-            // - For horizontal: estimated width, full height
-            var itemWidth = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateFractionalWidth(1.0f)
-                : NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedItemSize);
-
-            var itemHeight = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutDimension.CreateEstimated((float)linearLayout.EstimatedItemSize)
-                : NSCollectionLayoutDimension.CreateFractionalHeight(1.0f);
-
-            var itemSize = NSCollectionLayoutSize.Create(itemWidth, itemHeight);
+            var itemSize = NSCollectionLayoutSize.Create(sizingInfo.ItemWidth, sizingInfo.ItemHeight);
             var item = NSCollectionLayoutItem.Create(layoutSize: itemSize);
 
             // Create the group (one layout item per group, it's a depth level we don't use)
@@ -161,8 +243,8 @@ internal static class VirtualScrollPlatformLayoutFactory
             //     │   ├─ Item
 
             // Group dimensions: match item dimensions
-            var sectionGroupWidth = itemWidth;
-            var sectionGroupHeight = itemHeight;
+            var sectionGroupWidth = sizingInfo.ItemWidth;
+            var sectionGroupHeight = sizingInfo.ItemHeight;
             var groupSize = NSCollectionLayoutSize.Create(sectionGroupWidth, sectionGroupHeight);
 
             // For vertical list: group layouts horizontally (single column, items stack vertically)
@@ -179,7 +261,7 @@ internal static class VirtualScrollPlatformLayoutFactory
             section.BoundarySupplementaryItems = CreateSectionSupplementaryItems(
                 layoutInfo,
                 scrollDirection,
-                linearLayout);
+                sizingInfo);
 
             return section;
         }, layoutConfiguration)

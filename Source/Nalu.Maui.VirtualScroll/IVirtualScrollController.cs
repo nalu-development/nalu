@@ -19,5 +19,14 @@ public interface IVirtualScrollController
     /// <param name="totalScrollableWidth">The total scrollable width in device-independent units.</param>
     /// <param name="totalScrollableHeight">The total scrollable height in device-independent units.</param>
     void Scrolled(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight);
+
+    /// <summary>
+    /// Invoked by the handler when scrolling ends.
+    /// </summary>
+    /// <param name="scrollX">The current horizontal scroll position in device-independent units.</param>
+    /// <param name="scrollY">The current vertical scroll position in device-independent units.</param>
+    /// <param name="totalScrollableWidth">The total scrollable width in device-independent units.</param>
+    /// <param name="totalScrollableHeight">The total scrollable height in device-independent units.</param>
+    void ScrollEnded(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight);
 }
 

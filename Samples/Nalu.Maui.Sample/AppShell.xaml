@@ -48,6 +48,9 @@
         <ShellContent nalu:Navigation.PageType="pages:TenPage"
                       Title="Page Ten"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
+        <ShellContent nalu:Navigation.PageType="pages:TenCarouselPage"
+                      Title="Page Ten Carousel"
+                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
         <ShellContent nalu:Navigation.PageType="pages:ElevenPage"
                       Title="Page Eleven"
                       Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bb;', Color='Black', Size=24}" />

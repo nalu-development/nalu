@@ -326,6 +326,16 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         propertyChanged: OnScrolledCommandChanged
     );
 
+    /// <summary>
+    /// Bindable property for <see cref="ScrolledCommand"/>.
+    /// </summary>
+    public static readonly BindableProperty ScrollEndedCommandProperty = BindableProperty.Create(
+        nameof(ScrollEndedCommand),
+        typeof(ICommand),
+        typeof(VirtualScroll),
+        null
+    );
+
     private static void OnScrolledCommandChanged(BindableObject bindable, object? oldValue, object? newValue)
     {
         var virtualScroll = (VirtualScroll)bindable;
@@ -339,6 +349,15 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     {
         get => (ICommand?)GetValue(ScrolledCommandProperty);
         set => SetValue(ScrolledCommandProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the command to execute when the scroll position changes.
+    /// </summary>
+    public ICommand? ScrollEndedCommand
+    {
+        get => (ICommand?)GetValue(ScrollEndedCommandProperty);
+        set => SetValue(ScrollEndedCommandProperty, value);
     }
 
     /// <summary>
@@ -362,6 +381,11 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     }
 
     private event EventHandler<VirtualScrollScrolledEventArgs>? OnScrolledEvent;
+
+    /// <summary>
+    /// Event raised when the scrolling ends.
+    /// </summary>
+    public event EventHandler<VirtualScrollScrolledEventArgs>? OnScrollEnded;
 
     private void UpdateScrollEventSubscription()
     {
@@ -464,6 +488,18 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         }
 
         OnScrolledEvent?.Invoke(this, args);
+    }
+
+    void IVirtualScrollController.ScrollEnded(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
+    {
+        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
+
+        if (ScrollEndedCommand != null && ScrollEndedCommand.CanExecute(args))
+        {
+            ScrollEndedCommand.Execute(args);
+        }
+
+        OnScrollEnded?.Invoke(this, args);
     }
 
     /// <summary>
