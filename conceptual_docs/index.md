@@ -136,6 +136,7 @@ A **high-performance** virtualized scrolling view designed to replace the tradit
 - **Dynamic item sizing** with automatic layout updates
 - Pull-to-refresh support
 - Header, footer, and section templates
+- Carousel mode
 
 ```xml
 <nalu:VirtualScroll ItemsSource="{Binding Items}">

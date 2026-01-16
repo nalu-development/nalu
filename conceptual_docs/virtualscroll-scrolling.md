@@ -35,7 +35,7 @@ The `ScrollToPosition` options are:
 
 ## Scroll Events
 
-`VirtualScroll` provides two ways to respond to scroll position changes:
+`VirtualScroll` provides scroll position change events and scroll start/end events:
 
 ### ScrolledCommand
 
@@ -76,6 +76,41 @@ virtualScroll.OnScrolled += (sender, args) =>
     var scrollPercent = args.ScrollPercentageY;
     Console.WriteLine($"Scrolled to {scrollPercent:P0}%");
 };
+```
+
+### ScrollStartedCommand / ScrollEndedCommand
+
+Bind commands to be notified when the user starts or ends a scroll gesture:
+
+```xml
+<nalu:VirtualScroll ItemsSource="{Binding Items}"
+                    ScrollStartedCommand="{Binding ScrollStartedCommand}"
+                    ScrollEndedCommand="{Binding ScrollEndedCommand}">
+    ...
+</nalu:VirtualScroll>
+```
+
+```csharp
+[RelayCommand]
+private void OnScrollStarted(VirtualScrollScrolledEventArgs args)
+{
+    IsScrolling = true;
+}
+
+[RelayCommand]
+private void OnScrollEnded(VirtualScrollScrolledEventArgs args)
+{
+    IsScrolling = false;
+}
+```
+
+### OnScrollStarted / OnScrollEnded Events
+
+Alternatively, subscribe to the events:
+
+```csharp
+virtualScroll.OnScrollStarted += (_, _) => IsScrolling = true;
+virtualScroll.OnScrollEnded += (_, _) => IsScrolling = false;
 ```
 
 ### VirtualScrollScrolledEventArgs
@@ -167,6 +202,21 @@ The `VirtualScrollRange` struct represents the visible range with special consta
 | `GlobalFooterSectionIndex` | `int.MaxValue` | Section index indicating the global footer |
 | `SectionHeaderItemIndex` | `int.MinValue` | Item index indicating a section header |
 | `SectionFooterItemIndex` | `int.MaxValue` | Item index indicating a section footer |
+
+`VirtualScrollRange` can be implicitly converted to/from an `int` representing an item index in the first section. This is handy for carousel layout:
+
+```xml
+<vs:VirtualScroll ItemsSource="{Binding Adapter}"
+                  ItemsLayout="{vs:HorizontalCarouselVirtualScrollLayout}"
+                  vs:CarouselVirtualScrollLayout.CurrentRange="{Binding CurrentIndex}" />
+```
+
+```csharp
+[ObservableProperty]
+public partial int CurrentIndex { get; set; } = 0;
+```
+
+> **Note:** The implicit conversion throws if the range refers to a header/footer (global or section). Use `VirtualScrollRange` directly when you need those special values.
 
 **Example: Select All Visible Items (Button Action)**
 

@@ -86,16 +86,20 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
                     {
                         changes.Add(VirtualScrollChangeFactory.InsertSection(_sectionIndex));
                         _isEmpty = false;
-                    }
-
-                    if (e.NewItems.Count == 1)
-                    {
-                        changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, e.NewStartingIndex));
+                        // Don't emit InsertItem - the section insert already includes the items
                     }
                     else
                     {
-                        var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
-                        changes.Add(VirtualScrollChangeFactory.InsertItemRange(_sectionIndex, e.NewStartingIndex, endIndex));
+                        // Section already exists, just insert the items
+                        if (e.NewItems.Count == 1)
+                        {
+                            changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, e.NewStartingIndex));
+                        }
+                        else
+                        {
+                            var endIndex = e.NewStartingIndex + e.NewItems.Count - 1;
+                            changes.Add(VirtualScrollChangeFactory.InsertItemRange(_sectionIndex, e.NewStartingIndex, endIndex));
+                        }
                     }
                     break;
 

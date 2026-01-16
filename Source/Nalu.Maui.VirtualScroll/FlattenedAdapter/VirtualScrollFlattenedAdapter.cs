@@ -176,6 +176,18 @@ internal class VirtualScrollFlattenedAdapter : IVirtualScrollFlattenedAdapter, I
                     var sectionCount = change.EndSectionIndex - change.StartSectionIndex + 1;
                     var itemsToInsert = CalculateItemsForSections(change.StartSectionIndex, sectionCount);
                     UpdateOffsetsAfterSectionInsert(change.StartSectionIndex, sectionCount);
+                    
+                    if (itemsToInsert == 0)
+                    {
+                        // Section has no items (and no headers/footers) - nothing to insert
+                        return [];
+                    }
+                    
+                    if (itemsToInsert == 1)
+                    {
+                        return [VirtualScrollFlattenedChangeFactory.InsertItem(startFlattenedIndex)];
+                    }
+                    
                     return [VirtualScrollFlattenedChangeFactory.InsertItemRange(startFlattenedIndex, startFlattenedIndex + itemsToInsert - 1)];
                 }
 

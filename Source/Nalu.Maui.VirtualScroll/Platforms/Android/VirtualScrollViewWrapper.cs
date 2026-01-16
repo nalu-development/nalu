@@ -44,7 +44,8 @@ public class VirtualScrollViewWrapper : FrameLayout
             var width = MeasureSpec.GetSize(widthMeasureSpec);
             widthMeasureSpec = MeasureSpec.MakeMeasureSpec(width, MeasureSpecMode.Exactly);
         }
-        else
+
+        if (LayoutParameters!.Height == ViewGroup.LayoutParams.MatchParent)
         {
             var height = MeasureSpec.GetSize(heightMeasureSpec);
             heightMeasureSpec = MeasureSpec.MakeMeasureSpec(height, MeasureSpecMode.Exactly);
