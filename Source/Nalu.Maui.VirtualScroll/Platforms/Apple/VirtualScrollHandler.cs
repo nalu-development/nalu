@@ -306,7 +306,17 @@ public partial class VirtualScrollHandler
             collectionView.DataSource = new VirtualScrollPlatformDataSource(adapter, virtualScroll, reuseIdManager);
             
             // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
-            handler._notifier = new VirtualScrollPlatformDataSourceNotifier(collectionView, adapter);
+            // Notify the controller when batch updates complete so layouts can update their state
+            handler._notifier = new VirtualScrollPlatformDataSourceNotifier(
+                collectionView, 
+                adapter,
+                onBatchUpdatesCompleted: () =>
+                {
+                    if (virtualScroll is IVirtualScrollController controller)
+                    {
+                        controller.LayoutUpdateCompleted();
+                    }
+                });
         }
         else
         {

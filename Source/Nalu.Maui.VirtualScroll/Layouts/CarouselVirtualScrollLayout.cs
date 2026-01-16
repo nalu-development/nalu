@@ -73,6 +73,7 @@ public class CarouselVirtualScrollLayout : VirtualScrollLayout
         {
             _virtualScroll = virtualScroll;
             virtualScroll.OnScrollEnded += VirtualScroll_OnScrollEnded;
+            virtualScroll.OnLayoutUpdateCompleted += VirtualScroll_OnLayoutUpdateCompleted;
         }
 
         private void VirtualScroll_OnScrollEnded(object? sender, VirtualScrollScrolledEventArgs e)
@@ -82,6 +83,21 @@ public class CarouselVirtualScrollLayout : VirtualScrollLayout
                 return;
             }
 
+            UpdateCurrentRangeFromVisibleItems();
+        }
+
+        private void VirtualScroll_OnLayoutUpdateCompleted(object? sender, EventArgs e)
+        {
+            if (_virtualScroll.ItemsLayout is not CarouselVirtualScrollLayout)
+            {
+                return;
+            }
+
+            UpdateCurrentRangeFromVisibleItems();
+        }
+
+        private void UpdateCurrentRangeFromVisibleItems()
+        {
             var itemsRange = _virtualScroll.GetVisibleItemsRange();
 
             _updatingIndex = true;

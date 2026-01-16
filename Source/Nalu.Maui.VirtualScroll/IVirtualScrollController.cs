@@ -21,6 +21,15 @@ public interface IVirtualScrollController
     void Scrolled(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight);
 
     /// <summary>
+    /// Invoked by the handler when scrolling starts.
+    /// </summary>
+    /// <param name="scrollX">The current horizontal scroll position in device-independent units.</param>
+    /// <param name="scrollY">The current vertical scroll position in device-independent units.</param>
+    /// <param name="totalScrollableWidth">The total scrollable width in device-independent units.</param>
+    /// <param name="totalScrollableHeight">The total scrollable height in device-independent units.</param>
+    void ScrollStarted(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight);
+
+    /// <summary>
     /// Invoked by the handler when scrolling ends.
     /// </summary>
     /// <param name="scrollX">The current horizontal scroll position in device-independent units.</param>
@@ -28,5 +37,11 @@ public interface IVirtualScrollController
     /// <param name="totalScrollableWidth">The total scrollable width in device-independent units.</param>
     /// <param name="totalScrollableHeight">The total scrollable height in device-independent units.</param>
     void ScrollEnded(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight);
+
+    /// <summary>
+    /// Invoked by the handler when a batch layout update (item add/remove/move) completes.
+    /// This allows layouts to update their state based on the new visible items.
+    /// </summary>
+    void LayoutUpdateCompleted();
 }
 

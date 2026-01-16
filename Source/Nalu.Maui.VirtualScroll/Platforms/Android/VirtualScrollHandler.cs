@@ -23,8 +23,12 @@ public partial class VirtualScrollHandler
     private SwipeRefreshLayout? _swipeRefreshLayout;
     private FrameLayout? _rootLayout;
     private VirtualScrollRecyclerViewScrollListener? _scrollListener;
+    private VirtualScrollRecyclerViewScrollStateListener? _scrollStateListener;
     private bool _isUpdatingIsRefreshingFromPlatform;
     private IVirtualScrollFlattenedAdapter? _flattenedAdapter;
+    private SnapHelper? _snapHelper;
+    private AnimatorIsRunningListener? _animatorIsRunningListener;
+    private RecyclerView.ItemAnimator? _animator;
 
     /// <inheritdoc />
     protected override AView CreatePlatformView()
@@ -33,10 +37,31 @@ public partial class VirtualScrollHandler
 
         var recyclerView = new VirtualScrollRecyclerView(context);
         _recyclerView = recyclerView;
+        _animator = _recyclerView.GetItemAnimator();
+
+        _animatorIsRunningListener = new AnimatorIsRunningListener(OnLayoutAnimationFinished);
         
         _touchHelperCallback = new VirtualScrollTouchHelperCallback(VirtualView);
 
-        // Scroll listener will be set up when needed via MapSetScrollEventEnabled
+        // Always add scroll state listener for ScrollStarted/ScrollEnded events (needed for carousel, etc.)
+        _scrollStateListener = new VirtualScrollRecyclerViewScrollStateListener(
+            scrollStartedHandler: (rv, scrollX, scrollY, totalWidth, totalHeight) =>
+            {
+                if (VirtualView is IVirtualScrollController controller)
+                {
+                    controller.ScrollStarted(scrollX, scrollY, totalWidth, totalHeight);
+                }
+            },
+            scrollEndedHandler: (rv, scrollX, scrollY, totalWidth, totalHeight) =>
+            {
+                if (VirtualView is IVirtualScrollController controller)
+                {
+                    controller.ScrollEnded(scrollX, scrollY, totalWidth, totalHeight);
+                }
+            });
+        recyclerView.AddOnScrollListener(_scrollStateListener);
+
+        // Scroll listener for OnScrolled events will be set up when needed via MapSetScrollEventEnabled
 
         _swipeRefreshLayout = new SwipeRefreshLayout(context);
         _swipeRefreshLayout.AddView(
@@ -81,18 +106,38 @@ public partial class VirtualScrollHandler
         return _rootLayout;
     }
 
+    private void OnLayoutAnimationFinished()
+    {
+        if (_recyclerView is not null)
+        {
+            var virtualScroll = VirtualView as IVirtualScrollController;
+            virtualScroll?.LayoutUpdateCompleted();
+        }
+    }
+
     /// <inheritdoc />
     protected override void DisconnectHandler(PlatformView platformView)
     {
         _notifier?.Dispose();
         _notifier = null;
         
-        if (_recyclerView is not null && _scrollListener is not null)
+        if (_recyclerView is not null)
         {
-            _recyclerView.RemoveOnScrollListener(_scrollListener);
-            _scrollListener = null;
+            if (_scrollListener is not null)
+            {
+                _recyclerView.RemoveOnScrollListener(_scrollListener);
+                _scrollListener = null;
+            }
+            
+            if (_scrollStateListener is not null)
+            {
+                _recyclerView.RemoveOnScrollListener(_scrollStateListener);
+                _scrollStateListener = null;
+            }
         }
-        
+
+        _animator = null;
+        _animatorIsRunningListener?.Dispose();
         _recyclerViewAdapter?.Dispose();
         _recyclerViewAdapter = null;
         _touchHelperCallback?.Dispose();
@@ -100,6 +145,8 @@ public partial class VirtualScrollHandler
         _itemTouchHelper?.AttachToRecyclerView(null);
         _itemTouchHelper?.Dispose();
         _itemTouchHelper = null;
+        _snapHelper?.Dispose();
+        _snapHelper = null;
         _recyclerView?.Dispose();
         _recyclerView = null;
         _swipeRefreshLayout?.Dispose();
@@ -212,8 +259,17 @@ public partial class VirtualScrollHandler
             handler._flattenedAdapter = flattenedAdapter;
             handler._touchHelperCallback?.SetAdapter(flattenedAdapter);
             
+#pragma warning disable VSTHRD100
+            async void ListenForAnimationComplete()
+#pragma warning restore VSTHRD100
+            {
+                await Task.Yield();
+                handler._animator?.InvokeIsRunning(handler._animatorIsRunningListener);
+            }
+
             // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
-            handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, flattenedAdapter);
+            // Notify the controller when updates complete so layouts can update their state
+            handler._notifier = new VirtualScrollPlatformFlattenedAdapterNotifier(recyclerViewAdapter, flattenedAdapter, ListenForAnimationComplete);
         }
         else
         {
@@ -255,6 +311,11 @@ public partial class VirtualScrollHandler
     {
         var recyclerView = handler.PlatformRecyclerView;
 
+        // Dispose existing snap helper if any
+        handler._snapHelper?.AttachToRecyclerView(null);
+        handler._snapHelper?.Dispose();
+        handler._snapHelper = null;
+
         switch (virtualScroll.ItemsLayout)
         {
             case LinearVirtualScrollLayout linearLayout:
@@ -266,6 +327,21 @@ public partial class VirtualScrollHandler
 
                 recyclerView.Orientation = linearLayout.Orientation;
                 recyclerView.SetLayoutManager(layoutManager);
+
+                break;
+            case CarouselVirtualScrollLayout carouselLayout:
+                var carouselOrientation = carouselLayout.Orientation == ItemsLayoutOrientation.Vertical ? LinearLayoutManager.Vertical : LinearLayoutManager.Horizontal;
+                var carouselLayoutManager = new LinearLayoutManager(recyclerView.Context)
+                                            {
+                                                Orientation = carouselOrientation
+                                            };
+
+                recyclerView.Orientation = carouselLayout.Orientation;
+                recyclerView.SetLayoutManager(carouselLayoutManager);
+
+                // Attach PagerSnapHelper for carousel paging behavior
+                handler._snapHelper = new PagerSnapHelper();
+                handler._snapHelper.AttachToRecyclerView(recyclerView);
 
                 break;
             default:
@@ -406,9 +482,7 @@ public partial class VirtualScrollHandler
                 return;
             }
 
-            var orientation = virtualScroll.ItemsLayout is LinearVirtualScrollLayout linearLayout
-                ? linearLayout.Orientation
-                : ItemsLayoutOrientation.Vertical;
+            var orientation = virtualScroll.ItemsLayout.Orientation;
 
             switch (orientation)
             {

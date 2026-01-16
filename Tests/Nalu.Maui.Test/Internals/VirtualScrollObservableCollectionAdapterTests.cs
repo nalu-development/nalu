@@ -561,7 +561,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     #region Section Transition Tests - Add Operations
 
     [Fact]
-    public void Subscribe_WhenFirstItemAddedToEmptyCollection_ShouldNotifyInsertSectionAndInsertItem()
+    public void Subscribe_WhenFirstItemAddedToEmptyCollection_ShouldNotifyInsertSectionOnly()
     {
         // Arrange
         var collection = new ObservableCollection<string>();
@@ -574,20 +574,14 @@ public class VirtualScrollObservableCollectionAdapterTests
 
         // Assert
         receivedChangeSet.Should().NotBeNull();
-        receivedChangeSet!.Changes.Should().HaveCount(2);
+        receivedChangeSet!.Changes.Should().HaveCount(1, "when transitioning from empty to non-empty, only InsertSection should be emitted (it includes the items)");
         
         var changes = receivedChangeSet.Changes.ToList();
         
-        // First change should be InsertSection
+        // Only change should be InsertSection (which includes the item)
         var sectionChange = changes[0];
         sectionChange.Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
         sectionChange.StartSectionIndex.Should().Be(0);
-        
-        // Second change should be InsertItem
-        var itemChange = changes[1];
-        itemChange.Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
-        itemChange.StartSectionIndex.Should().Be(0);
-        itemChange.StartItemIndex.Should().Be(0);
     }
 
     [Fact]
@@ -611,7 +605,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     }
 
     [Fact]
-    public void Subscribe_WhenMultipleItemsAddedToEmptyCollection_ShouldNotifyInsertSectionAndInsertItemRange()
+    public void Subscribe_WhenMultipleItemsAddedToEmptyCollection_ShouldNotifyInsertSectionThenInsertItem()
     {
         // Arrange
         var collection = new ObservableCollection<string>();
@@ -626,9 +620,8 @@ public class VirtualScrollObservableCollectionAdapterTests
         // Assert - Check first change set (from first Add)
         changeSets.Should().HaveCount(2);
         var firstChanges = changeSets[0].Changes.ToList();
-        firstChanges.Should().HaveCount(2);
+        firstChanges.Should().HaveCount(1, "first add transitions from empty, so only InsertSection is emitted (includes the item)");
         firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
-        firstChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
         
         // Second change set should only have InsertItem (section already exists)
         var secondChanges = changeSets[1].Changes.ToList();
@@ -736,11 +729,11 @@ public class VirtualScrollObservableCollectionAdapterTests
         collection.Add("A");
         collection.Add("B");
 
-        // Assert - First add should trigger section insertion
+        // Assert - First add should trigger section insertion only (includes the item)
         changeSets.Should().HaveCountGreaterThanOrEqualTo(2); // Clear + Add operations
         var addChangeSet = changeSets[changeSets.Count - 2]; // Second to last (first Add)
         var changes = addChangeSet.Changes.ToList();
-        changes.Should().HaveCount(2);
+        changes.Should().HaveCount(1, "adding to empty collection should only emit InsertSection (includes the item)");
         changes[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
     }
 
@@ -846,11 +839,10 @@ public class VirtualScrollObservableCollectionAdapterTests
         // Assert
         changeSets.Should().HaveCount(2);
         
-        // First change set: InsertSection + InsertItem
+        // First change set: InsertSection only (includes item)
         var firstChanges = changeSets[0].Changes.ToList();
-        firstChanges.Should().HaveCount(2);
+        firstChanges.Should().HaveCount(1, "adding to empty collection should only emit InsertSection (includes the item)");
         firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
-        firstChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
         
         // Second change set: RemoveItem + RemoveSection
         var secondChanges = changeSets[1].Changes.ToList();
@@ -877,9 +869,9 @@ public class VirtualScrollObservableCollectionAdapterTests
         // Assert
         changeSets.Should().HaveCount(2);
         
-        // First change set should have InsertSection
+        // First change set should have InsertSection only (includes the item)
         var firstChanges = changeSets[0].Changes.ToList();
-        firstChanges.Should().HaveCount(2);
+        firstChanges.Should().HaveCount(1, "first add transitions from empty, so only InsertSection is emitted");
         firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
         
         // Second change set should NOT have InsertSection
@@ -917,6 +909,83 @@ public class VirtualScrollObservableCollectionAdapterTests
         secondChanges.Should().HaveCount(2);
         secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
         secondChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+    }
+
+    [Fact]
+    public void Subscribe_WhenClearingAllItemsThenAddingOne_FlattenedAdapterShouldHaveCorrectCount()
+    {
+        // Arrange - Start with multiple items
+        var collection = new ObservableCollection<string> { "A", "B", "C" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        
+        // Create layout info with no headers/footers (like carousel scenario)
+        var layoutInfo = Substitute.For<IVirtualScrollLayoutInfo>();
+        layoutInfo.HasGlobalHeader.Returns(false);
+        layoutInfo.HasGlobalFooter.Returns(false);
+        layoutInfo.HasSectionHeader.Returns(false);
+        layoutInfo.HasSectionFooter.Returns(false);
+        
+        var flattenedAdapter = new VirtualScrollFlattenedAdapter(adapter, layoutInfo);
+        
+        // Initial count should be 3
+        flattenedAdapter.GetItemCount().Should().Be(3);
+        
+        // Act - Remove all items one by one (simulating user clicking remove button)
+        collection.RemoveAt(0); // Remove "A"
+        flattenedAdapter.GetItemCount().Should().Be(2);
+        
+        collection.RemoveAt(0); // Remove "B"
+        flattenedAdapter.GetItemCount().Should().Be(1);
+        
+        collection.RemoveAt(0); // Remove "C"
+        flattenedAdapter.GetItemCount().Should().Be(0);
+        
+        // Act - Now add one item (simulating user clicking add button)
+        collection.Add("D");
+        
+        // Assert - Should have exactly 1 item, not 2
+        var finalCount = flattenedAdapter.GetItemCount();
+        finalCount.Should().Be(1, "after removing all items and adding one, count should be 1, not 2");
+        
+        // Verify we can get the item correctly
+        flattenedAdapter.TryGetSectionAndItemIndex(0, out var sectionIdx, out var itemIdx).Should().BeTrue();
+        sectionIdx.Should().Be(0);
+        itemIdx.Should().Be(0);
+    }
+    
+    [Fact]
+    public void Subscribe_WhenClearingThenAddingOne_FlattenedAdapterShouldHaveCorrectCount()
+    {
+        // Arrange - Start with multiple items
+        var collection = new ObservableCollection<string> { "A", "B", "C", "D", "E" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        
+        // Create layout info with no headers/footers
+        var layoutInfo = Substitute.For<IVirtualScrollLayoutInfo>();
+        layoutInfo.HasGlobalHeader.Returns(false);
+        layoutInfo.HasGlobalFooter.Returns(false);
+        layoutInfo.HasSectionHeader.Returns(false);
+        layoutInfo.HasSectionFooter.Returns(false);
+        
+        var flattenedAdapter = new VirtualScrollFlattenedAdapter(adapter, layoutInfo);
+        
+        // Initial count should be 5
+        flattenedAdapter.GetItemCount().Should().Be(5);
+        
+        // Act - Clear all items at once
+        collection.Clear();
+        flattenedAdapter.GetItemCount().Should().Be(0);
+        
+        // Act - Add one item
+        collection.Add("New Item");
+        
+        // Assert - Should have exactly 1 item
+        var finalCount = flattenedAdapter.GetItemCount();
+        finalCount.Should().Be(1, "after clearing and adding one item, count should be 1, not 2");
+        
+        // Verify adapter reports correct section count
+        adapter.GetSectionCount().Should().Be(1);
+        adapter.GetItemCount(0).Should().Be(1);
     }
 
     #endregion

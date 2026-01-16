@@ -11,6 +11,7 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
     private readonly UICollectionView _collectionView;
     private readonly IVirtualScrollAdapter _adapter;
     private readonly IDisposable _subscription;
+    private readonly Action? _onBatchUpdatesCompleted;
     private int _previousSectionCount;
     private bool _disposed;
 
@@ -19,10 +20,12 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
     /// </summary>
     /// <param name="collectionView">The collection view to update.</param>
     /// <param name="adapter">The adapter to subscribe to.</param>
-    public VirtualScrollPlatformDataSourceNotifier(UICollectionView collectionView, IVirtualScrollAdapter adapter)
+    /// <param name="onBatchUpdatesCompleted">Optional callback invoked after batch updates complete.</param>
+    public VirtualScrollPlatformDataSourceNotifier(UICollectionView collectionView, IVirtualScrollAdapter adapter, Action? onBatchUpdatesCompleted = null)
     {
         _collectionView = collectionView ?? throw new ArgumentNullException(nameof(collectionView));
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
+        _onBatchUpdatesCompleted = onBatchUpdatesCompleted;
         _previousSectionCount = adapter.GetSectionCount();
         _subscription = adapter.Subscribe(OnAdapterChanged);
     }
@@ -71,7 +74,7 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
                     var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
                     _collectionView.ReloadSections(reloadRange);
                 }
-            }, null);
+            }, _ => _onBatchUpdatesCompleted?.Invoke());
             
             // Update tracked section count
             _previousSectionCount = newSectionCount;
@@ -84,7 +87,7 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
             {
                 ApplyChange(change);
             }
-        }, null);
+        }, _ => _onBatchUpdatesCompleted?.Invoke());
         
         // Update tracked section count after processing changes
         _previousSectionCount = _adapter.GetSectionCount();

@@ -197,6 +197,10 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
         }
     }
     
+    // Handles when dragging starts
+    public override void DraggingStarted(UIScrollView scrollView)
+        => SendScrollStarted(scrollView);
+    
     // 1. Handles the "flick" stop
     public override void DecelerationEnded(UIScrollView scrollView)
         => SendScrollEnded(scrollView);
@@ -209,6 +213,13 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
             SendScrollEnded(scrollView);
         }
     }
+
+    private void SendScrollStarted(UIScrollView scrollView)
+        => _controller?.ScrollStarted(
+            scrollView.ContentOffset.X,
+            scrollView.ContentOffset.Y,
+            scrollView.ContentSize.Width,
+            scrollView.ContentSize.Height);
 
 #pragma warning disable VSTHRD100
     private async void SendScrollEnded(UIScrollView scrollView)

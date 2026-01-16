@@ -93,7 +93,7 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
 
         var platformView = view.ToPlatform(_mauiContext);
         var recyclerView = (VirtualScrollRecyclerView) parent;
-        var wrapperPlatformView = CreateViewHolderViewWrapper(recyclerView, view, platformView);
+        var wrapperPlatformView = CreateViewHolderViewWrapper(recyclerView, _virtualScroll, view, platformView);
         var holder = new VirtualScrollViewHolder(wrapperPlatformView);
         
         _cellManager.TrackCell(holder);
@@ -101,21 +101,18 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
         return holder;
     }
 
-    private static VirtualScrollViewWrapper CreateViewHolderViewWrapper(VirtualScrollRecyclerView recyclerView, IView view, AView platformView)
+    private static VirtualScrollViewWrapper CreateViewHolderViewWrapper(VirtualScrollRecyclerView recyclerView, IVirtualScroll virtualScroll, IView view, AView platformView)
     {
         var wrapperPlatformView = new VirtualScrollViewWrapper(recyclerView.Context!);
         wrapperPlatformView.VirtualView = view;
         wrapperPlatformView.AddView(platformView);
         wrapperPlatformView.Id = AView.GenerateViewId();
-        wrapperPlatformView.LayoutParameters = recyclerView.Orientation == ItemsLayoutOrientation.Vertical
-            ? new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MatchParent,
-                ViewGroup.LayoutParams.WrapContent
-            )
-            : new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WrapContent,
-                ViewGroup.LayoutParams.MatchParent
-            );
+
+        wrapperPlatformView.LayoutParameters = virtualScroll.ItemsLayout is CarouselVirtualScrollLayout
+            ? new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent)
+            : virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Vertical
+                ? new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+                : new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
         return wrapperPlatformView;
     }
 

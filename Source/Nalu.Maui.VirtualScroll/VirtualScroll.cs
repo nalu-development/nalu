@@ -327,16 +327,40 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     );
 
     /// <summary>
-    /// Bindable property for <see cref="ScrolledCommand"/>.
+    /// Bindable property for <see cref="ScrollStartedCommand"/>.
+    /// </summary>
+    public static readonly BindableProperty ScrollStartedCommandProperty = BindableProperty.Create(
+        nameof(ScrollStartedCommand),
+        typeof(ICommand),
+        typeof(VirtualScroll),
+        null,
+        propertyChanged: OnScrollStartedCommandChanged
+    );
+
+    /// <summary>
+    /// Bindable property for <see cref="ScrollEndedCommand"/>.
     /// </summary>
     public static readonly BindableProperty ScrollEndedCommandProperty = BindableProperty.Create(
         nameof(ScrollEndedCommand),
         typeof(ICommand),
         typeof(VirtualScroll),
-        null
+        null,
+        propertyChanged: OnScrollEndedCommandChanged
     );
 
     private static void OnScrolledCommandChanged(BindableObject bindable, object? oldValue, object? newValue)
+    {
+        var virtualScroll = (VirtualScroll)bindable;
+        virtualScroll.UpdateScrollEventSubscription();
+    }
+
+    private static void OnScrollStartedCommandChanged(BindableObject bindable, object? oldValue, object? newValue)
+    {
+        var virtualScroll = (VirtualScroll)bindable;
+        virtualScroll.UpdateScrollEventSubscription();
+    }
+
+    private static void OnScrollEndedCommandChanged(BindableObject bindable, object? oldValue, object? newValue)
     {
         var virtualScroll = (VirtualScroll)bindable;
         virtualScroll.UpdateScrollEventSubscription();
@@ -352,7 +376,16 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     }
 
     /// <summary>
-    /// Gets or sets the command to execute when the scroll position changes.
+    /// Gets or sets the command to execute when scrolling starts.
+    /// </summary>
+    public ICommand? ScrollStartedCommand
+    {
+        get => (ICommand?)GetValue(ScrollStartedCommandProperty);
+        set => SetValue(ScrollStartedCommandProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the command to execute when scrolling ends.
     /// </summary>
     public ICommand? ScrollEndedCommand
     {
@@ -382,10 +415,57 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
 
     private event EventHandler<VirtualScrollScrolledEventArgs>? OnScrolledEvent;
 
+    private int _onScrollStartedSubscriberCount;
+
+    /// <summary>
+    /// Event raised when scrolling starts.
+    /// </summary>
+    public event EventHandler<VirtualScrollScrolledEventArgs>? OnScrollStarted
+    {
+        add
+        {
+            _onScrollStartedSubscriberCount++;
+            UpdateScrollEventSubscription();
+            OnScrollStartedEvent += value;
+        }
+        remove
+        {
+            OnScrollStartedEvent -= value;
+            _onScrollStartedSubscriberCount--;
+            UpdateScrollEventSubscription();
+        }
+    }
+
+    private event EventHandler<VirtualScrollScrolledEventArgs>? OnScrollStartedEvent;
+
+    private int _onScrollEndedSubscriberCount;
+
     /// <summary>
     /// Event raised when the scrolling ends.
     /// </summary>
-    public event EventHandler<VirtualScrollScrolledEventArgs>? OnScrollEnded;
+    public event EventHandler<VirtualScrollScrolledEventArgs>? OnScrollEnded
+    {
+        add
+        {
+            _onScrollEndedSubscriberCount++;
+            UpdateScrollEventSubscription();
+            OnScrollEndedEvent += value;
+        }
+        remove
+        {
+            OnScrollEndedEvent -= value;
+            _onScrollEndedSubscriberCount--;
+            UpdateScrollEventSubscription();
+        }
+    }
+
+    private event EventHandler<VirtualScrollScrolledEventArgs>? OnScrollEndedEvent;
+
+    /// <summary>
+    /// Internal event raised when a batch layout update completes.
+    /// Used by layouts to update their state after items are added/removed/moved.
+    /// </summary>
+    internal event EventHandler? OnLayoutUpdateCompleted;
 
     private void UpdateScrollEventSubscription()
     {
@@ -394,7 +474,12 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
             return;
         }
 
-        var hasSubscribers = ScrolledCommand != null || _onScrolledSubscriberCount > 0;
+        var hasSubscribers = ScrolledCommand != null || 
+                            ScrollStartedCommand != null ||
+                            ScrollEndedCommand != null || 
+                            _onScrolledSubscriberCount > 0 ||
+                            _onScrollStartedSubscriberCount > 0 ||
+                            _onScrollEndedSubscriberCount > 0;
         Handler.Invoke("SetScrollEventEnabled", hasSubscribers);
     }
 
@@ -490,6 +575,18 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         OnScrolledEvent?.Invoke(this, args);
     }
 
+    void IVirtualScrollController.ScrollStarted(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
+    {
+        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
+
+        if (ScrollStartedCommand != null && ScrollStartedCommand.CanExecute(args))
+        {
+            ScrollStartedCommand.Execute(args);
+        }
+
+        OnScrollStartedEvent?.Invoke(this, args);
+    }
+
     void IVirtualScrollController.ScrollEnded(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
     {
         var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
@@ -499,8 +596,11 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
             ScrollEndedCommand.Execute(args);
         }
 
-        OnScrollEnded?.Invoke(this, args);
+        OnScrollEndedEvent?.Invoke(this, args);
     }
+
+    void IVirtualScrollController.LayoutUpdateCompleted()
+        => OnLayoutUpdateCompleted?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Gets the range of currently visible items in the virtual scroll.
