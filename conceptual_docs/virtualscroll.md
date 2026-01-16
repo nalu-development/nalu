@@ -2,7 +2,7 @@
 
 A high-performance virtualized scrolling view designed to replace the traditional `CollectionView` in .NET MAUI applications.
 
-`VirtualScroll` provides a more efficient implementation tailored specifically for Android and iOS platforms, offering smooth scrolling, dynamic item sizing, and proper support for observable collections.
+`VirtualScroll` provides a more efficient implementation tailored specifically for Android and iOS platforms, offering smooth scrolling, dynamic item sizing, carousel mode, and proper support for observable collections.
 
 > VirtualScroll is the result of over a year of platform-level engineering and performance optimizations derived from my experience contributing core improvements to **.NET MAUI**.
 >
