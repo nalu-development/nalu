@@ -1,8 +1,6 @@
-using System.Linq;
-using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using DragEventArgs = Microsoft.UI.Xaml.DragEventArgs;
 
 namespace Nalu;
 
@@ -28,48 +26,16 @@ internal class VirtualScrollDragDropHelper : IDisposable
         _virtualScroll = virtualScroll;
         _flattenedAdapter = flattenedAdapter;
 
-        // Enable drag and drop on ItemsRepeater
-        _itemsRepeater.CanDragItems = true;
-        _itemsRepeater.CanReorderItems = true;
-        _itemsRepeater.DragItemsStarting += OnDragItemsStarting;
+        // Note: ItemsRepeater doesn't support CanDragItems, CanReorderItems, or DragItemsStarting
+        // Drag and drop would need to be implemented using UIElement.DragStarting on individual elements
+        // For now, we'll only handle DragOver and Drop events which are available on ItemsRepeater
         _itemsRepeater.DragOver += OnDragOver;
         _itemsRepeater.Drop += OnDrop;
     }
 
-    private void OnDragItemsStarting(object sender, DragItemsStartingEventArgs e)
-    {
-        if (e.Items.Count == 0 || _flattenedAdapter is null || _virtualScroll.DragHandler is null || _virtualScroll.Adapter is null)
-        {
-            e.Cancel = true;
-            return;
-        }
-
-        // Get the first item being dragged
-        var flattenedIndex = (int)e.Items[0];
-        if (!_flattenedAdapter.TryGetSectionAndItemIndex(flattenedIndex, out var sectionIndex, out var itemIndex))
-        {
-            e.Cancel = true;
-            return;
-        }
-
-        var item = _virtualScroll.Adapter.GetItem(sectionIndex, itemIndex);
-        var dragInfo = new VirtualScrollDragInfo(item, sectionIndex, itemIndex);
-
-        _virtualScroll.DragHandler.OnDragInitiating(dragInfo);
-        if (!_virtualScroll.DragHandler.CanDragItem(dragInfo))
-        {
-            e.Cancel = true;
-            return;
-        }
-
-        _originalSectionIndex = sectionIndex;
-        _originalItemIndex = itemIndex;
-        _draggingItem = new WeakReference<object?>(item);
-        _virtualScroll.DragHandler.OnDragStarted(dragInfo);
-
-        // Store the container for later use
-        _draggingContainer = _itemsRepeater.TryGetElement(flattenedIndex) as VirtualScrollElementContainer;
-    }
+    // Note: ItemsRepeater doesn't support DragItemsStarting event like ListView does.
+    // Drag initiation would need to be handled at the element level using UIElement.DragStarting.
+    // For now, drag/drop functionality is limited on Windows platform.
 
     private void OnDragOver(object sender, DragEventArgs e)
     {
@@ -183,9 +149,6 @@ internal class VirtualScrollDragDropHelper : IDisposable
     {
         if (_itemsRepeater is not null)
         {
-            _itemsRepeater.CanDragItems = false;
-            _itemsRepeater.CanReorderItems = false;
-            _itemsRepeater.DragItemsStarting -= OnDragItemsStarting;
             _itemsRepeater.DragOver -= OnDragOver;
             _itemsRepeater.Drop -= OnDrop;
         }

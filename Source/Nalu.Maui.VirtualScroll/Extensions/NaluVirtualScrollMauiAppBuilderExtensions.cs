@@ -19,7 +19,7 @@ public static class NaluVirtualScrollMauiAppBuilderExtensions
     {
         _ = new NaluXamlVirtualScrollInitializer();
 
-#if IOS || MACCATALYST || ANDROID
+#if IOS || MACCATALYST || ANDROID || WINDOWS
         builder.ConfigureMauiHandlers(handlers =>
             {
                 handlers.AddHandler<IVirtualScroll, VirtualScrollHandler>();

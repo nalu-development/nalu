@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using Microsoft.Maui.Controls.Internals;
-using Microsoft.UI.Xaml.Controls;
 
 namespace Nalu;
 
@@ -36,6 +35,6 @@ internal sealed class VirtualScrollPlatformReuseIdManager
             _registeredTemplates.Add(storedReuseId, template);
         }
 
-        return storedReuseId;
+        return storedReuseId!;
     }
 }

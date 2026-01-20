@@ -1,5 +1,3 @@
-using Microsoft.Maui.Controls;
-using Microsoft.Maui.Platform;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -8,7 +6,7 @@ namespace Nalu;
 /// <summary>
 /// Element factory for Windows ItemsRepeater that handles element creation and recycling.
 /// </summary>
-internal class VirtualScrollElementFactory : IElementFactory, IDisposable
+internal partial class VirtualScrollElementFactory : IElementFactory, IDisposable
 {
     private readonly object _lockObj = new();
     private readonly IMauiContext _mauiContext;
@@ -41,7 +39,9 @@ internal class VirtualScrollElementFactory : IElementFactory, IDisposable
             }
 
             if (queue.TryDequeue(out var element))
+            {
                 return element;
+            }
         }
 
         return null;
@@ -65,12 +65,13 @@ internal class VirtualScrollElementFactory : IElementFactory, IDisposable
 
     public UIElement GetElement(ElementFactoryGetArgs args)
     {
-        if (args.Data is not int flattenedIndex)
+        if (args.Data is not VirtualScrollItemWrapper wrapper)
         {
             return new ContentControl(); // Return empty element for invalid data
         }
 
-        var item = _flattenedAdapter.GetItem(flattenedIndex);
+        var flattenedIndex = wrapper.FlattenedIndex;
+        var item = wrapper.Item;
         var template = item.Type switch
         {
             VirtualScrollFlattenedPositionType.Item => _virtualScroll.GetItemTemplate(item.Value),
@@ -94,7 +95,7 @@ internal class VirtualScrollElementFactory : IElementFactory, IDisposable
 
         if (container.NeedsView)
         {
-            var view = (IView)template?.CreateContent() ?? new ContentView();
+            var view = template?.CreateContent() as IView ?? new ContentView();
             container.SetupView(view);
         }
 
@@ -128,13 +129,6 @@ internal class VirtualScrollElementFactory : IElementFactory, IDisposable
         if (args.Element is VirtualScrollElementContainer container)
         {
             container.IsRecycled = true;
-
-            // Clean up logical child relationship
-            if (container.VirtualView is Element { Parent: { } parent } viewElement)
-            {
-                parent.RemoveLogicalChild(viewElement);
-            }
-
             AddRecycledElement(container);
         }
     }

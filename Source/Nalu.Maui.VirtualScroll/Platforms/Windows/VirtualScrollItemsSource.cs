@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
 
 namespace Nalu;
@@ -7,7 +6,7 @@ namespace Nalu;
 /// <summary>
 /// Data source for Windows ItemsRepeater that wraps the flattened adapter.
 /// </summary>
-internal class VirtualScrollItemsSource : IReadOnlyList<int>, INotifyCollectionChanged
+internal class VirtualScrollItemsSource : IReadOnlyList<VirtualScrollItemWrapper>, INotifyCollectionChanged
 {
     private readonly IVirtualScrollFlattenedAdapter _flattenedAdapter;
 
@@ -20,68 +19,81 @@ internal class VirtualScrollItemsSource : IReadOnlyList<int>, INotifyCollectionC
 
     public int Count => _flattenedAdapter.GetItemCount();
 
-    public int this[int index] => index; // ItemsRepeater uses index as data, we'll use flattened index
-
-    public void NotifyReset()
+    public VirtualScrollItemWrapper this[int index]
     {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        get
+        {
+            var item = _flattenedAdapter.GetItem(index);
+            return new VirtualScrollItemWrapper(index, item);   
+        }
     }
+
+    public void NotifyReset() => CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
 
     public void NotifyItemInserted(int index)
     {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, index, index));
+        var item = new VirtualScrollItemWrapper(index, _flattenedAdapter.GetItem(index));
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
     }
 
     public void NotifyItemRangeInserted(int startIndex, int count)
     {
-        var items = new List<int>();
+        var items = new List<VirtualScrollItemWrapper>();
         for (var i = startIndex; i < startIndex + count; i++)
         {
-            items.Add(i);
+            items.Add(new VirtualScrollItemWrapper(i, _flattenedAdapter.GetItem(i)));
         }
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, items, startIndex));
     }
 
     public void NotifyItemRemoved(int index)
     {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, index, index));
+        // For Remove, the adapter has already been updated, so we can't get the removed item
+        // Create a wrapper with the index - ItemsRepeater will use the index to identify what to remove
+        // We use a default item since we can't retrieve the actual removed item
+        var removedItem = new VirtualScrollItemWrapper(index, default(VirtualScrollFlattenedItem));
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItem, index));
     }
 
     public void NotifyItemRangeRemoved(int startIndex, int count)
     {
-        var items = new List<int>();
-        for (var i = startIndex; i < startIndex + count; i++)
+        // For Remove, the adapter has already been updated, so we can't get the removed items
+        // Create wrappers with indices - ItemsRepeater will use the indices to identify what to remove
+        var items = new List<VirtualScrollItemWrapper>();
+        for (var i = 0; i < count; i++)
         {
-            items.Add(i);
+            items.Add(new VirtualScrollItemWrapper(startIndex + i, default(VirtualScrollFlattenedItem)));
         }
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, items, startIndex));
     }
 
     public void NotifyItemChanged(int index)
     {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, index, index));
+        var item = new VirtualScrollItemWrapper(index, _flattenedAdapter.GetItem(index));
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, item, item, index));
     }
 
     public void NotifyItemRangeChanged(int startIndex, int count)
     {
-        var items = new List<int>();
+        var items = new List<VirtualScrollItemWrapper>();
         for (var i = startIndex; i < startIndex + count; i++)
         {
-            items.Add(i);
+            items.Add(new VirtualScrollItemWrapper(i, _flattenedAdapter.GetItem(i)));
         }
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, items, items, startIndex));
     }
 
     public void NotifyItemMoved(int oldIndex, int newIndex)
     {
-        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, newIndex, oldIndex, newIndex));
+        var item = new VirtualScrollItemWrapper(newIndex, _flattenedAdapter.GetItem(newIndex));
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, item, newIndex, oldIndex));
     }
 
-    public IEnumerator<int> GetEnumerator()
+    public IEnumerator<VirtualScrollItemWrapper> GetEnumerator()
     {
         for (var i = 0; i < Count; i++)
         {
-            yield return i;
+            yield return new VirtualScrollItemWrapper(i, _flattenedAdapter.GetItem(i));
         }
     }
 

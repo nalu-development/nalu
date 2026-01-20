@@ -1,4 +1,3 @@
-using Microsoft.Maui.Platform;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -26,7 +25,7 @@ public partial class VirtualScrollHandler
     private WStackLayout? _layout;
     private WGrid? _rootLayout;
     private IVirtualScrollFlattenedAdapter? _flattenedAdapter;
-    private bool _isUpdatingIsRefreshingFromPlatform;
+    private bool _isUpdatingIsRefreshingFromPlatform = false;
     private VirtualScrollDragDropHelper? _dragDropHelper;
 
     /// <inheritdoc />
@@ -84,8 +83,7 @@ public partial class VirtualScrollHandler
         _elementFactory?.Dispose();
         _elementFactory = null;
 
-        _itemsRepeater!.ItemTemplate = null;
-        _itemsRepeater.ItemsSource = null;
+        _itemsRepeater?.ItemsSource = null;
         _itemsSource = null;
         _flattenedAdapter = null;
         _reuseIdManager = null;

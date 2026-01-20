@@ -1,16 +1,13 @@
-using System.Linq;
-using Microsoft.Maui.Controls;
 using Microsoft.Maui.Platform;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 
 namespace Nalu;
 
 /// <summary>
 /// Container for virtualized elements in Windows ItemsRepeater.
 /// </summary>
-internal class VirtualScrollElementContainer : ContentControl
+internal partial class VirtualScrollElementContainer : ContentControl
 {
     public VirtualScrollElementContainer(IMauiContext context, string reuseId, IVirtualScroll virtualScroll)
         : base()
@@ -25,13 +22,13 @@ internal class VirtualScrollElementContainer : ContentControl
 
         if (orientation == ItemsLayoutOrientation.Vertical)
         {
-            HorizontalContentAlignment = UI.Xaml.HorizontalAlignment.Stretch;
-            HorizontalAlignment = UI.Xaml.HorizontalAlignment.Stretch;
+            HorizontalContentAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch;
+            HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch;
         }
         else
         {
-            VerticalContentAlignment = UI.Xaml.VerticalAlignment.Stretch;
-            VerticalAlignment = UI.Xaml.VerticalAlignment.Stretch;
+            VerticalContentAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch;
+            VerticalAlignment = Microsoft.UI.Xaml.VerticalAlignment.Stretch;
         }
     }
 
@@ -72,8 +69,12 @@ internal class VirtualScrollElementContainer : ContentControl
     protected override IEnumerable<DependencyObject> GetChildrenInTabFocusOrder()
     {
         if (IsRecycled)
+        {
             return Enumerable.Empty<DependencyObject>();
+        }
         else
+        {
             return base.GetChildrenInTabFocusOrder();
+        }
     }
 }
