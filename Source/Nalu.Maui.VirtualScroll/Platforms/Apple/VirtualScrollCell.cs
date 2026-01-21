@@ -16,7 +16,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     private uint _useCount;
     private bool _needsMeasure;
     private bool _readyForReuse = true;
-    public UICollectionViewScrollDirection ScrollDirection { get; set; }
+    public IVirtualScrollLayout? ItemsLayout { get; set; }
 
     public NSString? SupplementaryType { get; set; }
     public NSIndexPath? IndexPath { get; set; }
@@ -71,18 +71,27 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
             return base.PreferredLayoutAttributesFittingAttributes(layoutAttributes);
         }
 
-        var constraint = ScrollDirection == UICollectionViewScrollDirection.Vertical
-            ? new CGSize(layoutAttributes.Size.Width, double.PositiveInfinity)
-            : new CGSize(double.PositiveInfinity, layoutAttributes.Size.Height);
+        var attributesSize = layoutAttributes.Size;
+
+        var layout = ItemsLayout ?? throw new InvalidOperationException("Layout is not set on VirtualScrollCell.");
+        var isCarousel = layout is CarouselVirtualScrollLayout;
+        var constraint = isCarousel
+            ? new CGSize(attributesSize.Width, attributesSize.Height)
+            : layout.Orientation == ItemsLayoutOrientation.Vertical
+                ? new CGSize(attributesSize.Width, double.PositiveInfinity)
+                : new CGSize(double.PositiveInfinity, attributesSize.Height);
 
         var measure = NativeView!.Hidden ? Size.Zero : virtualView.Measure(constraint.Width, constraint.Height);
-        
-        var size = ScrollDirection == UICollectionViewScrollDirection.Vertical
-            ? new CGSize(layoutAttributes.Frame.Width, measure.Height)
-            : new CGSize(measure.Width, layoutAttributes.Frame.Height);
-        
-        layoutAttributes.Frame = new CGRect(layoutAttributes.Frame.Location, size);
-        
+
+        if (!isCarousel)
+        {
+            var size = layout.Orientation == ItemsLayoutOrientation.Vertical
+                ? new CGSize(layoutAttributes.Frame.Width, measure.Height)
+                : new CGSize(measure.Width, layoutAttributes.Frame.Height);
+
+            layoutAttributes.Frame = new CGRect(layoutAttributes.Frame.Location, size);
+        }
+
         return layoutAttributes;
     }
 

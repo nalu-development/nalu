@@ -153,6 +153,8 @@ public partial class NavigationServiceTests
     public record EvenIntent(int Value = 0);
 
     public record OddIntent(string Value = "Hello");
+    
+    public record SubOddIntent() : OddIntent("Hey");
 
     private class BaseTestPage : ContentPage
     {

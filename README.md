@@ -23,7 +23,7 @@ If `Nalu.Maui` is valuable to your work, consider supporting its continued devel
 *   **Controls** [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
     *   Includes useful cross-platform controls like `InteractableCanvasView` (a `SKCanvasView` with enhanced touch support) and `DurationWheel` (a `TimeSpan?` editor).
 *   **VirtualScroll** [![Nalu.Maui.VirtualScroll NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.VirtualScroll.svg)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.VirtualScroll)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/)
-    * A high-performance alternative to the .NET MAUI `CollectionView`, leveraging native `RecyclerView` (Android) and `UICollectionView` (iOS). Supports dynamic sizing, `ObservableCollection<T>`, pull-to-refresh, and section templates.
+    * A high-performance alternative to the .NET MAUI `CollectionView`, leveraging native `RecyclerView` (Android) and `UICollectionView` (iOS). Supports dynamic sizing, `ObservableCollection<T>`, pull-to-refresh, section templates and carousel mode.
     * ⚖️ **Dual Licensed**: 
         * **Non-Commercial:** Free under the MIT License (personal, educational, or non-commercial open-source use).
         * **Commercial:** Requires an active [GitHub Sponsors subscription](https://github.com/sponsors/albyrock87).

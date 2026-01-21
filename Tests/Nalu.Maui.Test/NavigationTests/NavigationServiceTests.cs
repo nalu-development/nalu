@@ -157,6 +157,24 @@ public partial class NavigationServiceTests
         model10.AppearingInvoked.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "NavigationService, when pushing a page with explicitly implemented lifecycle interface with intent subclass, should invoke lifecycle methods")]
+    public async Task NavigationServiceWhenPushingAPageWithExplicitlyImplementedLifecycleInterfaceWithIntentSubclassShouldInvokeLifecycleMethods()
+    {
+        ConfigureTestAsync("c1");
+        await _navigationService.InitializeAsync(_shellProxy, nameof(Page1), null);
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<Page10Model>().WithIntent(new SubOddIntent()));
+
+        var shellContent = _shellProxy.GetContent(nameof(Page1));
+        var shellSection = shellContent.Parent;
+        var navigationStackPages = shellSection.GetNavigationStack().ToList();
+        var page10 = navigationStackPages[1].Page;
+        var model10 = (Page10Model) page10.BindingContext;
+        
+        model10.EnteringInvoked.Should().BeTrue();
+        model10.AppearingInvoked.Should().BeTrue();
+    }
+
     [Fact(DisplayName = "NavigationService, when popping a page, should not leak the popped page")]
     public async Task NavigationServiceWhenPoppingAPageShouldNotLeakThePoppedPage()
     {

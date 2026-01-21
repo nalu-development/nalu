@@ -20,8 +20,7 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
         {
             virtualScrollCell.SupplementaryType = null;
             virtualScrollCell.IndexPath = indexPath;
-            var scrollDirection = layout?.ScrollDirection ?? UICollectionViewScrollDirection.Vertical;
-            virtualScrollCell.ScrollDirection = scrollDirection;
+            virtualScrollCell.ItemsLayout = virtualScroll.ItemsLayout;
 
             var viewFactory = (template ?? throw new InvalidOperationException("Template should not be null for VirtualScrollCell")).CreateContent;
             var handler = virtualScroll.Handler ?? throw new InvalidOperationException("VirtualScroll should not be null");
@@ -61,8 +60,7 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
         {
             virtualScrollCell.SupplementaryType = elementKind;
             virtualScrollCell.IndexPath = indexPath;
-            var scrollDirection = layout?.ScrollDirection ?? UICollectionViewScrollDirection.Vertical;
-            virtualScrollCell.ScrollDirection = scrollDirection;
+            virtualScrollCell.ItemsLayout = virtualScroll.ItemsLayout;
 
             var viewFactory = (template ?? throw new InvalidOperationException("Template should not be null for VirtualScrollCell")).CreateContent;
             var handler = virtualScroll.Handler ?? throw new InvalidOperationException("VirtualScroll should not be null");

@@ -113,7 +113,7 @@
                 </Button.CommandParameter>
             </Button>
             
-            <Entry Placeholder="Type something" />
+            <Entry Placeholder="Type something" BackgroundColor="Beige" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

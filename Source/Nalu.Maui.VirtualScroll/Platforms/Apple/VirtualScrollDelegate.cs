@@ -196,6 +196,45 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
             UpdateFadingEdgeInternal(collectionView);
         }
     }
+    
+    // Handles when dragging starts
+    public override void DraggingStarted(UIScrollView scrollView)
+        => SendScrollStarted(scrollView);
+    
+    // 1. Handles the "flick" stop
+    public override void DecelerationEnded(UIScrollView scrollView)
+        => SendScrollEnded(scrollView);
+
+    // 2. Handles the "manual drag" stop
+    public override void DraggingEnded(UIScrollView scrollView, bool willDecelerate)
+    {
+        if (!willDecelerate)
+        {
+            SendScrollEnded(scrollView);
+        }
+    }
+
+    private void SendScrollStarted(UIScrollView scrollView)
+        => _controller?.ScrollStarted(
+            scrollView.ContentOffset.X,
+            scrollView.ContentOffset.Y,
+            scrollView.ContentSize.Width,
+            scrollView.ContentSize.Height);
+
+#pragma warning disable VSTHRD100
+    private async void SendScrollEnded(UIScrollView scrollView)
+#pragma warning restore VSTHRD100
+    {
+        // Give CV time to settle positions before sending the event
+        await Task.Yield();
+
+        _controller?.ScrollEnded(
+            scrollView.ContentOffset.X,
+            scrollView.ContentOffset.Y,
+            scrollView.ContentSize.Width,
+            scrollView.ContentSize.Height
+        );
+    }
 
     protected override void Dispose(bool disposing)
     {

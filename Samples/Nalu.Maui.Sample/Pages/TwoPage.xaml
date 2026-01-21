@@ -8,39 +8,40 @@
              xmlns:controls="https://nalu-development.github.com/nalu/controls"
              x:Class="Nalu.Maui.Sample.Pages.TwoPage"
              x:DataType="pageModels:TwoPageModel"
-             Title="Page Two"
-             Padding="16">
+             Title="Page Two">
     <ContentPage.Content>
-        <VerticalStackLayout Spacing="16">
-            <Label Text="Page Two" FontSize="Title" Margin="0,16" />
-            <Label>
-                <Label.FormattedText>
-                    <FormattedString>
-                        <Span Text="Instance: " />
-                        <Span Text="{Binding InstanceCount}" />
-                    </FormattedString>
-                </Label.FormattedText>
-            </Label>
-            <Button Command="{Binding PushSixCommand}"
-                    Text="Push Six" />
-            <Button Command="{nalu:NavigateCommand}"
-                    Text="Push Six Via XAML">
-                <Button.CommandParameter>
-                    <nalu:RelativeNavigation>
-                        <nalu:NavigationSegment Type="pages:SixPage" />
-                    </nalu:RelativeNavigation>
-                </Button.CommandParameter>
-            </Button>
+        <ScrollView>
+            <VerticalStackLayout Spacing="16" Padding="16">
+                <Label Text="Page Two" FontSize="Title" Margin="0,16" />
+                <Label>
+                    <Label.FormattedText>
+                        <FormattedString>
+                            <Span Text="Instance: " />
+                            <Span Text="{Binding InstanceCount}" />
+                        </FormattedString>
+                    </Label.FormattedText>
+                </Label>
+                <Button Command="{Binding PushSixCommand}"
+                        Text="Push Six" />
+                <Button Command="{nalu:NavigateCommand}"
+                        Text="Push Six Via XAML">
+                    <Button.CommandParameter>
+                        <nalu:RelativeNavigation>
+                            <nalu:NavigationSegment Type="pages:SixPage" />
+                        </nalu:RelativeNavigation>
+                    </Button.CommandParameter>
+                </Button>
 
-            <Grid>
-                <controls:DurationWheel x:Name="DurationWheel"
-                                        Duration="{Binding Duration}" />
-                <Label HorizontalOptions="Center"
-                       VerticalOptions="Center"
-                       FontSize="24"
-                       InputTransparent="True"
-                       Text="{Binding DurationText}" />
-            </Grid>
-        </VerticalStackLayout>
+                <Grid>
+                    <controls:DurationWheel x:Name="DurationWheel"
+                                            Duration="{Binding Duration}" />
+                    <Label HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           FontSize="24"
+                           InputTransparent="True"
+                           Text="{Binding DurationText}" />
+                </Grid>
+            </VerticalStackLayout>
+        </ScrollView>
     </ContentPage.Content>
 </ContentPage>

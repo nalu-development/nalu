@@ -6,13 +6,6 @@ namespace Nalu;
 
 internal static partial class NavigationHelper
 {
-    private static readonly MethodInfo _sendEnteringWithIntentAsyncMethod =
-        typeof(NavigationHelper).GetMethod(nameof(SendEnteringWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
-
-    private static readonly MethodInfo _sendAppearingWithIntentAsyncMethod =
-        typeof(NavigationHelper).GetMethod(nameof(SendAppearingWithIntentAsync), BindingFlags.NonPublic | BindingFlags.Static)!;
-
-
     private static MethodInfo? GetImplementedLifecycleMethod(
         Regex methodRegex, 
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] Type targetType,
@@ -23,7 +16,7 @@ internal static partial class NavigationHelper
                                    .FirstOrDefault(m =>
                                        {
                                            var parameters = m.GetParameters();
-                                           return parameters.Length == 1 && parameters[0].ParameterType == intentType;
+                                           return parameters.Length == 1 && intentType.IsAssignableTo(parameters[0].ParameterType);
                                        }
                                    );
 
@@ -258,7 +251,7 @@ internal static partial class NavigationHelper
 
     public static Type GetPageType(Type? segmentType, INavigationConfiguration configuration)
     {
-        ArgumentNullException.ThrowIfNull(segmentType, nameof(segmentType));
+        ArgumentNullException.ThrowIfNull(segmentType);
 
         if (segmentType.IsSubclassOf(typeof(Page)))
         {
@@ -273,9 +266,6 @@ internal static partial class NavigationHelper
         throw new InvalidOperationException($"Cannot find page type for segment type {segmentType.FullName}.");
     }
 
-    private static ValueTask SendEnteringWithIntentAsync<TIntent>(IEnteringAware<TIntent> target, TIntent intent) => target.OnEnteringAsync(intent);
-    private static ValueTask SendAppearingWithIntentAsync<TIntent>(IAppearingAware<TIntent> target, TIntent intent) => target.OnAppearingAsync(intent);
-    
     [GeneratedRegex("^(Nalu\\.IEnteringAware<.+>\\.|^)OnEnteringAsync$")]
     private static partial Regex OnEnteringAsyncRegex();
     

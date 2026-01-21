@@ -6,17 +6,17 @@ namespace Nalu;
 internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
 {
     private readonly VirtualScrollRecyclerViewAdapter _adapter;
+    private readonly Action _onChangesApplied;
     private readonly IDisposable _subscription;
     private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollPlatformFlattenedAdapterNotifier" /> class.
     /// </summary>
-    /// <param name="adapter">The RecyclerView adapter to update.</param>
-    /// <param name="flattenedAdapter">The flattened adapter to subscribe to.</param>
-    public VirtualScrollPlatformFlattenedAdapterNotifier(VirtualScrollRecyclerViewAdapter adapter, IVirtualScrollFlattenedAdapter flattenedAdapter)
+    public VirtualScrollPlatformFlattenedAdapterNotifier(VirtualScrollRecyclerViewAdapter adapter, IVirtualScrollFlattenedAdapter flattenedAdapter, Action onChangesApplied)
     {
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
+        _onChangesApplied = onChangesApplied;
         _subscription = flattenedAdapter.Subscribe(OnAdapterChanged);
     }
 
@@ -42,6 +42,8 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
         {
             ApplyChange(change);
         }
+
+        _onChangesApplied();
     }
 
     private void ApplyChange(VirtualScrollFlattenedChange change)

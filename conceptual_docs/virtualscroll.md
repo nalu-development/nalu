@@ -2,7 +2,7 @@
 
 A high-performance virtualized scrolling view designed to replace the traditional `CollectionView` in .NET MAUI applications.
 
-`VirtualScroll` provides a more efficient implementation tailored specifically for Android and iOS platforms, offering smooth scrolling, dynamic item sizing, and proper support for observable collections.
+`VirtualScroll` provides a more efficient implementation tailored specifically for Android and iOS platforms, offering smooth scrolling, dynamic item sizing, carousel mode, and proper support for observable collections.
 
 > VirtualScroll is the result of over a year of platform-level engineering and performance optimizations derived from my experience contributing core improvements to **.NET MAUI**.
 >
@@ -194,7 +194,7 @@ All templates support `DataTemplateSelector` for heterogeneous item types:
 
 ### Layouts
 
-The `ItemsLayout` property controls how items are arranged. Currently, `VirtualScroll` supports linear layouts:
+The `ItemsLayout` property controls how items are arranged. `VirtualScroll` supports linear and carousel layouts:
 
 ```xml
 <!-- Vertical scrolling (default) -->
@@ -202,6 +202,45 @@ The `ItemsLayout` property controls how items are arranged. Currently, `VirtualS
 
 <!-- Horizontal scrolling -->
 <nalu:VirtualScroll ItemsLayout="{nalu:HorizontalVirtualScrollLayout}" ... />
+
+<!-- Carousel layouts (paging + full-size items) -->
+<nalu:VirtualScroll ItemsLayout="{nalu:HorizontalCarouselVirtualScrollLayout}" ... />
+<nalu:VirtualScroll ItemsLayout="{nalu:VerticalCarouselVirtualScrollLayout}" ... />
+```
+
+Carousel layouts:
+- Snap to pages (one item per viewport)
+- Measure items to fill the available space
+- Expose a two-way `CurrentRange` attached property representing the current item as `VirtualScrollRange`
+  - This property can also be bound to `int` for the majority of use cases
+- Loop-mode is not supported and it's not planned
+
+**Carousel usage example:**
+
+```xml
+<vs:VirtualScroll Grid.Row="1"
+                  x:Name="VirtualScroll"
+                  DragHandler="{Binding Adapter}"
+                  ItemsSource="{Binding Adapter}"
+                  vs:CarouselVirtualScrollLayout.CurrentRange="{Binding CurrentIndex}"
+                  ItemsLayout="{vs:HorizontalCarouselVirtualScrollLayout}">
+    <vs:VirtualScroll.ItemTemplate>
+        <DataTemplate x:DataType="pageModels:TenItem">
+            <nalu:ViewBox>
+                <Border Margin="8"
+                        Padding="16,8"
+                        BackgroundColor="LightCoral">
+                    <Label Text="{Binding Name}"/>
+                </Border>
+            </nalu:ViewBox>
+        </DataTemplate>
+    </vs:VirtualScroll.ItemTemplate>
+</vs:VirtualScroll>
+```
+
+```csharp
+[ObservableProperty]
+public partial int CurrentIndex { get; set; } = 5;
 ```
 
 You can also configure estimated sizes for better performance and UX on iOS:
@@ -224,7 +263,7 @@ The estimated size properties help reduce layout calculations on iOS, especially
 
 ### Scroll Events
 
-`VirtualScroll` provides two ways to respond to scroll position changes. See [Scrolling](virtualscroll-scrolling.md) for details.
+`VirtualScroll` provides scroll position changes plus scroll start/end events. See [Scrolling](virtualscroll-scrolling.md) for details.
 
 ### Visible Items Range
 
