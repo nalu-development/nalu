@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -84,6 +86,11 @@ public partial class VirtualScrollHandler
         _elementFactory = null;
 
         _itemsRepeater?.ItemsSource = null;
+        
+        if (_itemsSource is not null)
+        {
+            _itemsSource.CollectionChanged -= ItemsSourceOnCollectionChanged;
+        }
         _itemsSource = null;
         _flattenedAdapter = null;
         _reuseIdManager = null;
@@ -220,10 +227,18 @@ public partial class VirtualScrollHandler
             handler._flattenedAdapter = flattenedAdapter;
 
             handler._reuseIdManager = new VirtualScrollPlatformReuseIdManager();
-            handler._elementFactory = new VirtualScrollElementFactory(mauiContext, virtualScroll, flattenedAdapter, handler._reuseIdManager);
+            handler._elementFactory = new VirtualScrollElementFactory(mauiContext, virtualScroll, handler._reuseIdManager);
             itemsRepeater.ItemTemplate = handler._elementFactory;
 
-            handler._itemsSource = new VirtualScrollItemsSource(flattenedAdapter);
+            // Unsubscribe from previous itemsSource if any
+            if (handler._itemsSource is not null)
+            {
+                handler._itemsSource.CollectionChanged -= handler.ItemsSourceOnCollectionChanged;
+            }
+
+            var itemsSource = new VirtualScrollItemsSource(flattenedAdapter);
+            handler._itemsSource = itemsSource;
+            itemsSource.CollectionChanged += handler.ItemsSourceOnCollectionChanged;
             itemsRepeater.ItemsSource = handler._itemsSource;
 
             // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
@@ -235,9 +250,117 @@ public partial class VirtualScrollHandler
             itemsRepeater.ItemsSource = null;
             handler._elementFactory?.Dispose();
             handler._elementFactory = null;
+            
+            if (handler._itemsSource is not null)
+            {
+                handler._itemsSource.CollectionChanged -= handler.ItemsSourceOnCollectionChanged;
+            }
             handler._itemsSource = null;
             handler._flattenedAdapter = null;
             handler._reuseIdManager = null;
+        }
+    }
+
+    private void ItemsSourceOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_elementFactory is null)
+        {
+            return;
+        }
+
+        // adjust items indexes accordingly
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                foreach (var element in _elementFactory.RealizedElements)
+                {
+                    if (element.FlattenedIndex >= e.NewStartingIndex)
+                    {
+                        element.FlattenedIndex += e.NewItems?.Count ?? 1;
+                    }
+                }
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                var removeCount = e.OldItems?.Count ?? 1;
+                var removeStartIndex = e.OldStartingIndex;
+                var removeEndIndex = removeStartIndex + removeCount - 1;
+                
+                foreach (var element in _elementFactory.RealizedElements)
+                {
+                    var index = element.FlattenedIndex;
+                    
+                    // If element is in the removed range, invalidate it
+                    if (index >= removeStartIndex && index <= removeEndIndex)
+                    {
+                        element.FlattenedIndex = -1;
+                    }
+                    // If element is after the removed range, shift it back
+                    else if (index > removeEndIndex)
+                    {
+                        element.FlattenedIndex -= removeCount;
+                    }
+                }
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                // No index changes needed for replace - items are swapped in place
+                break;
+            case NotifyCollectionChangedAction.Move:
+                var moveCount = e.OldItems?.Count ?? 1;
+                var oldStartIndex = e.OldStartingIndex;
+                var oldEndIndex = oldStartIndex + moveCount - 1;
+                var newStartIndex = e.NewStartingIndex;
+                var newEndIndex = newStartIndex + moveCount - 1;
+                
+                // Use ToList to avoid modifying collection while iterating
+                var elements = _elementFactory.RealizedElements.ToList();
+                
+                foreach (var element in elements)
+                {
+                    var index = element.FlattenedIndex;
+                    
+                    // Elements that were in the moved range get updated to new position
+                    // But skip if already in destination range (to avoid double-processing)
+                    if (index >= oldStartIndex && index <= oldEndIndex)
+                    {
+                        // Check if this element is already at the destination (shouldn't happen, but safety check)
+                        if (index >= newStartIndex && index <= newEndIndex)
+                        {
+                            continue;
+                        }
+                        
+                        var offset = index - oldStartIndex;
+                        element.FlattenedIndex = newStartIndex + offset;
+                    }
+                    // Elements between old and new positions need to shift
+                    else if (oldStartIndex < newStartIndex)
+                    {
+                        // Moving forward: elements between old and new positions shift backward
+                        if (index > oldEndIndex && index <= newEndIndex)
+                        {
+                            element.FlattenedIndex -= moveCount;
+                        }
+                    }
+                    else // oldStartIndex > newStartIndex
+                    {
+                        // Moving backward: elements at and between new and old positions shift forward
+                        // Elements from newStartIndex (inclusive) to oldStartIndex (exclusive) shift forward
+                        if (index >= newStartIndex && index < oldStartIndex)
+                        {
+                            element.FlattenedIndex += moveCount;
+                        }
+                    }
+                }
+                break;
+            case NotifyCollectionChangedAction.Reset:
+                // On reset, invalidate all realized elements' indexes
+                // The ItemsRepeater will handle rebuilding the view
+                foreach (var element in _elementFactory.RealizedElements)
+                {
+                    element.FlattenedIndex = -1;
+                }
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
         }
     }
 

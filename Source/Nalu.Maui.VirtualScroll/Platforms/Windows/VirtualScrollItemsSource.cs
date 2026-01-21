@@ -51,7 +51,7 @@ internal class VirtualScrollItemsSource : IReadOnlyList<VirtualScrollItemWrapper
         // For Remove, the adapter has already been updated, so we can't get the removed item
         // Create a wrapper with the index - ItemsRepeater will use the index to identify what to remove
         // We use a default item since we can't retrieve the actual removed item
-        var removedItem = new VirtualScrollItemWrapper(index, default(VirtualScrollFlattenedItem));
+        var removedItem = new VirtualScrollItemWrapper(index, default);
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removedItem, index));
     }
 
@@ -62,7 +62,7 @@ internal class VirtualScrollItemsSource : IReadOnlyList<VirtualScrollItemWrapper
         var items = new List<VirtualScrollItemWrapper>();
         for (var i = 0; i < count; i++)
         {
-            items.Add(new VirtualScrollItemWrapper(startIndex + i, default(VirtualScrollFlattenedItem)));
+            items.Add(new VirtualScrollItemWrapper(startIndex + i, default));
         }
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, items, startIndex));
     }

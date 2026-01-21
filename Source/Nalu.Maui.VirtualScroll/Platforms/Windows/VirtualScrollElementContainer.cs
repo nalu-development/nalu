@@ -38,26 +38,21 @@ internal partial class VirtualScrollElementContainer : ContentControl
 
     public VirtualScrollFlattenedItem? FlattenedItem { get; private set; }
     public int FlattenedIndex { get; internal set; } = -1;
+    internal bool IsRecycled { get; set; }
 
-    private bool _isRecycled;
-
-    internal bool IsRecycled
-    {
-        get => _isRecycled;
-        set => _isRecycled = value;
-    }
-
-    public bool NeedsView => VirtualView is null || VirtualView.Handler is null;
+    public bool NeedsView => VirtualView is null;
 
     public IView? VirtualView { get; private set; }
 
     public void SetupView(IView view)
     {
-        if (VirtualView is null || VirtualView.Handler is null)
+        if (VirtualView is not null)
         {
-            Content = view.ToPlatform(MauiContext);
-            VirtualView = view;
+            throw new InvalidOperationException("VirtualScrollElementContainer is already initialized.");
         }
+
+        Content = view.ToPlatform(MauiContext);
+        VirtualView = view;
     }
 
     public void UpdateItem(VirtualScrollFlattenedItem item, int flattenedIndex)

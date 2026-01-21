@@ -8,59 +8,47 @@ namespace Nalu;
 /// </summary>
 internal partial class VirtualScrollElementFactory : IElementFactory, IDisposable
 {
-    private readonly object _lockObj = new();
     private readonly IMauiContext _mauiContext;
     private readonly IVirtualScroll _virtualScroll;
-    private readonly IVirtualScrollFlattenedAdapter _flattenedAdapter;
     private readonly VirtualScrollPlatformReuseIdManager _reuseIdManager;
     private readonly Dictionary<string, Queue<VirtualScrollElementContainer>> _recycledElements = [];
     private readonly VirtualScrollCellManager<VirtualScrollElementContainer> _cellManager = new(container => container.VirtualView);
+    private readonly HashSet<VirtualScrollElementContainer> _liveContainers = new();
+
+    public IEnumerable<VirtualScrollElementContainer> RealizedElements => _liveContainers;
 
     public VirtualScrollElementFactory(
         IMauiContext mauiContext,
         IVirtualScroll virtualScroll,
-        IVirtualScrollFlattenedAdapter flattenedAdapter,
         VirtualScrollPlatformReuseIdManager reuseIdManager)
     {
         _mauiContext = mauiContext;
         _virtualScroll = virtualScroll;
-        _flattenedAdapter = flattenedAdapter;
         _reuseIdManager = reuseIdManager;
     }
 
     private VirtualScrollElementContainer? GetRecycledElement(string reuseId)
     {
-        lock (_lockObj)
+        if (!_recycledElements.TryGetValue(reuseId, out var queue))
         {
-            if (!_recycledElements.TryGetValue(reuseId, out var queue))
-            {
-                queue = new Queue<VirtualScrollElementContainer>();
-                _recycledElements[reuseId] = queue;
-            }
-
-            if (queue.TryDequeue(out var element))
-            {
-                return element;
-            }
+            queue = new Queue<VirtualScrollElementContainer>();
+            _recycledElements[reuseId] = queue;
         }
 
-        return null;
+        return queue.TryDequeue(out var element) ? element : null;
     }
 
     private void AddRecycledElement(VirtualScrollElementContainer element)
     {
         var reuseId = element.ReuseId;
-
-        lock (_lockObj)
+        
+        if (!_recycledElements.TryGetValue(reuseId, out var queue))
         {
-            if (!_recycledElements.TryGetValue(reuseId, out var queue))
-            {
-                queue = new Queue<VirtualScrollElementContainer>();
-                _recycledElements[reuseId] = queue;
-            }
-
-            queue.Enqueue(element);
+            queue = new Queue<VirtualScrollElementContainer>();
+            _recycledElements[reuseId] = queue;
         }
+
+        queue.Enqueue(element);
     }
 
     public UIElement GetElement(ElementFactoryGetArgs args)
@@ -119,7 +107,8 @@ internal partial class VirtualScrollElementFactory : IElementFactory, IDisposabl
         }
 
         container.UpdateItem(item, flattenedIndex);
-        container.IsRecycled = false;
+        
+        _liveContainers.Add(container);
 
         return container;
     }
@@ -128,26 +117,17 @@ internal partial class VirtualScrollElementFactory : IElementFactory, IDisposabl
     {
         if (args.Element is VirtualScrollElementContainer container)
         {
+            _liveContainers.Remove(container);
             container.IsRecycled = true;
             AddRecycledElement(container);
         }
     }
 
-    public void Reset()
-    {
-        lock (_lockObj)
-        {
-            _recycledElements.Clear();
-        }
-    }
+    public void Reset() => _recycledElements.Clear();
 
     public void Dispose()
     {
         _cellManager.Dispose();
-        
-        lock (_lockObj)
-        {
-            _recycledElements.Clear();
-        }
+        _recycledElements.Clear();
     }
 }
