@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Layout = Microsoft.UI.Xaml.Controls.Layout;
 using PlatformView = Microsoft.UI.Xaml.FrameworkElement;
 using WGrid = Microsoft.UI.Xaml.Controls.Grid;
 using WStackLayout = Microsoft.UI.Xaml.Controls.StackLayout;
@@ -11,6 +12,7 @@ using WRect = Windows.Foundation.Rect;
 namespace Nalu;
 
 #pragma warning disable IDE0060
+
 // ReSharper disable UnusedParameter.Local
 /// <summary>
 /// Handler for the <see cref="VirtualScroll" /> view on Windows.
@@ -24,21 +26,24 @@ public partial class VirtualScrollHandler
     private VirtualScrollItemsSource? _itemsSource;
     private VirtualScrollPlatformFlattenedAdapterNotifier? _notifier;
     private VirtualScrollPlatformReuseIdManager? _reuseIdManager;
-    private WStackLayout? _layout;
+    private Layout? _layout;
     private WGrid? _rootLayout;
     private IVirtualScrollFlattenedAdapter? _flattenedAdapter;
     private bool _isUpdatingIsRefreshingFromPlatform = false;
     private VirtualScrollDragDropHelper? _dragDropHelper;
+    private bool _isSnapping = false;
+    private bool _wasScrolling = false;
 
     /// <inheritdoc />
     protected override PlatformView CreatePlatformView()
     {
-        _rootLayout = new WGrid();
+        _rootLayout = new VirtualScrollPlatformView();
 
         _itemsRepeaterScrollHost = new ItemsRepeaterScrollHost();
         _scrollViewer = new ScrollViewer();
         _itemsRepeater = new ItemsRepeater();
 
+        // Use StackLayout for linear layouts, will be replaced in MapLayout if carousel
         _layout = new WStackLayout { Orientation = Orientation.Vertical };
         _itemsRepeater.Layout = _layout;
 
@@ -59,6 +64,144 @@ public partial class VirtualScrollHandler
         // Register scroll event handlers
         _scrollViewer?.RegisterPropertyChangedCallback(ScrollViewer.VerticalOffsetProperty, OnScrollChanged);
         _scrollViewer?.RegisterPropertyChangedCallback(ScrollViewer.HorizontalOffsetProperty, OnScrollChanged);
+        
+        // Subscribe to ViewChanged for carousel snapping
+        if (_scrollViewer is not null)
+        {
+            _scrollViewer.ViewChanged += OnScrollViewerViewChanged;
+        }
+    }
+    
+    private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (_scrollViewer is null || VirtualView is not IVirtualScrollController controller)
+        {
+            return;
+        }
+
+        var scrollX = _scrollViewer.HorizontalOffset;
+        var scrollY = _scrollViewer.VerticalOffset;
+        var totalWidth = _scrollViewer.ScrollableWidth;
+        var totalHeight = _scrollViewer.ScrollableHeight;
+
+        // When scrolling ends (IsIntermediate becomes false), fire ScrollEnded
+        if (!e.IsIntermediate && _wasScrolling)
+        {
+            _wasScrolling = false;
+            controller.ScrollEnded(scrollX, scrollY, totalWidth, totalHeight);
+        }
+
+        // Handle carousel snapping when scrolling has completed
+        if (!e.IsIntermediate && !_isSnapping && VirtualView is IVirtualScroll virtualScroll)
+        {
+            // Only apply snapping for carousel layouts
+            if (virtualScroll.ItemsLayout is CarouselVirtualScrollLayout carouselLayout)
+            {
+                // Calculate the nearest item position and snap to it
+                SnapToNearestItem(carouselLayout.Orientation);
+            }
+        }
+    }
+    
+    private void SnapToNearestItem(ItemsLayoutOrientation orientation)
+    {
+        if (_scrollViewer is null || _itemsRepeater is null || _elementFactory is null)
+        {
+            return;
+        }
+
+        _isSnapping = true;
+
+        try
+        {
+            var realizedElements = _elementFactory.RealizedElements;
+            if (realizedElements.Count == 0)
+            {
+                return;
+            }
+
+            double currentOffset;
+            
+            if (orientation == ItemsLayoutOrientation.Vertical)
+            {
+                currentOffset = _scrollViewer.VerticalOffset;
+            }
+            else
+            {
+                currentOffset = _scrollViewer.HorizontalOffset;
+            }
+
+            // Find the nearest realized element based on its actual position
+            VirtualScrollElementContainer? nearestElement = null;
+            var minDistance = double.MaxValue;
+
+            foreach (var element in realizedElements)
+            {
+                if (element.FlattenedIndex < 0)
+                {
+                    continue;
+                }
+
+                // Get the element's position relative to the ItemsRepeater
+                var transform = element.TransformToVisual(_itemsRepeater);
+                var bounds = transform.TransformBounds(new WRect(0, 0, element.ActualWidth, element.ActualHeight));
+
+                double elementPosition;
+                if (orientation == ItemsLayoutOrientation.Vertical)
+                {
+                    elementPosition = bounds.Y;
+                }
+                else
+                {
+                    elementPosition = bounds.X;
+                }
+
+                // Calculate distance from current scroll offset
+                var distance = Math.Abs(elementPosition - currentOffset);
+                
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    nearestElement = element;
+                }
+            }
+
+            if (nearestElement is null)
+            {
+                return;
+            }
+
+            // Get the target position for the nearest element
+            var targetTransform = nearestElement.TransformToVisual(_itemsRepeater);
+            var targetBounds = targetTransform.TransformBounds(new WRect(0, 0, nearestElement.ActualWidth, nearestElement.ActualHeight));
+
+            double targetOffset;
+            if (orientation == ItemsLayoutOrientation.Vertical)
+            {
+                targetOffset = targetBounds.Y;
+            }
+            else
+            {
+                targetOffset = targetBounds.X;
+            }
+
+            // Only snap if we're not already at the target (to avoid infinite loops)
+            if (Math.Abs(currentOffset - targetOffset) > 1.0)
+            {
+                if (orientation == ItemsLayoutOrientation.Vertical)
+                {
+                    _scrollViewer.ChangeView(null, targetOffset, null, disableAnimation: false);
+                }
+                else
+                {
+                    _scrollViewer.ChangeView(targetOffset, null, null, disableAnimation: false);
+                }
+            }
+        }
+        finally
+        {
+            _isSnapping = false;
+        }
     }
 
     private void OnScrollChanged(DependencyObject sender, DependencyProperty dp)
@@ -72,6 +215,13 @@ public partial class VirtualScrollHandler
         var scrollY = _scrollViewer.VerticalOffset;
         var totalWidth = _scrollViewer.ScrollableWidth;
         var totalHeight = _scrollViewer.ScrollableHeight;
+
+        // Check if scrolling has started
+        if (!_wasScrolling)
+        {
+            _wasScrolling = true;
+            controller.ScrollStarted(scrollX, scrollY, totalWidth, totalHeight);
+        }
 
         controller.Scrolled(scrollX, scrollY, totalWidth, totalHeight);
     }
@@ -102,6 +252,11 @@ public partial class VirtualScrollHandler
             _itemsRepeaterScrollHost.Loaded -= ItemsRepeaterScrollHost_Loaded;
         }
 
+        if (_scrollViewer is not null)
+        {
+            _scrollViewer.ViewChanged -= OnScrollViewerViewChanged;
+        }
+
         _itemsRepeater = null;
         _scrollViewer = null;
         _itemsRepeaterScrollHost = null;
@@ -125,13 +280,13 @@ public partial class VirtualScrollHandler
     /// <returns>A <see cref="VirtualScrollRange"/> containing the first and last visible item positions, or <c>null</c> if no items are visible.</returns>
     public VirtualScrollRange? GetVisibleItemsRange()
     {
-        if (_itemsRepeater is null || _flattenedAdapter is null)
+        if (_itemsRepeater is null || _flattenedAdapter is null || _elementFactory is null || _scrollViewer is null)
         {
             return null;
         }
 
-        var childrenCount = VisualTreeHelper.GetChildrenCount(_itemsRepeater);
-        if (childrenCount == 0)
+        var realizedElements = _elementFactory.RealizedElements;
+        if (!realizedElements.Any())
         {
             return null;
         }
@@ -139,28 +294,32 @@ public partial class VirtualScrollHandler
         (int Section, int Item)? start = null;
         (int Section, int Item)? end = null;
 
-        for (var i = 0; i < childrenCount; i++)
+        // Filter realized elements by viewport visibility
+        foreach (var container in realizedElements)
         {
-            if (VisualTreeHelper.GetChild(_itemsRepeater, i) is VirtualScrollElementContainer container)
+            if (container.FlattenedIndex < 0)
             {
-                if (!IsElementVisible(container, _itemsRepeater))
-                {
-                    continue;
-                }
-
-                var position = GetPositionFromFlattenedIndex(container.FlattenedIndex);
-                if (!position.HasValue)
-                {
-                    continue;
-                }
-
-                if (!start.HasValue)
-                {
-                    start = position;
-                }
-
-                end = position;
+                continue;
             }
+
+            // Check if element is visible in the viewport
+            if (!IsElementVisibleInViewport(container))
+            {
+                continue;
+            }
+
+            var position = GetPositionFromFlattenedIndex(container.FlattenedIndex);
+            if (!position.HasValue)
+            {
+                continue;
+            }
+
+            if (!start.HasValue)
+            {
+                start = position;
+            }
+
+            end = position;
         }
 
         if (!start.HasValue || !end.HasValue)
@@ -171,16 +330,28 @@ public partial class VirtualScrollHandler
         return new VirtualScrollRange(start.Value.Section, start.Value.Item, end.Value.Section, end.Value.Item);
     }
 
-    private static bool IsElementVisible(VirtualScrollElementContainer element, FrameworkElement container)
+    private bool IsElementVisibleInViewport(VirtualScrollElementContainer element)
     {
+        if (_scrollViewer is null || _itemsRepeater is null)
+        {
+            return false;
+        }
+
         try
         {
-            var bounds = element.TransformToVisual(container).TransformBounds(new WRect(0.0, 0.0, element.ActualWidth, element.ActualHeight));
+            // Get element bounds relative to ItemsRepeater
+            var transform = element.TransformToVisual(_itemsRepeater);
+            var elementBounds = transform.TransformBounds(new WRect(0.0, 0.0, element.ActualWidth, element.ActualHeight));
 
-            return bounds.Left < container.ActualWidth
-                && bounds.Top < container.ActualHeight
-                && bounds.Right > 0
-                && bounds.Bottom > 0;
+            // Get ScrollViewer viewport bounds relative to ItemsRepeater
+            var scrollViewerTransform = _scrollViewer.TransformToVisual(_itemsRepeater);
+            var viewportBounds = scrollViewerTransform.TransformBounds(new WRect(0.0, 0.0, _scrollViewer.ViewportWidth, _scrollViewer.ViewportHeight));
+
+            // Check if element intersects with viewport
+            return elementBounds.Left < viewportBounds.Right
+                && elementBounds.Right > viewportBounds.Left
+                && elementBounds.Top < viewportBounds.Bottom
+                && elementBounds.Bottom > viewportBounds.Top;
         }
         catch
         {
@@ -387,7 +558,7 @@ public partial class VirtualScrollHandler
     /// </summary>
     public static void MapLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
-        if (handler._layout is null)
+        if (handler._itemsRepeater is null || handler._scrollViewer is null)
         {
             return;
         }
@@ -395,7 +566,28 @@ public partial class VirtualScrollHandler
         switch (virtualScroll.ItemsLayout)
         {
             case LinearVirtualScrollLayout linearLayout:
-                handler._layout.Orientation = linearLayout.Orientation == ItemsLayoutOrientation.Vertical
+                // For linear layouts, use StackLayout
+                if (handler._layout is not WStackLayout stackLayout)
+                {
+                    stackLayout = new WStackLayout();
+                    handler._layout = stackLayout;
+                    handler._itemsRepeater.Layout = stackLayout;
+                }
+                
+                stackLayout.Orientation = linearLayout.Orientation == ItemsLayoutOrientation.Vertical
+                    ? Orientation.Vertical
+                    : Orientation.Horizontal;
+                break;
+            case CarouselVirtualScrollLayout carouselLayout:
+                // For carousel layouts, use StackLayout (container will handle viewport sizing)
+                if (handler._layout is not WStackLayout carouselStackLayout)
+                {
+                    carouselStackLayout = new WStackLayout();
+                    handler._layout = carouselStackLayout;
+                    handler._itemsRepeater.Layout = carouselStackLayout;
+                }
+                
+                carouselStackLayout.Orientation = carouselLayout.Orientation == ItemsLayoutOrientation.Vertical
                     ? Orientation.Vertical
                     : Orientation.Horizontal;
                 break;

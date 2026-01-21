@@ -71,7 +71,9 @@ internal class VirtualScrollDragDropHelper : IDisposable
         // so we don't need to unsubscribe it here as it's handled dynamically
     }
     
-    private void OnElementDragStarting(UIElement sender, DragStartingEventArgs args)
+#pragma warning disable VSTHRD100
+    private async void OnElementDragStarting(UIElement sender, DragStartingEventArgs args)
+#pragma warning restore VSTHRD100
     {
         if (_flattenedAdapter is null || _virtualScroll.DragHandler is null || sender is not VirtualScrollElementContainer container)
         {
@@ -114,6 +116,11 @@ internal class VirtualScrollDragDropHelper : IDisposable
         
         // Call OnDragStarted after drag is initiated
         _virtualScroll.DragHandler.OnDragStarted(dragInfo);
+        
+        // TODO: if the list changed after initiating,
+        // we should update the cached flattened index
+        // actually, the handler should do that on collection changed event
+        // this is to support scenario on NinePage (drag section hides all items)
     }
 
     private void OnElementDragOver(object sender, DragEventArgs args)

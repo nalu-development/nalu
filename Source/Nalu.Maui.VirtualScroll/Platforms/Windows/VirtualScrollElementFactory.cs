@@ -15,7 +15,7 @@ internal partial class VirtualScrollElementFactory : IElementFactory, IDisposabl
     private readonly VirtualScrollCellManager<VirtualScrollElementContainer> _cellManager = new(container => container.VirtualView);
     private readonly HashSet<VirtualScrollElementContainer> _liveContainers = new();
 
-    public IEnumerable<VirtualScrollElementContainer> RealizedElements => _liveContainers;
+    public IReadOnlyCollection<VirtualScrollElementContainer> RealizedElements => _liveContainers;
 
     public VirtualScrollElementFactory(
         IMauiContext mauiContext,
