@@ -1,10 +1,12 @@
-#if IOS || MACCATALYST || ANDROID
+#if IOS || MACCATALYST || ANDROID || WINDOWS
 using Microsoft.Maui.Handlers;
 
 #if IOS || MACCATALYST
 using PlatformView = UIKit.UIView;
 #elif ANDROID
 using PlatformView = Android.Views.View;
+#elif WINDOWS
+using PlatformView = Microsoft.UI.Xaml.FrameworkElement;
 #endif
 
 namespace Nalu;

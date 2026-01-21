@@ -9,7 +9,6 @@
     <PackageReference Include="coverlet.collector" PrivateAssets="all" Version="6.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="FactCheck" Version="1.0.1" />
     <PackageReference Include="FluentAssertions" Version="8.8.0" />
     <PackageReference Include="FluentAssertions.Analyzers" PrivateAssets="all" Version="0.34.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

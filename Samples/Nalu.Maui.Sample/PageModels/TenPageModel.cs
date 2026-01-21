@@ -203,6 +203,8 @@ public partial class TenItem : ObservableObject
     [ObservableProperty]
     public partial string Name { get; set; }
 
+    public override string ToString() => Name;
+
     [RelayCommand]
     private void AddLine()
     {

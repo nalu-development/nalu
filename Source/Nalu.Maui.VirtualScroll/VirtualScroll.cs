@@ -608,7 +608,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// <returns>A <see cref="VirtualScrollRange"/> containing the first and last visible item positions, or <c>null</c> if no items are visible or the handler is not available.</returns>
     public VirtualScrollRange? GetVisibleItemsRange()
     {
-#if ANDROID || IOS || MACCATALYST
+#if ANDROID || IOS || MACCATALYST || WINDOWS
         if (Handler is VirtualScrollHandler handler)
         {
             return handler.GetVisibleItemsRange();

@@ -80,7 +80,7 @@
                 <vs:VirtualScroll.ItemTemplate>
                     <DataTemplate x:DataType="pageModels:TenItem">
                         <nalu:ViewBox>
-                            <Border Shadow="{Shadow Radius=6, Opacity=0.2, Offset='1,1'}"
+                            <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}"
                                     StrokeShape="RoundRectangle 8"
                                     Margin="8"
                                     Padding="16,8"
