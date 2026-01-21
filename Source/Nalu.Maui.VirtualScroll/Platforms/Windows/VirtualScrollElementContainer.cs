@@ -37,7 +37,7 @@ internal partial class VirtualScrollElementContainer : ContentControl
     public readonly IVirtualScroll VirtualScroll;
 
     public VirtualScrollFlattenedItem? FlattenedItem { get; private set; }
-    public int FlattenedIndex { get; private set; } = -1;
+    public int FlattenedIndex { get; internal set; } = -1;
 
     private bool _isRecycled;
 
