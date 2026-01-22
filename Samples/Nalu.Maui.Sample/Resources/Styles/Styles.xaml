@@ -318,7 +318,7 @@
         <Setter Property="StrokeShape" Value="RoundRectangle 8" />
         <Setter Property="StrokeThickness" Value="0" />
         <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}" />
-        <Setter Property="Shadow" Value="{Shadow Radius=16, Opacity={AppThemeBinding Light=.24, Dark=1}, Offset='1,2', Brush=Black}" />
+        <Setter Property="Shadow" Value="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}" />
     </Style>
 
     <Style TargetType="Slider">
