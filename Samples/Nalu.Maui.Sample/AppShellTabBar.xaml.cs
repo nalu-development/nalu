@@ -5,7 +5,7 @@ public partial class AppShellTabBar
     static AppShellTabBar()
     {
 #if IOS || ANDROID || MACCATALYST
-        UseBlurEffect = true;
+        NaluTabBar.UseBlurEffect = true;
 #endif
     }
     

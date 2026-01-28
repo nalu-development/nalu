@@ -12,10 +12,8 @@ using View = Android.Views.View;
 namespace Nalu;
 
 #pragma warning disable CS1591
-public class NaluShellItemRendererTabBarLayout : FrameLayout, IOnApplyWindowInsetsListener
+public class NaluShellItemRendererTabBarLayout : FrameLayout
 {
-    private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
-    private int _systemBarInset;
     private View? _tabBar;
 
     public NaluShellItemRendererTabBarLayout(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
@@ -27,7 +25,6 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IOnApplyWindowInse
 #endif
     public NaluShellItemRendererTabBarLayout(Context context) : base(context)
     {
-        ViewCompat.SetOnApplyWindowInsetsListener(this, this);
         // ReSharper disable once VirtualMemberCallInConstructor
         SetClipChildren(false);
 #if NET10_0_OR_GREATER
@@ -63,11 +60,6 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IOnApplyWindowInse
             MeasureChild(_tabBar, widthMeasureSpec, heightMeasureSpec);
             width = _tabBar.MeasuredWidth;
             height = _tabBar.MeasuredHeight;
-
-            if (height > 0)
-            {
-                height += _systemBarInset;
-            }
         }
         else
         {
@@ -100,19 +92,5 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IOnApplyWindowInse
         {
             ViewCompat.SetOnApplyWindowInsetsListener(this, null);
         }
-    }
-
-    WindowInsetsCompat AndroidX.Core.View.IOnApplyWindowInsetsListener.OnApplyWindowInsets(View? view, WindowInsetsCompat? insets)
-    {
-        ArgumentNullException.ThrowIfNull(insets);
-        var bottomInset = insets.GetInsets(_systemBarsInsetsType)?.Bottom ?? throw new InvalidOperationException("SystemBars insets are null.");
-
-        if (_systemBarInset != bottomInset)
-        {
-            _systemBarInset = bottomInset;
-            RequestLayout();
-        }
-
-        return insets;
     }
 }
