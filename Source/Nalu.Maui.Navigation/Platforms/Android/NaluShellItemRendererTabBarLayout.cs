@@ -1,3 +1,8 @@
+#if NET10_0_OR_GREATER
+using System.Diagnostics.CodeAnalysis;
+using Java.Lang;
+using Microsoft.Maui.Platform;
+#endif
 using Android.Content;
 using Android.Runtime;
 using Android.Widget;
@@ -16,12 +21,21 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IOnApplyWindowInse
     public NaluShellItemRendererTabBarLayout(IntPtr javaReference, JniHandleOwnership transfer) : base(javaReference, transfer)
     {
     }
-    
+
+#if NET10_0_OR_GREATER
+    [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicMethods, "Microsoft.Maui.Platform.MauiWindowInsetListener", "Microsoft.Maui")]
+#endif
     public NaluShellItemRendererTabBarLayout(Context context) : base(context)
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
         // ReSharper disable once VirtualMemberCallInConstructor
         SetClipChildren(false);
+#if NET10_0_OR_GREATER
+        var type = Type.GetType("Microsoft.Maui.Platform.MauiWindowInsetListener, Microsoft.Maui") ?? throw new UnsupportedOperationException("The MAUI version you are using is not supported because MauiWindowInsetListener is missing.");
+        type
+            .GetMethod("RegisterParentForChildViews", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .Invoke(null, [this, null]);
+#endif
     }
 
     public void SetTabBar(View? tabBar)
@@ -63,6 +77,20 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout, IOnApplyWindowInse
         
         SetMeasuredDimension(width, height);
     }
+
+#if NET10_0_OR_GREATER
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        if (_tabBar != null)
+        {
+            (_tabBar as LayoutViewGroup)!.Layout(0, 0, right, bottom - top);
+        }
+        else
+        {
+            base.OnLayout(changed, left, top, right, bottom);
+        }
+    }
+#endif
 
     protected override void Dispose(bool disposing)
     {
