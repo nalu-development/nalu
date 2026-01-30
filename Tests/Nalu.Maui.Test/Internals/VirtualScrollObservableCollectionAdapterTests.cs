@@ -989,5 +989,220 @@ public class VirtualScrollObservableCollectionAdapterTests
     }
 
     #endregion
+
+    #region PerformBatchUpdates Tests
+
+    [Fact]
+    public void PerformBatchUpdates_WhenMultipleItemsAdded_ShouldNotifyOnceWithAllChanges()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("B");
+            collection.Add("C");
+            collection.Add("D");
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1, "batch updates should consolidate into a single notification");
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(3);
+        allChanges.Should().AllSatisfy(c => c.Operation.Should().Be(VirtualScrollChangeOperation.InsertItem));
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenAddAndRemove_ShouldNotifyOnceWithAllChanges()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B", "C" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("D");
+            collection.RemoveAt(0);
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1);
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(2);
+        allChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        allChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenNoChanges_ShouldNotNotify()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A", "B" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var callCount = 0;
+        using var subscription = adapter.Subscribe(_ => callCount++);
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            // No changes
+        });
+
+        // Assert
+        callCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WithMultipleSubscribers_ShouldNotifyEachOnce()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets1 = new List<VirtualScrollChangeSet>();
+        var changeSets2 = new List<VirtualScrollChangeSet>();
+        using var subscription1 = adapter.Subscribe(cs => changeSets1.Add(cs));
+        using var subscription2 = adapter.Subscribe(cs => changeSets2.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("B");
+            collection.Add("C");
+        });
+
+        // Assert
+        changeSets1.Should().HaveCount(1);
+        changeSets2.Should().HaveCount(1);
+        changeSets1[0].Changes.Count().Should().Be(2);
+        changeSets2[0].Changes.Count().Should().Be(2);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_ChangesOutsideBatch_ShouldNotifyImmediately()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - add outside batch
+        collection.Add("B");
+        
+        // Then add inside batch
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("C");
+            collection.Add("D");
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(2, "one for immediate change, one for batched changes");
+        changeSets[0].Changes.Count().Should().Be(1);
+        changeSets[1].Changes.Count().Should().Be(2);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenExceptionThrown_ShouldStillFlushChanges()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act & Assert
+        var action = () => adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("B");
+            throw new InvalidOperationException("Test exception");
+        });
+
+        action.Should().Throw<InvalidOperationException>();
+        changeSets.Should().HaveCount(1, "changes made before exception should still be notified");
+        changeSets[0].Changes.Count().Should().Be(1);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenTransitioningFromEmptyToNonEmpty_ShouldBatchSectionAndItemChanges()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string>();
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("A"); // This triggers InsertSection
+            collection.Add("B"); // This triggers InsertItem
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1);
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(2);
+        allChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+        allChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenDisposedSubscriber_ShouldNotNotifyDisposedSubscriber()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets1 = new List<VirtualScrollChangeSet>();
+        var changeSets2 = new List<VirtualScrollChangeSet>();
+        var subscription1 = adapter.Subscribe(cs => changeSets1.Add(cs));
+        using var subscription2 = adapter.Subscribe(cs => changeSets2.Add(cs));
+
+        // Dispose first subscription
+        subscription1.Dispose();
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("B");
+        });
+
+        // Assert
+        changeSets1.Should().BeEmpty();
+        changeSets2.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_AfterBatchCompletes_ShouldNotifyImmediatelyAgain()
+    {
+        // Arrange
+        var collection = new ObservableCollection<string> { "A" };
+        var adapter = new VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<string>>(collection);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            collection.Add("B");
+        });
+        
+        // Add after batch - should notify immediately
+        collection.Add("C");
+
+        // Assert
+        changeSets.Should().HaveCount(2);
+        changeSets[0].Changes.Count().Should().Be(1);
+        changeSets[1].Changes.Count().Should().Be(1);
+    }
+
+    #endregion
 }
 

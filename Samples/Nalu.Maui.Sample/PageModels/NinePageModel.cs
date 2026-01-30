@@ -152,15 +152,18 @@ public sealed class FriendListAdapter : VirtualScrollObservableCollectionAdapter
     {
         if (dragInfo.Item is FriendGroupHeader)
         {
-            // Remove all FriendItems and AddFriendButtons from the collection temporarily
-            // to allow reordering groups. We iterate backwards to avoid index shifting issues.
-            for (var i = Collection.Count - 1; i >= 0; i--)
+            PerformBatchUpdates(() =>
             {
-                if (Collection[i] is FriendItem or AddFriendButton)
+                // Remove all FriendItems and AddFriendButtons from the collection temporarily
+                // to allow reordering groups. We iterate backwards to avoid index shifting issues.
+                for (var i = Collection.Count - 1; i >= 0; i--)
                 {
-                    Collection.RemoveAt(i);
+                    if (Collection[i] is FriendItem or AddFriendButton)
+                    {
+                        Collection.RemoveAt(i);
+                    }
                 }
-            }
+            });
         }
     }
 
@@ -168,26 +171,30 @@ public sealed class FriendListAdapter : VirtualScrollObservableCollectionAdapter
     {
         if (dragInfo.Item is FriendGroupHeader)
         {
-            // Re-add all FriendItems and AddFriendButtons back to the collection
-            // Structure: Header → Friends → AddButton for each group
-            for (var i = 0; i < Collection.Count; i++)
-            {
-                if (Collection[i] is FriendGroupHeader header)
+            PerformBatchUpdates(() =>
                 {
-                    var insertIndex = i + 1;
-                    
-                    // Insert all friends after the header
-                    foreach (var friend in header.Group.Friends)
+                    // Re-add all FriendItems and AddFriendButtons back to the collection
+                    // Structure: Header → Friends → AddButton for each group
+                    for (var i = 0; i < Collection.Count; i++)
                     {
-                        Collection.Insert(insertIndex++, friend);
-                        i++;
+                        if (Collection[i] is FriendGroupHeader header)
+                        {
+                            var insertIndex = i + 1;
+
+                            // Insert all friends after the header
+                            foreach (var friend in header.Group.Friends)
+                            {
+                                Collection.Insert(insertIndex++, friend);
+                                i++;
+                            }
+
+                            // Insert the add button after the friends
+                            Collection.Insert(insertIndex, header.Group.AddButton);
+                            i++;
+                        }
                     }
-                    
-                    // Insert the add button after the friends
-                    Collection.Insert(insertIndex, header.Group.AddButton);
-                    i++;
                 }
-            }
+            );
         }
     }
 
@@ -218,7 +225,7 @@ public partial class NinePageModel : ObservableObject
     /// <summary>
     /// The adapter for the VirtualScroll.
     /// </summary>
-    public IReorderableVirtualScrollAdapter Adapter { get; }
+    public IVirtualScrollReorderableSource Adapter { get; }
 
     /// <summary>
     /// All friend groups for management.

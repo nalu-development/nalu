@@ -68,7 +68,7 @@ public partial class TenPageModel : ObservableObject, ILeavingAware
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
     
     public ReplaceableObservableCollection<TenItem> Items { get; }
-    public IReorderableVirtualScrollAdapter Adapter { get; }
+    public IVirtualScrollReorderableSource Adapter { get; }
 
     public TenPageModel(IMessenger messenger)
     {

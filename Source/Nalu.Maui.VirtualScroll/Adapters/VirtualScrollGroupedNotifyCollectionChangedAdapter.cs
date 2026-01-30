@@ -8,12 +8,14 @@ namespace Nalu;
 /// </summary>
 /// <typeparam name="TSectionCollection">The type of the sections' collection.</typeparam>
 /// <typeparam name="TItemCollection">The type of the items collection within each section.</typeparam>
-public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollection, TItemCollection> : IVirtualScrollAdapter
+public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollection, TItemCollection> : IVirtualScrollBatchableSource
     where TSectionCollection : IList, INotifyCollectionChanged
     where TItemCollection : IList, INotifyCollectionChanged
 {
     private readonly TSectionCollection _sections;
     private readonly Func<object, TItemCollection> _sectionItemsGetter;
+    private readonly List<GroupedObservableCollectionAdapterSubscription> _subscriptions = [];
+    private bool _isBatching;
 
     /// <summary>
     /// The underlying observable collection.
@@ -83,8 +85,33 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
     }
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new GroupedObservableCollectionAdapterSubscription(_sections, _sectionItemsGetter, changeCallback, ShouldIgnoreCollectionChanges);
-    
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback)
+    {
+        var subscription = new GroupedObservableCollectionAdapterSubscription(this, _sections, _sectionItemsGetter, changeCallback);
+        _subscriptions.Add(subscription);
+        return subscription;
+    }
+
+    /// <inheritdoc/>
+    public void PerformBatchUpdates(Action updateAction)
+    {
+        _isBatching = true;
+
+        try
+        {
+            updateAction();
+        }
+        finally
+        {
+            _isBatching = false;
+
+            foreach (var subscription in _subscriptions)
+            {
+                subscription.FlushBatchedChanges();
+            }
+        }
+    }
+
     /// <summary>
     /// Tells if the adapter should ignore collection changes, therefore not notifying subscribers.
     /// </summary>
@@ -93,30 +120,52 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
     
     private sealed class GroupedObservableCollectionAdapterSubscription : IDisposable
     {
+        private readonly VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollection, TItemCollection> _adapter;
         private readonly TSectionCollection _sections;
         private readonly Func<object, TItemCollection> _sectionItemsGetter;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
-        private readonly Func<bool> _isDragging;
         private readonly List<ItemCollectionSubscription> _itemCollectionSubscriptions = [];
+        private readonly List<VirtualScrollChange> _batchedChanges = [];
         private bool _disposed;
 
         public GroupedObservableCollectionAdapterSubscription(
+            VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollection, TItemCollection> adapter,
             TSectionCollection sections,
             Func<object, TItemCollection> sectionItemsGetter,
-            Action<VirtualScrollChangeSet> changeCallback,
-            Func<bool> isDragging
+            Action<VirtualScrollChangeSet> changeCallback
         )
         {
+            _adapter = adapter;
             _sections = sections;
             _sectionItemsGetter = sectionItemsGetter;
             _changeCallback = changeCallback;
-            _isDragging = isDragging;
             _sections.CollectionChanged += OnSectionsCollectionChanged;
             
             // Subscribe to all existing sections' item collections
             for (var i = 0; i < _sections.Count; i++)
             {
                 _itemCollectionSubscriptions.Add(CreateSubscriptionForSection(i));
+            }
+        }
+
+        public void FlushBatchedChanges()
+        {
+            if (_batchedChanges.Count > 0)
+            {
+                _changeCallback(new VirtualScrollChangeSet([.._batchedChanges]));
+                _batchedChanges.Clear();
+            }
+        }
+
+        private void NotifyOrBatch(List<VirtualScrollChange> changes)
+        {
+            if (_adapter._isBatching)
+            {
+                _batchedChanges.AddRange(changes);
+            }
+            else
+            {
+                _changeCallback(new VirtualScrollChangeSet(changes));
             }
         }
 
@@ -137,7 +186,7 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
 
         private void OnSectionsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (_disposed || _isDragging())
+            if (_disposed || _adapter.ShouldIgnoreCollectionChanges())
             {
                 return;
             }
@@ -351,13 +400,13 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
 
             if (changes.Count > 0)
             {
-                _changeCallback(new VirtualScrollChangeSet(changes));
+                NotifyOrBatch(changes);
             }
         }
 
         private void OnItemCollectionChanged(int sectionIndex, NotifyCollectionChangedEventArgs e)
         {
-            if (_disposed || _isDragging())
+            if (_disposed || _adapter.ShouldIgnoreCollectionChanges())
             {
                 return;
             }
@@ -502,7 +551,7 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
 
             if (changes.Count > 0)
             {
-                _changeCallback(new VirtualScrollChangeSet(changes));
+                NotifyOrBatch(changes);
             }
         }
 
@@ -518,6 +567,7 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
                 }
                 _itemCollectionSubscriptions.Clear();
                 
+                _adapter._subscriptions.Remove(this);
                 _disposed = true;
             }
         }

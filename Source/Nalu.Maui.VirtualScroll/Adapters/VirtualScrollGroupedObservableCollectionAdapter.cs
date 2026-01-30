@@ -9,7 +9,7 @@ namespace Nalu;
 /// </summary>
 /// <typeparam name="TSectionCollection"></typeparam>
 /// <typeparam name="TItem"></typeparam>
-public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection, TItem> : VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollection, ObservableCollection<TItem>>, IReorderableVirtualScrollAdapter
+public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection, TItem> : VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollection, ObservableCollection<TItem>>, IVirtualScrollSource
     where TSectionCollection : IList, INotifyCollectionChanged
 {
     private bool _movingItemsViaDrag;

@@ -947,5 +947,268 @@ public class VirtualScrollGroupedObservableCollectionAdapterTests
     }
 
     #endregion
+
+    #region PerformBatchUpdates Tests
+
+    [Fact]
+    public void PerformBatchUpdates_WhenMultipleSectionsAdded_ShouldNotifyOnceWithAllChanges()
+    {
+        // Arrange
+        var sections = new ObservableCollection<TestSection>
+        {
+            new() { Name = "Section1", Items = new ObservableCollection<string> { "A" } }
+        };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            sections.Add(new TestSection { Name = "Section2", Items = new ObservableCollection<string> { "B" } });
+            sections.Add(new TestSection { Name = "Section3", Items = new ObservableCollection<string> { "C" } });
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1, "batch updates should consolidate into a single notification");
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(2);
+        allChanges.Should().AllSatisfy(c => c.Operation.Should().Be(VirtualScrollChangeOperation.InsertSection));
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenItemsAddedToMultipleSections_ShouldNotifyOnceWithAllChanges()
+    {
+        // Arrange
+        var section1 = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var section2 = new TestSection { Name = "Section2", Items = new ObservableCollection<string> { "B" } };
+        var sections = new ObservableCollection<TestSection> { section1, section2 };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            section1.Items.Add("A2");
+            section2.Items.Add("B2");
+            section1.Items.Add("A3");
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1);
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(3);
+        allChanges.Should().AllSatisfy(c => c.Operation.Should().Be(VirtualScrollChangeOperation.InsertItem));
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenSectionAndItemChanges_ShouldNotifyOnceWithAllChanges()
+    {
+        // Arrange
+        var section1 = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var sections = new ObservableCollection<TestSection> { section1 };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            section1.Items.Add("A2");
+            sections.Add(new TestSection { Name = "Section2", Items = new ObservableCollection<string> { "B" } });
+            section1.Items.Add("A3");
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1);
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(3);
+        
+        // Verify order is preserved
+        allChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        allChanges[0].StartSectionIndex.Should().Be(0);
+        allChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
+        allChanges[2].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        allChanges[2].StartSectionIndex.Should().Be(0);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenNoChanges_ShouldNotNotify()
+    {
+        // Arrange
+        var sections = new ObservableCollection<TestSection>
+        {
+            new() { Name = "Section1", Items = new ObservableCollection<string> { "A" } }
+        };
+        var adapter = CreateAdapter(sections);
+        var callCount = 0;
+        using var subscription = adapter.Subscribe(_ => callCount++);
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            // No changes
+        });
+
+        // Assert
+        callCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WithMultipleSubscribers_ShouldNotifyEachOnce()
+    {
+        // Arrange
+        var section = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var sections = new ObservableCollection<TestSection> { section };
+        var adapter = CreateAdapter(sections);
+        var changeSets1 = new List<VirtualScrollChangeSet>();
+        var changeSets2 = new List<VirtualScrollChangeSet>();
+        using var subscription1 = adapter.Subscribe(cs => changeSets1.Add(cs));
+        using var subscription2 = adapter.Subscribe(cs => changeSets2.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            section.Items.Add("B");
+            section.Items.Add("C");
+        });
+
+        // Assert
+        changeSets1.Should().HaveCount(1);
+        changeSets2.Should().HaveCount(1);
+        changeSets1[0].Changes.Count().Should().Be(2);
+        changeSets2[0].Changes.Count().Should().Be(2);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_ChangesOutsideBatch_ShouldNotifyImmediately()
+    {
+        // Arrange
+        var section = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var sections = new ObservableCollection<TestSection> { section };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - add outside batch
+        section.Items.Add("B");
+        
+        // Then add inside batch
+        adapter.PerformBatchUpdates(() =>
+        {
+            section.Items.Add("C");
+            section.Items.Add("D");
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(2, "one for immediate change, one for batched changes");
+        changeSets[0].Changes.Count().Should().Be(1);
+        changeSets[1].Changes.Count().Should().Be(2);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenExceptionThrown_ShouldStillFlushChanges()
+    {
+        // Arrange
+        var section = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var sections = new ObservableCollection<TestSection> { section };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act & Assert
+        var action = () => adapter.PerformBatchUpdates(() =>
+        {
+            section.Items.Add("B");
+            throw new InvalidOperationException("Test exception");
+        });
+
+        action.Should().Throw<InvalidOperationException>();
+        changeSets.Should().HaveCount(1, "changes made before exception should still be notified");
+        changeSets[0].Changes.Count().Should().Be(1);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenDisposedSubscriber_ShouldNotNotifyDisposedSubscriber()
+    {
+        // Arrange
+        var section = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var sections = new ObservableCollection<TestSection> { section };
+        var adapter = CreateAdapter(sections);
+        var changeSets1 = new List<VirtualScrollChangeSet>();
+        var changeSets2 = new List<VirtualScrollChangeSet>();
+        var subscription1 = adapter.Subscribe(cs => changeSets1.Add(cs));
+        using var subscription2 = adapter.Subscribe(cs => changeSets2.Add(cs));
+
+        // Dispose first subscription
+        subscription1.Dispose();
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            section.Items.Add("B");
+        });
+
+        // Assert
+        changeSets1.Should().BeEmpty();
+        changeSets2.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_AfterBatchCompletes_ShouldNotifyImmediatelyAgain()
+    {
+        // Arrange
+        var section = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A" } };
+        var sections = new ObservableCollection<TestSection> { section };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act
+        adapter.PerformBatchUpdates(() =>
+        {
+            section.Items.Add("B");
+        });
+        
+        // Add after batch - should notify immediately
+        section.Items.Add("C");
+
+        // Assert
+        changeSets.Should().HaveCount(2);
+        changeSets[0].Changes.Count().Should().Be(1);
+        changeSets[1].Changes.Count().Should().Be(1);
+    }
+
+    [Fact]
+    public void PerformBatchUpdates_WhenRemovingFromOneAndAddingToAnother_ShouldBatchAllChanges()
+    {
+        // Arrange - This simulates moving an item between sections
+        var section1 = new TestSection { Name = "Section1", Items = new ObservableCollection<string> { "A", "B" } };
+        var section2 = new TestSection { Name = "Section2", Items = new ObservableCollection<string> { "C" } };
+        var sections = new ObservableCollection<TestSection> { section1, section2 };
+        var adapter = CreateAdapter(sections);
+        var changeSets = new List<VirtualScrollChangeSet>();
+        using var subscription = adapter.Subscribe(cs => changeSets.Add(cs));
+
+        // Act - Simulate moving "B" from Section1 to Section2
+        adapter.PerformBatchUpdates(() =>
+        {
+            var item = section1.Items[1];
+            section1.Items.RemoveAt(1);
+            section2.Items.Add(item);
+        });
+
+        // Assert
+        changeSets.Should().HaveCount(1, "remove and add should be batched into single notification");
+        var allChanges = changeSets[0].Changes.ToList();
+        allChanges.Should().HaveCount(2);
+        allChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
+        allChanges[0].StartSectionIndex.Should().Be(0);
+        allChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.InsertItem);
+        allChanges[1].StartSectionIndex.Should().Be(1);
+    }
+
+    #endregion
 }
 

@@ -5,7 +5,7 @@ namespace Nalu;
 /// <summary>
 /// An adapter that wraps an <see cref="IEnumerable"/> for use with <see cref="VirtualScroll"/>.
 /// </summary>
-public class VirtualScrollListAdapter : IReorderableVirtualScrollAdapter
+public class VirtualScrollListAdapter : IVirtualScrollReorderableSource
 {
     private static readonly NoOpUnsubscriber _noOpUnsubscriber = new();
 

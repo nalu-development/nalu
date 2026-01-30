@@ -119,6 +119,26 @@ var adapter = VirtualScroll.CreateStaticCollectionAdapter(
 
 **Note:** This adapter doesn't support change notifications. If your data changes, you'll need to recreate the adapter or use `VirtualScrollGroupedObservableCollectionAdapter` instead.
 
+## Batch Updates
+
+When making multiple changes to a data source (such as moving items between sections using DynamicData grouping), individual change notifications can cause race conditions with the native UI. The `IVirtualScrollBatchableSource` interface provides a `PerformBatchUpdates` method that consolidates multiple change notifications into a single atomic update.
+
+All built-in observable collection adapters implement `IVirtualScrollBatchableSource`:
+
+```csharp
+// Example: Moving an item between sections with DynamicData
+adapter.PerformBatchUpdates(() =>
+{
+    // These changes are batched into a single notification
+    sourceSection.Items.Remove(item);
+    targetSection.Items.Add(item);
+});
+```
+
+Benefits of batch updates:
+- **Prevents race conditions**: if supported, the platform view receives a single, consistent update
+- **Better performance**: Reduces UI refresh cycles
+
 ## Custom Adapters
 
 For advanced scenarios requiring direct data source access (databases, web APIs, etc.), implement `IVirtualScrollAdapter`:

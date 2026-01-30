@@ -7,11 +7,13 @@ namespace Nalu;
 /// An adapter that wraps an observable collection for use with <see cref="VirtualScroll"/>.
 /// </summary>
 /// <typeparam name="TItemCollection">The type of the observable collection.</typeparam>
-public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVirtualScrollAdapter
+public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVirtualScrollBatchableSource
     where TItemCollection : IList, INotifyCollectionChanged
 {
     private readonly TItemCollection _collection;
+    private readonly List<ObservableCollectionAdapterSubscription> _subscriptions = [];
     private const int _sectionIndex = 0;
+    private bool _isBatching;
 
     /// <summary>
     /// The underlying observable collection.
@@ -39,7 +41,32 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
     public object? GetItem(int sectionIndex, int itemIndex) => _collection[itemIndex];
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new ObservableCollectionAdapterSubscription(_collection, changeCallback, ShouldIgnoreCollectionChanges);
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback)
+    {
+        var subscription = new ObservableCollectionAdapterSubscription(this, _collection, changeCallback);
+        _subscriptions.Add(subscription);
+        return subscription;
+    }
+
+    /// <inheritdoc/>
+    public void PerformBatchUpdates(Action updateAction)
+    {
+        _isBatching = true;
+
+        try
+        {
+            updateAction();
+        }
+        finally
+        {
+            _isBatching = false;
+
+            foreach (var subscription in _subscriptions)
+            {
+                subscription.FlushBatchedChanges();
+            }
+        }
+    }
 
     /// <summary>
     /// Tells if the adapter should ignore collection changes, therefore not notifying subscribers.
@@ -49,24 +76,49 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
     
     private sealed class ObservableCollectionAdapterSubscription : IDisposable
     {
+        private readonly VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> _adapter;
         private readonly TItemCollection _collection;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
-        private readonly Func<bool> _shouldIgnoreCollectionChanges;
+        private readonly List<VirtualScrollChange> _batchedChanges = [];
         private bool _disposed;
         private bool _isEmpty;
 
-        public ObservableCollectionAdapterSubscription(TItemCollection collection, Action<VirtualScrollChangeSet> changeCallback, Func<bool> shouldIgnoreCollectionChanges)
+        public ObservableCollectionAdapterSubscription(
+            VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> adapter,
+            TItemCollection collection,
+            Action<VirtualScrollChangeSet> changeCallback)
         {
+            _adapter = adapter;
             _collection = collection;
             _changeCallback = changeCallback;
-            _shouldIgnoreCollectionChanges = shouldIgnoreCollectionChanges;
             _isEmpty = _collection.Count == 0;
             _collection.CollectionChanged += OnCollectionChanged;
         }
 
+        public void FlushBatchedChanges()
+        {
+            if (_batchedChanges.Count > 0)
+            {
+                _changeCallback(new VirtualScrollChangeSet([.._batchedChanges]));
+                _batchedChanges.Clear();
+            }
+        }
+
+        private void NotifyOrBatch(List<VirtualScrollChange> changes)
+        {
+            if (_adapter._isBatching)
+            {
+                _batchedChanges.AddRange(changes);
+            }
+            else
+            {
+                _changeCallback(new VirtualScrollChangeSet(changes));
+            }
+        }
+
         private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (_disposed || _shouldIgnoreCollectionChanges())
+            if (_disposed || _adapter.ShouldIgnoreCollectionChanges())
             {
                 return;
             }
@@ -251,7 +303,7 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
 
             if (changes.Count > 0)
             {
-                _changeCallback(new VirtualScrollChangeSet(changes));
+                NotifyOrBatch(changes);
             }
         }
 
@@ -260,6 +312,7 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
             if (!_disposed)
             {
                 _collection.CollectionChanged -= OnCollectionChanged;
+                _adapter._subscriptions.Remove(this);
                 _disposed = true;
             }
         }

@@ -61,6 +61,21 @@ public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IDi
             SourceList.RemoveAt(randomIndex);
         }
     }
+    
+    [RelayCommand]
+    private void ReloadItem()
+    {
+        if (SourceList.Count > 0)
+        {
+            var randomIndex = Random.Shared.Next(SourceList.Count);
+            SourceList.Edit(innerList =>
+            {
+                var dynamicDataItem = innerList[randomIndex];
+                dynamicDataItem.Expanded = !dynamicDataItem.Expanded;
+                innerList[randomIndex] = dynamicDataItem;
+            });
+        }
+    }
 
     [RelayCommand]
     private void ClearItems()
@@ -171,6 +186,9 @@ public partial class DynamicDataItem : ObservableObject
 {
     [ObservableProperty]
     public partial string Name { get; set; }
+    
+    [ObservableProperty]
+    public partial bool Expanded { get; set; }
 
     [RelayCommand]
     private void AddLine()

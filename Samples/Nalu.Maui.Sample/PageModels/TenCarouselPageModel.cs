@@ -16,7 +16,7 @@ public partial class TenCarouselPageModel : ObservableObject, ILeavingAware
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
     
     public ReplaceableObservableCollection<TenItem> Items { get; }
-    public IReorderableVirtualScrollAdapter Adapter { get; }
+    public IVirtualScrollReorderableSource Adapter { get; }
 
     [ObservableProperty]
     public partial int CurrentIndex { get; set; } = 5;

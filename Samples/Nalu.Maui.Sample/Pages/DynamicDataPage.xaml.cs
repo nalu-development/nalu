@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.Messaging;
 using Nalu.Maui.Sample.PageModels;
@@ -14,6 +15,23 @@ public partial class DynamicDataPage : ContentPage, IRecipient<DynamicDataPageSc
         _messenger.Register(this);
         BindingContext = viewModel;
         InitializeComponent();
+
+        Resources.TryGetValue("ItemTemplate", out var value);
+        var dataTemplate = (DataTemplate)value!;
+        VirtualScroll.ItemTemplate = new StaticDataTemplateSelector(dataTemplate);
+    }
+
+    public class StaticDataTemplateSelector(DataTemplate template) : DataTemplateSelector
+    {
+        protected override DataTemplate OnSelectTemplate(object item, BindableObject container)
+        {
+            if (item is null)
+            {
+                Debugger.Break();
+            }
+            
+            return template;
+        }
     }
 
     public void Receive(DynamicDataPageScrollToItemMessage message)

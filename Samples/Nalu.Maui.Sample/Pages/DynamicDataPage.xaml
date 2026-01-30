@@ -8,6 +8,37 @@
              x:Class="Nalu.Maui.Sample.Pages.DynamicDataPage"
              x:DataType="pageModels:DynamicDataPageModel"
              Title="DynamicData Page">
+    <ContentPage.Resources>
+        <DataTemplate x:DataType="pageModels:DynamicDataItem" x:Key="ItemTemplate">
+            <nalu:ViewBox>
+                <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}"
+                        StrokeShape="RoundRectangle 8"
+                        Margin="8"
+                        Padding="16,8"
+                        BackgroundColor="LightCoral">
+                    <Label Text="{Binding Name}"/>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding AddLineCommand}"/>
+                    </Border.GestureRecognizers>
+                </Border>
+            </nalu:ViewBox>
+        </DataTemplate>
+        <DataTemplate x:DataType="pageModels:DynamicDataItem" x:Key="ItemTemplateExpanded">
+            <nalu:ViewBox>
+                <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}"
+                        StrokeShape="RoundRectangle 8"
+                        Margin="8"
+                        Padding="16,8"
+                        MinimumHeightRequest="200"
+                        BackgroundColor="LightCoral">
+                    <Label Text="{Binding Name}"/>
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding AddLineCommand}"/>
+                    </Border.GestureRecognizers>
+                </Border>
+            </nalu:ViewBox>
+        </DataTemplate>
+    </ContentPage.Resources>
     <ContentPage.Content>
         <Grid IgnoreSafeArea="True">
             <Grid.RowDefinitions>
@@ -15,32 +46,26 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" 
-                  ColumnDefinitions="*,*,*,*,*,*,*"
+            <nalu:HorizontalWrapLayout Grid.Row="0" 
                   Padding="16,8"
-                  ColumnSpacing="8">
-                <Button Grid.Column="0"
-                        Text="Add"
+                  HorizontalSpacing="8">
+                <Button Text="Reload"
+                        Command="{Binding ReloadItemCommand}" />
+                <Button Text="Add"
                         Command="{Binding AddItemCommand}" />
-                <Button Grid.Column="1"
-                        Text="Remove"
+                <Button Text="Remove"
                         Command="{Binding RemoveItemCommand}" />
-                <Button Grid.Column="2"
-                        Text="Move"
+                <Button Text="Move"
                         Command="{Binding MoveItemCommand}" />
-                <Button Grid.Column="3"
-                        Text="Scroll"
+                <Button Text="Scroll"
                         Command="{Binding ScrollToItemCommand}" />
-                <Button Grid.Column="4"
-                        Text="Auto"
+                <Button Text="Auto"
                         Command="{Binding ToggleAutoChangesCommand}" />
-                <Button Grid.Column="5"
-                        Text="Clear"
+                <Button Text="Clear"
                         Command="{Binding ClearItemsCommand}" />
-                <Button Grid.Column="6"
-                        Text="Replace"
+                <Button Text="Replace"
                         Command="{Binding ReplaceItemsCommand}" />
-            </Grid>
+            </nalu:HorizontalWrapLayout>
 
             <vs:VirtualScroll Grid.Row="1"
                                 x:Name="VirtualScroll"
@@ -77,20 +102,7 @@
                     </DataTemplate>
                 </vs:VirtualScroll.FooterTemplate>
                 <vs:VirtualScroll.ItemTemplate>
-                    <DataTemplate x:DataType="pageModels:DynamicDataItem">
-                        <nalu:ViewBox>
-                            <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}"
-                                    StrokeShape="RoundRectangle 8"
-                                    Margin="8"
-                                    Padding="16,8"
-                                    BackgroundColor="LightCoral">
-                                <Label Text="{Binding Name}"/>
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding AddLineCommand}"/>
-                                </Border.GestureRecognizers>
-                            </Border>
-                        </nalu:ViewBox>
-                    </DataTemplate>
+                    
                 </vs:VirtualScroll.ItemTemplate>
             </vs:VirtualScroll>
         </Grid>

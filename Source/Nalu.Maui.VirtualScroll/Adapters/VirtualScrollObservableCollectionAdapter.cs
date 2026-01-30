@@ -6,7 +6,7 @@ namespace Nalu;
 /// An adapter that wraps an observable collection for use with <see cref="VirtualScroll"/> supporting drag and drop.
 /// </summary>
 /// <typeparam name="TItem"></typeparam>
-public class VirtualScrollObservableCollectionAdapter<TItem> : VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<TItem>>, IReorderableVirtualScrollAdapter
+public class VirtualScrollObservableCollectionAdapter<TItem> : VirtualScrollNotifyCollectionChangedAdapter<ObservableCollection<TItem>>, IVirtualScrollSource
 {
     private bool _movingItemsViaDrag;
 
