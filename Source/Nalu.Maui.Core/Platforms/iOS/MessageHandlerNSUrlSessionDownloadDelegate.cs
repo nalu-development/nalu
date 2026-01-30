@@ -17,6 +17,7 @@ namespace Nalu;
 /// <summary>
 /// iOS processor for background HTTP requests.
 /// </summary>
+// ReSharper disable once InconsistentNaming
 internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSessionDownloadDelegate
 {
     // ReSharper disable once InconsistentNaming
@@ -357,6 +358,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 throw new IOException($"NSFileManager.Remove failed: {removeErrorMessage}. Path: {targetResponseContentFilePath}");
             }
 
+            // Source may have been removed by the system (e.g. nsurlsessiond cleanup); fail fast with a clear message
+            var sourcePath = location.Path;
+            if (string.IsNullOrEmpty(sourcePath) || !fileManager.FileExists(sourcePath))
+            {
+                throw new IOException($"Downloaded file was removed by the system before it could be processed. Source: {sourcePath}");
+            }
+
             if (!fileManager.Move(location, destinationUrl, out var moveError))
             {
                 var errorMessage = moveError?.LocalizedDescription ?? "Unknown error";
@@ -367,8 +375,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to process downloaded file for {RequestIdentifier}. Source: {Source}, Destination: {Destination}, DestExists: {DestExists}",
+            Logger.LogError(ex, "Failed to process downloaded file for {RequestIdentifier} at {Url}. Source: {Source}, Destination: {Destination}, DestExists: {DestExists}",
                 requestIdentifier,
+                (task.CurrentRequest ?? task.OriginalRequest)?.Url.ToString() ?? "Missing URL",
                 location.Path,
                 targetResponseContentFilePath,
                 File.Exists(targetResponseContentFilePath));
