@@ -17,7 +17,7 @@ public partial class ElevenPageModel : ObservableObject
 
     public ObservableCollection<ElevenGroup> Groups { get; }
     
-    public IVirtualScrollSource Adapter { get; set; }
+    public IReorderableVirtualScrollAdapter Adapter { get; set; }
 
     public ElevenPageModel()
     {
@@ -82,57 +82,19 @@ public partial class ElevenPageModel : ObservableObject
     [RelayCommand]
     private void MoveItem()
     {
-        // Need at least one non-empty group to move from
-        var nonEmptyGroups = Groups.Where(g => g.Items.Count > 0).ToList();
-        if (nonEmptyGroups.Count == 0 || Groups.Count < 1)
+        var nonEmptyGroups = Groups.Where(g => g.Items.Count > 1).ToList();
+        if (nonEmptyGroups.Count > 0)
         {
-            return;
-        }
-
-        // Pick a random source group and item
-        var sourceGroup = nonEmptyGroups[Random.Shared.Next(nonEmptyGroups.Count)];
-        var sourceIndex = Random.Shared.Next(sourceGroup.Items.Count);
-        var item = sourceGroup.Items[sourceIndex];
-
-        // Pick a random destination group (can be the same or different)
-        // If same group, ensure it has > 1 item (otherwise move is pointless)
-        ElevenGroup destGroup;
-        if (Groups.Count > 1 || sourceGroup.Items.Count > 1)
-        {
+            var group = nonEmptyGroups[Random.Shared.Next(nonEmptyGroups.Count)];
+            var fromIndex = Random.Shared.Next(group.Items.Count);
+            int toIndex;
             do
             {
-                destGroup = Groups[Random.Shared.Next(Groups.Count)];
-            } while (destGroup == sourceGroup && sourceGroup.Items.Count <= 1);
+                toIndex = Random.Shared.Next(group.Items.Count);
+            } while (toIndex == fromIndex);
+            
+            group.Items.Move(fromIndex, toIndex);
         }
-        else
-        {
-            // Only one group with one item - nothing to move
-            return;
-        }
-
-        // Use batching to ensure atomic cross-section move
-        Adapter.PerformBatchUpdates(() =>
-        {
-            sourceGroup.Items.RemoveAt(sourceIndex);
-
-            // Calculate destination index AFTER removal to get correct count
-            int destIndex;
-            if (destGroup == sourceGroup)
-            {
-                // Same group: pick a different position than the original
-                do
-                {
-                    destIndex = Random.Shared.Next(destGroup.Items.Count + 1);
-                } while (destIndex == sourceIndex);
-            }
-            else
-            {
-                // Different group: any position is valid
-                destIndex = destGroup.Items.Count > 0 ? Random.Shared.Next(destGroup.Items.Count + 1) : 0;
-            }
-
-            destGroup.Items.Insert(destIndex, item);
-        });
     }
 
     [RelayCommand]

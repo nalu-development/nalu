@@ -1,5 +1,4 @@
 using Foundation;
-using Microsoft.Extensions.Logging;
 using UIKit;
 
 namespace Nalu;
@@ -12,9 +11,10 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
         var itemIndex = indexPath.Item.ToInt32();
         
         var item = virtualScrollAdapter.GetItem(sectionIndex, itemIndex);
-        var template = SafeGetTemplate(item, sectionIndex, -1, virtualScroll.GetItemTemplate);
+        var template = virtualScroll.GetItemTemplate(item);
         var reuseId = template is null ? reuseIdManager.DefaultReuseId : reuseIdManager.GetReuseId(template);
         var nativeCell = collectionView.DequeueReusableCell(reuseId, indexPath);
+        var layout = collectionView.CollectionViewLayout as VirtualScrollCollectionViewLayout;
 
         if (nativeCell is VirtualScrollCell virtualScrollCell)
         {
@@ -45,14 +45,16 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
             VirtualScrollPlatformLayoutFactory.ElementKindGlobalFooter => virtualScroll.GetGlobalFooterTemplate(),
             VirtualScrollPlatformLayoutFactory.ElementKindGlobalHeader => virtualScroll.GetGlobalHeaderTemplate(),
             _ => supplementaryType == VirtualScrollPlatformLayoutFactory.ElementKindSectionHeader
-                ? SafeGetTemplate(section, sectionIndex, -1, virtualScroll.GetSectionHeaderTemplate)
+                ? virtualScroll.GetSectionHeaderTemplate(section)
                 : supplementaryType == VirtualScrollPlatformLayoutFactory.ElementKindSectionFooter
-                    ? SafeGetTemplate(section, sectionIndex, -1, virtualScroll.GetSectionFooterTemplate)
+                    ? virtualScroll.GetSectionFooterTemplate(section)
                     : throw new NotSupportedException($"Supplementary view type {supplementaryType} is not supported.")
         };
         
         var reuseId = template is null ? reuseIdManager.DefaultReuseId : reuseIdManager.GetReuseId(template, supplementaryType);
+
         var nativeCell = collectionView.DequeueReusableSupplementaryView(elementKind, reuseId, indexPath);
+        var layout = collectionView.CollectionViewLayout as VirtualScrollCollectionViewLayout;
 
         if (nativeCell is VirtualScrollCell virtualScrollCell)
         {
@@ -109,23 +111,5 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
         }
 
         return canDragItem;
-    }
-
-    private DataTemplate? SafeGetTemplate(object? data, int sectionIndex, int itemIndex, Func<object?, DataTemplate?> getTemplateFunc)
-    {
-        if (data is null)
-        {
-            try
-            {
-                return getTemplateFunc(data);
-            }
-            catch (Exception ex)
-            {
-                virtualScroll.Handler?.MauiContext?.Services.GetService<ILogger<VirtualScroll>>()?.LogWarning(ex, "Error selecting data template for [{SectionIndex}:{ItemIndex}] null object in VirtualScroll.", sectionIndex, itemIndex);
-                return null;
-            }
-        }
-
-        return getTemplateFunc(data);
     }
 }

@@ -5,7 +5,7 @@ namespace Nalu;
 /// <summary>
 /// An adapter that wraps a grouped list for use with <see cref="VirtualScroll"/>.
 /// </summary>
-public class VirtualScrollGroupedListAdapter : IVirtualScrollReorderableSource
+public class VirtualScrollGroupedListAdapter : IReorderableVirtualScrollAdapter
 {
     private static readonly NoOpUnsubscriber _noOpUnsubscriber = new();
 

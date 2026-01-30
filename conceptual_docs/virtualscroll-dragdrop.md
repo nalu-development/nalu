@@ -19,7 +19,7 @@ To enable drag and drop, simply bind the `DragHandler` property to your adapter:
 </vs:VirtualScroll>
 ```
 
-Since all built-in adapters implement `IVirtualScrollSource` (which combines `IVirtualScrollBatchableSource` and `IVirtualScrollReorderableSource`), you can bind the same adapter instance to both `ItemsSource` and `DragHandler`.
+Since all built-in adapters implement `IReorderableVirtualScrollAdapter` (which combines `IVirtualScrollAdapter` and `IVirtualScrollDragHandler`), you can bind the same adapter instance to both `ItemsSource` and `DragHandler`.
 
 ### Basic Usage with Observable Collections
 
@@ -46,7 +46,7 @@ The simplest way to enable drag and drop is with an `ObservableCollection<T>`:
 public partial class MyPageModel : ObservableObject
 {
     public ObservableCollection<MyItem> Items { get; }
-    public IVirtualScrollSource Adapter { get; }
+    public IReorderableVirtualScrollAdapter Adapter { get; }
 
     public MyPageModel()
     {
@@ -94,7 +94,7 @@ Drag and drop also works with grouped collections, allowing items to be moved bo
 public partial class GroupedPageModel : ObservableObject
 {
     public ObservableCollection<Group> Groups { get; }
-    public IVirtualScrollSource Adapter { get; }
+    public IReorderableVirtualScrollAdapter Adapter { get; }
 
     public GroupedPageModel()
     {
@@ -133,7 +133,7 @@ When dragging items in a grouped collection:
 
 ### Custom Drag Behavior
 
-You can customize drag behavior by creating a custom adapter that implements `IVirtualScrollReorderableSource` or by overriding methods in the built-in adapters:
+You can customize drag behavior by creating a custom adapter that implements `IReorderableVirtualScrollAdapter` or by overriding methods in the built-in adapters:
 
 #### Controlling Which Items Can Be Dragged
 
@@ -297,7 +297,7 @@ Here's a complete example demonstrating drag and drop with custom behavior:
 public partial class TaskListPageModel : ObservableObject
 {
     public ObservableCollection<TaskItem> Tasks { get; }
-    public IVirtualScrollSource Adapter { get; }
+    public IReorderableVirtualScrollAdapter Adapter { get; }
 
     public TaskListPageModel()
     {
