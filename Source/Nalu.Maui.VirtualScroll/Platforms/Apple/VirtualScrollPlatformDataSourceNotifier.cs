@@ -49,27 +49,28 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         if (changes.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
         {
             var currentSectionCount = _previousSectionCount;
-            
-            if (currentSectionCount < newSectionCount)
-            {
-                // Sections were added - insert them
-                var addedCount = newSectionCount - currentSectionCount;
-                var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
-                _collectionView.InsertSections(insertRange);
-            }
-            else if (currentSectionCount > newSectionCount)
+
+            if (currentSectionCount > newSectionCount)
             {
                 // Sections were removed - delete them
                 var removeRange = NSIndexSet.FromNSRange(new NSRange(newSectionCount, currentSectionCount - newSectionCount));
                 _collectionView.DeleteSections(removeRange);
             }
-                
+
             // Reload all existing sections that will exist after the reset
             var remainingSectionCount = Math.Min(currentSectionCount, newSectionCount);
             if (remainingSectionCount > 0)
             {
                 var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
                 _collectionView.ReloadSections(reloadRange);
+            }
+
+            if (currentSectionCount < newSectionCount)
+            {
+                // Sections were added - insert them
+                var addedCount = newSectionCount - currentSectionCount;
+                var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
+                _collectionView.InsertSections(insertRange);
             }
         }
         else
