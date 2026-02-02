@@ -43,55 +43,58 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         }
 
         var changes = changeSet.Changes.ToList();
+        var newSectionCount = _adapter.GetSectionCount();
         
         // If Reset is present, handle section count changes and reload
         if (changes.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
         {
             var currentSectionCount = _previousSectionCount;
-            var newSectionCount = _adapter.GetSectionCount();
             
-            // Use PerformBatchUpdates to handle section count changes, then reload sections
-            _collectionView.PerformBatchUpdates(() =>
+            if (currentSectionCount < newSectionCount)
             {
-                if (currentSectionCount < newSectionCount)
-                {
-                    // Sections were added - insert them
-                    var addedCount = newSectionCount - currentSectionCount;
-                    var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
-                    _collectionView.InsertSections(insertRange);
-                }
-                else if (currentSectionCount > newSectionCount)
-                {
-                    // Sections were removed - delete them
-                    var removeRange = NSIndexSet.FromNSRange(new NSRange(newSectionCount, currentSectionCount - newSectionCount));
-                    _collectionView.DeleteSections(removeRange);
-                }
+                // Sections were added - insert them
+                var addedCount = newSectionCount - currentSectionCount;
+                var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
+                _collectionView.InsertSections(insertRange);
+            }
+            else if (currentSectionCount > newSectionCount)
+            {
+                // Sections were removed - delete them
+                var removeRange = NSIndexSet.FromNSRange(new NSRange(newSectionCount, currentSectionCount - newSectionCount));
+                _collectionView.DeleteSections(removeRange);
+            }
                 
-                // Reload all existing sections that will exist after the reset
-                var remainingSectionCount = Math.Min(currentSectionCount, newSectionCount);
-                if (remainingSectionCount > 0)
-                {
-                    var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
-                    _collectionView.ReloadSections(reloadRange);
-                }
-            }, _ => _onBatchUpdatesCompleted?.Invoke());
-            
-            // Update tracked section count
-            _previousSectionCount = newSectionCount;
-            return;
+            // Reload all existing sections that will exist after the reset
+            var remainingSectionCount = Math.Min(currentSectionCount, newSectionCount);
+            if (remainingSectionCount > 0)
+            {
+                var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
+                _collectionView.ReloadSections(reloadRange);
+            }
+        }
+        else
+        {
+            foreach (var change in changeSet.Changes)
+            {
+                ApplyChange(change);
+            }
         }
 
-        foreach (var change in changeSet.Changes)
-        {
-            ApplyChange(change);
-        }
+        // Update tracked section count
+        _previousSectionCount = newSectionCount;
 
-        _collectionView.PerformBatchUpdates(() =>
+        // Use PerformBatchUpdates to handle section count changes, then reload sections
+        WaitForUpdatesAndNotify();
+    }
+
+    private void WaitForUpdatesAndNotify()
+    {
+        _collectionView.PerformBatchUpdates(Noop, _ => _onBatchUpdatesCompleted?.Invoke());
+        return;
+
+        static void Noop()
         {
-        }, _ => _onBatchUpdatesCompleted?.Invoke());
-        
-        // Update tracked section count after processing changes
-        _previousSectionCount = _adapter.GetSectionCount();
+        }
     }
 
     private void ApplyChange(VirtualScrollChange change)
