@@ -111,6 +111,13 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
 
                     // Collection has already been updated, so check current count
                     var isEmptyAfterRemove = _collection.Count == 0;
+                    // If transitioning from non-empty to empty, remove section after items
+                    if (isEmptyAfterRemove && !_isEmpty)
+                    {
+                        changes.Add(VirtualScrollChangeFactory.RemoveSection(_sectionIndex));
+                        _isEmpty = true;
+                        break;
+                    }
 
                     if (e.OldItems.Count == 1)
                     {
@@ -120,13 +127,6 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
                     {
                         var endIndex = e.OldStartingIndex + e.OldItems.Count - 1;
                         changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, e.OldStartingIndex, endIndex));
-                    }
-
-                    // If transitioning from non-empty to empty, remove section after items
-                    if (isEmptyAfterRemove && !_isEmpty)
-                    {
-                        changes.Add(VirtualScrollChangeFactory.RemoveSection(_sectionIndex));
-                        _isEmpty = true;
                     }
                     break;
 
