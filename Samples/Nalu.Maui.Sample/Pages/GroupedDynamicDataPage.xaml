@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Nalu.Maui.Sample.PageModels"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             x:Class="Nalu.Maui.Sample.Pages.GroupedDynamicDataPage"
+             x:DataType="pageModels:GroupedDynamicDataPageModel"
+             Title="Grouped DynamicData">
+    <ContentPage.Content>
+        <Grid Background="LightGoldenrodYellow">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <VerticalStackLayout Grid.Row="0" BackgroundColor="#E0E0E0">
+                <!-- Visible Range Info Label -->
+                <Label x:Name="RangeInfoLabel"
+                       Text="Visible Range: -"
+                       FontSize="12"
+                       Padding="16,8"
+                       TextColor="Black" />
+
+                <!-- Toolbar with action buttons -->
+                <Grid ColumnDefinitions="*,*,*,*,*,*"
+                      Padding="16,8"
+                      ColumnSpacing="8">
+                    <Button Grid.Column="0"
+                            Text="+Item"
+                            FontSize="12"
+                            Command="{Binding AddItemCommand}" />
+                    <Button Grid.Column="1"
+                            Text="-Item"
+                            FontSize="12"
+                            Command="{Binding RemoveItemCommand}" />
+                    <Button Grid.Column="2"
+                            Text="Move"
+                            FontSize="12"
+                            Command="{Binding MoveItemCommand}" />
+                    <Button Grid.Column="3"
+                            Text="Switch"
+                            FontSize="12"
+                            Command="{Binding SwitchCategoryCommand}" />
+                    <Button Grid.Column="4"
+                            Text="Clear"
+                            FontSize="12"
+                            Command="{Binding ClearGroupsCommand}" />
+                </Grid>
+            </VerticalStackLayout>
+
+            <!-- Grouped VirtualScroll -->
+            <vs:VirtualScroll Grid.Row="1"
+                                FadingEdgeLength="32"
+                                Background="LightGoldenrodYellow"
+                                x:Name="VirtualScroll"
+                                ItemsSource="{Binding Adapter}"
+                                OnScrolled="VirtualScroll_OnScrolled">
+
+                <!-- Global Header -->
+                <vs:VirtualScroll.HeaderTemplate>
+                    <DataTemplate x:DataType="pageModels:GroupedDynamicDataPageModel">
+                        <VerticalStackLayout Padding="16">
+                            <Image Source="banner.png"
+                                   HeightRequest="100"
+                                   Aspect="AspectFit"
+                                   Margin="0,8,0,16" />
+                        
+                            <Label Text="{Binding Message}"
+                                   FontSize="24"
+                                   FontAttributes="Bold"
+                                   HorizontalOptions="Center" />
+                            
+                            <Label Text="Items grouped by category (enum). Use Switch to move a random item between groups."
+                                   FontSize="14"
+                                   TextColor="Gray"
+                                   HorizontalOptions="Center"
+                                   Margin="0,8,0,0" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </vs:VirtualScroll.HeaderTemplate>
+
+                <!-- Global Footer -->
+                <vs:VirtualScroll.FooterTemplate>
+                    <DataTemplate x:DataType="pageModels:GroupedDynamicDataPageModel">
+                        <VerticalStackLayout Padding="16,24" Background="LightGoldenrodYellow">
+                            <Label Text="{Binding InstanceCount, StringFormat='Page Instance: {0}'}"
+                                   HorizontalOptions="Center"
+                                   TextColor="Gray" />
+                            <Label Text="End of grouped list"
+                                   HorizontalOptions="Center"
+                                   FontSize="12"
+                                   TextColor="DarkGray" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </vs:VirtualScroll.FooterTemplate>
+
+                <!-- Section Header Template -->
+                <vs:VirtualScroll.SectionHeaderTemplate>
+                    <DataTemplate x:DataType="pageModels:SampleItemGroup">
+                        <Grid BackgroundColor="#FF6B6B"
+                              Padding="16,12">
+                            <Label Text="{Binding Category}"
+                                   FontSize="18"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </vs:VirtualScroll.SectionHeaderTemplate>
+
+                <!-- Section Footer Template -->
+                <vs:VirtualScroll.SectionFooterTemplate>
+                    <DataTemplate x:DataType="pageModels:SampleItemGroup">
+                        <nalu:ViewBox>
+                            <Grid BackgroundColor="#FFE5E5"
+                                  Padding="16,8">
+                                <Label Text="{Binding Items.Count, StringFormat='{0} items in this group'}"
+                                       FontSize="12"
+                                       TextColor="#CC6B6B"
+                                       HorizontalOptions="End" />
+                            </Grid>
+                        </nalu:ViewBox>
+                    </DataTemplate>
+                </vs:VirtualScroll.SectionFooterTemplate>
+
+                <!-- Item Template -->
+                <vs:VirtualScroll.ItemTemplate>
+                    <DataTemplate x:DataType="pageModels:SampleItem">
+                        <nalu:ViewBox BackgroundColor="White">
+                            <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}"
+                                    StrokeShape="RoundRectangle 8"
+                                    Margin="12,6"
+                                    Padding="16,12"
+                                    BackgroundColor="White">
+                                <Label Text="{Binding Name}"
+                                       FontSize="16"
+                                       VerticalOptions="Center" />
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding TapCommand}"/>
+                                </Border.GestureRecognizers>
+                            </Border>
+                        </nalu:ViewBox>
+                    </DataTemplate>
+                </vs:VirtualScroll.ItemTemplate>
+
+            </vs:VirtualScroll>
+        </Grid>
+    </ContentPage.Content>
+</ContentPage>
