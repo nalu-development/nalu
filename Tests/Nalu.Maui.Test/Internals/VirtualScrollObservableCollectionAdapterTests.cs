@@ -634,7 +634,7 @@ public class VirtualScrollObservableCollectionAdapterTests
     #region Section Transition Tests - Remove Operations
 
     [Fact]
-    public void Subscribe_WhenLastItemRemovedFromCollection_ShouldNotifyRemoveItemAndRemoveSection()
+    public void Subscribe_WhenLastItemRemovedFromCollection_ShouldNotifyRemoveSection()
     {
         // Arrange
         var collection = new ObservableCollection<string> { "A" };
@@ -645,22 +645,12 @@ public class VirtualScrollObservableCollectionAdapterTests
         // Act
         collection.RemoveAt(0);
 
-        // Assert
+        // Assert - when transitioning to empty, adapter emits only RemoveSection
         receivedChangeSet.Should().NotBeNull();
-        receivedChangeSet!.Changes.Should().HaveCount(2);
-        
-        var changes = receivedChangeSet.Changes.ToList();
-        
-        // First change should be RemoveItem
-        var itemChange = changes[0];
-        itemChange.Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
-        itemChange.StartSectionIndex.Should().Be(0);
-        itemChange.StartItemIndex.Should().Be(0);
-        
-        // Second change should be RemoveSection
-        var sectionChange = changes[1];
-        sectionChange.Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
-        sectionChange.StartSectionIndex.Should().Be(0);
+        receivedChangeSet!.Changes.Should().HaveCount(1);
+        var change = receivedChangeSet.Changes.First();
+        change.Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+        change.StartSectionIndex.Should().Be(0);
     }
 
     [Fact]
@@ -701,12 +691,10 @@ public class VirtualScrollObservableCollectionAdapterTests
         // Act - Remove last item (should remove section)
         collection.RemoveAt(0);
 
-        // Assert
+        // Assert - when transitioning to empty, adapter emits only RemoveSection
         receivedChangeSet.Should().NotBeNull();
-        receivedChangeSet!.Changes.Should().HaveCount(2);
-        var changes = receivedChangeSet.Changes.ToList();
-        changes[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
-        changes[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+        receivedChangeSet!.Changes.Should().HaveCount(1);
+        receivedChangeSet.Changes.First().Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
     }
 
     #endregion
@@ -844,11 +832,10 @@ public class VirtualScrollObservableCollectionAdapterTests
         firstChanges.Should().HaveCount(1, "adding to empty collection should only emit InsertSection (includes the item)");
         firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.InsertSection);
         
-        // Second change set: RemoveItem + RemoveSection
+        // Second change set: when transitioning to empty, adapter emits only RemoveSection
         var secondChanges = changeSets[1].Changes.ToList();
-        secondChanges.Should().HaveCount(2);
-        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
-        secondChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+        secondChanges.Should().HaveCount(1);
+        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
     }
 
     [Fact]
@@ -904,11 +891,10 @@ public class VirtualScrollObservableCollectionAdapterTests
         firstChanges.Should().HaveCount(1);
         firstChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
         
-        // Second change set should have RemoveSection
+        // Second change set: when transitioning to empty, adapter emits only RemoveSection
         var secondChanges = changeSets[1].Changes.ToList();
-        secondChanges.Should().HaveCount(2);
-        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveItem);
-        secondChanges[1].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
+        secondChanges.Should().HaveCount(1);
+        secondChanges[0].Operation.Should().Be(VirtualScrollChangeOperation.RemoveSection);
     }
 
     [Fact]
