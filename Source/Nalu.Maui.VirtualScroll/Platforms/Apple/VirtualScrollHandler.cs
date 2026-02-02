@@ -381,7 +381,7 @@ public partial class VirtualScrollHandler
         }
 
         var collectionView = handler.PlatformCollectionView;
-        collectionView.PerformBatchUpdates(collectionView.ReloadData, null!);
+        collectionView.ReloadData();
     }
 
     /// <summary>

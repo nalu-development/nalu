@@ -4,7 +4,7 @@ using UIKit;
 namespace Nalu;
 
 /// <summary>
-/// Handles adapter change notifications and applies them to a UICollectionView using performBatchUpdates.
+/// Handles adapter change notifications and applies them to a UICollectionView.
 /// </summary>
 internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
 {
@@ -81,12 +81,13 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
             return;
         }
 
+        foreach (var change in changeSet.Changes)
+        {
+            ApplyChange(change);
+        }
+
         _collectionView.PerformBatchUpdates(() =>
         {
-            foreach (var change in changeSet.Changes)
-            {
-                ApplyChange(change);
-            }
         }, _ => _onBatchUpdatesCompleted?.Invoke());
         
         // Update tracked section count after processing changes
