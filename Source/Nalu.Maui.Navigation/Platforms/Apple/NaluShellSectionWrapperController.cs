@@ -64,7 +64,15 @@ internal class NaluShellSectionWrapperController : UIViewController
 
         if (newViewController is not null)
         {
-            View!.InsertSubview(newViewController.View!, 0);
+            var childView = newViewController.View!;
+            View!.InsertSubview(childView, 0);
+            childView.TranslatesAutoresizingMaskIntoConstraints = false;
+            NSLayoutConstraint.ActivateConstraints([
+                childView.TopAnchor.ConstraintEqualTo(View.TopAnchor),
+                childView.BottomAnchor.ConstraintEqualTo(View.BottomAnchor),
+                childView.LeftAnchor.ConstraintEqualTo(View.LeftAnchor),
+                childView.RightAnchor.ConstraintEqualTo(View.RightAnchor)
+            ]);
         }
         
         if (oldViewController is not null)

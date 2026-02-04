@@ -22,6 +22,7 @@ public partial class VirtualScrollHandler
     private VirtualScrollCollectionView? _collectionView;
     private VirtualScrollContainerView? _containerView;
     private UILongPressGestureRecognizer? _dragGestureRecognizer;
+    private CGSize _lastBounds;
 
     /// <summary>
     /// Gets the <see cref="UICollectionView"/> platform view.
@@ -149,8 +150,8 @@ public partial class VirtualScrollHandler
         _containerView = new VirtualScrollContainerView();
         
         // Subscribe to events for fading edge updates
-        _containerView.BoundsChanged += OnFadingEdgeBoundsChanged;
-        collectionView.ContentSizeChanged += OnFadingEdgeBoundsChanged;
+        _containerView.BoundsChanged += OnBoundsChanged;
+        collectionView.ContentSizeChanged += OnContentSizeChanged;
         
         var containerView = _containerView;
         collectionView.TranslatesAutoresizingMaskIntoConstraints = false;
@@ -210,7 +211,56 @@ public partial class VirtualScrollHandler
             }
         );
 
-    private void OnFadingEdgeBoundsChanged(object? s, EventArgs e)
+    private void OnBoundsChanged(object? sender, EventArgs e)
+    {
+        if (_collectionView is not null)
+        {
+            _delegate?.UpdateFadingEdge(_collectionView);
+
+            // Maintain carousel snap to the first page
+            if (_collectionView.PagingEnabled && VirtualView?.ItemsLayout is { Orientation: var orientation })
+            {
+                var bounds = _collectionView.Bounds;
+                var contentSize = _collectionView.ContentSize;
+                var scrollX = _collectionView.ContentOffset.X;
+                var scrollY = _collectionView.ContentOffset.Y;
+                nfloat? newX = null, newY = null;
+
+                if (orientation == ItemsLayoutOrientation.Horizontal)
+                {
+                    var pageWidth = bounds.Width;
+                    if (pageWidth > 0 && _lastBounds.Width > 0 && contentSize.Width > 0)
+                    {
+                        var page = Math.Round(scrollX / _lastBounds.Width);
+                        var snapX = (nfloat)(page * pageWidth);
+                        var maxX = contentSize.Width - pageWidth;
+                        newX = (nfloat)Math.Max(0, Math.Min(maxX, snapX));
+                        newY = scrollY;
+                    }
+                }
+                else
+                {
+                    var pageHeight = bounds.Height;
+                    if (pageHeight > 0 && _lastBounds.Height > 0 && contentSize.Height > 0)
+                    {
+                        var page = Math.Round(scrollY / _lastBounds.Height);
+                        var snapY = (nfloat)(page * pageHeight);
+                        var maxY = contentSize.Height - pageHeight;
+                        newX = scrollX;
+                        newY = (nfloat)Math.Max(0, Math.Min(maxY, snapY));
+                    }
+                }
+
+                if (newX is { } x && newY is { } y)
+                {
+                    _collectionView.SetContentOffset(new CGPoint(x, y), false);
+                }
+            }
+
+            _lastBounds = _collectionView.Bounds.Size;
+        }
+    }
+    private void OnContentSizeChanged(object? s, EventArgs e)
     {
         if (_collectionView is not null)
         {
@@ -243,12 +293,12 @@ public partial class VirtualScrollHandler
         // Unsubscribe from events
         if (_containerView is not null)
         {
-            _containerView.BoundsChanged -= OnFadingEdgeBoundsChanged;
+            _containerView.BoundsChanged -= OnBoundsChanged;
         }
         
         if (_collectionView is not null)
         {
-            _collectionView.ContentSizeChanged -= OnFadingEdgeBoundsChanged;
+            _collectionView.ContentSizeChanged -= OnContentSizeChanged;
             _collectionView.DataSource = null!;
             _collectionView.Delegate = null!;
             _collectionView.RefreshControl = null;
@@ -262,6 +312,7 @@ public partial class VirtualScrollHandler
         _dragGestureRecognizer?.Dispose();
         _containerView?.Dispose();
         _containerView = null;
+        _lastBounds = CGSize.Empty;
         _reuseIdManager = null;
 
         base.DisconnectHandler(platformView);

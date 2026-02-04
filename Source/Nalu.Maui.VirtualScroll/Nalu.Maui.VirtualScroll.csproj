@@ -57,19 +57,12 @@
   </Target>
 
   <ItemGroup>
-    <PackageReference Include="DynamicData" Version="9.4.1" />
     <PackageReference Condition="$(TargetFramework.StartsWith('net9'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion9)"/>
     <PackageReference Condition="$(TargetFramework.StartsWith('net10'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion10)"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="Platforms\Android\VirtualScrollPlatformReuseIdManager.cs">
-      <ExcludeFromCurrentConfiguration>true</ExcludeFromCurrentConfiguration>
-    </Compile>
   </ItemGroup>
 
   <ItemGroup Label="Files">
