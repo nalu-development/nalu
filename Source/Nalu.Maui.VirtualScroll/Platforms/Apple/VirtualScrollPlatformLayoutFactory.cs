@@ -278,7 +278,20 @@ internal class VirtualScrollCollectionViewLayout : UICollectionViewCompositional
 {
     public required UICollectionViewScrollDirection ScrollDirection { get; init; }
     
+    /// <summary>
+    /// Called when the collection view finalizes layout updates.
+    /// Note: Per Apple docs, this is called within the animation block, not after animations complete.
+    /// See: https://developer.apple.com/documentation/uikit/uicollectionviewlayout/finalizecollectionviewupdates()
+    /// </summary>
+    public Action? OnLayoutUpdateCompleted { get; set; }
+    
     public VirtualScrollCollectionViewLayout(UICollectionViewCompositionalLayoutSectionProvider sectionProvider, UICollectionViewCompositionalLayoutConfiguration configuration) : base(sectionProvider, configuration)
     {
+    }
+    
+    public override void FinalizeCollectionViewUpdates()
+    {
+        base.FinalizeCollectionViewUpdates();
+        OnLayoutUpdateCompleted?.Invoke();
     }
 }

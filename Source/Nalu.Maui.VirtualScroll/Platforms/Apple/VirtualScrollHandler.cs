@@ -357,17 +357,7 @@ public partial class VirtualScrollHandler
             collectionView.DataSource = new VirtualScrollPlatformDataSource(adapter, virtualScroll, reuseIdManager);
             
             // Create a new notifier instance every time the adapter changes to ensure a fresh subscription
-            // Notify the controller when batch updates complete so layouts can update their state
-            handler._notifier = new VirtualScrollPlatformDataSourceNotifier(
-                collectionView, 
-                adapter,
-                onBatchUpdatesCompleted: () =>
-                {
-                    if (virtualScroll is IVirtualScrollController controller)
-                    {
-                        controller.LayoutUpdateCompleted();
-                    }
-                });
+            handler._notifier = new VirtualScrollPlatformDataSourceNotifier(collectionView, adapter);
         }
         else
         {
@@ -407,12 +397,28 @@ public partial class VirtualScrollHandler
     {
         var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("The provided IVirtualScroll does not implement IVirtualScrollLayoutInfo interface.");
 
-        return virtualScroll.ItemsLayout switch
+        var layoutSetup = virtualScroll.ItemsLayout switch
         {
             LinearVirtualScrollLayout linearLayout => VirtualScrollPlatformLayoutFactory.CreateList(linearLayout, layoutInfo),
             CarouselVirtualScrollLayout carouselLayout => VirtualScrollPlatformLayoutFactory.CreateCarousel(carouselLayout, layoutInfo),
             _ => throw new NotSupportedException($"Layout type {virtualScroll.ItemsLayout.GetType().Name} is not supported.")
         };
+        
+        // Wire up layout update callback via FinalizeCollectionViewUpdates
+        // Use WeakReference to avoid the delegate holding a strong reference to virtualScroll
+        if (layoutSetup.Layout is VirtualScrollCollectionViewLayout vsLayout)
+        {
+            var weakVirtualScroll = new WeakReference<IVirtualScroll>(virtualScroll);
+            vsLayout.OnLayoutUpdateCompleted = () =>
+            {
+                if (weakVirtualScroll.TryGetTarget(out var target) && target is IVirtualScrollController controller)
+                {
+                    controller.LayoutUpdateCompleted();
+                }
+            };
+        }
+        
+        return layoutSetup;
     }
 
     /// <summary>

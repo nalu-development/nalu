@@ -11,7 +11,6 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
     private readonly UICollectionView _collectionView;
     private readonly IVirtualScrollAdapter _adapter;
     private readonly IDisposable _subscription;
-    private readonly Action? _onBatchUpdatesCompleted;
     private int _previousSectionCount;
     private bool _disposed;
 
@@ -20,12 +19,10 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
     /// </summary>
     /// <param name="collectionView">The collection view to update.</param>
     /// <param name="adapter">The adapter to subscribe to.</param>
-    /// <param name="onBatchUpdatesCompleted">Optional callback invoked after batch updates complete.</param>
-    public VirtualScrollPlatformDataSourceNotifier(UICollectionView collectionView, IVirtualScrollAdapter adapter, Action? onBatchUpdatesCompleted = null)
+    public VirtualScrollPlatformDataSourceNotifier(UICollectionView collectionView, IVirtualScrollAdapter adapter)
     {
         _collectionView = collectionView ?? throw new ArgumentNullException(nameof(collectionView));
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
-        _onBatchUpdatesCompleted = onBatchUpdatesCompleted;
         _previousSectionCount = adapter.GetSectionCount();
         _subscription = adapter.Subscribe(OnAdapterChanged);
     }
@@ -42,7 +39,7 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
             throw new InvalidOperationException("Changes on the data source must be applied and notified on the main thread.");
         }
 
-        var changes = changeSet.Changes.ToList();
+        var changes = changeSet.Changes as IReadOnlyCollection<VirtualScrollChange> ?? [..changeSet.Changes];
         var newSectionCount = _adapter.GetSectionCount();
         
         // If Reset is present, handle section count changes and reload
@@ -75,7 +72,7 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         }
         else
         {
-            foreach (var change in changeSet.Changes)
+            foreach (var change in changes)
             {
                 ApplyChange(change);
             }
@@ -83,19 +80,6 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
 
         // Update tracked section count
         _previousSectionCount = newSectionCount;
-
-        // Use PerformBatchUpdates to handle section count changes, then reload sections
-        WaitForUpdatesAndNotify();
-    }
-
-    private void WaitForUpdatesAndNotify()
-    {
-        _collectionView.PerformBatchUpdates(Noop, _ => _onBatchUpdatesCompleted?.Invoke());
-        return;
-
-        static void Noop()
-        {
-        }
     }
 
     private void ApplyChange(VirtualScrollChange change)
