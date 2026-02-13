@@ -95,7 +95,11 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
 
     public override bool CanMoveItem(UICollectionView collectionView, NSIndexPath indexPath)
     {
-        var dragHandler = virtualScroll.DragHandler ?? throw new InvalidOperationException("DragHandler should not be null when CanMoveItem is called.");
+        if (virtualScroll.DragHandler is not { } dragHandler)
+        {
+            return false;
+        }
+
         var sectionIndex = indexPath.Section;
         var itemIndex = indexPath.Item.ToInt32();
 
