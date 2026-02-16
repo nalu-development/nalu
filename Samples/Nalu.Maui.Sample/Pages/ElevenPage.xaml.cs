@@ -17,10 +17,10 @@ public partial class ElevenPage : ContentPage
         if (range.HasValue)
         {
             var r = range.Value;
-            var startType = GetPositionType(r.StartSectionIndex, r.StartItemIndex);
-            var endType = GetPositionType(r.EndSectionIndex, r.EndItemIndex);
+            var startType = GetPosition(r.StartSectionIndex, r.StartItemIndex);
+            var endType = GetPosition(r.EndSectionIndex, r.EndItemIndex);
             
-            RangeInfoLabel.Text = $"Visible: {startType} → {endType}";
+            RangeInfoLabel.Text = $"Visible: {startType} → {endType}, {e.ScrollPercentageY*100:0.0}%";
         }
         else
         {
@@ -28,7 +28,7 @@ public partial class ElevenPage : ContentPage
         }
     }
 
-    private static string GetPositionType(int sectionIndex, int itemIndex)
+    private static string GetPosition(int sectionIndex, int itemIndex)
     {
         if (sectionIndex == VirtualScrollRange.GlobalHeaderSectionIndex)
             return "GlobalHeader";

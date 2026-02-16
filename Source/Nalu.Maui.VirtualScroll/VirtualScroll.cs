@@ -19,6 +19,8 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     private bool _hasSectionHeader;
     private bool _hasGlobalFooter;
     private bool _hasSectionFooter;
+    private double _lastHeight;
+    private double _lastWidth;
 
     /// <summary>
     /// Bindable property for <see cref="ItemsSource"/>.
@@ -563,9 +565,18 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     }
 
     /// <inheritdoc/>
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+
+        _lastWidth = width;
+        _lastHeight = height;
+    }
+
+    /// <inheritdoc/>
     void IVirtualScrollController.Scrolled(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
     {
-        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
+        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight, _lastWidth, _lastHeight);
 
         if (ScrolledCommand != null && ScrolledCommand.CanExecute(args))
         {
@@ -577,7 +588,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
 
     void IVirtualScrollController.ScrollStarted(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
     {
-        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
+        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight, _lastWidth, _lastHeight);
 
         if (ScrollStartedCommand != null && ScrollStartedCommand.CanExecute(args))
         {
@@ -589,7 +600,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
 
     void IVirtualScrollController.ScrollEnded(double scrollX, double scrollY, double totalScrollableWidth, double totalScrollableHeight)
     {
-        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight);
+        var args = new VirtualScrollScrolledEventArgs(scrollX, scrollY, totalScrollableWidth, totalScrollableHeight, _lastWidth, _lastHeight);
 
         if (ScrollEndedCommand != null && ScrollEndedCommand.CanExecute(args))
         {
