@@ -123,8 +123,12 @@ The event arguments provide comprehensive scroll information:
 | `ScrollY` | `double` | Current vertical scroll position in device-independent units |
 | `TotalScrollableWidth` | `double` | Total scrollable width in device-independent units |
 | `TotalScrollableHeight` | `double` | Total scrollable height in device-independent units |
-| `ScrollPercentageX` | `double` | Horizontal scroll percentage (0.0 to 1.0), or 0.0 if not scrollable horizontally |
-| `ScrollPercentageY` | `double` | Vertical scroll percentage (0.0 to 1.0), or 0.0 if not scrollable vertically |
+| `ViewportWidth` | `double` | Width of the viewport in device-independent units |
+| `ViewportHeight` | `double` | Height of the viewport in device-independent units |
+| `ScrollPercentageX` | `double` | Horizontal scroll percentage (0.0 to 1.0), or 1.0 if not scrollable horizontally |
+| `ScrollPercentageY` | `double` | Vertical scroll percentage (0.0 to 1.0), or 1.0 if not scrollable vertically |
+| `RemainingScrollX` | `double` | Remaining horizontal scroll distance in device-independent units (0 if at end or not scrollable) |
+| `RemainingScrollY` | `double` | Remaining vertical scroll distance in device-independent units (0 if at end or not scrollable) |
 
 **Example: Scroll Progress Indicator**
 
@@ -332,19 +336,20 @@ private static string GetPositionType(int sectionIndex, int itemIndex)
 }
 ```
 
-**Example: Infinite Scroll Loading (using Scroll Percentage)**
+**Example: Infinite Scroll Loading (using RemainingScrollY)**
 
 ```csharp
 private bool _isLoadingMore;
 private System.Threading.Timer? _loadMoreTimer;
 private const int LoadMoreDebounceMs = 300;
+private const double LoadMoreThreshold = 200; // Load more when 200 units from bottom
 
 [RelayCommand]
 private void OnScrolled(VirtualScrollScrolledEventArgs e)
 {
-    // Only check when near the bottom (e.g., within 10% of end)
-    // Use ScrollPercentageY - it's efficient and doesn't require platform queries
-    if (e.ScrollPercentageY < 0.9 || _isLoadingMore)
+    // Load more when within threshold distance from bottom
+    // RemainingScrollY is 0 when at bottom or when content doesn't scroll
+    if (e.RemainingScrollY > LoadMoreThreshold || _isLoadingMore)
     {
         return;
     }
@@ -373,10 +378,12 @@ private async void LoadMoreItems()
 }
 ```
 
-**Why use ScrollPercentageY instead of GetVisibleItemsRange()?**
-- `ScrollPercentageY` is calculated from scroll position data already available in the event args (no platform queries)
+You can also use `ScrollPercentageY` for percentage-based thresholds (e.g., `e.ScrollPercentageY >= 0.9` for "within 10% of end").
+
+**Why use RemainingScrollY/ScrollPercentageY instead of GetVisibleItemsRange()?**
+- `RemainingScrollY` and `ScrollPercentageY` are calculated from scroll position data already available in the event args (no platform queries)
 - `GetVisibleItemsRange()` requires querying the native platform scroll view, which is expensive
-- For infinite scroll, you only need to know "are we near the bottom?"—scroll percentage is perfect for this
+- For infinite scroll, you only need to know "are we near the bottom?"—remaining scroll distance or scroll percentage is perfect for this
 
 **Performance Notes:**
 - Scroll events are only processed when `ScrolledCommand` is set or `OnScrolled` has subscribers. This ensures optimal performance when scroll tracking is not needed.
