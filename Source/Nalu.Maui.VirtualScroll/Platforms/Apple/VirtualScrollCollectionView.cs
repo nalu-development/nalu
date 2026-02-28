@@ -24,11 +24,11 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
 {
     private readonly IVirtualScrollLayoutInfo _layoutInfo;
     private readonly VirtualScrollCellManager<VirtualScrollCell> _cellManager = new(cell => cell.VirtualView);
-    private readonly List<NSIndexPath> _invalidatedGlobalHeaders = new(16);
-    private readonly List<NSIndexPath> _invalidatedGlobalFooters = new(16);
-    private readonly List<NSIndexPath> _invalidatedSectionHeaders = new(16);
-    private readonly List<NSIndexPath> _invalidatedSectionFooters = new(16);
-    private readonly List<NSIndexPath> _invalidatedPaths = new(16);
+    private readonly List<NSIndexPath> _invalidatedGlobalHeaders = new(2);
+    private readonly List<NSIndexPath> _invalidatedGlobalFooters = new(2);
+    private readonly List<NSIndexPath> _invalidatedSectionHeaders = new(8);
+    private readonly List<NSIndexPath> _invalidatedSectionFooters = new(8);
+    private readonly List<NSIndexPath> _invalidatedPaths = new(20);
     private bool _needsCellsLayout;
     private CGSize _lastContentSize;
 
@@ -72,6 +72,15 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         var cellsLayoutController = (IVirtualScrollCellsLayoutController) this;
 
         if (!cellsLayoutController.NeedsCellsLayout)
+        {
+            return;
+        }
+
+        // Avoid triggering layout invalidation when the collection view has no size (e.g. during
+        // iPad split view / Stage Manager / rotation transitions). Otherwise the layout can run
+        // with a zero-width container and supplementary views may be asked for preferred size,
+        // leading to NSInternalInconsistencyException ("Preferred size is ZERO for auxiliary item").
+        if (Bounds.Width <= 0 || Bounds.Height <= 0)
         {
             return;
         }

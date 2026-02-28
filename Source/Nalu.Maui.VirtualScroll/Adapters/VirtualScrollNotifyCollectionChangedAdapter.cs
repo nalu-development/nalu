@@ -36,7 +36,15 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
     public object? GetSection(int sectionIndex) => null;
 
     /// <inheritdoc/>
-    public object? GetItem(int sectionIndex, int itemIndex) => _collection[itemIndex];
+    public object? GetItem(int sectionIndex, int itemIndex)
+    {
+        if (itemIndex < 0 || itemIndex >= _collection.Count)
+        {
+            return null;
+        }
+        
+        return _collection[itemIndex];
+    }
 
     /// <inheritdoc/>
     public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new ObservableCollectionAdapterSubscription(_collection, changeCallback, ShouldIgnoreCollectionChanges);

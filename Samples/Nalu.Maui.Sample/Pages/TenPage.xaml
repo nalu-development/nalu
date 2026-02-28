@@ -16,7 +16,7 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" 
-                  ColumnDefinitions="*,*,*,*,*,*,*"
+                  ColumnDefinitions="*,*,*,*,*,*,*,*"
                   Padding="16,8"
                   ColumnSpacing="8">
                 <Button Grid.Column="0"
@@ -40,6 +40,9 @@
                 <Button Grid.Column="6"
                         Text="Replace"
                         Command="{Binding ReplaceItemsCommand}" />
+                <Button Grid.Column="7"
+                        Text="0-Toggle"
+                        Clicked="Toggle0" />
             </Grid>
 
             <vs:VirtualScroll Grid.Row="1"

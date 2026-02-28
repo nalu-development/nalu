@@ -58,9 +58,9 @@ internal static class VirtualScrollPlatformLayoutFactory
                     HeaderHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
                     FooterWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedFooterSize),
                     FooterHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
-                    SectionHeaderWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedHeaderSize),
+                    SectionHeaderWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedSectionHeaderSize),
                     SectionHeaderHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f),
-                    SectionFooterWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedFooterSize),
+                    SectionFooterWidth = NSCollectionLayoutDimension.CreateEstimated((float) linearLayout.EstimatedSectionFooterSize),
                     SectionFooterHeight = NSCollectionLayoutDimension.CreateFractionalHeight(1.0f)
                 }
             );

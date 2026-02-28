@@ -83,14 +83,20 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
         var measure = NativeView!.Hidden ? Size.Zero : virtualView.Measure(constraint.Width, constraint.Height);
 
-        if (!isCarousel)
-        {
-            var size = layout.Orientation == ItemsLayoutOrientation.Vertical
+        // Workaround to prevent a crash with a zero-width container during iPad split view / Stage Manager / rotation transitions.
+        // If the container has zero width or height, supplementary views may be asked for preferred size,
+        // leading to NSInternalInconsistencyException ("Preferred size is ZERO for auxiliary item").
+        // We've already tried a workaround in VirtualScrollCollectionView.LayoutSubviews to avoid triggering layout when the collection view has no size,
+        // but we want to make sure the cell doesn't crash if that somehow fails.
+        var size = SupplementaryType is null
+            ? layout.Orientation == ItemsLayoutOrientation.Vertical
                 ? new CGSize(layoutAttributes.Frame.Width, measure.Height)
-                : new CGSize(measure.Width, layoutAttributes.Frame.Height);
+                : new CGSize(measure.Width, layoutAttributes.Frame.Height)
+            : layout.Orientation == ItemsLayoutOrientation.Vertical
+                ? new CGSize(Math.Max(1, layoutAttributes.Frame.Width), Math.Max(1, measure.Height))
+                : new CGSize(Math.Max(1, measure.Width), Math.Max(1, layoutAttributes.Frame.Height));
 
-            layoutAttributes.Frame = new CGRect(layoutAttributes.Frame.Location, size);
-        }
+        layoutAttributes.Frame = new CGRect(layoutAttributes.Frame.Location, size);
 
         return layoutAttributes;
     }

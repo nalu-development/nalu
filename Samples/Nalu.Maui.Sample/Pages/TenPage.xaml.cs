@@ -30,5 +30,10 @@ public partial class TenPage : ContentPage, IRecipient<TenPageScrollToItemMessag
     {
         _messenger.UnregisterAll(this);
     }
+
+    private void Toggle0(object? sender, EventArgs e)
+    {
+        VirtualScroll.WidthRequest = VirtualScroll.WidthRequest == -1 ? 0 : -1;
+    }
 }
 
