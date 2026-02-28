@@ -98,7 +98,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: "Download Artefact"
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: "windows-latest"
       - name: "Dotnet NuGet Add Source"
@@ -125,7 +125,7 @@ jobs:
         with:
           user: ${{secrets.NUGET_USER}}
       - name: "Download Artefact"
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: "windows-latest"
       - name: "Dotnet NuGet Push"
@@ -152,7 +152,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download Documentation Site
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: docfx-site
           path: ./_site
