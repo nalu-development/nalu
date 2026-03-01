@@ -8,9 +8,15 @@ namespace Nalu;
 /// <param name="viewBox">The layout using this <see cref="ILayoutManager" />.</param>
 public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
 {
+    internal double LastWidthConstraint { get; private set; }
+    internal double LastHeightConstraint { get; private set; }
+    
     /// <inheritdoc cref="ILayoutManager.Measure" />
-    public Size Measure(double widthConstraint, double heightConstraint)
+    public virtual Size Measure(double widthConstraint, double heightConstraint)
     {
+        LastWidthConstraint = widthConstraint;
+        LastHeightConstraint = heightConstraint;
+
         var padding = viewBox.Padding;
 
         var paddingHorizontalThickness = padding.HorizontalThickness;
@@ -40,7 +46,7 @@ public class ViewBoxLayoutManager(IViewBox viewBox) : ILayoutManager
     }
 
     /// <inheritdoc cref="ILayoutManager.ArrangeChildren" />
-    public Size ArrangeChildren(Rect bounds)
+    public virtual Size ArrangeChildren(Rect bounds)
     {
         var padding = viewBox.Padding;
 

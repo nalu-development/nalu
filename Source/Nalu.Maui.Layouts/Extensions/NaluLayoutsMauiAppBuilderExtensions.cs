@@ -20,6 +20,7 @@ public static class NaluLayoutsMauiAppBuilderExtensions
         builder.ConfigureMauiHandlers(handlers =>
             {
                 handlers.AddHandler<IViewBox, ViewBoxHandler>();
+                handlers.AddHandler<SlideScrollView, SlideScrollViewHandler>();
             }
         );
 
