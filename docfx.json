@@ -26,14 +26,15 @@
     ],
     "resource": [
       { "files": ["assets/**"], "src": "conceptual_docs" },
-      { "files": ["Images/Banner.png"] }
+      { "files": ["Images/Banner.png", "Images/Icon.png"] }
     ],
     "output": "_site",
     "globalMetadata": {
       "_appTitle": "Nalu Documentation",
       "_appFooter": "© Nalu Development - All rights reserved",
       "_enableSearch": true,
-      "_appLogoPath": "Images/Banner.png"
+      "_appLogoPath": "Images/Banner.png",
+      "_appFaviconPath": "Images/Icon.png"
     },
     "template": ["default", "modern", "conceptual_docs"]
   }
