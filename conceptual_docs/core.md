@@ -7,7 +7,7 @@ The core library is intended to provide a set of common use utilities.
 An alternative soft keyboard management for iOS and Android mobile platforms in order to standardize the UX.
 
 - **DO NOT** use this with MAUI's CollectionView containing input fields: more info down below
-- **DO** use this with 3rd party CollectionView implementations as we do not interfere with the internal insets
+- **DO** use this with Nalu's **VirtualScroll** (Nalu.Maui.VirtualScroll) for lists with input fields, as we do not interfere with its internal insets
 
 This can be enabled via `builder.UseNaluSoftKeyboardManager(defaultAdjustMode: SoftKeyboardAdjustMode.Resize)`.
 
@@ -36,6 +36,8 @@ It may work with basic scenarios, but it will fail in more complex ones.
 MAUI's keyboard management messes up with the `CollectionView` internal insets and that causes unexpected behaviors.
 Our management on the other hand, does not interfere with the `CollectionView` insets, and simply resizes the `Page`,
 but unfortunately, MAUI's `CollectionView` does not support resizing very well, so it causes weird jumps and scrolls when opening/closing the keyboard.
+
+For lists that contain input fields, use **Nalu.Maui.VirtualScroll** instead of MAUI's CollectionView; it works correctly with the soft keyboard manager.
 
 ### Background iOS HttpClient requests
 

@@ -3,6 +3,7 @@
 > **Note**: The custom tab bar feature is **independent** of Nalu's MVVM navigation system. It can be used with **standard MAUI Shell** as well as `NaluShell`.
 
 Nalu provides a custom `Shell` handler implementation that allows you to replace the native tab bar with a fully customizable cross-platform view.
+You can use **NaluTabBar** (styled built-in control) or draw a **completely custom bar** (any view + `NaluTabBar.GoTo(shellSection)` for navigation).
 This is especially useful when you need more than 5 tabs (avoiding the native "More" tab on iOS) or want complete control over tab bar styling.
 
 This feature also solves the issues `Shell` has with pages under the iOS `More` tab.
@@ -77,7 +78,7 @@ public partial class AppShellTabBar : NaluTabBar
 
 **Creating a Completely Custom Tab Bar:**
 
-If you create a completely custom tab bar that doesn't inherit from `NaluTabBar`, you need to handle navigation manually. When a tab button is pressed, call `NaluTabBar.GoTo(shellSection)` to trigger navigation:
+You can use any view as the tab bar (e.g. a `Grid` or `ContentView`) and draw it entirely to your liking. If it doesn't inherit from `NaluTabBar`, handle navigation manually: when a tab button is pressed, call `NaluTabBar.GoTo(shellSection)` to trigger navigation:
 
 ```csharp
 // In your custom tab bar's button tap handler
@@ -92,6 +93,7 @@ private void OnTabTapped(object? sender, EventArgs args)
 
 The `BindingContext` of your custom tab bar will be set to the `ShellItem` (TabBar or FlyoutItem), so you can iterate through `ShellItem.Items` to access the `ShellSection` instances for each tab. Each tab button should have its `BindingContext` set to the corresponding `ShellSection` so that `NaluTabBar.GoTo()` can be called with the correct section.
 
+**Edge-to-edge and safe area:** If page content extends into the bottom safe area (e.g. behind the tab bar), use a root container (e.g. `Grid`) with `SafeAreaEdges="None"` and inner content with `SafeAreaEdges="Container"` so the bar and content respect insets. See [Custom TabBarView: Page content extends into bottom safe area (edge-to-edge)](https://github.com/nalu-development/nalu/discussions/124) for a full example and fixes.
 
 4. Attach the custom tab bar view to your `TabBar` or `FlyoutItem`:
 
