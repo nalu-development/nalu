@@ -141,9 +141,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         var cancellationTokenRegistration = cancellationToken.Register(() =>
             {
+                Logger.LogDebug("Triggered cancellation for {RequestName}", requestIdentifier);
                 if (weakTask.TryGetTarget(out var t) && t?.State is NSUrlSessionTaskState.Running or NSUrlSessionTaskState.Suspended)
                 {
                     t.Cancel();
+                    Logger.LogDebug("Cancellation requested for {RequestName} task", requestIdentifier);
+                }
+                else
+                {
+                    Logger.LogWarning("Missing task for {RequestName} required for cancellation", requestIdentifier);
                 }
             }
         );
