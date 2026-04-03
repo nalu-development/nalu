@@ -12,6 +12,10 @@ public partial class TwoPageModel(INavigationService navigationService) : Observ
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task PushSixAsync() => navigationService.GoToAsync(Navigation.Relative().Push<SixPageModel>());
 
+    [RelayCommand(AllowConcurrentExecutions = false)]
+    private Task GoToOneRootThreeAsync() =>
+        navigationService.GoToAsync(Navigation.Absolute().Root<OnePageModel>().Add<ThreePageModel>());
+
     // Simulate long loading times on the page
     public async ValueTask OnAppearingAsync() => await Task.Delay(500).ConfigureAwait(true);
 

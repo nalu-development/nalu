@@ -1,4 +1,8 @@
-﻿namespace Nalu.Maui.Sample;
+﻿using Nalu.Maui.Sample.PageModels;
+using Plugin.LocalNotification;
+using Plugin.LocalNotification.EventArgs;
+
+namespace Nalu.Maui.Sample;
 
 public partial class App : Application
 {
@@ -10,7 +14,20 @@ public partial class App : Application
     public App(INavigationService navigationService)
     {
         _navigationService = navigationService;
+        LocalNotificationCenter.Current.NotificationActionTapped += OnNotificationActionTapped;
         InitializeComponent();
+    }
+
+    private async void OnNotificationActionTapped(NotificationActionEventArgs e)
+    {
+        if (!e.IsTapped || e.Request.NotificationId != LocalNotificationIds.FiveRootThenThreeStack)
+        {
+            return;
+        }
+
+        await MainThread.InvokeOnMainThreadAsync(async () =>
+            await _navigationService.GoToAsync(Navigation.Absolute().Root<FivePageModel>().Add<ThreePageModel>())
+        );
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

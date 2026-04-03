@@ -4,6 +4,7 @@ using FFImageLoading.Maui;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Nalu.Maui.Sample.PopupModels;
+using Plugin.LocalNotification;
 using Nalu.Maui.Sample.Popups;
 using Nalu.Maui.Sample.Services;
 using SkiaSharp.Views.Maui.Controls.Hosting;
@@ -24,6 +25,7 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
+            .UseLocalNotification()
             .ConfigureLifecycleEvents(events =>
                 {
 #if WINDOWS

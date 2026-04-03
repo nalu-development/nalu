@@ -9,6 +9,11 @@
 		<integer>1</integer>
 		<integer>2</integer>
 	</array>
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>fetch</string>
+    <string>remote-notification</string>
+  </array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>

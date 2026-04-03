@@ -93,6 +93,10 @@
                     Text="Push Three"
                     HorizontalOptions="Center" />
 
+            <Button Command="{Binding ScheduleFiveThreeNavigationNotificationCommand}"
+                    Text="Schedule Five→Three notification (5s)"
+                    HorizontalOptions="Center" />
+
             <Button Command="{nalu:NavigateCommand}"
                     Text="Push Six Via XAML">
                 <Button.CommandParameter>

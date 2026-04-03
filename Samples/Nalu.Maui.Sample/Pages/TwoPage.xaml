@@ -23,6 +23,8 @@
                 </Label>
                 <Button Command="{Binding PushSixCommand}"
                         Text="Push Six" />
+                <Button Command="{Binding GoToOneRootThreeCommand}"
+                        Text="One (root) → Three" />
                 <Button Command="{nalu:NavigateCommand}"
                         Text="Push Six Via XAML">
                     <Button.CommandParameter>

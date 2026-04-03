@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Nalu.Maui.Sample.Services;
+using Plugin.LocalNotification;
+using Plugin.LocalNotification.Core.Models;
 
 namespace Nalu.Maui.Sample.PageModels;
 
@@ -39,6 +41,32 @@ public partial class OnePageModel(
 
     [RelayCommand(AllowConcurrentExecutions = false)]
     private Task PushThreeAsync() => navigationService.GoToAsync(Navigation.Relative().Push<ThreePageModel>());
+
+    [RelayCommand]
+    private async Task ScheduleFiveThreeNavigationNotificationAsync()
+    {
+        if (!LocalNotificationCenter.Current.IsSupported)
+        {
+            return;
+        }
+        
+        // Check if notifications are enabled
+        if (await LocalNotificationCenter.Current.AreNotificationsEnabled() == false)
+        {
+            // Basic permission request
+            await LocalNotificationCenter.Current.RequestNotificationPermission();
+        }
+
+        var request = new NotificationRequest
+                      {
+                          NotificationId = LocalNotificationIds.FiveRootThenThreeStack,
+                          Title = "Navigation ready",
+                          Description = "Tap to open Five → Three (5s demo)",
+                          Schedule = new NotificationRequestSchedule { NotifyTime = DateTime.Now.AddSeconds(5) }
+                      };
+
+        await LocalNotificationCenter.Current.Show(request);
+    }
 
     [RelayCommand]
     private async Task SendRequestAsync()
