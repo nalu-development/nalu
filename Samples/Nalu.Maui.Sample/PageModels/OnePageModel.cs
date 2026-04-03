@@ -60,9 +60,16 @@ public partial class OnePageModel(
         Result3 = "waiting...";
         Result3 = await followUpRequest;
 
-        var followUpRequest2 = SendRequestAsync(CreateTestLongRequest(999999));
+        using var cancellationTokenSource = new CancellationTokenSource(3000);
+        var followUpRequest2 = SendRequestAsync(CreateTestLongRequest(), cancellationTokenSource.Token);
         Result4 = "waiting...";
-        Result4 = await followUpRequest2;
+
+        try
+        {
+            Result4 = await followUpRequest2;
+        } catch (OperationCanceledException) {
+            Result4 = "Request was cancelled";
+        }
 
         await Task.Delay(2000);
         _ = SendRequestAsync(CreateTestLongRequest(5000, "MySuperDuperRequestId-" + Guid.NewGuid()));
@@ -71,14 +78,14 @@ public partial class OnePageModel(
         throw new InvalidOperationException("Crashing the app on purpose");
     }
 
-    private async Task<string> SendRequestAsync(HttpRequestMessage requestMessage)
+    private async Task<string> SendRequestAsync(HttpRequestMessage requestMessage, CancellationToken cancellationToken = default)
     {
         string result;
 
         try
         {
-            using var responseMessage = await httpClient.SendAsync(requestMessage);
-            result = await responseMessage.Content.ReadAsStringAsync();
+            using var responseMessage = await httpClient.SendAsync(requestMessage, cancellationToken);
+            result = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
         }
         catch (Exception e)
         {
