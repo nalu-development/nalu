@@ -36,7 +36,6 @@ Task("Build")
                            NoRestore = true,
                            MSBuildSettings = new DotNetMSBuildSettings().EnableBinaryLogger(binlogPath)
                        };
-        StartProcess("dotnet", "--version");
         DotNetBuild("Nalu.Pack.slnf", settings);
     });
 
