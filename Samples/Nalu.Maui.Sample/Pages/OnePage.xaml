@@ -8,7 +8,8 @@
              xmlns:layouts="https://nalu-development.github.com/nalu/layouts"
              x:Class="Nalu.Maui.Sample.Pages.OnePage"
              x:DataType="pageModels:OnePageModel"
-             Title="Page One">
+             Title="Page One"
+             BackgroundColor="Purple">
     <ScrollView Padding="16">
         <VerticalStackLayout Spacing="16">
             <Image Source="banner.png"
@@ -16,108 +17,108 @@
                    Aspect="AspectFit"
                    Margin="0,16,0,24" />
 
-            <Button Command="{Binding SendRequestCommand}"
-                    Text="Send requests and crash on last"
-                    HorizontalOptions="Center" />
-
-            <Label Text="Background Responses from Boot" />
-            <VerticalStackLayout BindableLayout.ItemsSource="{Binding BackgroundResponses}">
-                <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="x:String">
-                        <Label Text="{Binding .}" />
-                    </DataTemplate>
-                </BindableLayout.ItemTemplate>
-            </VerticalStackLayout>
-
-            <Label>
-                <Label.FormattedText>
-                    <FormattedString>
-                        <Span Text="Parallel Request 1: " />
-                        <Span Text="{Binding Result1}" />
-                    </FormattedString>
-                </Label.FormattedText>
-            </Label>
-
-            <Label>
-                <Label.FormattedText>
-                    <FormattedString>
-                        <Span Text="Parallel Request 2: " />
-                        <Span Text="{Binding Result2}" />
-                    </FormattedString>
-                </Label.FormattedText>
-            </Label>
-
-            <Label>
-                <Label.FormattedText>
-                    <FormattedString>
-                        <Span Text="Follow-up Request 3: " />
-                        <Span Text="{Binding Result3}" />
-                    </FormattedString>
-                </Label.FormattedText>
-            </Label>
-
-            <Label>
-                <Label.FormattedText>
-                    <FormattedString>
-                        <Span Text="Erroring Request 4: " />
-                        <Span Text="{Binding Result4}" />
-                    </FormattedString>
-                </Label.FormattedText>
-            </Label>
-
-            <Label>
-                <Label.FormattedText>
-                    <FormattedString>
-                        <Span Text="Instance: " />
-                        <Span Text="{Binding InstanceCount}" />
-                    </FormattedString>
-                </Label.FormattedText>
-            </Label>
-            
-            <Label Text="TemplateSourceSelector" />
-            <CollectionView VerticalOptions="Center" ItemTemplate="{layouts:TemplateSourceSelector}" HeightRequest="100">
-                <CollectionView.ItemsSource>
-                    <layouts:DataTemplatesSource x:Key="VirtualizedViews">
-                        <DataTemplate x:DataType="pageModels:OnePageModel">
-                            <Label Text="{Binding Animal.Name}"/>
-                        </DataTemplate>
-                    </layouts:DataTemplatesSource>
-                </CollectionView.ItemsSource>
-            </CollectionView>
-
-            <layouts:ViewBox ContentBindingContext="{Binding Animal}">
-                <Label Text="{Binding Name}" x:DataType="pageModels:AnimalModel" />
-            </layouts:ViewBox>
-
-            <Button Command="{Binding PushThreeCommand}"
-                    Text="Push Three"
-                    HorizontalOptions="Center" />
-
-            <Button Command="{Binding ScheduleFiveThreeNavigationNotificationCommand}"
-                    Text="Schedule Five→Three notification (5s)"
-                    HorizontalOptions="Center" />
-
-            <Button Command="{nalu:NavigateCommand}"
-                    Text="Push Six Via XAML">
-                <Button.CommandParameter>
-                    <nalu:RelativeNavigation>
-                        <nalu:NavigationSegment Type="pages:SixPage" />
-                    </nalu:RelativeNavigation>
-                </Button.CommandParameter>
-            </Button>
-
-            <Button Command="{nalu:NavigateCommand}"
-                    Text="Push Six 3 times">
-                <Button.CommandParameter>
-                    <nalu:RelativeNavigation>
-                        <nalu:NavigationSegment Type="pages:SixPage" />
-                        <nalu:NavigationSegment Type="pages:SixPage" />
-                        <nalu:NavigationSegment Type="pages:SixPage" />
-                    </nalu:RelativeNavigation>
-                </Button.CommandParameter>
-            </Button>
-            
-            <Entry Placeholder="Type something" BackgroundColor="Beige" />
+            <!-- <Button Command="{Binding SendRequestCommand}" -->
+            <!--         Text="Send requests and crash on last" -->
+            <!--         HorizontalOptions="Center" /> -->
+            <!-- -->
+            <!-- <Label Text="Background Responses from Boot" /> -->
+            <!-- <VerticalStackLayout BindableLayout.ItemsSource="{Binding BackgroundResponses}"> -->
+            <!--     <BindableLayout.ItemTemplate> -->
+            <!--         <DataTemplate x:DataType="x:String"> -->
+            <!--             <Label Text="{Binding .}" /> -->
+            <!--         </DataTemplate> -->
+            <!--     </BindableLayout.ItemTemplate> -->
+            <!-- </VerticalStackLayout> -->
+            <!-- -->
+            <!-- <Label> -->
+            <!--     <Label.FormattedText> -->
+            <!--         <FormattedString> -->
+            <!--             <Span Text="Parallel Request 1: " /> -->
+            <!--             <Span Text="{Binding Result1}" /> -->
+            <!--         </FormattedString> -->
+            <!--     </Label.FormattedText> -->
+            <!-- </Label> -->
+            <!-- -->
+            <!-- <Label> -->
+            <!--     <Label.FormattedText> -->
+            <!--         <FormattedString> -->
+            <!--             <Span Text="Parallel Request 2: " /> -->
+            <!--             <Span Text="{Binding Result2}" /> -->
+            <!--         </FormattedString> -->
+            <!--     </Label.FormattedText> -->
+            <!-- </Label> -->
+            <!-- -->
+            <!-- <Label> -->
+            <!--     <Label.FormattedText> -->
+            <!--         <FormattedString> -->
+            <!--             <Span Text="Follow-up Request 3: " /> -->
+            <!--             <Span Text="{Binding Result3}" /> -->
+            <!--         </FormattedString> -->
+            <!--     </Label.FormattedText> -->
+            <!-- </Label> -->
+            <!-- -->
+            <!-- <Label> -->
+            <!--     <Label.FormattedText> -->
+            <!--         <FormattedString> -->
+            <!--             <Span Text="Erroring Request 4: " /> -->
+            <!--             <Span Text="{Binding Result4}" /> -->
+            <!--         </FormattedString> -->
+            <!--     </Label.FormattedText> -->
+            <!-- </Label> -->
+            <!-- -->
+            <!-- <Label> -->
+            <!--     <Label.FormattedText> -->
+            <!--         <FormattedString> -->
+            <!--             <Span Text="Instance: " /> -->
+            <!--             <Span Text="{Binding InstanceCount}" /> -->
+            <!--         </FormattedString> -->
+            <!--     </Label.FormattedText> -->
+            <!-- </Label> -->
+            <!-- -->
+            <!-- <Label Text="TemplateSourceSelector" /> -->
+            <!-- <CollectionView VerticalOptions="Center" ItemTemplate="{layouts:TemplateSourceSelector}" HeightRequest="100"> -->
+            <!--     <CollectionView.ItemsSource> -->
+            <!--         <layouts:DataTemplatesSource x:Key="VirtualizedViews"> -->
+            <!--             <DataTemplate x:DataType="pageModels:OnePageModel"> -->
+            <!--                 <Label Text="{Binding Animal.Name}"/> -->
+            <!--             </DataTemplate> -->
+            <!--         </layouts:DataTemplatesSource> -->
+            <!--     </CollectionView.ItemsSource> -->
+            <!-- </CollectionView> -->
+            <!-- -->
+            <!-- <layouts:ViewBox ContentBindingContext="{Binding Animal}"> -->
+            <!--     <Label Text="{Binding Name}" x:DataType="pageModels:AnimalModel" /> -->
+            <!-- </layouts:ViewBox> -->
+            <!-- -->
+            <!-- <Button Command="{Binding PushThreeCommand}" -->
+            <!--         Text="Push Three" -->
+            <!--         HorizontalOptions="Center" /> -->
+            <!-- -->
+            <!-- <Button Command="{Binding ScheduleFiveThreeNavigationNotificationCommand}" -->
+            <!--         Text="Schedule Five→Three notification (5s)" -->
+            <!--         HorizontalOptions="Center" /> -->
+            <!-- -->
+            <!-- <Button Command="{nalu:NavigateCommand}" -->
+            <!--         Text="Push Six Via XAML"> -->
+            <!--     <Button.CommandParameter> -->
+            <!--         <nalu:RelativeNavigation> -->
+            <!--             <nalu:NavigationSegment Type="pages:SixPage" /> -->
+            <!--         </nalu:RelativeNavigation> -->
+            <!--     </Button.CommandParameter> -->
+            <!-- </Button> -->
+            <!-- -->
+            <!-- <Button Command="{nalu:NavigateCommand}" -->
+            <!--         Text="Push Six 3 times"> -->
+            <!--     <Button.CommandParameter> -->
+            <!--         <nalu:RelativeNavigation> -->
+            <!--             <nalu:NavigationSegment Type="pages:SixPage" /> -->
+            <!--             <nalu:NavigationSegment Type="pages:SixPage" /> -->
+            <!--             <nalu:NavigationSegment Type="pages:SixPage" /> -->
+            <!--         </nalu:RelativeNavigation> -->
+            <!--     </Button.CommandParameter> -->
+            <!-- </Button> -->
+            <!-- -->
+            <!-- <Entry Placeholder="Type something" BackgroundColor="Beige" /> -->
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

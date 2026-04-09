@@ -21,7 +21,7 @@ public partial class DynamicDataPage : ContentPage, IRecipient<DynamicDataPageSc
         Dispatcher.Dispatch(() =>
             {
                 Toast.Make($"Scrolling to item at index {message.ItemIndex}").Show();
-                VirtualScroll.ScrollTo(0, message.ItemIndex);
+                //VirtualScroll.ScrollTo(0, message.ItemIndex);
             }
         );
     }

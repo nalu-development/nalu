@@ -10,22 +10,22 @@
     <FlyoutItem Route="main"
                 FlyoutDisplayOptions="AsMultipleItems"
                 Title="Tabs"
-                Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}"
+                Icon="{FontImageSource Glyph='&#xe88a;'}"
                 nalu:NaluShell.TabBarView="{sample:AppShellTabBar}">
         <Tab Title="Pages"
              Route="pages"
              FlyoutDisplayOptions="AsMultipleItems"
-             Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}">
+             Icon="{FontImageSource Glyph='&#xe88a;'}">
             <ShellContent nalu:Navigation.PageType="pages:OnePage"
                           Title="Page One"
-                          Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88a;', Color='Black', Size=24}" />
+                          Icon="{FontImageSource Glyph='&#xe88a;'}" />
             <ShellContent nalu:Navigation.PageType="pages:SevenPage"
                           Title="Page Seven"
-                          Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}" />
+                          Icon="{FontImageSource Glyph='&#xe88b;'}" />
         </Tab>
         <ShellContent nalu:Navigation.PageType="pages:TwoPage"
                       Title="Page Two"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe88e;'}" />
         <ShellContent nalu:Navigation.PageType="pages:EightPage"
                       Title="Page Eight">
             <ShellContent.Icon>
@@ -33,47 +33,47 @@
                                          Path="IsChecked">
                         <x:Binding.Converter>
                                 <toolkit:BoolToObjectConverter x:TypeArguments="ImageSource"
-                                                             TrueObject="{FontImageSource FontFamily='MaterialFilled', Glyph='&#xe88e;', Color='Black', Size=24}"
-                                                             FalseObject="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
+                                                             TrueObject="{FontImageSource FontFamily='MaterialFilled', Glyph='&#xe88e;'}"
+                                                             FalseObject="{FontImageSource Glyph='&#xe88e;'}"/>
                             </x:Binding.Converter>
                     </x:Binding>
             </ShellContent.Icon>
         </ShellContent>
         <ShellContent nalu:Navigation.PageType="pages:NinePage"
                       Title="Page Nine"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8b9;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8b9;'}" />
         <ShellContent nalu:Navigation.PageType="pages:DynamicDataPage"
                       Title="Dynamic Data"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8ba;'}" />
         <ShellContent nalu:Navigation.PageType="pages:TenPage"
                       Title="Page Ten"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8ba;'}" />
         <ShellContent nalu:Navigation.PageType="pages:TenCarouselPage"
                       Title="Page Ten Carousel"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8ba;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8ba;'}" />
         <ShellContent nalu:Navigation.PageType="pages:ElevenPage"
                       Title="Page Eleven"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bb;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8bb;'}" />
         <ShellContent nalu:Navigation.PageType="pages:GroupedDynamicDataPage"
                       Title="Grouped DynamicData"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bc;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8bc;'}" />
         <ShellContent nalu:Navigation.PageType="pages:ExpanderPage"
                       Title="Expander Page"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bd;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8bd;'}" />
         <ShellContent nalu:Navigation.PageType="pages:TwelvePage"
                       Title="Page Twelve"
-                      Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe8bc;', Color='Black', Size=24}" />
+                      Icon="{FontImageSource Glyph='&#xe8bc;'}" />
     </FlyoutItem>
     <MenuItem x:Name="CustomMenuItem"
               Text="Hello"
-              IconImageSource="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88e;', Color='Black', Size=24}"/>
+              IconImageSource="{FontImageSource Glyph='&#xe88e;'}"/>
     <ShellContent nalu:Navigation.PageType="pages:FivePage"
                   Title="Page Five"
-                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88b;', Color='Black', Size=24}" />
+                  Icon="{FontImageSource Glyph='&#xe88b;'}" />
     <ShellContent nalu:Navigation.PageType="pages:MagnetDemoPage"
                   Title="Magnet Demo"
-                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe88c;', Color='Black', Size=24}" />
+                  Icon="{FontImageSource Glyph='&#xe88c;'}" />
     <ShellContent nalu:Navigation.PageType="pages:SoftKeyboardManagerPage"
                   Title="Soft Keyboard Manager"
-                  Icon="{FontImageSource FontFamily='MaterialOutlined', Glyph='&#xe312;', Color='Black', Size=24}" />
+                  Icon="{FontImageSource Glyph='&#xe312;'}" />
 </nalu:NaluShell>

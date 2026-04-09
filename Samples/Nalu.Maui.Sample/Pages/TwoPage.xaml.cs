@@ -10,6 +10,6 @@ public partial class TwoPage : ContentPage
     {
         BindingContext = enchantedPageModel;
         InitializeComponent();
-        DurationWheel.WholeDuration = TimeSpan.FromMinutes(5);
+        //DurationWheel.WholeDuration = TimeSpan.FromMinutes(5);
     }
 }

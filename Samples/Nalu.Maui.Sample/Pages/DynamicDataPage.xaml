@@ -7,7 +7,8 @@
              xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              x:Class="Nalu.Maui.Sample.Pages.DynamicDataPage"
              x:DataType="pageModels:DynamicDataPageModel"
-             Title="DynamicData Page">
+             Title="DynamicData Page"
+             BackgroundColor="DarkSalmon">
     <ContentPage.Content>
         <Grid IgnoreSafeArea="True">
             <Grid.RowDefinitions>
@@ -42,57 +43,57 @@
                         Command="{Binding ReplaceItemsCommand}" />
             </Grid>
 
-            <vs:VirtualScroll Grid.Row="1"
-                                x:Name="VirtualScroll"
-                                ItemsSource="{Binding Items}"
-                                IsRefreshEnabled="True"
-                                FadingEdgeLength="32"
-                                RefreshCommand="{Binding RefreshCommand}"
-                                RefreshAccentColor="CornflowerBlue">
-                <vs:VirtualScroll.HeaderTemplate>
-                    <DataTemplate x:DataType="pageModels:DynamicDataPageModel">
-                        <VerticalStackLayout>
-                            <Image Source="banner.png"
-                                   HeightRequest="128"
-                                   Aspect="AspectFit"
-                                   Margin="0,16,0,24" />
-                        
-                            <Label Text="DynamicData Page"
-                                   FontSize="32"
-                                   FontAttributes="Bold"
-                                   HorizontalOptions="Center" />
-                        </VerticalStackLayout>
-                    </DataTemplate>
-                </vs:VirtualScroll.HeaderTemplate>
-                <vs:VirtualScroll.FooterTemplate>
-                    <DataTemplate x:DataType="pageModels:DynamicDataPageModel">
-                        <VerticalStackLayout Padding="16, 8">
-                            <Label Text="{Binding Message}"
-                                   FontSize="18"
-                                   HorizontalOptions="Center" />
-                
-                            <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}"
-                                   HorizontalOptions="Center" />
-                        </VerticalStackLayout>
-                    </DataTemplate>
-                </vs:VirtualScroll.FooterTemplate>
-                <vs:VirtualScroll.ItemTemplate>
-                    <DataTemplate x:DataType="pageModels:DynamicDataItem">
-                        <nalu:ViewBox>
-                            <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}"
-                                    StrokeShape="RoundRectangle 8"
-                                    Margin="8"
-                                    Padding="16,8"
-                                    BackgroundColor="LightCoral">
-                                <Label Text="{Binding Name}"/>
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding AddLineCommand}"/>
-                                </Border.GestureRecognizers>
-                            </Border>
-                        </nalu:ViewBox>
-                    </DataTemplate>
-                </vs:VirtualScroll.ItemTemplate>
-            </vs:VirtualScroll>
+            <!-- <vs:VirtualScroll Grid.Row="1" -->
+            <!--                     x:Name="VirtualScroll" -->
+            <!--                     ItemsSource="{Binding Items}" -->
+            <!--                     IsRefreshEnabled="True" -->
+            <!--                     FadingEdgeLength="32" -->
+            <!--                     RefreshCommand="{Binding RefreshCommand}" -->
+            <!--                     RefreshAccentColor="CornflowerBlue"> -->
+            <!--     <vs:VirtualScroll.HeaderTemplate> -->
+            <!--         <DataTemplate x:DataType="pageModels:DynamicDataPageModel"> -->
+            <!--             <VerticalStackLayout> -->
+            <!--                 <Image Source="banner.png" -->
+            <!--                        HeightRequest="128" -->
+            <!--                        Aspect="AspectFit" -->
+            <!--                        Margin="0,16,0,24" /> -->
+            <!--              -->
+            <!--                 <Label Text="DynamicData Page" -->
+            <!--                        FontSize="32" -->
+            <!--                        FontAttributes="Bold" -->
+            <!--                        HorizontalOptions="Center" /> -->
+            <!--             </VerticalStackLayout> -->
+            <!--         </DataTemplate> -->
+            <!--     </vs:VirtualScroll.HeaderTemplate> -->
+            <!--     <vs:VirtualScroll.FooterTemplate> -->
+            <!--         <DataTemplate x:DataType="pageModels:DynamicDataPageModel"> -->
+            <!--             <VerticalStackLayout Padding="16, 8"> -->
+            <!--                 <Label Text="{Binding Message}" -->
+            <!--                        FontSize="18" -->
+            <!--                        HorizontalOptions="Center" /> -->
+            <!--      -->
+            <!--                 <Label Text="{Binding InstanceCount, StringFormat='Instance: {0}'}" -->
+            <!--                        HorizontalOptions="Center" /> -->
+            <!--             </VerticalStackLayout> -->
+            <!--         </DataTemplate> -->
+            <!--     </vs:VirtualScroll.FooterTemplate> -->
+            <!--     <vs:VirtualScroll.ItemTemplate> -->
+            <!--         <DataTemplate x:DataType="pageModels:DynamicDataItem"> -->
+            <!--             <nalu:ViewBox> -->
+            <!--                 <Border Shadow="{OnPlatform WinUI={x:Null}, Default={Shadow Radius=6, Opacity=0.2, Offset='1,1'}}" -->
+            <!--                         StrokeShape="RoundRectangle 8" -->
+            <!--                         Margin="8" -->
+            <!--                         Padding="16,8" -->
+            <!--                         BackgroundColor="LightCoral"> -->
+            <!--                     <Label Text="{Binding Name}"/> -->
+            <!--                     <Border.GestureRecognizers> -->
+            <!--                         <TapGestureRecognizer Command="{Binding AddLineCommand}"/> -->
+            <!--                     </Border.GestureRecognizers> -->
+            <!--                 </Border> -->
+            <!--             </nalu:ViewBox> -->
+            <!--         </DataTemplate> -->
+            <!--     </vs:VirtualScroll.ItemTemplate> -->
+            <!-- </vs:VirtualScroll> -->
         </Grid>
     </ContentPage.Content>
 </ContentPage>

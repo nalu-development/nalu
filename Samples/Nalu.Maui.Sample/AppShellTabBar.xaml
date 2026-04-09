@@ -1,19 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<nalu:NaluTabBar xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:nalu="https://nalu-development.github.com/nalu/navigation"
-             x:Class="Nalu.Maui.Sample.AppShellTabBar"
-             BarShadow="{Shadow Radius=16, Opacity=0.4}"
-             HeightRequest="64"
-             Padding="4"
-             BarBackground="Transparent"
-             BarStrokeShape="RoundRectangle 32"
-             TabStrokeShape="RoundRectangle 32"
-             TabPadding="12,4"
-             TabFontFamily="OpenSansSemibold"
-             ActiveTabStrokeShape="RoundRectangle 32"
-             ActiveTabPadding="12,4"
-             ActiveTabFontFamily="OpenSansSemibold"
-             BarPadding="0"
-             ScrollPadding="4"/>
+<Grid xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+      xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+      xmlns:sample="clr-namespace:Nalu.Maui.Sample"
+      xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+      SafeAreaEdges="None"
+      x:Class="Nalu.Maui.Sample.AppShellTabBar">
+    <Grid.Resources>
+        <Style TargetType="ImageButton">
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="HeightRequest" Value="48"/>
+        </Style>
+        <Style TargetType="FontImageSource">
+            <Setter Property="Size" Value="24"/>
+            <Setter Property="FontFamily" Value="MaterialRound"/>
+            <Setter Property="Color" Value="#888"/>
+        </Style>
+    </Grid.Resources>
+    <Border SafeAreaEdges="None"
+            ZIndex="1"
+            StrokeThickness="0"
+            BackgroundColor="White"
+            Shadow="{Shadow Radius=4, Offset='1,1', Opacity=0.16}">
+        <Border.StrokeShape>
+            <sample:FancyTabBarShape x:Name="TabBarShape"
+                                     InsetHeight="40"
+                                     InsetWidth="120"
+                                     TopRadius="0"
+                                     BottomRadius="24" />
+        </Border.StrokeShape>
+        <Grid x:Name="Buttons"
+              ColumnDefinitions="*,*,*,*,*"
+              SafeAreaEdges="None"
+              Padding="20,0, 20, 12">
+            <ImageButton Source="{FontImageSource Glyph='&#xe9b0;'}"
+                         Grid.Column="0"
+                         Clicked="IconClicked"/>
+            <ImageButton Source="{FontImageSource Glyph='&#xe241;'}"
+                         Grid.Column="1"
+                         Clicked="IconClicked"/>
+            <ImageButton Source="{FontImageSource Glyph='&#xe8d4;'}"
+                         Grid.Column="2"
+                         Clicked="IconClicked"/>
+            <ImageButton Source="{FontImageSource Glyph='&#xe8aa;'}"
+                         Grid.Column="3"
+                         Clicked="IconClicked"/>
+            <ImageButton Source="{FontImageSource Glyph='&#xe7ff;'}"
+                         Grid.Column="4"
+                         Clicked="IconClicked"/>
+        </Grid>
+    </Border>
+    
+    <Grid TranslationY="-16"
+          VerticalOptions="Start">
+        <nalu:ViewBox x:Name="SelectedShape" HorizontalOptions="Start" TranslationX="36">
+            <Border BackgroundColor="White"
+                    HeightRequest="48"
+                    StrokeThickness="0"
+                    WidthRequest="48"
+                    Shadow="{Shadow Radius=4, Offset='1,1', Opacity=0.4}"
+                    StrokeShape="RoundRectangle 24">
+                <ImageButton x:Name="SelectedButton" Clicked="SelectedButtonClicked" Padding="10">
+                    <ImageButton.Source>
+                        <FontImageSource Glyph="&#xe9b0;"
+                                         Color="Black"/>
+                    </ImageButton.Source>
+                </ImageButton>
+            </Border>
+        </nalu:ViewBox>
+    </Grid>
+</Grid>
