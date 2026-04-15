@@ -278,13 +278,15 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
             if (oldValue is View oldView)
             {
-                oldView.BindingContext = null;
                 oldView.DisconnectHandlers();
+                shellItem.RemoveLogicalChild(oldView);
+                oldView.BindingContext = null;
             }
 
             if (newValue is View newView)
             {
                 newView.BindingContext = shellItem;
+                shellItem.AddLogicalChild(newView);
             }
         }
     );
@@ -306,13 +308,15 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
 
             if (oldValue is View oldView)
             {
-                oldView.BindingContext = null;
                 oldView.DisconnectHandlers();
+                shellItem.RemoveLogicalChild(oldView);
+                oldView.BindingContext = null;
             }
 
             if (newValue is View newView)
             {
                 newView.BindingContext = shellItem;
+                shellItem.AddLogicalChild(newView);
             }
         }
     );
