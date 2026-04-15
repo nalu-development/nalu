@@ -8,9 +8,9 @@ namespace Nalu;
 /// </summary>
 internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
 {
-    private readonly UICollectionView _collectionView;
-    private readonly IVirtualScrollAdapter _adapter;
-    private readonly IDisposable _subscription;
+    private UICollectionView _collectionView;
+    private IVirtualScrollAdapter _adapter;
+    private IDisposable _subscription;
     private int _previousSectionCount;
     private bool _disposed;
 
@@ -199,6 +199,9 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         if (!_disposed)
         {
             _subscription.Dispose();
+            _subscription = null!;
+            _adapter = null!;
+            _collectionView = null!;
             _disposed = true;
         }
     }

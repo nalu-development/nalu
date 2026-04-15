@@ -119,22 +119,7 @@ public partial class VirtualScrollHandler
         // Create refresh control
         _refreshControl = new UIRefreshControl();
         _refreshControl.Enabled = virtualScroll.IsRefreshEnabled;
-        _refreshControl.AddTarget((s, a) =>
-        {
-            // User pulled to refresh - sync platform state to IsRefreshing first
-            if (virtualScroll is VirtualScroll virtualScrollElement && _refreshControl is not null)
-            {
-                _isUpdatingIsRefreshingFromPlatform = true;
-                virtualScrollElement.SetValueFromRenderer(VirtualScroll.IsRefreshEnabledProperty, _refreshControl.Refreshing);
-                _isUpdatingIsRefreshingFromPlatform = false;
-            }
-            
-            // Then call Refresh() which will fire RefreshCommand/OnRefresh
-            if (virtualScroll is IVirtualScrollController controller)
-            {
-                controller.Refresh(() => { /* Completion handled by IsRefreshing property */ });
-            }
-        }, UIControlEvent.ValueChanged);
+        _refreshControl.AddTarget(RefreshControlEventHandler, UIControlEvent.ValueChanged);
 
         collectionView.AlwaysBounceVertical = true;
         collectionView.RefreshControl = _refreshControl;
@@ -165,6 +150,24 @@ public partial class VirtualScrollHandler
         ]);
 
         return containerView;
+    }
+
+    private void RefreshControlEventHandler(object? sender, EventArgs e)
+    {
+        var virtualView = VirtualView;
+        // User pulled to refresh - sync platform state to IsRefreshing first
+        if (virtualView is VirtualScroll virtualScrollElement && _refreshControl is not null)
+        {
+            _isUpdatingIsRefreshingFromPlatform = true;
+            virtualScrollElement.SetValueFromRenderer(VirtualScroll.IsRefreshEnabledProperty, _refreshControl.Refreshing);
+            _isUpdatingIsRefreshingFromPlatform = false;
+        }
+            
+        // Then call Refresh() which will fire RefreshCommand/OnRefresh
+        if (virtualView is IVirtualScrollController controller)
+        {
+            controller.Refresh(() => { /* Completion handled by IsRefreshing property */ });
+        }
     }
 
     private static UILongPressGestureRecognizer CreateDragGestureRecognizer(IVirtualScroll virtualView, VirtualScrollCollectionView collectionView)
@@ -285,6 +288,7 @@ public partial class VirtualScrollHandler
         
         if (_refreshControl is not null)
         {
+            _refreshControl.RemoveTarget(RefreshControlEventHandler, UIControlEvent.ValueChanged);
             _refreshControl.RemoveFromSuperview();
             _refreshControl.Dispose();
             _refreshControl = null;
@@ -299,6 +303,11 @@ public partial class VirtualScrollHandler
         if (_collectionView is not null)
         {
             _collectionView.ContentSizeChanged -= OnContentSizeChanged;
+            var dataSource = _collectionView.DataSource;
+            if (dataSource is not null)
+            {
+                dataSource.Dispose();
+            }
             _collectionView.DataSource = null!;
             _collectionView.Delegate = null!;
             _collectionView.RefreshControl = null;
@@ -350,6 +359,7 @@ public partial class VirtualScrollHandler
         handler._notifier = null;
 
         var collectionView = handler.PlatformCollectionView;
+        var oldDataSource = collectionView.DataSource;
 
         if (virtualScroll.Adapter is { } adapter)
         {
@@ -362,6 +372,11 @@ public partial class VirtualScrollHandler
         else
         {
             collectionView.DataSource = new EmptyVirtualScrollPlatformDataSource();
+        }
+
+        if (oldDataSource is not null)
+        {
+            oldDataSource.Dispose();
         }
     }
 
