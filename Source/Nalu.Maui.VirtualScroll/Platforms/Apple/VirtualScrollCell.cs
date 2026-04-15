@@ -13,7 +13,6 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     
     private WeakReference<IView>? _weakVirtualView;
     private UIView? _nativeView;
-    private uint _useCount;
     private bool _needsMeasure;
     private bool _readyForReuse = true;
     public IVirtualScrollLayout? ItemsLayout { get; set; }
@@ -21,7 +20,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
     public NSString? SupplementaryType { get; set; }
     public NSIndexPath? IndexPath { get; set; }
     public bool NeedsMeasure => _needsMeasure && !_readyForReuse && ContentView.NeedsMeasure;
-    public uint UseCount => _useCount;
+    public bool Used { get; set; }
 
     public IView? VirtualView
     {
@@ -192,11 +191,6 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
         IndexPath = null;
         SupplementaryType = null;
-
-        unchecked
-        {
-            _useCount++;
-        }
 
         _readyForReuse = true;
         _needsMeasure = false;

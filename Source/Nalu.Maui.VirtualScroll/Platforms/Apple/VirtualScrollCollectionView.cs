@@ -176,8 +176,9 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     public override UICollectionReusableView DequeueReusableCell(NSString reuseIdentifier, NSIndexPath indexPath)
     {
         var cell = base.DequeueReusableCell(reuseIdentifier, indexPath);
-        if (cell is VirtualScrollCell { UseCount: 0 } virtualCell)
+        if (cell is VirtualScrollCell { Used: false } virtualCell)
         {
+            virtualCell.Used = true;
             _cellManager.TrackCell(virtualCell);
         }
 
@@ -188,8 +189,9 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     public override UICollectionReusableView DequeueReusableSupplementaryView(NSString kind, NSString identifier, NSIndexPath indexPath)
     {
         var cell = base.DequeueReusableSupplementaryView(kind, identifier, indexPath);
-        if (cell is VirtualScrollCell { UseCount: 0 } virtualCell)
+        if (cell is VirtualScrollCell { Used: false } virtualCell)
         {
+            virtualCell.Used = true;
             _cellManager.TrackCell(virtualCell);
         }
 
