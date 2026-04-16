@@ -44,7 +44,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
         private set => _nativeView = value;
     }
 
-    public new VirtualScrollCellContent ContentView { get; } 
+    public new VirtualScrollCellContent ContentView { get; private set; } 
 
     [Export("initWithFrame:")]
     public VirtualScrollCell(CGRect frame) : base(frame)
@@ -194,5 +194,19 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 
         _readyForReuse = true;
         _needsMeasure = false;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (disposing)
+        {
+            ItemsLayout = null;
+            VirtualView = null;
+            NativeView = null;
+            SupplementaryType = null;
+            IndexPath = null;
+        }
     }
 }

@@ -22,8 +22,8 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     , Microsoft.Maui.Platform.IPlatformMeasureInvalidationController
 #endif
 {
-    private readonly IVirtualScrollLayoutInfo _layoutInfo;
-    private readonly VirtualScrollCellManager<VirtualScrollCell> _cellManager = new(cell => cell.VirtualView);
+    private IVirtualScrollLayoutInfo _layoutInfo;
+    private VirtualScrollCellManager<VirtualScrollCell> _cellManager = new(cell => cell.VirtualView);
     private readonly List<NSIndexPath> _invalidatedGlobalHeaders = new(2);
     private readonly List<NSIndexPath> _invalidatedGlobalFooters = new(2);
     private readonly List<NSIndexPath> _invalidatedSectionHeaders = new(8);
@@ -206,6 +206,13 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         if (disposing)
         {
             _cellManager.Dispose();
+            _cellManager = null!;
+            _layoutInfo = null!;
+            _invalidatedGlobalFooters.Clear();
+            _invalidatedGlobalHeaders.Clear();
+            _invalidatedSectionFooters.Clear();
+            _invalidatedSectionHeaders.Clear();
+            _invalidatedPaths.Clear();
         }
     }
 

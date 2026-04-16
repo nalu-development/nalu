@@ -111,8 +111,6 @@ public partial class VirtualScrollHandler
 
         layoutSetup.ConfigureCollectionView(collectionView);
 
-        _dragGestureRecognizer = CreateDragGestureRecognizer(virtualScroll, collectionView);
-
         _reuseIdManager = reuseIdManager;
         _collectionView = collectionView;
 
@@ -170,49 +168,60 @@ public partial class VirtualScrollHandler
         }
     }
 
-    private static UILongPressGestureRecognizer CreateDragGestureRecognizer(IVirtualScroll virtualView, VirtualScrollCollectionView collectionView)
-        => new(gesture =>
+    private static UILongPressGestureRecognizer CreateDragGestureRecognizer()
+        => new(HandleLongPress);
+
+    // ReSharper disable once MemberCanBeMadeStatic.Local
+    private static void HandleLongPress(UILongPressGestureRecognizer gesture)
+    {
+        if (gesture.View is not VirtualScrollCollectionView cv)
+        {
+            return;
+        }
+
+        switch (gesture.State)
+        {
+            case UIGestureRecognizerState.Began:
             {
-                switch (gesture.State)
+                var location = gesture.LocationInView(cv);
+                var indexPath = cv.IndexPathForItemAtPoint(location);
+
+                if (indexPath is not null && cv.CellForItem(indexPath) is { } cell)
                 {
-                    case UIGestureRecognizerState.Began:
-                    {
-                        var location = gesture.LocationInView(collectionView);
-                        var indexPath = collectionView.IndexPathForItemAtPoint(location);
-                        if (indexPath is not null && collectionView.CellForItem(indexPath) is { } cell)
-                        {
-                            ((VirtualScrollDelegate)collectionView.Delegate).ItemDragInitiating(indexPath);
-                            indexPath = collectionView.IndexPathForCell(cell);
-                            if (indexPath is not null)
-                            {
-                                collectionView.BeginInteractiveMovementForItem(indexPath);
-                            }
-                        }
+                    ((VirtualScrollDelegate) cv.Delegate).ItemDragInitiating(indexPath);
+                    indexPath = cv.IndexPathForCell(cell);
 
-                        break;
-                    }
-                    case UIGestureRecognizerState.Changed:
+                    if (indexPath is not null)
                     {
-                        var location = gesture.LocationInView(collectionView);
-                        collectionView.UpdateInteractiveMovement(location);
-
-                        break;
-                    }
-                    case UIGestureRecognizerState.Ended:
-                    {
-                        collectionView.EndInteractiveMovement();
-                        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragEnded();
-                        break;
-                    }
-                    default:
-                    {
-                        collectionView.CancelInteractiveMovement();
-                        ((VirtualScrollDelegate)collectionView.Delegate).ItemDragEnded();
-                        break;
+                        cv.BeginInteractiveMovementForItem(indexPath);
                     }
                 }
+
+                break;
             }
-        );
+            case UIGestureRecognizerState.Changed:
+            {
+                var location = gesture.LocationInView(cv);
+                cv.UpdateInteractiveMovement(location);
+
+                break;
+            }
+            case UIGestureRecognizerState.Ended:
+            {
+                cv.EndInteractiveMovement();
+                ((VirtualScrollDelegate) cv.Delegate).ItemDragEnded();
+
+                break;
+            }
+            default:
+            {
+                cv.CancelInteractiveMovement();
+                ((VirtualScrollDelegate) cv.Delegate).ItemDragEnded();
+
+                break;
+            }
+        }
+    }
 
     private void OnBoundsChanged(object? sender, EventArgs e)
     {
@@ -316,9 +325,14 @@ public partial class VirtualScrollHandler
         _delegate?.Dispose();
         _delegate = null;
 
+        if (_dragGestureRecognizer is not null)
+        {
+            _collectionView?.RemoveGestureRecognizer(_dragGestureRecognizer);
+            _dragGestureRecognizer.Dispose();
+            _dragGestureRecognizer = null;
+        }
         _collectionView?.Dispose();
         _collectionView = null;
-        _dragGestureRecognizer?.Dispose();
         _containerView?.Dispose();
         _containerView = null;
         _lastBounds = CGSize.Empty;
@@ -336,16 +350,17 @@ public partial class VirtualScrollHandler
     {
         var collectionView = handler.PlatformCollectionView;
         var isDragEnabled = virtualScroll.DragHandler is not null;
-        var dragGestureRecognizer = handler._dragGestureRecognizer ?? throw new InvalidOperationException("Drag gesture recognizer is not initialized.");
-
+        
         if (isDragEnabled)
         {
-            
-            collectionView.AddGestureRecognizer(dragGestureRecognizer);
+            handler._dragGestureRecognizer ??= CreateDragGestureRecognizer();
+            collectionView.AddGestureRecognizer(handler._dragGestureRecognizer);
         }
-        else
+        else if (handler._dragGestureRecognizer is not null)
         {
-            collectionView.RemoveGestureRecognizer(dragGestureRecognizer);
+            collectionView.RemoveGestureRecognizer(handler._dragGestureRecognizer);
+            handler._dragGestureRecognizer.Dispose();
+            handler._dragGestureRecognizer = null;
         }
     }
 
@@ -407,10 +422,37 @@ public partial class VirtualScrollHandler
             handler._delegate?.UpdateFadingEdge(handler._collectionView);
         }
     }
+
+    private struct VirtualScrollLayoutInfo : IVirtualScrollLayoutInfo
+    {
+        public VirtualScrollLayoutInfo(IVirtualScrollLayoutInfo virtualScroll)
+        {
+            HasGlobalFooter = virtualScroll.HasGlobalFooter;
+            HasGlobalHeader = virtualScroll.HasGlobalHeader;
+            HasSectionFooter = virtualScroll.HasSectionFooter;
+            HasSectionHeader = virtualScroll.HasSectionHeader;
+        }
+        
+        public bool Equals(IVirtualScrollLayoutInfo? other) =>
+            other != null &&
+            HasGlobalFooter == other.HasGlobalFooter &&
+            HasGlobalHeader == other.HasGlobalHeader &&
+            HasSectionFooter == other.HasSectionFooter &&
+            HasSectionHeader == other.HasSectionHeader;
+            
+
+        public bool HasGlobalHeader { get; }
+        public bool HasGlobalFooter { get; }
+        public bool HasSectionHeader { get; }
+        public bool HasSectionFooter { get; }
+    }
     
     private static VirtualScrollCollectionViewLayoutSetup CreatePlatformLayout(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
-        var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo ?? throw new InvalidOperationException("The provided IVirtualScroll does not implement IVirtualScrollLayoutInfo interface.");
+        var layoutInfo = new VirtualScrollLayoutInfo(
+            virtualScroll as IVirtualScrollLayoutInfo ??
+            throw new InvalidOperationException("The provided IVirtualScroll does not implement IVirtualScrollLayoutInfo interface.")
+        );
 
         var layoutSetup = virtualScroll.ItemsLayout switch
         {
