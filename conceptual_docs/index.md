@@ -153,3 +153,41 @@ The controls library provides a set of cross-platform controls to simplify your 
 - A `TimeSpan?` edit control named `DurationWheel` which allows the user to enter a duration by spinning a wheel!!
 
 **Find out more on the [Controls Wiki](controls.md)**.
+
+---
+
+### SharpState [![Nalu.SharpState NuGet Package](https://img.shields.io/nuget/v/Nalu.SharpState.svg)](https://www.nuget.org/packages/Nalu.SharpState/) [![Nalu.SharpState NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.SharpState)](https://www.nuget.org/packages/Nalu.SharpState/)
+
+A compile-time, AOT-friendly state machine powered by a Roslyn source generator. Declare states and triggers with attributes, describe transitions with a strongly-typed fluent API, and let the generator emit a ready-to-use `Actor` with typed trigger methods.
+
+```csharp
+[StateMachineDefinition(typeof(DoorContext))]
+public partial class DoorMachine
+{
+    [StateTriggerDefinition] static partial void Open(string reason);
+    [StateTriggerDefinition] static partial void Close();
+
+    [StateDefinition]
+    private static IStateConfiguration Closed => ConfigureState()
+        .OnOpen(t => t
+            .Target(State.Opened)
+            .Invoke((ctx, reason) => ctx.LastReason = reason));
+
+    [StateDefinition]
+    private static IStateConfiguration Opened => ConfigureState()
+        .OnClose(t => t.Target(State.Closed));
+}
+```
+
+```csharp
+var door = DoorMachine.CreateActor(DoorMachine.State.Closed, new DoorContext());
+door.Open("delivery");
+Console.WriteLine(door.CurrentState); // Opened
+```
+
+- **Strongly typed** trigger methods, guards, and actions — no `object[]` bags, no reflection.
+- **Hierarchical state machines** via nested `[SubStateMachine]` partial classes with strict scoping rules.
+- **Sync or async** machines with one flag on the definition attribute.
+- **Compile-time diagnostics** (`NSS001`-`NSS009`) catch mistakes before you ship.
+
+**Find out more on the [SharpState Wiki](sharpstate.md)**.

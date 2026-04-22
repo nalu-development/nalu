@@ -47,5 +47,16 @@
   href: core.md
 - name: Controls
   href: controls.md
+- name: SharpState
+  href: sharpstate.md
+  items:
+    - name: Overview
+      href: sharpstate.md
+    - name: Hierarchical State Machines
+      href: sharpstate-hierarchy.md
+    - name: Asynchronous Machines
+      href: sharpstate-async.md
+    - name: Diagnostics & Troubleshooting
+      href: sharpstate-diagnostics.md
 - name: API
   href: ../api/Nalu.yml
