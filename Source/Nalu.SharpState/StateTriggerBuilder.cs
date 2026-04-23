@@ -13,9 +13,9 @@ public abstract class StateTriggerBuilderBase<TContext, TState>
     private TState _target;
     private bool _targetSet;
     private bool _stay;
-    private Func<TContext, object?[], bool>? _guard;
-    private Action<TContext, object?[]>? _syncAction;
-    private Func<TContext, object?[], ValueTask>? _asyncAction;
+    private Func<TContext, TriggerArgs, bool>? _guard;
+    private Action<TContext, TriggerArgs>? _syncAction;
+    private Func<TContext, TriggerArgs, ValueTask>? _asyncAction;
 
     /// <summary>
     /// Records the destination state for this transition. Mutually exclusive with <see cref="SetStay"/>.
@@ -35,17 +35,17 @@ public abstract class StateTriggerBuilderBase<TContext, TState>
     /// <summary>
     /// Records the guard predicate.
     /// </summary>
-    protected void SetGuard(Func<TContext, object?[], bool> guard) => _guard = guard;
+    protected void SetGuard(Func<TContext, TriggerArgs, bool> guard) => _guard = guard;
 
     /// <summary>
     /// Records the synchronous action.
     /// </summary>
-    protected void SetSyncAction(Action<TContext, object?[]> action) => _syncAction = action;
+    protected void SetSyncAction(Action<TContext, TriggerArgs> action) => _syncAction = action;
 
     /// <summary>
     /// Records the asynchronous action.
     /// </summary>
-    protected void SetAsyncAction(Func<TContext, object?[], ValueTask> action) => _asyncAction = action;
+    protected void SetAsyncAction(Func<TContext, TriggerArgs, ValueTask> action) => _asyncAction = action;
 
     /// <summary>
     /// Validates that exactly one of <c>Target</c>/<c>Stay</c> was configured. Throws <see cref="InvalidOperationException"/>
@@ -107,6 +107,12 @@ public sealed class StateTriggerBuilder<TContext, TState>
         return this;
     }
 
+    ISyncStateTriggerBuilder<TContext, TState> ISyncStateTriggerBuilder<TContext, TState>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     ISyncStateTriggerBuilder<TContext, TState> ISyncStateTriggerBuilder<TContext, TState>.When(Func<TContext, bool> guard)
     {
         if (guard is null)
@@ -136,6 +142,12 @@ public sealed class StateTriggerBuilder<TContext, TState>
     }
 
     IAsyncStateTriggerBuilder<TContext, TState> IAsyncStateTriggerBuilder<TContext, TState>.Stay()
+    {
+        SetStay();
+        return this;
+    }
+
+    IAsyncStateTriggerBuilder<TContext, TState> IAsyncStateTriggerBuilder<TContext, TState>.Ignore()
     {
         SetStay();
         return this;
@@ -188,6 +200,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0>
         return this;
     }
 
+    ISyncStateTriggerBuilder<TContext, TState, TArg0> ISyncStateTriggerBuilder<TContext, TState, TArg0>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     ISyncStateTriggerBuilder<TContext, TState, TArg0> ISyncStateTriggerBuilder<TContext, TState, TArg0>.When(Func<TContext, TArg0, bool> guard)
     {
         if (guard is null)
@@ -195,7 +213,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0>
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!));
         return this;
     }
 
@@ -206,7 +224,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0>
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetSyncAction((context, args) => action(context, (TArg0) args[0]!));
+        SetSyncAction((context, args) => action(context, (TArg0)args[0]!));
         return this;
     }
 
@@ -222,6 +240,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0>
         return this;
     }
 
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0> IAsyncStateTriggerBuilder<TContext, TState, TArg0>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     IAsyncStateTriggerBuilder<TContext, TState, TArg0> IAsyncStateTriggerBuilder<TContext, TState, TArg0>.When(Func<TContext, TArg0, bool> guard)
     {
         if (guard is null)
@@ -229,7 +253,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0>
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!));
         return this;
     }
 
@@ -240,7 +264,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0>
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetAsyncAction((context, args) => action(context, (TArg0) args[0]!));
+        SetAsyncAction((context, args) => action(context, (TArg0)args[0]!));
         return this;
     }
 }
@@ -270,6 +294,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1>
         return this;
     }
 
+    ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1>.When(Func<TContext, TArg0, TArg1, bool> guard)
     {
         if (guard is null)
@@ -277,7 +307,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1>
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!, (TArg1) args[1]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!));
         return this;
     }
 
@@ -288,7 +318,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1>
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetSyncAction((context, args) => action(context, (TArg0) args[0]!, (TArg1) args[1]!));
+        SetSyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!));
         return this;
     }
 
@@ -304,6 +334,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1>
         return this;
     }
 
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1>.When(Func<TContext, TArg0, TArg1, bool> guard)
     {
         if (guard is null)
@@ -311,7 +347,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1>
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!, (TArg1) args[1]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!));
         return this;
     }
 
@@ -322,7 +358,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1>
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetAsyncAction((context, args) => action(context, (TArg0) args[0]!, (TArg1) args[1]!));
+        SetAsyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!));
         return this;
     }
 }
@@ -353,6 +389,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
         return this;
     }
 
+    ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>.When(Func<TContext, TArg0, TArg1, TArg2, bool> guard)
     {
         if (guard is null)
@@ -360,7 +402,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
         return this;
     }
 
@@ -371,7 +413,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetSyncAction((context, args) => action(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!));
+        SetSyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
         return this;
     }
 
@@ -387,6 +429,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
         return this;
     }
 
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>.When(Func<TContext, TArg0, TArg1, TArg2, bool> guard)
     {
         if (guard is null)
@@ -394,7 +442,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
         return this;
     }
 
@@ -405,7 +453,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetAsyncAction((context, args) => action(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!));
+        SetAsyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
         return this;
     }
 }
@@ -437,6 +485,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, T
         return this;
     }
 
+    ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3>.When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard)
     {
         if (guard is null)
@@ -444,7 +498,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, T
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!, (TArg3) args[3]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!));
         return this;
     }
 
@@ -455,7 +509,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, T
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetSyncAction((context, args) => action(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!, (TArg3) args[3]!));
+        SetSyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!));
         return this;
     }
 
@@ -471,6 +525,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, T
         return this;
     }
 
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3>.Ignore()
+    {
+        SetStay();
+        return this;
+    }
+
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3>.When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard)
     {
         if (guard is null)
@@ -478,7 +538,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, T
             throw new ArgumentNullException(nameof(guard));
         }
 
-        SetGuard((context, args) => guard(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!, (TArg3) args[3]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!));
         return this;
     }
 
@@ -489,7 +549,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, T
             throw new ArgumentNullException(nameof(action));
         }
 
-        SetAsyncAction((context, args) => action(context, (TArg0) args[0]!, (TArg1) args[1]!, (TArg2) args[2]!, (TArg3) args[3]!));
+        SetAsyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!));
         return this;
     }
 }

@@ -66,9 +66,9 @@ public class StateTriggerBuilderTests
 
         var transition = builder.BuildTransitions()[0];
         var ctx = new TestContext();
-        transition.Guard!(ctx, ["bad"]).Should().BeFalse();
-        transition.Guard!(ctx, ["ok"]).Should().BeTrue();
-        transition.SyncAction!(ctx, ["ok"]);
+        transition.Guard!(ctx, TriggerArgs.From("bad")).Should().BeFalse();
+        transition.Guard!(ctx, TriggerArgs.From("ok")).Should().BeTrue();
+        transition.SyncAction!(ctx, TriggerArgs.From("ok"));
         ctx.LastArg.Should().Be("ok");
     }
 
@@ -85,9 +85,9 @@ public class StateTriggerBuilderTests
 
         var transition = builder.BuildTransitions()[0];
         var ctx = new TestContext();
-        transition.Guard!(ctx, ["hi", 2]).Should().BeTrue();
-        transition.Guard!(ctx, ["hi", 3]).Should().BeFalse();
-        transition.SyncAction!(ctx, ["hi", 2]);
+        transition.Guard!(ctx, TriggerArgs.From("hi", 2)).Should().BeTrue();
+        transition.Guard!(ctx, TriggerArgs.From("hi", 3)).Should().BeFalse();
+        transition.SyncAction!(ctx, TriggerArgs.From("hi", 2));
         ctx.Log.Should().Equal("hi:2");
     }
 
@@ -108,7 +108,18 @@ public class StateTriggerBuilderTests
         var transition = builder.BuildTransitions()[0];
         transition.AsyncAction.Should().NotBeNull();
         var ctx = new TestContext { Counter = 10 };
-        await transition.AsyncAction!(ctx, [5]);
+        await transition.AsyncAction!(ctx, TriggerArgs.From(5));
         ctx.Counter.Should().Be(15);
+    }
+
+    [Fact]
+    public void Ignore_is_syntax_sugar_for_internal_transition()
+    {
+        var builder = new StateTriggerBuilder<TestContext, FlatState>();
+        ISyncStateTriggerBuilder<TestContext, FlatState> sync = builder;
+        sync.Ignore();
+        builder.Validate();
+
+        builder.BuildTransitions()[0].IsInternal.Should().BeTrue();
     }
 }

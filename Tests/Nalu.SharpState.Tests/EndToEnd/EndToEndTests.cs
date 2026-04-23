@@ -155,4 +155,29 @@ public class EndToEndTests
         machine.CurrentState.Should().Be(NetworkMachine.State.Idle);
         machine.IsIn(NetworkMachine.State.Connected).Should().BeFalse();
     }
+
+    [Fact]
+    public void Entry_and_exit_hooks_run_for_generated_machine()
+    {
+        var ctx = new HookContext();
+        var machine = HookMachine.CreateActor(HookMachine.State.Idle, ctx);
+
+        machine.Start();
+
+        machine.CurrentState.Should().Be(HookMachine.State.Running);
+        ctx.Log.Should().Equal("exit:Idle", "enter:Running");
+    }
+
+    [Fact]
+    public void Ignore_syntax_sugar_keeps_current_state_without_unhandled()
+    {
+        var ctx = new HookContext();
+        var machine = HookMachine.CreateActor(HookMachine.State.Running, ctx);
+
+        var act = () => machine.Ping();
+
+        act.Should().NotThrow();
+        machine.CurrentState.Should().Be(HookMachine.State.Running);
+        ctx.Log.Should().BeEmpty();
+    }
 }

@@ -35,7 +35,7 @@ public class StateMachineEngineTests
         (FlatState from, FlatState to, FlatTrigger trigger, object?[] args)? captured = null;
         engine.StateChanged += (from, to, trig, args) => captured = (from, to, trig, args);
 
-        engine.Fire(FlatTrigger.Go, [42, "payload"]);
+        engine.Fire(FlatTrigger.Go, TriggerArgs.From(42, "payload"));
 
         engine.CurrentState.Should().Be(FlatState.B);
         captured.Should().NotBeNull();
@@ -53,7 +53,7 @@ public class StateMachineEngineTests
         (FlatState state, FlatTrigger trigger, object?[] args)? captured = null;
         engine.OnUnhandled = (s, t, a) => captured = (s, t, a);
 
-        engine.Fire(FlatTrigger.NoMatch, [123]);
+        engine.Fire(FlatTrigger.NoMatch, TriggerArgs.From(123));
 
         captured.Should().NotBeNull();
         captured!.Value.state.Should().Be(FlatState.A);
@@ -68,7 +68,7 @@ public class StateMachineEngineTests
         var definition = BuildFlat();
         var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
 
-        var act = () => engine.Fire(FlatTrigger.NoMatch, []);
+        var act = () => engine.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty);
 
         act.Should().Throw<NotSupportedException>();
         engine.CurrentState.Should().Be(FlatState.A);
@@ -83,7 +83,7 @@ public class StateMachineEngineTests
             OnUnhandled = null,
         };
 
-        var act = () => engine.Fire(FlatTrigger.NoMatch, []);
+        var act = () => engine.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty);
 
         act.Should().NotThrow();
         engine.CurrentState.Should().Be(FlatState.A);
@@ -101,7 +101,7 @@ public class StateMachineEngineTests
         });
 
         var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext { Counter = 5 });
-        engine.Fire(FlatTrigger.Go, []);
+        engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
         engine.CurrentState.Should().Be(FlatState.C);
     }
 
@@ -121,10 +121,10 @@ public class StateMachineEngineTests
         {
             OnUnhandled = null,
         };
-        engine.Fire(FlatTrigger.Go, [41]);
+        engine.Fire(FlatTrigger.Go, TriggerArgs.From(41));
         engine.CurrentState.Should().Be(FlatState.A);
 
-        engine.Fire(FlatTrigger.Go, [42]);
+        engine.Fire(FlatTrigger.Go, TriggerArgs.From(42));
         engine.CurrentState.Should().Be(FlatState.B);
     }
 
@@ -144,9 +144,61 @@ public class StateMachineEngineTests
         var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, ctx);
         engine.StateChanged += (_, _, _, _) => ctx.Log.Add("changed:" + ctx.Counter);
 
-        engine.Fire(FlatTrigger.Go, []);
+        engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
 
         ctx.Log.Should().BeEquivalentTo("action:1", "changed:1");
+    }
+
+    [Fact]
+    public void Fire_when_all_guards_fail_invokes_unhandled()
+    {
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A].AddAllFor(FlatTrigger.Go, [
+                new Transition<TestContext, FlatState>(FlatState.B, false, (_, _) => false, null, null),
+                new Transition<TestContext, FlatState>(FlatState.C, false, (_, _) => false, null, null)
+            ]);
+        });
+
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        FlatState? capturedState = null;
+        engine.OnUnhandled = (state, _, _) => capturedState = state;
+
+        engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
+
+        capturedState.Should().Be(FlatState.A);
+        engine.CurrentState.Should().Be(FlatState.A);
+    }
+
+    [Fact]
+    public void Fire_walks_to_parent_when_leaf_has_no_matching_transition()
+    {
+        var definition = HierarchyTests.CreateStandardHierarchy();
+        var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticated, new TestContext());
+
+        engine.Fire(HierTrigger.Disconnect, TriggerArgs.Empty);
+
+        engine.CurrentState.Should().Be(HierState.Idle);
+    }
+
+    [Fact]
+    public void Fire_runs_exit_then_entry_actions_around_external_transition()
+    {
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A]
+                .OnExit(ctx => ctx.Log.Add("exit:A"))
+                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
+            map[FlatState.B]
+                .OnEntry(ctx => ctx.Log.Add("enter:B"));
+        });
+
+        var ctx = new TestContext();
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, ctx);
+
+        engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
+
+        ctx.Log.Should().Equal("exit:A", "enter:B");
     }
 }
 

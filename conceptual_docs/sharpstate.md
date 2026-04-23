@@ -94,6 +94,7 @@ Inside each `[StateDefinition]` property body you call `ConfigureState()` and ch
 |--------|---------|
 | `Target(State s)` | Move to `s` when the trigger fires. If `s` is composite, its initial-child chain is resolved to a leaf. |
 | `Stay()` | Run the action but keep the current state (internal transition). `StateChanged` is **not** raised. |
+| `Ignore()` | Syntax sugar for `Stay()` with no action, useful when a trigger should be accepted but do nothing. |
 | `When(predicate)` | Guard the transition. The predicate receives the context and trigger arguments. |
 | `Invoke(action)` / `InvokeAsync(action)` | Run side effects before the state commits. The signature mirrors the trigger's parameters. |
 
@@ -110,6 +111,24 @@ private static IStateConfiguration Idle => ConfigureState()
 ```
 
 If no transition matches, the `OnUnhandled` callback fires (see below).
+
+### Entry and exit hooks
+
+States can also react to external transitions with `OnEntry(...)` and `OnExit(...)` (or `OnEntryAsync(...)` / `OnExitAsync(...)` on async machines):
+
+```csharp
+[StateDefinition]
+private static IStateConfiguration Running => ConfigureState()
+    .OnEntry(ctx => ctx.Log.Add("entered running"))
+    .OnExit(ctx => ctx.Log.Add("leaving running"))
+    .OnStop(t => t.Target(State.Stopped));
+```
+
+Hooks run only for external transitions:
+
+- Exit hooks run from the current leaf upward until the lowest common ancestor with the destination.
+- Entry hooks run from that ancestor's child down to the new leaf.
+- Internal transitions (`Stay()` / `Ignore()`) do not fire entry or exit hooks.
 
 ## Interacting with the actor
 
@@ -156,6 +175,14 @@ door.OnUnhandled = (state, trigger, args) =>
 door.OnUnhandled = null;
 ```
 
+If a trigger should be accepted silently from a given state, prefer modeling that directly:
+
+```csharp
+[StateDefinition]
+private static IStateConfiguration Running => ConfigureState()
+    .OnHeartbeat(t => t.Ignore());
+```
+
 ### StateChanged
 
 `StateChanged` fires once per committed transition, with the original leaf, the new leaf, the trigger, and the boxed arguments.
@@ -196,6 +223,7 @@ Guards are pure predicates — keep them free of side effects. Actions run **bef
 
 ## What next?
 
+- [Benchmarks](../Tests/Nalu.SharpState.Benchmarks/) — measure trigger dispatch and allocations on your machine.
 - [Hierarchical State Machines](sharpstate-hierarchy.md) — nested composite states via `[SubStateMachine]`.
 - [Asynchronous Machines](sharpstate-async.md) — `ValueTask` triggers with `InvokeAsync`.
 - [Diagnostics & Troubleshooting](sharpstate-diagnostics.md) — generator errors (`NSS001`-`NSS009`) and common pitfalls.

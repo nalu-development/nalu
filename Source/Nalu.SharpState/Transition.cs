@@ -15,9 +15,9 @@ public sealed class Transition<TContext, TState>
     internal Transition(
         TState target,
         bool isInternal,
-        Func<TContext, object?[], bool>? guard,
-        Action<TContext, object?[]>? syncAction,
-        Func<TContext, object?[], ValueTask>? asyncAction)
+        Func<TContext, TriggerArgs, bool>? guard,
+        Action<TContext, TriggerArgs>? syncAction,
+        Func<TContext, TriggerArgs, ValueTask>? asyncAction)
     {
         _target = target;
         IsInternal = isInternal;
@@ -44,15 +44,15 @@ public sealed class Transition<TContext, TState>
     /// Optional guard predicate. When <c>null</c>, the transition always fires.
     /// When non-null, the transition fires only if the guard returns <c>true</c>.
     /// </summary>
-    public Func<TContext, object?[], bool>? Guard { get; }
+    public Func<TContext, TriggerArgs, bool>? Guard { get; }
 
     /// <summary>
     /// Optional synchronous action executed after the guard passes and before the state change is committed.
     /// </summary>
-    public Action<TContext, object?[]>? SyncAction { get; }
+    public Action<TContext, TriggerArgs>? SyncAction { get; }
 
     /// <summary>
     /// Optional asynchronous action executed after the guard passes and before the state change is committed.
     /// </summary>
-    public Func<TContext, object?[], ValueTask>? AsyncAction { get; }
+    public Func<TContext, TriggerArgs, ValueTask>? AsyncAction { get; }
 }

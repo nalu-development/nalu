@@ -14,9 +14,18 @@
                           ReferenceOutputAssembly="false" />
     </ItemGroup>
 
-    <Target Name="PackAnalyzer" BeforeTargets="_GetPackageFiles">
+    <Target Name="PackAnalyzer"
+            BeforeTargets="_GetPackageFiles"
+            DependsOnTargets="Build">
+        <PropertyGroup>
+            <_SharpStateAnalyzerPath>$(MSBuildThisFileDirectory)..\Nalu.SharpState.Generators\bin\$(Configuration)\netstandard2.0\Nalu.SharpState.Generators.dll</_SharpStateAnalyzerPath>
+        </PropertyGroup>
+
+        <Error Condition="!Exists('$(_SharpStateAnalyzerPath)')"
+               Text="Unable to locate Nalu.SharpState.Generators.dll during packing at '$(_SharpStateAnalyzerPath)'." />
+
         <ItemGroup>
-            <None Include="$(MSBuildThisFileDirectory)..\Nalu.SharpState.Generators\bin\$(Configuration)\netstandard2.0\Nalu.SharpState.Generators.dll"
+            <None Include="$(_SharpStateAnalyzerPath)"
                   Pack="true"
                   PackagePath="analyzers/dotnet/cs"
                   Visible="false" />

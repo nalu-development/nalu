@@ -205,6 +205,41 @@ public class SnapshotTests
     }
 
     [Fact]
+    public Task Lifecycle_hooks_and_ignore()
+    {
+        var source = """
+        using Nalu.SharpState;
+
+        namespace Sample;
+
+        public class Ctx
+        {
+            public int Entries { get; set; }
+            public int Exits { get; set; }
+        }
+
+        [StateMachineDefinition(typeof(Ctx))]
+        public partial class Hooks
+        {
+            [StateTriggerDefinition] static partial void Start();
+            [StateTriggerDefinition] static partial void Ping();
+
+            [StateDefinition]
+            private static IStateConfiguration Idle => ConfigureState()
+                .OnExit(ctx => ctx.Exits++)
+                .OnStart(t => t.Target(State.Running));
+
+            [StateDefinition]
+            private static IStateConfiguration Running => ConfigureState()
+                .OnEntry(ctx => ctx.Entries++)
+                .OnPing(t => t.Ignore());
+        }
+        """;
+        var result = GeneratorDriverHelper.RunGenerator(source, out _);
+        return Verify(result).UseDirectory("Snapshots");
+    }
+
+    [Fact]
     public void Incrementality_second_run_is_cached()
     {
         var source = """

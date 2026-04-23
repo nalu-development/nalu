@@ -2,7 +2,7 @@ namespace Nalu.SharpState;
 
 /// <summary>
 /// Read-only view of a single state's configuration: the set of transitions indexed by trigger,
-/// plus optional hierarchy metadata (parent state, initial child state).
+/// optional hierarchy metadata (parent state, initial child state), and optional entry/exit hooks.
 /// </summary>
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
@@ -21,6 +21,26 @@ public interface IStateConfiguration<TContext, TState, TTrigger>
     /// when the composite itself is targeted by a transition. <c>null</c> for leaf states.
     /// </summary>
     TState? InitialChildState { get; }
+
+    /// <summary>
+    /// Optional synchronous callback invoked when the machine enters this state during an external transition.
+    /// </summary>
+    Action<TContext>? EntryAction { get; }
+
+    /// <summary>
+    /// Optional synchronous callback invoked when the machine exits this state during an external transition.
+    /// </summary>
+    Action<TContext>? ExitAction { get; }
+
+    /// <summary>
+    /// Optional asynchronous callback invoked when the machine enters this state during an external transition.
+    /// </summary>
+    Func<TContext, ValueTask>? EntryActionAsync { get; }
+
+    /// <summary>
+    /// Optional asynchronous callback invoked when the machine exits this state during an external transition.
+    /// </summary>
+    Func<TContext, ValueTask>? ExitActionAsync { get; }
 
     /// <summary>
     /// Attempts to look up all transitions declared on this state for the given trigger.

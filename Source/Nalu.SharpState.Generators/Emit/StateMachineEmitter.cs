@@ -226,6 +226,17 @@ internal static class StateMachineEmitter
         w.WriteLine("protected interface IStateConfigurator : IStateConfiguration");
         using (w.Block())
         {
+            if (m.IsAsync)
+            {
+                w.WriteLine($"IStateConfigurator OnEntryAsync(Func<{context}, ValueTask> action);");
+                w.WriteLine($"IStateConfigurator OnExitAsync(Func<{context}, ValueTask> action);");
+            }
+            else
+            {
+                w.WriteLine($"IStateConfigurator OnEntry(Action<{context}> action);");
+                w.WriteLine($"IStateConfigurator OnExit(Action<{context}> action);");
+            }
+
             foreach (var t in m.Triggers)
             {
                 w.WriteLine($"IStateConfigurator On{t.Name}(Action<{BuilderInterfaceType(context, t, m.IsAsync)}> configure);");
@@ -304,18 +315,16 @@ internal static class StateMachineEmitter
     private static void EmitActorTriggerMethod(SourceWriter w, TriggerModel t, bool isAsync)
     {
         var paramList = string.Join(", ", t.Parameters.Select(p => $"{p.TypeDisplay} {p.Name}"));
-        var argArray = t.Parameters.Count == 0
-            ? "global::System.Array.Empty<object?>()"
-            : "new object?[] { " + string.Join(", ", t.Parameters.Select(p => p.Name)) + " }";
+        var triggerArgs = TriggerArgsFactory(t);
 
         if (isAsync)
         {
             var methodName = t.Name + "Async";
-            w.WriteLine($"public global::System.Threading.Tasks.ValueTask {methodName}({paramList}) => _engine.FireAsync(Trigger.{t.Name}, {argArray});");
+            w.WriteLine($"public global::System.Threading.Tasks.ValueTask {methodName}({paramList}) => _engine.FireAsync(Trigger.{t.Name}, {triggerArgs});");
         }
         else
         {
-            w.WriteLine($"public void {t.Name}({paramList}) => _engine.Fire(Trigger.{t.Name}, {argArray});");
+            w.WriteLine($"public void {t.Name}({paramList}) => _engine.Fire(Trigger.{t.Name}, {triggerArgs});");
         }
     }
 
@@ -328,6 +337,42 @@ internal static class StateMachineEmitter
             w.WriteLine("internal void ApplyParent(State parent) => SetParent(parent);");
             w.WriteBlankLine();
             w.WriteLine("internal void ApplyInitialChild(State initial) => SetInitialChild(initial);");
+            w.WriteBlankLine();
+
+            if (m.IsAsync)
+            {
+                w.WriteLine($"public IStateConfigurator OnEntryAsync(Func<{context}, ValueTask> action)");
+                using (w.Block())
+                {
+                    w.WriteLine("SetEntryActionAsync(action);");
+                    w.WriteLine("return this;");
+                }
+
+                w.WriteBlankLine();
+                w.WriteLine($"public IStateConfigurator OnExitAsync(Func<{context}, ValueTask> action)");
+                using (w.Block())
+                {
+                    w.WriteLine("SetExitActionAsync(action);");
+                    w.WriteLine("return this;");
+                }
+            }
+            else
+            {
+                w.WriteLine($"public IStateConfigurator OnEntry(Action<{context}> action)");
+                using (w.Block())
+                {
+                    w.WriteLine("SetEntryAction(action);");
+                    w.WriteLine("return this;");
+                }
+
+                w.WriteBlankLine();
+                w.WriteLine($"public IStateConfigurator OnExit(Action<{context}> action)");
+                using (w.Block())
+                {
+                    w.WriteLine("SetExitAction(action);");
+                    w.WriteLine("return this;");
+                }
+            }
 
             foreach (var t in m.Triggers)
             {
@@ -373,5 +418,16 @@ internal static class StateMachineEmitter
 
         var args = string.Join(", ", t.Parameters.Select(p => p.TypeDisplay));
         return $"global::Nalu.SharpState.StateTriggerBuilder<{context}, State, {args}>";
+    }
+
+    private static string TriggerArgsFactory(TriggerModel t)
+    {
+        if (t.Parameters.Count == 0)
+        {
+            return "global::Nalu.SharpState.TriggerArgs.Empty";
+        }
+
+        var args = string.Join(", ", t.Parameters.Select(p => p.Name));
+        return $"global::Nalu.SharpState.TriggerArgs.From({args})";
     }
 }

@@ -82,19 +82,19 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
     /// runs and the state is updated (unless the transition is internal).
     /// </summary>
     /// <param name="trigger">The trigger to fire.</param>
-    /// <param name="args">Arguments matching the original trigger method's parameter list, boxed into an array.</param>
-    public void Fire(TTrigger trigger, object?[] args)
+    /// <param name="args">Arguments matching the original trigger method's parameter list.</param>
+    public void Fire(TTrigger trigger, TriggerArgs args)
     {
         var match = FindMatchingTransition(trigger, args);
         if (match is null)
         {
-            OnUnhandled?.Invoke(_currentState, trigger, args);
+            OnUnhandled?.Invoke(_currentState, trigger, args.ToArray());
             return;
         }
 
         var transition = match.Value.Transition;
         transition.SyncAction?.Invoke(Context, args);
-        CommitTransition(trigger, transition, args);
+        CommitTransition(trigger, match.Value.Source, transition, args);
     }
 
     /// <summary>
@@ -102,14 +102,14 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
     /// <see cref="Transition{TContext, TState}.AsyncAction"/> before committing the state change.
     /// </summary>
     /// <param name="trigger">The trigger to fire.</param>
-    /// <param name="args">Arguments matching the original trigger method's parameter list, boxed into an array.</param>
+    /// <param name="args">Arguments matching the original trigger method's parameter list.</param>
     /// <returns>A task that completes after the action has run and the state has been committed.</returns>
-    public async ValueTask FireAsync(TTrigger trigger, object?[] args)
+    public async ValueTask FireAsync(TTrigger trigger, TriggerArgs args)
     {
         var match = FindMatchingTransition(trigger, args);
         if (match is null)
         {
-            OnUnhandled?.Invoke(_currentState, trigger, args);
+            OnUnhandled?.Invoke(_currentState, trigger, args.ToArray());
             return;
         }
 
@@ -123,10 +123,10 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
             transition.SyncAction?.Invoke(Context, args);
         }
 
-        CommitTransition(trigger, transition, args);
+        await CommitTransitionAsync(trigger, match.Value.Source, transition, args).ConfigureAwait(false);
     }
 
-    private (Transition<TContext, TState> Transition, TState Source)? FindMatchingTransition(TTrigger trigger, object?[] args)
+    private (Transition<TContext, TState> Transition, TState Source)? FindMatchingTransition(TTrigger trigger, TriggerArgs args)
     {
         var source = _currentState;
         var state = source;
@@ -153,16 +153,122 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
         }
     }
 
-    private void CommitTransition(TTrigger trigger, Transition<TContext, TState> transition, object?[] args)
+    private void CommitTransition(TTrigger trigger, TState source, Transition<TContext, TState> transition, TriggerArgs args)
     {
         if (transition.IsInternal)
         {
             return;
         }
 
-        var previous = _currentState;
         var newLeaf = _definition.LeafOf(transition.Target);
+        InvokeExitActions(source, newLeaf);
         _currentState = newLeaf;
-        StateChanged?.Invoke(previous, newLeaf, trigger, args);
+        InvokeEntryActions(source, newLeaf);
+        StateChanged?.Invoke(source, newLeaf, trigger, args.ToArray());
+    }
+
+    private async ValueTask CommitTransitionAsync(TTrigger trigger, TState source, Transition<TContext, TState> transition, TriggerArgs args)
+    {
+        if (transition.IsInternal)
+        {
+            return;
+        }
+
+        var newLeaf = _definition.LeafOf(transition.Target);
+        await InvokeExitActionsAsync(source, newLeaf).ConfigureAwait(false);
+        _currentState = newLeaf;
+        await InvokeEntryActionsAsync(source, newLeaf).ConfigureAwait(false);
+        StateChanged?.Invoke(source, newLeaf, trigger, args.ToArray());
+    }
+
+    private void InvokeExitActions(TState source, TState destination)
+    {
+        foreach (var state in EnumerateExitPath(source, destination))
+        {
+            var config = _definition.GetConfiguration(state);
+            config.ExitAction?.Invoke(Context);
+        }
+    }
+
+    private void InvokeEntryActions(TState source, TState destination)
+    {
+        foreach (var state in EnumerateEntryPath(source, destination))
+        {
+            var config = _definition.GetConfiguration(state);
+            config.EntryAction?.Invoke(Context);
+        }
+    }
+
+    private async ValueTask InvokeExitActionsAsync(TState source, TState destination)
+    {
+        foreach (var state in EnumerateExitPath(source, destination))
+        {
+            var config = _definition.GetConfiguration(state);
+            if (config.ExitActionAsync is { } exitAsync)
+            {
+                await exitAsync(Context).ConfigureAwait(false);
+            }
+            else
+            {
+                config.ExitAction?.Invoke(Context);
+            }
+        }
+    }
+
+    private async ValueTask InvokeEntryActionsAsync(TState source, TState destination)
+    {
+        foreach (var state in EnumerateEntryPath(source, destination))
+        {
+            var config = _definition.GetConfiguration(state);
+            if (config.EntryActionAsync is { } entryAsync)
+            {
+                await entryAsync(Context).ConfigureAwait(false);
+            }
+            else
+            {
+                config.EntryAction?.Invoke(Context);
+            }
+        }
+    }
+
+    private IEnumerable<TState> EnumerateExitPath(TState source, TState destination)
+    {
+        var lca = _definition.LowestCommonAncestor(source, destination);
+        var current = source;
+        while (!lca.HasValue || !EqualityComparer<TState>.Default.Equals(current, lca.Value))
+        {
+            yield return current;
+
+            if (!_definition.Parent.TryGetValue(current, out var parent))
+            {
+                yield break;
+            }
+
+            current = parent;
+        }
+    }
+
+    private IEnumerable<TState> EnumerateEntryPath(TState source, TState destination)
+    {
+        var lca = _definition.LowestCommonAncestor(source, destination);
+        var stack = new Stack<TState>();
+        var current = destination;
+
+        while (!lca.HasValue || !EqualityComparer<TState>.Default.Equals(current, lca.Value))
+        {
+            stack.Push(current);
+
+            if (!_definition.Parent.TryGetValue(current, out var parent))
+            {
+                break;
+            }
+
+            current = parent;
+        }
+
+        while (stack.Count > 0)
+        {
+            yield return stack.Pop();
+        }
     }
 }

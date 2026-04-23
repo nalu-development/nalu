@@ -17,12 +17,28 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
     private readonly Dictionary<TTrigger, List<Transition<TContext, TState>>> _transitions = new();
     private TState? _parent;
     private TState? _initialChild;
+    private Action<TContext>? _entryAction;
+    private Action<TContext>? _exitAction;
+    private Func<TContext, ValueTask>? _entryActionAsync;
+    private Func<TContext, ValueTask>? _exitActionAsync;
 
     /// <inheritdoc />
     public TState? ParentState => _parent;
 
     /// <inheritdoc />
     public TState? InitialChildState => _initialChild;
+
+    /// <inheritdoc />
+    public Action<TContext>? EntryAction => _entryAction;
+
+    /// <inheritdoc />
+    public Action<TContext>? ExitAction => _exitAction;
+
+    /// <inheritdoc />
+    public Func<TContext, ValueTask>? EntryActionAsync => _entryActionAsync;
+
+    /// <inheritdoc />
+    public Func<TContext, ValueTask>? ExitActionAsync => _exitActionAsync;
 
     /// <inheritdoc />
     public bool TryGetTransitions(TTrigger trigger, out IReadOnlyList<Transition<TContext, TState>> transitions)
@@ -89,5 +105,69 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
         }
 
         _initialChild = initial;
+    }
+
+    /// <summary>
+    /// Declares a synchronous callback to run after the machine enters this state.
+    /// May be called at most once per configurator.
+    /// </summary>
+    protected void SetEntryAction(Action<TContext> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_entryAction is not null || _entryActionAsync is not null)
+        {
+            throw new InvalidOperationException("OnEntry has already been set on this state configurator.");
+        }
+
+        _entryAction = action;
+    }
+
+    /// <summary>
+    /// Declares a synchronous callback to run before the machine exits this state.
+    /// May be called at most once per configurator.
+    /// </summary>
+    protected void SetExitAction(Action<TContext> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_exitAction is not null || _exitActionAsync is not null)
+        {
+            throw new InvalidOperationException("OnExit has already been set on this state configurator.");
+        }
+
+        _exitAction = action;
+    }
+
+    /// <summary>
+    /// Declares an asynchronous callback to run after the machine enters this state.
+    /// May be called at most once per configurator.
+    /// </summary>
+    protected void SetEntryActionAsync(Func<TContext, ValueTask> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_entryAction is not null || _entryActionAsync is not null)
+        {
+            throw new InvalidOperationException("OnEntry has already been set on this state configurator.");
+        }
+
+        _entryActionAsync = action;
+    }
+
+    /// <summary>
+    /// Declares an asynchronous callback to run before the machine exits this state.
+    /// May be called at most once per configurator.
+    /// </summary>
+    protected void SetExitActionAsync(Func<TContext, ValueTask> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+
+        if (_exitAction is not null || _exitActionAsync is not null)
+        {
+            throw new InvalidOperationException("OnExit has already been set on this state configurator.");
+        }
+
+        _exitActionAsync = action;
     }
 }

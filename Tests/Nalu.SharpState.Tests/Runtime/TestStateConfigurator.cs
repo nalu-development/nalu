@@ -22,22 +22,46 @@ internal sealed class TestStateConfigurator<TContext, TState, TTrigger>
         SetInitialChild(initial);
         return this;
     }
+
+    public TestStateConfigurator<TContext, TState, TTrigger> OnEntry(Action<TContext> action)
+    {
+        SetEntryAction(action);
+        return this;
+    }
+
+    public TestStateConfigurator<TContext, TState, TTrigger> OnExit(Action<TContext> action)
+    {
+        SetExitAction(action);
+        return this;
+    }
+
+    public TestStateConfigurator<TContext, TState, TTrigger> OnEntryAsync(Func<TContext, ValueTask> action)
+    {
+        SetEntryActionAsync(action);
+        return this;
+    }
+
+    public TestStateConfigurator<TContext, TState, TTrigger> OnExitAsync(Func<TContext, ValueTask> action)
+    {
+        SetExitActionAsync(action);
+        return this;
+    }
 }
 
 internal static class TestTransition
 {
     public static Transition<TContext, TState> ToTarget<TContext, TState>(
         TState target,
-        Func<TContext, object?[], bool>? guard = null,
-        Action<TContext, object?[]>? syncAction = null,
-        Func<TContext, object?[], ValueTask>? asyncAction = null)
+        Func<TContext, TriggerArgs, bool>? guard = null,
+        Action<TContext, TriggerArgs>? syncAction = null,
+        Func<TContext, TriggerArgs, ValueTask>? asyncAction = null)
         where TState : struct, Enum
         => new(target, false, guard, syncAction, asyncAction);
 
     public static Transition<TContext, TState> Stay<TContext, TState>(
-        Action<TContext, object?[]>? syncAction = null,
-        Func<TContext, object?[], ValueTask>? asyncAction = null,
-        Func<TContext, object?[], bool>? guard = null)
+        Action<TContext, TriggerArgs>? syncAction = null,
+        Func<TContext, TriggerArgs, ValueTask>? asyncAction = null,
+        Func<TContext, TriggerArgs, bool>? guard = null)
         where TState : struct, Enum
         => new(default, true, guard, syncAction, asyncAction);
 }

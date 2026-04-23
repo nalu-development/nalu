@@ -79,4 +79,50 @@ public class DefinitionValidationTests
         var act = () => Build(map);
         act.Should().Throw<InvalidOperationException>();
     }
+
+    [Fact]
+    public void Cycle_in_state_hierarchy_throws()
+    {
+        var map = new Dictionary<HierState, TestStateConfigurator<TestContext, HierState, HierTrigger>>
+        {
+            [HierState.Idle] = new TestStateConfigurator<TestContext, HierState, HierTrigger>()
+                .Parent(HierState.Outside)
+                .AsStateMachine(HierState.Connected),
+            [HierState.Connected] = new TestStateConfigurator<TestContext, HierState, HierTrigger>()
+                .Parent(HierState.Idle)
+                .AsStateMachine(HierState.Authenticated),
+            [HierState.Authenticating] = new(),
+            [HierState.Authenticated] = new TestStateConfigurator<TestContext, HierState, HierTrigger>()
+                .Parent(HierState.Connected)
+                .AsStateMachine(HierState.Outside),
+            [HierState.Outside] = new TestStateConfigurator<TestContext, HierState, HierTrigger>()
+                .Parent(HierState.Authenticated)
+                .AsStateMachine(HierState.Idle)
+        };
+
+        var act = () => Build(map);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Cycle detected*");
+    }
+
+    [Fact]
+    public void AncestorsOf_returns_immediate_parent_first()
+    {
+        var definition = HierarchyTests.CreateStandardHierarchy();
+
+        definition.AncestorsOf(HierState.Authenticated)
+            .Should()
+            .Equal(HierState.Connected);
+    }
+
+    [Fact]
+    public void LowestCommonAncestor_returns_nearest_common_composite()
+    {
+        var definition = HierarchyTests.CreateStandardHierarchy();
+
+        definition.LowestCommonAncestor(HierState.Authenticating, HierState.Authenticated)
+            .Should()
+            .Be(HierState.Connected);
+    }
 }

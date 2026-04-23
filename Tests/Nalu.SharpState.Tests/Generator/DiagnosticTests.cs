@@ -5,12 +5,7 @@ namespace Nalu.SharpState.Tests.Generator;
 
 public class DiagnosticTests
 {
-    private static IReadOnlyList<Diagnostic> GetDiagnostics(string source)
-    {
-        GeneratorDriverHelper.RunGenerator(source, out var compilation);
-        var driverResult = GeneratorDriverHelper.RunGenerator(source, out _);
-        return driverResult.Diagnostics;
-    }
+    private static IReadOnlyList<Diagnostic> GetDiagnostics(string source) => GeneratorDriverHelper.RunGenerator(source, out _).Diagnostics;
 
     [Fact]
     public void NSS001_reported_when_class_is_not_partial()
@@ -73,6 +68,29 @@ public class DiagnosticTests
         }
         """;
         GetDiagnostics(source).Should().Contain(d => d.Id == "NSS003");
+    }
+
+    [Fact]
+    public void NSS003_not_reported_for_generic_runtime_interface_return_type()
+    {
+        var source = """
+        using Nalu.SharpState;
+
+        namespace Sample;
+
+        public class Ctx { }
+
+        [StateMachineDefinition(typeof(Ctx))]
+        public partial class GenericConfigReturnType
+        {
+            [StateTriggerDefinition] static partial void Go();
+
+            [StateDefinition]
+            private static global::Nalu.SharpState.IStateConfiguration<Ctx, State, Trigger> A => ConfigureState();
+        }
+        """;
+
+        GetDiagnostics(source).Should().NotContain(d => d.Id == "NSS003");
     }
 
     [Fact]

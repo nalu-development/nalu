@@ -15,6 +15,9 @@ public interface ISyncStateTriggerBuilder<TContext, TState>
     /// <summary>Marks this transition as internal: the action runs but the state does not change.</summary>
     ISyncStateTriggerBuilder<TContext, TState> Stay();
 
+    /// <summary>Marks this trigger as explicitly ignored. Equivalent to <see cref="Stay"/> with no action.</summary>
+    ISyncStateTriggerBuilder<TContext, TState> Ignore();
+
     /// <summary>Sets the guard predicate. The transition only fires when the guard returns <c>true</c>.</summary>
     /// <param name="guard">The predicate evaluated with the current context.</param>
     ISyncStateTriggerBuilder<TContext, TState> When(Func<TContext, bool> guard);
@@ -39,6 +42,9 @@ public interface ISyncStateTriggerBuilder<TContext, TState, TArg0>
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0> Stay();
 
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    ISyncStateTriggerBuilder<TContext, TState, TArg0> Ignore();
+
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0> When(Func<TContext, TArg0, bool> guard);
 
@@ -61,6 +67,9 @@ public interface ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1>
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> Stay();
+
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> Ignore();
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> When(Func<TContext, TArg0, TArg1, bool> guard);
@@ -85,6 +94,9 @@ public interface ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2>
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> Stay();
+
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> Ignore();
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> When(Func<TContext, TArg0, TArg1, TArg2, bool> guard);
@@ -111,6 +123,9 @@ public interface ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2,
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> Stay();
 
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> Ignore();
+
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     ISyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard);
 
@@ -131,6 +146,9 @@ public interface IAsyncStateTriggerBuilder<TContext, TState>
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     IAsyncStateTriggerBuilder<TContext, TState> Stay();
+
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    IAsyncStateTriggerBuilder<TContext, TState> Ignore();
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     IAsyncStateTriggerBuilder<TContext, TState> When(Func<TContext, bool> guard);
@@ -155,6 +173,9 @@ public interface IAsyncStateTriggerBuilder<TContext, TState, TArg0>
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0> Stay();
 
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0> Ignore();
+
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0> When(Func<TContext, TArg0, bool> guard);
 
@@ -177,6 +198,9 @@ public interface IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1>
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> Stay();
+
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> Ignore();
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1> When(Func<TContext, TArg0, TArg1, bool> guard);
@@ -202,6 +226,9 @@ public interface IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> Stay();
 
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> Ignore();
+
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2> When(Func<TContext, TArg0, TArg1, TArg2, bool> guard);
 
@@ -226,6 +253,9 @@ public interface IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Stay"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> Stay();
+
+    /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.Ignore"/>
+    IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> Ignore();
 
     /// <inheritdoc cref="ISyncStateTriggerBuilder{TContext, TState}.When(Func{TContext, bool})"/>
     IAsyncStateTriggerBuilder<TContext, TState, TArg0, TArg1, TArg2, TArg3> When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard);

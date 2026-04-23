@@ -22,7 +22,7 @@ public class HierarchyTests
         return new StateMachineDefinition<TestContext, HierState, HierTrigger>(readonlyMap);
     }
 
-    private static StateMachineDefinition<TestContext, HierState, HierTrigger> StandardHierarchy()
+    internal static StateMachineDefinition<TestContext, HierState, HierTrigger> CreateStandardHierarchy()
         => BuildHier(map =>
         {
             map[HierState.Idle].On(
@@ -45,10 +45,10 @@ public class HierarchyTests
     [Fact]
     public void Targeting_composite_drills_to_initial_child()
     {
-        var definition = StandardHierarchy();
+        var definition = CreateStandardHierarchy();
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Idle, new TestContext());
 
-        engine.Fire(HierTrigger.Connect, []);
+        engine.Fire(HierTrigger.Connect, TriggerArgs.Empty);
 
         engine.CurrentState.Should().Be(HierState.Authenticating);
     }
@@ -56,7 +56,7 @@ public class HierarchyTests
     [Fact]
     public void Composite_is_entered_as_initial_child_when_used_as_starting_state()
     {
-        var definition = StandardHierarchy();
+        var definition = CreateStandardHierarchy();
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Connected, new TestContext());
         engine.CurrentState.Should().Be(HierState.Authenticating);
     }
@@ -64,10 +64,10 @@ public class HierarchyTests
     [Fact]
     public void Child_inherits_parent_transition_when_not_overridden()
     {
-        var definition = StandardHierarchy();
+        var definition = CreateStandardHierarchy();
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticated, new TestContext());
 
-        engine.Fire(HierTrigger.Disconnect, []);
+        engine.Fire(HierTrigger.Disconnect, TriggerArgs.Empty);
 
         engine.CurrentState.Should().Be(HierState.Idle);
     }
@@ -89,14 +89,14 @@ public class HierarchyTests
         });
 
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticating, new TestContext());
-        engine.Fire(HierTrigger.Disconnect, []);
+        engine.Fire(HierTrigger.Disconnect, TriggerArgs.Empty);
         engine.CurrentState.Should().Be(HierState.Outside);
     }
 
     [Fact]
     public void IsIn_true_for_composite_ancestor_and_leaf()
     {
-        var definition = StandardHierarchy();
+        var definition = CreateStandardHierarchy();
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticated, new TestContext());
 
         engine.IsIn(HierState.Authenticated).Should().BeTrue();
@@ -107,11 +107,11 @@ public class HierarchyTests
     [Fact]
     public void Stay_inside_composite_does_not_change_state()
     {
-        var definition = StandardHierarchy();
+        var definition = CreateStandardHierarchy();
         var ctx = new TestContext();
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticated, ctx);
 
-        engine.Fire(HierTrigger.Message, ["hi"]);
+        engine.Fire(HierTrigger.Message, TriggerArgs.From("hi"));
 
         engine.CurrentState.Should().Be(HierState.Authenticated);
         ctx.Log.Should().Equal("hi");
@@ -120,12 +120,40 @@ public class HierarchyTests
     [Fact]
     public void Cross_hierarchy_transition_resets_to_leaf()
     {
-        var definition = StandardHierarchy();
+        var definition = CreateStandardHierarchy();
         var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticated, new TestContext());
 
-        engine.Fire(HierTrigger.Disconnect, []);
+        engine.Fire(HierTrigger.Disconnect, TriggerArgs.Empty);
 
         engine.CurrentState.Should().Be(HierState.Idle);
         engine.IsIn(HierState.Connected).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Exit_and_entry_actions_follow_hierarchy_path()
+    {
+        var definition = BuildHier(map =>
+        {
+            map[HierState.Idle].On(HierTrigger.Connect, TestTransition.ToTarget<TestContext, HierState>(HierState.Connected));
+            map[HierState.Connected]
+                .AsStateMachine(HierState.Authenticating)
+                .OnExit(ctx => ctx.Log.Add("exit:Connected"))
+                .On(HierTrigger.Disconnect, TestTransition.ToTarget<TestContext, HierState>(HierState.Idle));
+            map[HierState.Authenticating]
+                .Parent(HierState.Connected)
+                .OnExit(ctx => ctx.Log.Add("exit:Authenticating"))
+                .On(HierTrigger.AuthOk, TestTransition.ToTarget<TestContext, HierState>(HierState.Authenticated));
+            map[HierState.Authenticated]
+                .Parent(HierState.Connected)
+                .OnEntry(ctx => ctx.Log.Add("enter:Authenticated"));
+            map[HierState.Outside].OnEntry(ctx => ctx.Log.Add("enter:Outside"));
+        });
+
+        var ctx = new TestContext();
+        var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticating, ctx);
+
+        engine.Fire(HierTrigger.AuthOk, TriggerArgs.Empty);
+
+        ctx.Log.Should().Equal("exit:Authenticating", "enter:Authenticated");
     }
 }

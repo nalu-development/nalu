@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31423.177
@@ -117,6 +117,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.SharpState.Generators", "Source\Nalu.SharpState.Generators\Nalu.SharpState.Generators.csproj", "{E6E73B88-1F58-4E44-BADA-BF72BC3F0177}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.SharpState.Tests", "Tests\Nalu.SharpState.Tests\Nalu.SharpState.Tests.csproj", "{DCA2E69B-0CF5-484A-890C-8A8250CA65B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nalu.SharpState.Benchmarks", "Tests\Nalu.SharpState.Benchmarks\Nalu.SharpState.Benchmarks.csproj", "{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -360,6 +362,18 @@ Global
 		{DCA2E69B-0CF5-484A-890C-8A8250CA65B2}.Release|x64.Build.0 = Release|Any CPU
 		{DCA2E69B-0CF5-484A-890C-8A8250CA65B2}.Release|x86.ActiveCfg = Release|Any CPU
 		{DCA2E69B-0CF5-484A-890C-8A8250CA65B2}.Release|x86.Build.0 = Release|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Debug|x64.Build.0 = Debug|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Debug|x86.Build.0 = Debug|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Release|x64.ActiveCfg = Release|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Release|x64.Build.0 = Release|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Release|x86.ActiveCfg = Release|Any CPU
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -388,6 +402,7 @@ Global
 		{EDD0665D-A926-402C-97AC-78DE03CE6CF9} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 		{E6E73B88-1F58-4E44-BADA-BF72BC3F0177} = {719809C2-A551-4C4A-9EFD-B10FB5E35BC0}
 		{DCA2E69B-0CF5-484A-890C-8A8250CA65B2} = {E1B24F25-B8A4-46EE-B7EB-7803DCFC543F}
+		{D6A61C35-FFA5-44C4-80E7-B46B6A19351A} = {E1B24F25-B8A4-46EE-B7EB-7803DCFC543F}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {73F36209-F8D6-4066-8951-D97729F773CF}

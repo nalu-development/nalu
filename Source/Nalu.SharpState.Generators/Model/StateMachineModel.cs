@@ -178,8 +178,11 @@ internal sealed record StateMachineModel(
                 .OfType<PropertyDeclarationSyntax>()
                 .FirstOrDefault();
 
-            var returnTypeName = property.Type.Name;
-            if (returnTypeName != "IStateConfiguration")
+            var isStateConfiguration = property.Type.Name == "IStateConfiguration"
+                || property.Type is INamedTypeSymbol namedType
+                && namedType.TypeArguments.Length == 3
+                && namedType.ConstructedFrom.Name == "IStateConfiguration";
+            if (!isStateConfiguration)
             {
                 var loc = propertySyntax?.Identifier.GetLocation() ?? property.Locations.FirstOrDefault();
                 diagnostics.Add(DiagnosticInfo.Create(
