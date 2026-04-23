@@ -22,6 +22,8 @@ If `Nalu.Maui` is valuable to your work, consider supporting its continued devel
     *   Simplifies XAML development with template controls (`ToggleTemplate`, `TemplateBox`), lightweight `ContentView` replacement with clipping support (`ViewBox`), animated expanders (`ExpanderViewBox`), and a **constraint-based layout system** (`Magnet`).
 *   **Controls** [![Nalu.Maui.Controls NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Controls.svg)](https://www.nuget.org/packages/Nalu.Maui.Controls/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Controls)](https://www.nuget.org/packages/Nalu.Maui.Controls/)
     *   Includes useful cross-platform controls like `InteractableCanvasView` (a `SKCanvasView` with enhanced touch support) and `DurationWheel` (a `TimeSpan?` editor).
+*   **SharpState**
+    *   Source-generated, strongly typed state machines for .NET with hierarchical states, guarded transitions, entry/exit hooks, sync-first generated actors, DI-friendly `Factory` delegates, and post-transition `ReactAsync(...)` reactions that can trigger follow-up state changes through the generated `IActor`.
 *   **VirtualScroll** [![Nalu.Maui.VirtualScroll NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.VirtualScroll.svg)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.VirtualScroll)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/)
     * A high-performance alternative to the .NET MAUI `CollectionView`, leveraging native `RecyclerView` (Android) and `UICollectionView` (iOS). Supports dynamic sizing, `ObservableCollection<T>`, pull-to-refresh, section templates and carousel mode.
     * ⚖️ **Dual Licensed**: 
