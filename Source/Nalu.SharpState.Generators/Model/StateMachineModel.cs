@@ -193,7 +193,12 @@ internal sealed record StateMachineModel(
 
             localStateNames.Add(property.Name);
             var regionPath = accessPrefix.TrimEnd('.');
-            states.Add(new StateModel(property.Name, parentStateName, InitialChildState: null, regionPath));
+            states.Add(new StateModel(
+                property.Name,
+                parentStateName,
+                InitialChildState: null,
+                regionPath,
+                DocumentationCommentId(property, ct)));
         }
 
         foreach (var nested in regionClass.GetTypeMembers())
@@ -348,9 +353,15 @@ internal sealed record StateMachineModel(
 
             triggers.Add(new TriggerModel(
                 method.Name,
-                new EquatableArray<ParameterModel>(parameters)));
+                new EquatableArray<ParameterModel>(parameters),
+                DocumentationCommentId(method, ct)));
         }
     }
+
+    private static string? DocumentationCommentId(ISymbol symbol, CancellationToken ct)
+        => string.IsNullOrWhiteSpace(symbol.GetDocumentationCommentXml(cancellationToken: ct))
+            ? null
+            : Microsoft.CodeAnalysis.DocumentationCommentId.CreateDeclarationId(symbol);
 
     private static void ParseSubStateMachineArgs(AttributeData attr, out string? parent, out string? initial)
     {

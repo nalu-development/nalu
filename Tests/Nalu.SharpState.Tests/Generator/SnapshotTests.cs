@@ -239,6 +239,43 @@ public class SnapshotTests
     }
 
     [Fact]
+    public Task Documentation_inheritdoc()
+    {
+        var source = """
+        using Nalu.SharpState;
+
+        namespace Sample;
+
+        public class Ctx { }
+
+        [StateMachineDefinition(typeof(Ctx))]
+        public partial class Documented
+        {
+            /// <summary>
+            /// Opens the document.
+            /// </summary>
+            /// <param name="reason">Why the document is being opened.</param>
+            [StateTriggerDefinition] static partial void Open(string reason);
+
+            [StateTriggerDefinition] static partial void Close();
+
+            /// <summary>
+            /// The machine is currently closed.
+            /// </summary>
+            [StateDefinition]
+            private static IStateConfiguration Closed => ConfigureState()
+                .OnOpen(t => t.Target(State.Opened));
+
+            [StateDefinition]
+            private static IStateConfiguration Opened => ConfigureState()
+                .OnClose(t => t.Target(State.Closed));
+        }
+        """;
+        var result = GeneratorDriverHelper.RunGenerator(source, out _);
+        return Verify(result).UseDirectory("Snapshots");
+    }
+
+    [Fact]
     public void Incrementality_second_run_is_cached()
     {
         var source = """

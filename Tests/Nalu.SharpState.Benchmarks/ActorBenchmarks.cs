@@ -5,8 +5,8 @@ namespace Nalu.SharpState.Benchmarks;
 [MemoryDiagnoser]
 public class FlatActorBenchmarks
 {
-    private NoArgsMachine.Actor _noArgsActor = null!;
-    private OneArgMachine.Actor _oneArgActor = null!;
+    private NoArgsMachine.IActor _noArgsActor = null!;
+    private OneArgMachine.IActor _oneArgActor = null!;
 
     [GlobalSetup]
     public void Setup()
@@ -25,7 +25,7 @@ public class FlatActorBenchmarks
 [MemoryDiagnoser]
 public class HierarchicalActorBenchmarks
 {
-    private HierMachine.Actor _actor = null!;
+    private HierMachine.IActor _actor = null!;
 
     [GlobalSetup]
     public void Setup() => _actor = HierMachine.CreateActor(HierMachine.State.Running, new CounterContext());

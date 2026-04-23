@@ -83,13 +83,16 @@ internal static class StateMachineEmitter
             w.WriteBlankLine();
             EmitConfiguratorInterface(w, context, m);
             w.WriteBlankLine();
+            EmitActorInterface(w, context, m);
+            w.WriteBlankLine();
             w.WriteLine("protected static IStateConfigurator ConfigureState() => new GeneratedStateConfigurator();");
             w.WriteBlankLine();
             w.WriteLine($"private static readonly global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger> _definition = BuildDefinition();");
             w.WriteBlankLine();
             EmitBuildDefinition(w, context, m);
             w.WriteBlankLine();
-            w.WriteLine($"public static Actor CreateActor(State currentState, {context} context) => new Actor(_definition, currentState, context);");
+            EmitCreateActorDocs(w, context);
+            w.WriteLine($"public static IActor CreateActor(State currentState, {context} context) => new Actor(_definition, currentState, context);");
             w.WriteBlankLine();
             EmitActorClass(w, context, m);
             w.WriteBlankLine();
@@ -197,6 +200,7 @@ internal static class StateMachineEmitter
         {
             foreach (var s in m.States)
             {
+                EmitInheritdoc(w, s.DocumentationCommentId);
                 w.WriteLine($"{s.Name},");
             }
         }
@@ -209,6 +213,7 @@ internal static class StateMachineEmitter
         {
             foreach (var t in m.Triggers)
             {
+                EmitInheritdoc(w, t.DocumentationCommentId);
                 w.WriteLine($"{t.Name},");
             }
         }
@@ -226,12 +231,69 @@ internal static class StateMachineEmitter
         w.WriteLine("protected interface IStateConfigurator : IStateConfiguration");
         using (w.Block())
         {
+            EmitWhenEnteringDocs(w, context);
             w.WriteLine($"IStateConfigurator WhenEntering(Action<{context}> action);");
+            w.WriteBlankLine();
+            EmitWhenExitingDocs(w, context);
             w.WriteLine($"IStateConfigurator WhenExiting(Action<{context}> action);");
 
             foreach (var t in m.Triggers)
             {
+                w.WriteBlankLine();
+                EmitConfiguratorTriggerDocs(w, context, t);
                 w.WriteLine($"IStateConfigurator On{t.Name}(Action<{BuilderInterfaceType(context, t)}> configure);");
+            }
+        }
+    }
+
+    private static void EmitActorInterface(SourceWriter w, string context, StateMachineModel m)
+    {
+        var machineTypeCref = MachineTypeCref(m);
+        w.WriteLine("/// <summary>");
+        w.WriteLine($"/// <see cref=\"{machineTypeCref}\"/> runtime actor.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <remarks>");
+        w.WriteLine($"/// Use <see cref=\"CreateActor(State, {context})\"/> to create an instance.");
+        w.WriteLine("/// </remarks>");
+        w.WriteLine("public interface IActor");
+        using (w.Block())
+        {
+            w.WriteLine("/// <summary>");
+            w.WriteLine("/// Gets the current leaf <see cref=\"State\"/>.");
+            w.WriteLine("/// </summary>");
+            w.WriteLine("State CurrentState { get; }");
+            w.WriteBlankLine();
+            w.WriteLine("/// <summary>");
+            w.WriteLine("/// Gets the shared context passed to guards, actions, and reactions.");
+            w.WriteLine("/// </summary>");
+            w.WriteLine($"{context} Context {{ get; }}");
+            w.WriteBlankLine();
+            w.WriteLine("/// <summary>");
+            w.WriteLine("/// Gets or sets the callback invoked when a trigger has no matching transition.");
+            w.WriteLine("/// </summary>");
+            w.WriteLine("global::Nalu.SharpState.UnhandledTriggerHandler<State, Trigger>? OnUnhandled { get; set; }");
+            w.WriteBlankLine();
+            w.WriteLine("/// <summary>");
+            w.WriteLine("/// Raised after a transition commits and changes the current state.");
+            w.WriteLine("/// </summary>");
+            w.WriteLine("event global::Nalu.SharpState.StateChangedHandler<State, Trigger>? StateChanged;");
+            w.WriteBlankLine();
+            w.WriteLine("/// <summary>");
+            w.WriteLine("/// Raised when a background reaction scheduled by <c>ReactAsync(...)</c> fails.");
+            w.WriteLine("/// </summary>");
+            w.WriteLine("event global::Nalu.SharpState.ReactionFailedHandler<State, Trigger>? ReactionFailed;");
+            w.WriteBlankLine();
+            w.WriteLine("/// <summary>");
+            w.WriteLine("/// Determines whether the current leaf equals <paramref name=\"state\"/> or is contained by it.");
+            w.WriteLine("/// </summary>");
+            w.WriteLine("/// <param name=\"state\">The state to test against the current hierarchy.</param>");
+            w.WriteLine("/// <returns><c>true</c> when the actor is currently in <paramref name=\"state\"/>; otherwise <c>false</c>.</returns>");
+            w.WriteLine("bool IsIn(State state);");
+
+            foreach (var t in m.Triggers)
+            {
+                w.WriteBlankLine();
+                EmitActorInterfaceTriggerMethod(w, t);
             }
         }
     }
@@ -260,7 +322,7 @@ internal static class StateMachineEmitter
 
     private static void EmitActorClass(SourceWriter w, string context, StateMachineModel m)
     {
-        w.WriteLine("public sealed class Actor");
+        w.WriteLine("private sealed class Actor : IActor");
         using (w.Block())
         {
             w.WriteLine($"private readonly global::Nalu.SharpState.StateMachineEngine<{context}, State, Trigger> _engine;");
@@ -368,6 +430,68 @@ internal static class StateMachineEmitter
         }
     }
 
+    private static void EmitActorInterfaceTriggerMethod(SourceWriter w, TriggerModel t)
+    {
+        var paramList = string.Join(", ", t.Parameters.Select(p => $"{p.TypeDisplay} {p.Name}"));
+        if (!string.IsNullOrWhiteSpace(t.DocumentationCommentId))
+        {
+            EmitInheritdoc(w, t.DocumentationCommentId);
+        }
+        else
+        {
+            w.WriteLine("/// <summary>");
+            w.WriteLine($"/// Fires <see cref=\"Trigger.{t.Name}\"/> from the current state.");
+            w.WriteLine("/// </summary>");
+            foreach (var parameter in t.Parameters)
+            {
+                w.WriteLine($"/// <param name=\"{parameter.Name}\">The value to pass to the trigger.</param>");
+            }
+        }
+
+        w.WriteLine($"void {t.Name}({paramList});");
+    }
+
+    private static void EmitCreateActorDocs(SourceWriter w, string context)
+    {
+        w.WriteLine("/// <summary>");
+        w.WriteLine("/// Creates a new <see cref=\"IActor\"/> bound to this generated state machine definition.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <param name=\"currentState\">The starting state. Composite states resolve to their initial leaf.</param>");
+        w.WriteLine($"/// <param name=\"context\">The shared <see cref=\"{context}\"/> passed to guards, actions, and reactions.</param>");
+        w.WriteLine("/// <returns>A new <see cref=\"IActor\"/> instance.</returns>");
+    }
+
+    private static void EmitWhenEnteringDocs(SourceWriter w, string context)
+    {
+        w.WriteLine("/// <summary>");
+        w.WriteLine("/// Declares a synchronous callback to run after the machine enters this state.");
+        w.WriteLine($"/// See <see cref=\"global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger>.SetEntryAction(Action<{context}>)\"/>.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <param name=\"action\">The callback to run after the state is entered.</param>");
+        w.WriteLine("/// <returns>The same configurator for chaining.</returns>");
+    }
+
+    private static void EmitWhenExitingDocs(SourceWriter w, string context)
+    {
+        w.WriteLine("/// <summary>");
+        w.WriteLine("/// Declares a synchronous callback to run before the machine exits this state.");
+        w.WriteLine($"/// See <see cref=\"global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger>.SetExitAction(Action<{context}>)\"/>.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <param name=\"action\">The callback to run before the state is exited.</param>");
+        w.WriteLine("/// <returns>The same configurator for chaining.</returns>");
+    }
+
+    private static void EmitConfiguratorTriggerDocs(SourceWriter w, string context, TriggerModel t)
+    {
+        var actorMethodCref = ActorMethodCref(t);
+        var builderType = BuilderInterfaceType(context, t);
+        w.WriteLine("/// <summary>");
+        w.WriteLine($"/// Configures what happens when <see cref=\"{actorMethodCref}\"/> is invoked.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine($"/// <param name=\"configure\">Configures the <see cref=\"{builderType}\"/> used by <see cref=\"{actorMethodCref}\"/>.</param>");
+        w.WriteLine("/// <returns>The same configurator for chaining.</returns>");
+    }
+
     private static string BuilderInterfaceType(string context, TriggerModel t)
     {
         const string kind = "ISyncStateTriggerBuilder";
@@ -400,5 +524,34 @@ internal static class StateMachineEmitter
 
         var args = string.Join(", ", t.Parameters.Select(p => p.Name));
         return $"global::Nalu.SharpState.TriggerArgs.From({args})";
+    }
+
+    private static string ActorMethodCref(TriggerModel t)
+    {
+        if (t.Parameters.Count == 0)
+        {
+            return $"IActor.{t.Name}()";
+        }
+
+        var parameterTypes = string.Join(", ", t.Parameters.Select(p => p.TypeDisplay));
+        return $"IActor.{t.Name}({parameterTypes})";
+    }
+
+    private static string MachineTypeCref(StateMachineModel m)
+    {
+        var typePath = string.Join(".", m.ContainingTypes.Select(t => t.Name).Append(m.ClassName));
+        return string.IsNullOrEmpty(m.Namespace)
+            ? typePath
+            : $"global::{m.Namespace}.{typePath}";
+    }
+
+    private static void EmitInheritdoc(SourceWriter w, string? documentationCommentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentationCommentId))
+        {
+            return;
+        }
+
+        w.WriteLine($"/// <inheritdoc cref=\"{documentationCommentId}\"/>");
     }
 }
