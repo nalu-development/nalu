@@ -72,13 +72,15 @@ The generator produces:
 
 - A `State` enum with the values `Closed, Opened`.
 - A `Trigger` enum with the values `Open, Close`.
-- A nested `public sealed class Actor` exposing `Open(string)`, `Close()`, `CurrentState`, `Context`, `IsIn(...)`, `StateChanged`, and `OnUnhandled`.
-- A `public static Actor CreateActor(State currentState, DoorContext context)` factory.
+- A nested `public interface IActor` exposing `Open(string)`, `Close()`, `CurrentState`, `Context`, `IsIn(...)`, `StateChanged`, `ReactionFailed`, and `OnUnhandled`.
+- A nested `public delegate IActor Factory(State currentState, DoorContext context)` for dependency injection and tests.
+- A `public static IActor CreateActor(State currentState, DoorContext context)` helper that the factory can point to.
 
 Usage:
 
 ```csharp
-var door = DoorMachine.CreateActor(DoorMachine.State.Closed, new DoorContext());
+DoorMachine.Factory createDoor = DoorMachine.CreateActor;
+var door = createDoor(DoorMachine.State.Closed, new DoorContext());
 
 door.Open("delivery");
 
@@ -133,10 +135,11 @@ Hooks run only for external transitions:
 
 ## Interacting with the actor
 
-The generated `Actor` exposes everything you need at runtime:
+The generated `IActor` exposes everything you need at runtime:
 
 ```csharp
-var door = DoorMachine.CreateActor(DoorMachine.State.Closed, new DoorContext());
+DoorMachine.Factory createDoor = DoorMachine.CreateActor;
+var door = createDoor(DoorMachine.State.Closed, new DoorContext());
 
 door.StateChanged += (from, to, trigger, args) =>
     Console.WriteLine($"{from} -> {to} via {trigger}");
@@ -158,6 +161,55 @@ Console.WriteLine(door.IsIn(DoorMachine.State.Opened)); // true
 | `ReactionFailed` | Raised when a background `ReactAsync(...)` callback throws after the transition already completed. |
 | `OnUnhandled` | Invoked when a trigger has no matching transition on the leaf nor on any ancestor. |
 | `<Trigger>(...)` | One strongly-typed `void` method per trigger. |
+
+### Testability
+
+For application code, prefer injecting the generated `Factory` delegate instead of calling the static `CreateActor(...)` directly:
+
+```csharp
+services.AddSingleton<DoorMachine.Factory>(DoorMachine.CreateActor);
+
+public sealed class DoorWorkflow
+{
+    private readonly DoorMachine.Factory _createDoor;
+
+    public DoorWorkflow(DoorMachine.Factory createDoor) => _createDoor = createDoor;
+
+    public DoorMachine.IActor Start(DoorContext context)
+        => _createDoor(DoorMachine.State.Closed, context);
+}
+```
+
+This keeps actor creation DI-friendly and unit-testable:
+
+- tests can replace `DoorMachine.Factory` with a lambda
+- the lambda can return a mocked or fake `DoorMachine.IActor`
+- production code can still use `DoorMachine.CreateActor` as the implementation behind the delegate
+
+### Unit testing
+
+With `NSubstitute`, a unit test can stub both the factory and the generated actor:
+
+```csharp
+var actor = Substitute.For<DoorMachine.IActor>();
+var factory = Substitute.For<DoorMachine.Factory>();
+factory(DoorMachine.State.Closed, Arg.Any<DoorContext>()).Returns(actor);
+
+var workflow = new DoorWorkflow(factory);
+var result = workflow.Start(new DoorContext());
+
+result.Should().BeSameAs(actor);
+```
+
+And if your application code calls triggers on the actor, you can verify those too:
+
+```csharp
+var actor = Substitute.For<DoorMachine.IActor>();
+
+actor.Open("delivery");
+
+actor.Received().Open("delivery");
+```
 
 ### Unhandled triggers
 

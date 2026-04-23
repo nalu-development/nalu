@@ -101,6 +101,15 @@ namespace Sample.Nested.Deep
                 void Go();
             }
             
+            /// <summary>
+            /// Factory delegate that creates a new <see cref="IActor"/> bound to this generated state machine definition.
+            /// Useful for dependency injection and unit tests.
+            /// </summary>
+            /// <param name="currentState">The starting state. Composite states resolve to their initial leaf.</param>
+            /// <param name="context">The shared <see cref="global::Sample.Nested.Deep.Ctx"/> passed to guards, actions, and reactions.</param>
+            /// <returns>A new <see cref="IActor"/> instance.</returns>
+            public delegate IActor Factory(State currentState, global::Sample.Nested.Deep.Ctx context);
+            
             protected static IStateConfigurator ConfigureState() => new GeneratedStateConfigurator();
             
             private static readonly global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor> _definition = BuildDefinition();

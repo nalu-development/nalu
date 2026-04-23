@@ -85,6 +85,8 @@ internal static class StateMachineEmitter
             w.WriteBlankLine();
             EmitActorInterface(w, context, m);
             w.WriteBlankLine();
+            EmitActorFactoryDelegate(w, context);
+            w.WriteBlankLine();
             w.WriteLine("protected static IStateConfigurator ConfigureState() => new GeneratedStateConfigurator();");
             w.WriteBlankLine();
             w.WriteLine($"private static readonly global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger, IActor> _definition = BuildDefinition();");
@@ -296,6 +298,18 @@ internal static class StateMachineEmitter
                 EmitActorInterfaceTriggerMethod(w, t);
             }
         }
+    }
+
+    private static void EmitActorFactoryDelegate(SourceWriter w, string context)
+    {
+        w.WriteLine("/// <summary>");
+        w.WriteLine("/// Factory delegate that creates a new <see cref=\"IActor\"/> bound to this generated state machine definition.");
+        w.WriteLine("/// Useful for dependency injection and unit tests.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <param name=\"currentState\">The starting state. Composite states resolve to their initial leaf.</param>");
+        w.WriteLine($"/// <param name=\"context\">The shared <see cref=\"{context}\"/> passed to guards, actions, and reactions.</param>");
+        w.WriteLine("/// <returns>A new <see cref=\"IActor\"/> instance.</returns>");
+        w.WriteLine($"public delegate IActor Factory(State currentState, {context} context);");
     }
 
     private static void EmitBuildDefinition(SourceWriter w, string context, StateMachineModel m)
