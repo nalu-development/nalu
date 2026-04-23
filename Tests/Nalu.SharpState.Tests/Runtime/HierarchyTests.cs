@@ -137,16 +137,16 @@ public class HierarchyTests
             map[HierState.Idle].On(HierTrigger.Connect, TestTransition.ToTarget<TestContext, HierState>(HierState.Connected));
             map[HierState.Connected]
                 .AsStateMachine(HierState.Authenticating)
-                .OnExit(ctx => ctx.Log.Add("exit:Connected"))
+                .WhenExiting(ctx => ctx.Log.Add("exit:Connected"))
                 .On(HierTrigger.Disconnect, TestTransition.ToTarget<TestContext, HierState>(HierState.Idle));
             map[HierState.Authenticating]
                 .Parent(HierState.Connected)
-                .OnExit(ctx => ctx.Log.Add("exit:Authenticating"))
+                .WhenExiting(ctx => ctx.Log.Add("exit:Authenticating"))
                 .On(HierTrigger.AuthOk, TestTransition.ToTarget<TestContext, HierState>(HierState.Authenticated));
             map[HierState.Authenticated]
                 .Parent(HierState.Connected)
-                .OnEntry(ctx => ctx.Log.Add("enter:Authenticated"));
-            map[HierState.Outside].OnEntry(ctx => ctx.Log.Add("enter:Outside"));
+                .WhenEntering(ctx => ctx.Log.Add("enter:Authenticated"));
+            map[HierState.Outside].WhenEntering(ctx => ctx.Log.Add("enter:Outside"));
         });
 
         var ctx = new TestContext();

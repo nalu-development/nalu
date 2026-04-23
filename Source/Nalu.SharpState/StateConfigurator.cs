@@ -109,7 +109,7 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
 
         if (_entryAction is not null)
         {
-            throw new InvalidOperationException("OnEntry has already been set on this state configurator.");
+            throw new InvalidOperationException("WhenEntering has already been set on this state configurator.");
         }
 
         _entryAction = action;
@@ -125,7 +125,7 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
 
         if (_exitAction is not null)
         {
-            throw new InvalidOperationException("OnExit has already been set on this state configurator.");
+            throw new InvalidOperationException("WhenExiting has already been set on this state configurator.");
         }
 
         _exitAction = action;

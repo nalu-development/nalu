@@ -31,8 +31,8 @@ namespace Sample.Nested.Deep
             
             protected interface IStateConfigurator : IStateConfiguration
             {
-                IStateConfigurator OnEntry(Action<global::Sample.Nested.Deep.Ctx> action);
-                IStateConfigurator OnExit(Action<global::Sample.Nested.Deep.Ctx> action);
+                IStateConfigurator WhenEntering(Action<global::Sample.Nested.Deep.Ctx> action);
+                IStateConfigurator WhenExiting(Action<global::Sample.Nested.Deep.Ctx> action);
                 IStateConfigurator OnGo(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State>> configure);
             }
             
@@ -98,13 +98,13 @@ namespace Sample.Nested.Deep
                 
                 internal void ApplyInitialChild(State initial) => SetInitialChild(initial);
                 
-                public IStateConfigurator OnEntry(Action<global::Sample.Nested.Deep.Ctx> action)
+                public IStateConfigurator WhenEntering(Action<global::Sample.Nested.Deep.Ctx> action)
                 {
                     SetEntryAction(action);
                     return this;
                 }
                 
-                public IStateConfigurator OnExit(Action<global::Sample.Nested.Deep.Ctx> action)
+                public IStateConfigurator WhenExiting(Action<global::Sample.Nested.Deep.Ctx> action)
                 {
                     SetExitAction(action);
                     return this;

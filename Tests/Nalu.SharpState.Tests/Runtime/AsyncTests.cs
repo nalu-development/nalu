@@ -11,7 +11,7 @@ public class AsyncTests
         var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
         {
             [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-                .OnExit(ctx => ctx.Log.Add("exit:A"))
+                .WhenExiting(ctx => ctx.Log.Add("exit:A"))
                 .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(
                     FlatState.B,
                     syncAction: (ctx, _) => ctx.Log.Add("invoke"),
@@ -21,7 +21,7 @@ public class AsyncTests
                         ctx.Log.Add("react");
                     })),
             [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-                .OnEntry(ctx => ctx.Log.Add("enter:B")),
+                .WhenEntering(ctx => ctx.Log.Add("enter:B")),
             [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
         };
 

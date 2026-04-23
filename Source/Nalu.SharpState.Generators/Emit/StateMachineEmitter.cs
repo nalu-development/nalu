@@ -226,8 +226,8 @@ internal static class StateMachineEmitter
         w.WriteLine("protected interface IStateConfigurator : IStateConfiguration");
         using (w.Block())
         {
-            w.WriteLine($"IStateConfigurator OnEntry(Action<{context}> action);");
-            w.WriteLine($"IStateConfigurator OnExit(Action<{context}> action);");
+            w.WriteLine($"IStateConfigurator WhenEntering(Action<{context}> action);");
+            w.WriteLine($"IStateConfigurator WhenExiting(Action<{context}> action);");
 
             foreach (var t in m.Triggers)
             {
@@ -330,7 +330,7 @@ internal static class StateMachineEmitter
             w.WriteLine("internal void ApplyInitialChild(State initial) => SetInitialChild(initial);");
             w.WriteBlankLine();
 
-            w.WriteLine($"public IStateConfigurator OnEntry(Action<{context}> action)");
+            w.WriteLine($"public IStateConfigurator WhenEntering(Action<{context}> action)");
             using (w.Block())
             {
                 w.WriteLine("SetEntryAction(action);");
@@ -338,7 +338,7 @@ internal static class StateMachineEmitter
             }
 
             w.WriteBlankLine();
-            w.WriteLine($"public IStateConfigurator OnExit(Action<{context}> action)");
+            w.WriteLine($"public IStateConfigurator WhenExiting(Action<{context}> action)");
             using (w.Block())
             {
                 w.WriteLine("SetExitAction(action);");

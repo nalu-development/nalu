@@ -24,13 +24,13 @@ internal sealed class TestStateConfigurator<TContext, TState, TTrigger>
         return this;
     }
 
-    public TestStateConfigurator<TContext, TState, TTrigger> OnEntry(Action<TContext> action)
+    public TestStateConfigurator<TContext, TState, TTrigger> WhenEntering(Action<TContext> action)
     {
         SetEntryAction(action);
         return this;
     }
 
-    public TestStateConfigurator<TContext, TState, TTrigger> OnExit(Action<TContext> action)
+    public TestStateConfigurator<TContext, TState, TTrigger> WhenExiting(Action<TContext> action)
     {
         SetExitAction(action);
         return this;

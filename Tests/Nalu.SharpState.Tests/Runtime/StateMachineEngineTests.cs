@@ -187,10 +187,10 @@ public class StateMachineEngineTests
         var definition = BuildFlat(map =>
         {
             map[FlatState.A]
-                .OnExit(ctx => ctx.Log.Add("exit:A"))
+                .WhenExiting(ctx => ctx.Log.Add("exit:A"))
                 .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
             map[FlatState.B]
-                .OnEntry(ctx => ctx.Log.Add("enter:B"));
+                .WhenEntering(ctx => ctx.Log.Add("enter:B"));
         });
 
         var ctx = new TestContext();
@@ -210,7 +210,7 @@ public class StateMachineEngineTests
             map[FlatState.A]
                 .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
             map[FlatState.B]
-                .OnEntry(_ => engine!.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty));
+                .WhenEntering(_ => engine!.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty));
         });
 
         engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext())

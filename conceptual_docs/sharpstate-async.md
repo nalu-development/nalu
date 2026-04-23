@@ -26,10 +26,10 @@ public partial class ReviewMachine
 
 For external transitions, the execution order is:
 
-1. `OnExit(...)`
+1. `WhenExiting(...)`
 2. `Invoke(...)`
 3. state commit
-4. `OnEntry(...)`
+4. `WhenEntering(...)`
 5. `StateChanged`
 6. `ReactAsync(...)`
 

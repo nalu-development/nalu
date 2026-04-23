@@ -225,12 +225,12 @@ public class SnapshotTests
 
             [StateDefinition]
             private static IStateConfiguration Idle => ConfigureState()
-                .OnExit(ctx => ctx.Exits++)
+                .WhenExiting(ctx => ctx.Exits++)
                 .OnStart(t => t.Target(State.Running));
 
             [StateDefinition]
             private static IStateConfiguration Running => ConfigureState()
-                .OnEntry(ctx => ctx.Entries++)
+                .WhenEntering(ctx => ctx.Entries++)
                 .OnPing(t => t.Ignore());
         }
         """;

@@ -14,11 +14,11 @@ public partial class HookMachine
 
     [StateDefinition]
     private static IStateConfiguration Idle => ConfigureState()
-        .OnExit(ctx => ctx.Log.Add("exit:Idle"))
+        .WhenExiting(ctx => ctx.Log.Add("exit:Idle"))
         .OnStart(t => t.Target(State.Running));
 
     [StateDefinition]
     private static IStateConfiguration Running => ConfigureState()
-        .OnEntry(ctx => ctx.Log.Add("enter:Running"))
+        .WhenEntering(ctx => ctx.Log.Add("enter:Running"))
         .OnPing(t => t.Ignore());
 }

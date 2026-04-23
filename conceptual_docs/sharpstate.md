@@ -115,13 +115,13 @@ If no transition matches, the `OnUnhandled` callback fires (see below).
 
 ### Entry and exit hooks
 
-States can also react to external transitions with `OnEntry(...)` and `OnExit(...)`:
+States can also react to external transitions with `WhenEntering(...)` and `WhenExiting(...)`:
 
 ```csharp
 [StateDefinition]
 private static IStateConfiguration Running => ConfigureState()
-    .OnEntry(ctx => ctx.Log.Add("entered running"))
-    .OnExit(ctx => ctx.Log.Add("leaving running"))
+    .WhenEntering(ctx => ctx.Log.Add("entered running"))
+    .WhenExiting(ctx => ctx.Log.Add("leaving running"))
     .OnStop(t => t.Target(State.Stopped));
 ```
 
@@ -241,10 +241,10 @@ private static IStateConfiguration Saving => ConfigureState()
 
 For external transitions, the order is:
 
-1. `OnExit(...)`
+1. `WhenExiting(...)`
 2. `Invoke(...)`
 3. state commit
-4. `OnEntry(...)`
+4. `WhenEntering(...)`
 5. `StateChanged`
 6. `ReactAsync(...)`
 

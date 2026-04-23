@@ -34,8 +34,8 @@ namespace Sample
         
         protected interface IStateConfigurator : IStateConfiguration
         {
-            IStateConfigurator OnEntry(Action<global::Sample.Ctx> action);
-            IStateConfigurator OnExit(Action<global::Sample.Ctx> action);
+            IStateConfigurator WhenEntering(Action<global::Sample.Ctx> action);
+            IStateConfigurator WhenExiting(Action<global::Sample.Ctx> action);
             IStateConfigurator OnConnect(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State>> configure);
             IStateConfigurator OnDisconnect(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State>> configure);
             IStateConfigurator OnAuthOk(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State>> configure);
@@ -112,13 +112,13 @@ namespace Sample
             
             internal void ApplyInitialChild(State initial) => SetInitialChild(initial);
             
-            public IStateConfigurator OnEntry(Action<global::Sample.Ctx> action)
+            public IStateConfigurator WhenEntering(Action<global::Sample.Ctx> action)
             {
                 SetEntryAction(action);
                 return this;
             }
             
-            public IStateConfigurator OnExit(Action<global::Sample.Ctx> action)
+            public IStateConfigurator WhenExiting(Action<global::Sample.Ctx> action)
             {
                 SetExitAction(action);
                 return this;
