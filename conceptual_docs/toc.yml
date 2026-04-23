@@ -54,7 +54,7 @@
       href: sharpstate.md
     - name: Hierarchical State Machines
       href: sharpstate-hierarchy.md
-    - name: Asynchronous Machines
+    - name: Post-Transition Reactions
       href: sharpstate-async.md
     - name: Diagnostics & Troubleshooting
       href: sharpstate-diagnostics.md

@@ -15,7 +15,7 @@ Classic state machine libraries rely on reflection, dictionaries keyed by string
 - **Compile-time validated**: duplicate names, unreachable hierarchies, and misconfigured sub-machines become build errors via dedicated `NSS001`-`NSS009` diagnostics.
 - **AOT / trim friendly**: zero reflection at runtime. The generator emits the registration tables at compile time.
 - **Hierarchical**: composite states are modeled as nested `[SubStateMachine]` partial classes with strict scoping rules.
-- **Sync or async**: one flag on the machine attribute switches the entire API surface between `void` triggers and `ValueTask` triggers.
+- **Sync-first**: generated actors stay synchronous, with optional fire-and-forget `ReactAsync(...)` callbacks for post-transition work.
 
 ## Installation
 
@@ -96,7 +96,8 @@ Inside each `[StateDefinition]` property body you call `ConfigureState()` and ch
 | `Stay()` | Run the action but keep the current state (internal transition). `StateChanged` is **not** raised. |
 | `Ignore()` | Syntax sugar for `Stay()` with no action, useful when a trigger should be accepted but do nothing. |
 | `When(predicate)` | Guard the transition. The predicate receives the context and trigger arguments. |
-| `Invoke(action)` / `InvokeAsync(action)` | Run side effects before the state commits. The signature mirrors the trigger's parameters. |
+| `Invoke(action)` | Run side effects before the state commits. The signature mirrors the trigger's parameters. |
+| `ReactAsync(action)` | Schedule fire-and-forget work after the transition commits and after `StateChanged` fires. |
 
 You can register multiple transitions for the same trigger in the same state; the first one whose guard passes (or has no guard) wins:
 
@@ -114,7 +115,7 @@ If no transition matches, the `OnUnhandled` callback fires (see below).
 
 ### Entry and exit hooks
 
-States can also react to external transitions with `OnEntry(...)` and `OnExit(...)` (or `OnEntryAsync(...)` / `OnExitAsync(...)` on async machines):
+States can also react to external transitions with `OnEntry(...)` and `OnExit(...)`:
 
 ```csharp
 [StateDefinition]
@@ -154,8 +155,9 @@ Console.WriteLine(door.IsIn(DoorMachine.State.Opened)); // true
 | `Context` | The context instance supplied to `CreateActor`. |
 | `IsIn(State s)` | `true` if `CurrentState` equals `s` **or** is a descendant of `s`. Use this to query composites. |
 | `StateChanged` | `StateChangedHandler<State, Trigger>` raised **after** a non-internal transition commits. |
+| `ReactionFailed` | Raised when a background `ReactAsync(...)` callback throws after the transition already completed. |
 | `OnUnhandled` | Invoked when a trigger has no matching transition on the leaf nor on any ancestor. |
-| `<Trigger>(...)` | One strongly-typed method per trigger. Sync machines return `void`, async machines return `ValueTask`. |
+| `<Trigger>(...)` | One strongly-typed `void` method per trigger. |
 
 ### Unhandled triggers
 
@@ -219,11 +221,38 @@ private static IStateConfiguration Open => ConfigureState()
             ctx.Ledger.Add((note, $"insufficient for {amount}"))));
 ```
 
-Guards are pure predicates — keep them free of side effects. Actions run **before** the state commits and before `StateChanged` fires; any exception they throw propagates out of the `Fire`/`FireAsync` call without changing the state.
+Guards are pure predicates — keep them free of side effects. `Invoke(...)` runs inline during dispatch and any exception it throws propagates out of `Fire(...)` before the new state is committed.
+
+### ReactAsync
+
+Use `ReactAsync(...)` when the transition should commit immediately but you still want to kick off asynchronous follow-up work:
+
+```csharp
+[StateDefinition]
+private static IStateConfiguration Saving => ConfigureState()
+    .OnSaved(t => t
+        .Target(State.Ready)
+        .Invoke(ctx => ctx.LastSavedAt = DateTimeOffset.UtcNow)
+        .ReactAsync(async ctx =>
+        {
+            await ctx.Analytics.TrackSavedAsync();
+        }));
+```
+
+For external transitions, the order is:
+
+1. `OnExit(...)`
+2. `Invoke(...)`
+3. state commit
+4. `OnEntry(...)`
+5. `StateChanged`
+6. `ReactAsync(...)`
+
+`ReactAsync(...)` captures the current `SynchronizationContext` when the trigger is fired. If the background reaction throws, the exception is surfaced through `ReactionFailed`.
 
 ## What next?
 
 - [Benchmarks](../Tests/Nalu.SharpState.Benchmarks/) — measure trigger dispatch and allocations on your machine.
 - [Hierarchical State Machines](sharpstate-hierarchy.md) — nested composite states via `[SubStateMachine]`.
-- [Asynchronous Machines](sharpstate-async.md) — `ValueTask` triggers with `InvokeAsync`.
+- [Post-Transition Reactions](sharpstate-async.md) — background `ReactAsync(...)` work and `ReactionFailed`.
 - [Diagnostics & Troubleshooting](sharpstate-diagnostics.md) — generator errors (`NSS001`-`NSS009`) and common pitfalls.

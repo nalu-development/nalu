@@ -4,7 +4,7 @@
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <!-- VSTHRD200: InvokeAsync is a fluent builder configuration method, not an awaitable. -->
+        <!-- VSTHRD200: ReactAsync is configuration syntax, not an awaitable call site. -->
         <NoWarn>$(NoWarn);VSTHRD200</NoWarn>
     </PropertyGroup>
 

@@ -226,20 +226,12 @@ internal static class StateMachineEmitter
         w.WriteLine("protected interface IStateConfigurator : IStateConfiguration");
         using (w.Block())
         {
-            if (m.IsAsync)
-            {
-                w.WriteLine($"IStateConfigurator OnEntryAsync(Func<{context}, ValueTask> action);");
-                w.WriteLine($"IStateConfigurator OnExitAsync(Func<{context}, ValueTask> action);");
-            }
-            else
-            {
-                w.WriteLine($"IStateConfigurator OnEntry(Action<{context}> action);");
-                w.WriteLine($"IStateConfigurator OnExit(Action<{context}> action);");
-            }
+            w.WriteLine($"IStateConfigurator OnEntry(Action<{context}> action);");
+            w.WriteLine($"IStateConfigurator OnExit(Action<{context}> action);");
 
             foreach (var t in m.Triggers)
             {
-                w.WriteLine($"IStateConfigurator On{t.Name}(Action<{BuilderInterfaceType(context, t, m.IsAsync)}> configure);");
+                w.WriteLine($"IStateConfigurator On{t.Name}(Action<{BuilderInterfaceType(context, t)}> configure);");
             }
         }
     }
@@ -302,30 +294,29 @@ internal static class StateMachineEmitter
             }
 
             w.WriteBlankLine();
+            w.WriteLine("public event global::Nalu.SharpState.ReactionFailedHandler<State, Trigger>? ReactionFailed");
+            using (w.Block())
+            {
+                w.WriteLine("add => _engine.ReactionFailed += value;");
+                w.WriteLine("remove => _engine.ReactionFailed -= value;");
+            }
+
+            w.WriteBlankLine();
             w.WriteLine("public bool IsIn(State state) => _engine.IsIn(state);");
 
             foreach (var t in m.Triggers)
             {
                 w.WriteBlankLine();
-                EmitActorTriggerMethod(w, t, m.IsAsync);
+                EmitActorTriggerMethod(w, t);
             }
         }
     }
 
-    private static void EmitActorTriggerMethod(SourceWriter w, TriggerModel t, bool isAsync)
+    private static void EmitActorTriggerMethod(SourceWriter w, TriggerModel t)
     {
         var paramList = string.Join(", ", t.Parameters.Select(p => $"{p.TypeDisplay} {p.Name}"));
         var triggerArgs = TriggerArgsFactory(t);
-
-        if (isAsync)
-        {
-            var methodName = t.Name + "Async";
-            w.WriteLine($"public global::System.Threading.Tasks.ValueTask {methodName}({paramList}) => _engine.FireAsync(Trigger.{t.Name}, {triggerArgs});");
-        }
-        else
-        {
-            w.WriteLine($"public void {t.Name}({paramList}) => _engine.Fire(Trigger.{t.Name}, {triggerArgs});");
-        }
+        w.WriteLine($"public void {t.Name}({paramList}) => _engine.Fire(Trigger.{t.Name}, {triggerArgs});");
     }
 
     private static void EmitGeneratedConfigurator(SourceWriter w, string context, StateMachineModel m)
@@ -339,52 +330,32 @@ internal static class StateMachineEmitter
             w.WriteLine("internal void ApplyInitialChild(State initial) => SetInitialChild(initial);");
             w.WriteBlankLine();
 
-            if (m.IsAsync)
+            w.WriteLine($"public IStateConfigurator OnEntry(Action<{context}> action)");
+            using (w.Block())
             {
-                w.WriteLine($"public IStateConfigurator OnEntryAsync(Func<{context}, ValueTask> action)");
-                using (w.Block())
-                {
-                    w.WriteLine("SetEntryActionAsync(action);");
-                    w.WriteLine("return this;");
-                }
-
-                w.WriteBlankLine();
-                w.WriteLine($"public IStateConfigurator OnExitAsync(Func<{context}, ValueTask> action)");
-                using (w.Block())
-                {
-                    w.WriteLine("SetExitActionAsync(action);");
-                    w.WriteLine("return this;");
-                }
+                w.WriteLine("SetEntryAction(action);");
+                w.WriteLine("return this;");
             }
-            else
-            {
-                w.WriteLine($"public IStateConfigurator OnEntry(Action<{context}> action)");
-                using (w.Block())
-                {
-                    w.WriteLine("SetEntryAction(action);");
-                    w.WriteLine("return this;");
-                }
 
-                w.WriteBlankLine();
-                w.WriteLine($"public IStateConfigurator OnExit(Action<{context}> action)");
-                using (w.Block())
-                {
-                    w.WriteLine("SetExitAction(action);");
-                    w.WriteLine("return this;");
-                }
+            w.WriteBlankLine();
+            w.WriteLine($"public IStateConfigurator OnExit(Action<{context}> action)");
+            using (w.Block())
+            {
+                w.WriteLine("SetExitAction(action);");
+                w.WriteLine("return this;");
             }
 
             foreach (var t in m.Triggers)
             {
                 w.WriteBlankLine();
-                EmitConfiguratorTriggerMethod(w, context, t, m.IsAsync);
+                EmitConfiguratorTriggerMethod(w, context, t);
             }
         }
     }
 
-    private static void EmitConfiguratorTriggerMethod(SourceWriter w, string context, TriggerModel t, bool isAsync)
+    private static void EmitConfiguratorTriggerMethod(SourceWriter w, string context, TriggerModel t)
     {
-        var builderType = BuilderInterfaceType(context, t, isAsync);
+        var builderType = BuilderInterfaceType(context, t);
         var concreteBuilder = ConcreteBuilderType(context, t);
         w.WriteLine($"public IStateConfigurator On{t.Name}(Action<{builderType}> configure)");
         using (w.Block())
@@ -397,9 +368,9 @@ internal static class StateMachineEmitter
         }
     }
 
-    private static string BuilderInterfaceType(string context, TriggerModel t, bool isAsync)
+    private static string BuilderInterfaceType(string context, TriggerModel t)
     {
-        var kind = isAsync ? "IAsyncStateTriggerBuilder" : "ISyncStateTriggerBuilder";
+        const string kind = "ISyncStateTriggerBuilder";
         if (t.Parameters.Count == 0)
         {
             return $"global::Nalu.SharpState.{kind}<{context}, State>";

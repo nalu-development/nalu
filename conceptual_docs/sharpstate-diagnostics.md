@@ -57,10 +57,10 @@ private static IStateConfiguration Idle => ConfigureState()
 [StateTriggerDefinition] method 'Open' must be declared as 'partial void' ...
 ```
 
-Even on async machines, you declare triggers as `static partial void`. The generator chooses the runtime return type (`void` or `ValueTask`) based on the machine's `Async` flag; writing the return type yourself desynchronizes the declaration from what the generator needs to emit.
+Triggers are always declared as `static partial void`. The generator emits the dispatch body behind that declaration; writing the return type yourself desynchronizes the declaration from what the generator needs to emit.
 
 ```csharp
-// Right, for both sync and async machines
+// Right
 [StateTriggerDefinition] static partial void Open(string reason);
 ```
 
@@ -144,33 +144,6 @@ triggers must live on the root [StateMachineDefinition] class
 
 Regions describe structure, not new inputs. Move any `[StateTriggerDefinition]` up to the root machine; every region already sees the root's `Trigger` enum and can react to any of them.
 
-### `NSS010` — Async machine trigger names must not end with `Async`
-
-```
-[StateTriggerDefinition] 'InspectAsync' ends with 'Async'; on an async state machine the generator
-appends the 'Async' suffix automatically - declare the trigger without the suffix
-```
-
-On async machines (`[StateMachineDefinition(typeof(Ctx), Async = true)]`) the generator appends `Async` to the Actor method name automatically (for example `Inspect` becomes `actor.InspectAsync()`). Declaring the trigger with that suffix already applied would produce a `InspectAsyncAsync` method, so the generator refuses it.
-
-```csharp
-// Wrong
-[StateMachineDefinition(typeof(Ctx), Async = true)]
-public partial class Scanner
-{
-    [StateTriggerDefinition] static partial void InspectAsync();
-}
-
-// Right — declare without the suffix, the Actor method is InspectAsync()
-[StateMachineDefinition(typeof(Ctx), Async = true)]
-public partial class Scanner
-{
-    [StateTriggerDefinition] static partial void Inspect();
-}
-```
-
-The `Trigger.Inspect` enum value and the `OnInspect(...)` configurator method keep their unsuffixed names — the suffix only applies to the generated Actor method.
-
 ## Runtime exceptions
 
 On top of compile-time diagnostics, a few exceptions surface misconfigurations that cannot be caught by the generator (for example, when you hand-build a `StateMachineDefinition` for testing).
@@ -186,6 +159,6 @@ On top of compile-time diagnostics, a few exceptions surface misconfigurations t
 
 - **Forgetting to declare a trigger on an ancestor that should handle it.** If `Connected` is the place where `Disconnect` should live, don't redeclare it on every child — let the hierarchy inherit it (see [Hierarchical State Machines](sharpstate-hierarchy.md#2-transitions-are-inherited-from-ancestors)).
 - **Entering a composite and expecting `CurrentState` to equal the composite.** It never does — `CurrentState` is always the leaf. Use `IsIn(composite)` for the ancestor check.
-- **Throwing from an action.** The exception propagates out of `Fire`/`FireAsync` and the state is **not** updated. Wrap the call in a `try`/`catch` if you want to recover, or keep actions side-effect free.
-- **Mixing `Invoke` and `InvokeAsync`.** Each machine is either sync or async — set the `Async` flag on `[StateMachineDefinition]` and use the matching method. See [Asynchronous Machines](sharpstate-async.md).
+- **Throwing from `Invoke(...)`.** The exception propagates out of `Fire(...)` and the state is **not** updated. Wrap the call in a `try`/`catch` if you want to recover, or keep inline actions side-effect free.
+- **Using `ReactAsync(...)` when you need transactional behavior.** `ReactAsync(...)` runs after the transition already committed. If the work must finish before the new state becomes visible, keep it in `Invoke(...)` instead. See [Post-Transition Reactions](sharpstate-async.md).
 - **Expecting `StateChanged` to fire for `.Stay()` transitions.** Internal transitions intentionally do not raise the event; only leaf-changing transitions do.

@@ -5,18 +5,51 @@ namespace Nalu.SharpState.Tests.Runtime;
 public class AsyncTests
 {
     [Fact]
-    public async Task FireAsync_awaits_async_action_and_transitions()
+    public void Fire_schedules_reaction_after_transition_finishes()
     {
+        var syncContext = new RecordingSynchronizationContext();
+        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
+        {
+            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+                .OnExit(ctx => ctx.Log.Add("exit:A"))
+                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(
+                    FlatState.B,
+                    syncAction: (ctx, _) => ctx.Log.Add("invoke"),
+                    reactionAsync: async (ctx, _) =>
+                    {
+                        await Task.Yield();
+                        ctx.Log.Add("react");
+                    })),
+            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+                .OnEntry(ctx => ctx.Log.Add("enter:B")),
+            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+        };
+
+        var ctx = new TestContext();
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(
+            new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map),
+            FlatState.A,
+            ctx);
+        engine.StateChanged += (_, _, _, _) => ctx.Log.Add("changed");
+
+        RunOn(syncContext, () => engine.Fire(FlatTrigger.Go, TriggerArgs.Empty));
+
+        ctx.Log.Should().Equal("exit:A", "invoke", "enter:B", "changed");
+        syncContext.Drain();
+        ctx.Log.Should().Equal("exit:A", "invoke", "enter:B", "changed", "react");
+    }
+
+    [Fact]
+    public void ReactionFailed_is_raised_when_background_reaction_throws()
+    {
+        var syncContext = new RecordingSynchronizationContext();
         var cfg = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>();
-        cfg.On(FlatTrigger.Go, new Transition<TestContext, FlatState>(
+        cfg.On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(
             FlatState.B,
-            false,
-            null,
-            null,
-            async (ctx, _) =>
+            reactionAsync: async (_, _) =>
             {
                 await Task.Yield();
-                ctx.Counter++;
+                throw new InvalidOperationException("boom");
             }));
 
         var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
@@ -25,75 +58,29 @@ public class AsyncTests
             [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
             [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
         };
-        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
-        var ctx = new TestContext();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, ctx);
 
-        await engine.FireAsync(FlatTrigger.Go, TriggerArgs.Empty);
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(
+            new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map),
+            FlatState.A,
+            new TestContext());
+        (FlatState from, FlatState to, FlatTrigger trigger, object?[] args, Exception exception)? failure = null;
+        engine.ReactionFailed += (from, to, trigger, args, exception) => failure = (from, to, trigger, args, exception);
 
-        engine.CurrentState.Should().Be(FlatState.B);
-        ctx.Counter.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task FireAsync_propagates_exception_from_async_action()
-    {
-        var cfg = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>();
-        cfg.On(FlatTrigger.Go, new Transition<TestContext, FlatState>(
-            FlatState.B,
-            false,
-            null,
-            null,
-            (_, _) => throw new InvalidOperationException("boom")));
-
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
-        {
-            [FlatState.A] = cfg,
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-        };
-        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
-
-        var act = async () => await engine.FireAsync(FlatTrigger.Go, TriggerArgs.Empty);
-
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("boom");
-        engine.CurrentState.Should().Be(FlatState.A);
-    }
-
-    [Fact]
-    public void Fire_on_async_only_transition_skips_action_but_still_commits()
-    {
-        var sideEffect = 0;
-        var cfg = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>();
-        cfg.On(FlatTrigger.Go, new Transition<TestContext, FlatState>(
-            FlatState.B,
-            false,
-            null,
-            null,
-            (_, _) =>
-            {
-                sideEffect++;
-                return default;
-            }));
-
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
-        {
-            [FlatState.A] = cfg,
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-        };
-        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
-
-        engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
+        RunOn(syncContext, () => engine.Fire(FlatTrigger.Go, TriggerArgs.From(5)));
+        syncContext.Drain();
 
         engine.CurrentState.Should().Be(FlatState.B);
-        sideEffect.Should().Be(0);
+        failure.Should().NotBeNull();
+        failure!.Value.from.Should().Be(FlatState.A);
+        failure.Value.to.Should().Be(FlatState.B);
+        failure.Value.trigger.Should().Be(FlatTrigger.Go);
+        failure.Value.args.Should().Equal(5);
+        failure.Value.exception.Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Be("boom");
     }
 
     [Fact]
-    public async Task FireAsync_unhandled_trigger_invokes_callback()
+    public void Fire_unhandled_trigger_invokes_callback()
     {
         var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
         {
@@ -107,7 +94,7 @@ public class AsyncTests
         (FlatState state, FlatTrigger trigger, object?[] args)? captured = null;
         engine.OnUnhandled = (state, trigger, args) => captured = (state, trigger, args);
 
-        await engine.FireAsync(FlatTrigger.NoMatch, TriggerArgs.From(5));
+        engine.Fire(FlatTrigger.NoMatch, TriggerArgs.From(5));
 
         captured.Should().NotBeNull();
         captured!.Value.state.Should().Be(FlatState.A);
@@ -116,7 +103,7 @@ public class AsyncTests
     }
 
     [Fact]
-    public async Task FireAsync_unhandled_with_default_callback_throws()
+    public void Fire_unhandled_with_default_callback_throws()
     {
         var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
         {
@@ -128,38 +115,47 @@ public class AsyncTests
         var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
         var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
 
-        var act = async () => await engine.FireAsync(FlatTrigger.NoMatch, TriggerArgs.Empty);
+        var act = () => engine.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty);
 
-        await act.Should().ThrowAsync<NotSupportedException>();
+        act.Should().Throw<NotSupportedException>();
     }
 
-    [Fact]
-    public async Task FireAsync_runs_async_exit_then_entry_actions()
+    private static void RunOn(RecordingSynchronizationContext synchronizationContext, Action action)
     {
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(synchronizationContext);
+        try
         {
-            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-                .OnExitAsync(ctx =>
+            action();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
+    private sealed class RecordingSynchronizationContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> _queue = new();
+
+        public override void Post(SendOrPostCallback d, object? state) => _queue.Enqueue((d, state));
+
+        public void Drain()
+        {
+            while (_queue.Count > 0)
+            {
+                var (callback, state) = _queue.Dequeue();
+                var previous = Current;
+                SetSynchronizationContext(this);
+                try
                 {
-                    ctx.Log.Add("exit:A");
-                    return default;
-                })
-                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B)),
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-                .OnEntryAsync(ctx =>
+                    callback(state);
+                }
+                finally
                 {
-                    ctx.Log.Add("enter:B");
-                    return default;
-                }),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
-        };
-
-        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
-        var ctx = new TestContext();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, ctx);
-
-        await engine.FireAsync(FlatTrigger.Go, TriggerArgs.Empty);
-
-        ctx.Log.Should().Equal("exit:A", "enter:B");
+                    SetSynchronizationContext(previous);
+                }
+            }
+        }
     }
 }

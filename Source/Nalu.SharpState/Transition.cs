@@ -1,9 +1,10 @@
 namespace Nalu.SharpState;
 
 /// <summary>
-/// A single resolved transition built by <see cref="ISyncStateTriggerBuilder{TContext, TState}"/> (or its async/arity variants).
-/// Carries the optional guard, optional sync/async action, and either a target state (external transition)
-/// or the <see cref="IsInternal"/> flag (internal transition that does not leave the current state).
+/// A single resolved transition built by <see cref="ISyncStateTriggerBuilder{TContext, TState}"/> (or its arity variants).
+/// Carries the optional guard, optional synchronous transition action, optional asynchronous reaction,
+/// and either a target state (external transition) or the <see cref="IsInternal"/> flag
+/// (internal transition that does not leave the current state).
 /// </summary>
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
@@ -17,13 +18,13 @@ public sealed class Transition<TContext, TState>
         bool isInternal,
         Func<TContext, TriggerArgs, bool>? guard,
         Action<TContext, TriggerArgs>? syncAction,
-        Func<TContext, TriggerArgs, ValueTask>? asyncAction)
+        Func<TContext, TriggerArgs, ValueTask>? reactionAsync)
     {
         _target = target;
         IsInternal = isInternal;
         Guard = guard;
         SyncAction = syncAction;
-        AsyncAction = asyncAction;
+        ReactionAsync = reactionAsync;
     }
 
     /// <summary>
@@ -52,7 +53,7 @@ public sealed class Transition<TContext, TState>
     public Action<TContext, TriggerArgs>? SyncAction { get; }
 
     /// <summary>
-    /// Optional asynchronous action executed after the guard passes and before the state change is committed.
+    /// Optional asynchronous reaction scheduled after the state transition has completed.
     /// </summary>
-    public Func<TContext, TriggerArgs, ValueTask>? AsyncAction { get; }
+    public Func<TContext, TriggerArgs, ValueTask>? ReactionAsync { get; }
 }

@@ -92,13 +92,13 @@ public class StateTriggerBuilderTests
     }
 
     [Fact]
-    public async Task InvokeAsync_stores_async_action()
+    public async Task ReactAsync_stores_background_reaction()
     {
         var builder = new StateTriggerBuilder<TestContext, FlatState, int>();
-        IAsyncStateTriggerBuilder<TestContext, FlatState, int> asyncBuilder = builder;
-        asyncBuilder
+        ISyncStateTriggerBuilder<TestContext, FlatState, int> sync = builder;
+        sync
             .Target(FlatState.B)
-            .InvokeAsync(async (ctx, i) =>
+            .ReactAsync(async (ctx, i) =>
             {
                 await Task.Yield();
                 ctx.Counter += i;
@@ -106,9 +106,9 @@ public class StateTriggerBuilderTests
         builder.Validate();
 
         var transition = builder.BuildTransitions()[0];
-        transition.AsyncAction.Should().NotBeNull();
+        transition.ReactionAsync.Should().NotBeNull();
         var ctx = new TestContext { Counter = 10 };
-        await transition.AsyncAction!(ctx, TriggerArgs.From(5));
+        await transition.ReactionAsync!(ctx, TriggerArgs.From(5));
         ctx.Counter.Should().Be(15);
     }
 

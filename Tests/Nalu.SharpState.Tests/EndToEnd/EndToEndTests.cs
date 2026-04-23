@@ -35,27 +35,33 @@ public class EndToEndTests
     }
 
     [Fact]
-    public async Task Async_trigger_returns_ValueTask_and_awaits()
+    public void ReactAsync_runs_after_trigger_returns()
     {
         var ctx = new InspectContext();
-        var machine = AsyncMachine.CreateActor(AsyncMachine.State.Idle, ctx);
+        var machine = ReactionMachine.CreateActor(ReactionMachine.State.Idle, ctx);
+        var syncContext = new RecordingSynchronizationContext();
 
-        var valueTask = machine.InspectAsync();
-        valueTask.GetType().Should().Be(typeof(ValueTask));
-        await valueTask;
+        RunOn(syncContext, machine.Inspect);
 
-        machine.CurrentState.Should().Be(AsyncMachine.State.Idle);
+        machine.CurrentState.Should().Be(ReactionMachine.State.Idle);
+        ctx.Inspections.Should().Be(0);
+        syncContext.Drain();
         ctx.Inspections.Should().Be(1);
     }
 
     [Fact]
-    public async Task Async_trigger_target_transitions_to_new_state()
+    public void ReactAsync_target_transition_commits_before_reaction()
     {
-        var machine = AsyncMachine.CreateActor(AsyncMachine.State.Idle, new InspectContext());
+        var ctx = new InspectContext();
+        var machine = ReactionMachine.CreateActor(ReactionMachine.State.Idle, ctx);
+        var syncContext = new RecordingSynchronizationContext();
 
-        await machine.FinishAsync();
+        RunOn(syncContext, machine.Finish);
 
-        machine.CurrentState.Should().Be(AsyncMachine.State.Done);
+        machine.CurrentState.Should().Be(ReactionMachine.State.Done);
+        ctx.Inspections.Should().Be(0);
+        syncContext.Drain();
+        ctx.Inspections.Should().Be(10);
     }
 
     [Fact]
@@ -179,5 +185,44 @@ public class EndToEndTests
         act.Should().NotThrow();
         machine.CurrentState.Should().Be(HookMachine.State.Running);
         ctx.Log.Should().BeEmpty();
+    }
+
+    private static void RunOn(RecordingSynchronizationContext synchronizationContext, Action action)
+    {
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(synchronizationContext);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
+    private sealed class RecordingSynchronizationContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> _queue = new();
+
+        public override void Post(SendOrPostCallback d, object? state) => _queue.Enqueue((d, state));
+
+        public void Drain()
+        {
+            while (_queue.Count > 0)
+            {
+                var (callback, state) = _queue.Dequeue();
+                var previous = Current;
+                SetSynchronizationContext(this);
+                try
+                {
+                    callback(state);
+                }
+                finally
+                {
+                    SetSynchronizationContext(previous);
+                }
+            }
+        }
     }
 }

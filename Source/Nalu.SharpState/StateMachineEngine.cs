@@ -1,19 +1,21 @@
 namespace Nalu.SharpState;
 
 /// <summary>
-/// Runtime dispatcher used by every generated <c>Instance</c>: holds the current leaf state and the caller's context,
-/// and implements <see cref="Fire"/>/<see cref="FireAsync"/> by walking the hierarchy, evaluating guards,
-/// running the action, and committing the new leaf state.
+/// Runtime dispatcher used by every generated actor: holds the current leaf state and the caller's context,
+/// walks the hierarchy to resolve transitions, commits state changes, and schedules any post-transition reactions.
 /// </summary>
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
 /// <typeparam name="TTrigger">Enum type listing all triggers of the machine.</typeparam>
 public sealed class StateMachineEngine<TContext, TState, TTrigger>
+    where TContext : class
     where TState : struct, Enum
     where TTrigger : struct, Enum
 {
+    private readonly object _gate = new();
     private readonly StateMachineDefinition<TContext, TState, TTrigger> _definition;
     private TState _currentState;
+    private bool _isDispatching;
 
     /// <summary>
     /// Initializes a new <see cref="StateMachineEngine{TContext, TState, TTrigger}"/>.
@@ -57,6 +59,11 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
     public event StateChangedHandler<TState, TTrigger>? StateChanged;
 
     /// <summary>
+    /// Raised when a background <c>ReactAsync(...)</c> callback fails after the transition already completed.
+    /// </summary>
+    public event ReactionFailedHandler<TState, TTrigger>? ReactionFailed;
+
+    /// <summary>
     /// Callback invoked when a trigger fires but no transition matches (neither on the current leaf
     /// nor on any of its ancestors, or all guards returned <c>false</c>). Handlers receive the current
     /// leaf state, the trigger itself, and the arguments originally passed to it.
@@ -77,53 +84,39 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
     public bool IsIn(TState state) => _definition.IsSelfOrDescendantOf(_currentState, state);
 
     /// <summary>
-    /// Fires a synchronous trigger. Walks the ancestor chain of <see cref="CurrentState"/> looking for a configured
-    /// transition whose guard (if any) returns <c>true</c>. The first match wins: its <see cref="Transition{TContext, TState}.SyncAction"/>
-    /// runs and the state is updated (unless the transition is internal).
+    /// Fires a trigger synchronously. The first matching transition wins.
+    /// External transitions run exit actions, transition action, state commit, entry actions, and <see cref="StateChanged"/>
+    /// before any configured <c>ReactAsync(...)</c> callback is scheduled in the captured synchronization context.
     /// </summary>
-    /// <param name="trigger">The trigger to fire.</param>
-    /// <param name="args">Arguments matching the original trigger method's parameter list.</param>
     public void Fire(TTrigger trigger, TriggerArgs args)
     {
-        var match = FindMatchingTransition(trigger, args);
-        if (match is null)
+        lock (_gate)
         {
-            OnUnhandled?.Invoke(_currentState, trigger, args.ToArray());
-            return;
-        }
+            if (_isDispatching)
+            {
+                throw new InvalidOperationException(
+                    $"Trigger '{trigger}' cannot be fired while another trigger is still being processed. Use ReactAsync(...) for post-transition work instead.");
+            }
 
-        var transition = match.Value.Transition;
-        transition.SyncAction?.Invoke(Context, args);
-        CommitTransition(trigger, match.Value.Source, transition, args);
-    }
+            _isDispatching = true;
+            try
+            {
+                var synchronizationContext = System.Threading.SynchronizationContext.Current;
+                var match = FindMatchingTransition(trigger, args);
+                if (match is null)
+                {
+                    OnUnhandled?.Invoke(_currentState, trigger, args.ToArray());
+                    return;
+                }
 
-    /// <summary>
-    /// Fires an asynchronous trigger. Semantics mirror <see cref="Fire"/> but awaits the
-    /// <see cref="Transition{TContext, TState}.AsyncAction"/> before committing the state change.
-    /// </summary>
-    /// <param name="trigger">The trigger to fire.</param>
-    /// <param name="args">Arguments matching the original trigger method's parameter list.</param>
-    /// <returns>A task that completes after the action has run and the state has been committed.</returns>
-    public async ValueTask FireAsync(TTrigger trigger, TriggerArgs args)
-    {
-        var match = FindMatchingTransition(trigger, args);
-        if (match is null)
-        {
-            OnUnhandled?.Invoke(_currentState, trigger, args.ToArray());
-            return;
+                var transition = match.Value.Transition;
+                CommitTransition(trigger, match.Value.Source, transition, args, synchronizationContext);
+            }
+            finally
+            {
+                _isDispatching = false;
+            }
         }
-
-        var transition = match.Value.Transition;
-        if (transition.AsyncAction is { } asyncAction)
-        {
-            await asyncAction(Context, args).ConfigureAwait(false);
-        }
-        else
-        {
-            transition.SyncAction?.Invoke(Context, args);
-        }
-
-        await CommitTransitionAsync(trigger, match.Value.Source, transition, args).ConfigureAwait(false);
     }
 
     private (Transition<TContext, TState> Transition, TState Source)? FindMatchingTransition(TTrigger trigger, TriggerArgs args)
@@ -153,32 +146,27 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
         }
     }
 
-    private void CommitTransition(TTrigger trigger, TState source, Transition<TContext, TState> transition, TriggerArgs args)
+    private void CommitTransition(
+        TTrigger trigger,
+        TState source,
+        Transition<TContext, TState> transition,
+        TriggerArgs args,
+        System.Threading.SynchronizationContext? synchronizationContext)
     {
         if (transition.IsInternal)
         {
+            transition.SyncAction?.Invoke(Context, args);
+            ScheduleReaction(source, source, trigger, transition, args, synchronizationContext);
             return;
         }
 
         var newLeaf = _definition.LeafOf(transition.Target);
         InvokeExitActions(source, newLeaf);
+        transition.SyncAction?.Invoke(Context, args);
         _currentState = newLeaf;
         InvokeEntryActions(source, newLeaf);
         StateChanged?.Invoke(source, newLeaf, trigger, args.ToArray());
-    }
-
-    private async ValueTask CommitTransitionAsync(TTrigger trigger, TState source, Transition<TContext, TState> transition, TriggerArgs args)
-    {
-        if (transition.IsInternal)
-        {
-            return;
-        }
-
-        var newLeaf = _definition.LeafOf(transition.Target);
-        await InvokeExitActionsAsync(source, newLeaf).ConfigureAwait(false);
-        _currentState = newLeaf;
-        await InvokeEntryActionsAsync(source, newLeaf).ConfigureAwait(false);
-        StateChanged?.Invoke(source, newLeaf, trigger, args.ToArray());
+        ScheduleReaction(source, newLeaf, trigger, transition, args, synchronizationContext);
     }
 
     private void InvokeExitActions(TState source, TState destination)
@@ -199,34 +187,53 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
         }
     }
 
-    private async ValueTask InvokeExitActionsAsync(TState source, TState destination)
+    private void ScheduleReaction(
+        TState source,
+        TState destination,
+        TTrigger trigger,
+        Transition<TContext, TState> transition,
+        TriggerArgs args,
+        System.Threading.SynchronizationContext? synchronizationContext)
     {
-        foreach (var state in EnumerateExitPath(source, destination))
+        if (transition.ReactionAsync is null)
         {
-            var config = _definition.GetConfiguration(state);
-            if (config.ExitActionAsync is { } exitAsync)
-            {
-                await exitAsync(Context).ConfigureAwait(false);
-            }
-            else
-            {
-                config.ExitAction?.Invoke(Context);
-            }
+            return;
         }
+
+        var workItem = new ReactionWorkItem(this, transition.ReactionAsync, source, destination, trigger, args);
+        if (synchronizationContext is null)
+        {
+            _ = Task.Run(workItem.Start);
+            return;
+        }
+
+#pragma warning disable VSTHRD001
+        synchronizationContext.Post(static state => ((ReactionWorkItem)state!).Start(), workItem);
+#pragma warning restore VSTHRD001
     }
 
-    private async ValueTask InvokeEntryActionsAsync(TState source, TState destination)
+#pragma warning disable VSTHRD100
+    private async void ExecuteReaction(
+#pragma warning restore VSTHRD100
+        Func<TContext, TriggerArgs, ValueTask> reactionAsync,
+        TState source,
+        TState destination,
+        TTrigger trigger,
+        TriggerArgs args)
     {
-        foreach (var state in EnumerateEntryPath(source, destination))
+        try
         {
-            var config = _definition.GetConfiguration(state);
-            if (config.EntryActionAsync is { } entryAsync)
+            await reactionAsync(Context, args);
+        }
+        catch (Exception exception)
+        {
+            try
             {
-                await entryAsync(Context).ConfigureAwait(false);
+                ReactionFailed?.Invoke(source, destination, trigger, args.ToArray(), exception);
             }
-            else
+            catch
             {
-                config.EntryAction?.Invoke(Context);
+                // Ignore failures in failure-reporting subscribers to avoid turning fire-and-forget work into process-wide faults.
             }
         }
     }
@@ -270,5 +277,33 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
         {
             yield return stack.Pop();
         }
+    }
+
+    private sealed class ReactionWorkItem
+    {
+        private readonly StateMachineEngine<TContext, TState, TTrigger> _engine;
+        private readonly Func<TContext, TriggerArgs, ValueTask> _reactionAsync;
+        private readonly TState _source;
+        private readonly TState _destination;
+        private readonly TTrigger _trigger;
+        private readonly TriggerArgs _args;
+
+        public ReactionWorkItem(
+            StateMachineEngine<TContext, TState, TTrigger> engine,
+            Func<TContext, TriggerArgs, ValueTask> reactionAsync,
+            TState source,
+            TState destination,
+            TTrigger trigger,
+            TriggerArgs args)
+        {
+            _engine = engine;
+            _reactionAsync = reactionAsync;
+            _source = source;
+            _destination = destination;
+            _trigger = trigger;
+            _args = args;
+        }
+
+        public void Start() => _engine.ExecuteReaction(_reactionAsync, _source, _destination, _trigger, _args);
     }
 }

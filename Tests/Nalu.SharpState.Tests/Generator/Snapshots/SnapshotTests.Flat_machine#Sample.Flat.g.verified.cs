@@ -81,6 +81,12 @@ namespace Sample
                 remove => _engine.StateChanged -= value;
             }
             
+            public event global::Nalu.SharpState.ReactionFailedHandler<State, Trigger>? ReactionFailed
+            {
+                add => _engine.ReactionFailed += value;
+                remove => _engine.ReactionFailed -= value;
+            }
+            
             public bool IsIn(State state) => _engine.IsIn(state);
             
             public void Connect(string deviceId) => _engine.Fire(Trigger.Connect, global::Nalu.SharpState.TriggerArgs.From(deviceId));

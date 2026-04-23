@@ -33,7 +33,7 @@ internal static class Descriptors
     public static readonly DiagnosticDescriptor TriggerMustBePartialVoid = new(
         id: "NSS004",
         title: "Trigger method must be partial void",
-        messageFormat: "[StateTriggerDefinition] method '{0}' must be declared as 'partial void' (its return type is driven by the machine-level Async flag)",
+        messageFormat: "[StateTriggerDefinition] method '{0}' must be declared as 'partial void'",
         category: _category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -78,11 +78,4 @@ internal static class Descriptors
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
-    public static readonly DiagnosticDescriptor TriggerNameAsyncSuffix = new(
-        id: "NSS010",
-        title: "Async machine trigger names must not end with 'Async'",
-        messageFormat: "[StateTriggerDefinition] '{0}' ends with 'Async'; on an async state machine the generator appends the 'Async' suffix automatically - declare the trigger without the suffix",
-        category: _category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true);
 }

@@ -33,16 +33,6 @@ public interface IStateConfiguration<TContext, TState, TTrigger>
     Action<TContext>? ExitAction { get; }
 
     /// <summary>
-    /// Optional asynchronous callback invoked when the machine enters this state during an external transition.
-    /// </summary>
-    Func<TContext, ValueTask>? EntryActionAsync { get; }
-
-    /// <summary>
-    /// Optional asynchronous callback invoked when the machine exits this state during an external transition.
-    /// </summary>
-    Func<TContext, ValueTask>? ExitActionAsync { get; }
-
-    /// <summary>
     /// Attempts to look up all transitions declared on this state for the given trigger.
     /// Multiple transitions may share a trigger (each guarded by a distinct <c>When</c>).
     /// </summary>

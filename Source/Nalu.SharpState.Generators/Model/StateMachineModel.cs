@@ -18,7 +18,6 @@ internal sealed record StateMachineModel(
     string ClassAccessibility,
     string TypeParameters,
     string ContextTypeDisplay,
-    bool IsAsync,
     EquatableArray<ContainingTypeModel> ContainingTypes,
     EquatableArray<StateModel> States,
     EquatableArray<TriggerModel> Triggers,
@@ -77,7 +76,6 @@ internal sealed record StateMachineModel(
             a.AttributeClass is { } ac
             && ac.ToDisplayString() == "Nalu.SharpState.StateMachineDefinitionAttribute");
         var contextType = "global::System.Object";
-        var isAsyncMachine = false;
         if (attribute is not null)
         {
             if (attribute.ConstructorArguments.Length > 0
@@ -86,13 +84,6 @@ internal sealed record StateMachineModel(
                 contextType = ctxSym.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             }
 
-            foreach (var kv in attribute.NamedArguments)
-            {
-                if (kv.Key == "Async" && kv.Value.Value is bool b)
-                {
-                    isAsyncMachine = b;
-                }
-            }
         }
 
         var triggers = ImmutableArray.CreateBuilder<TriggerModel>();
@@ -105,7 +96,6 @@ internal sealed record StateMachineModel(
             parentStateName: null,
             accessPrefix: string.Empty,
             isRoot: true,
-            isAsyncMachine: isAsyncMachine,
             states,
             seenStates,
             triggers,
@@ -133,7 +123,6 @@ internal sealed record StateMachineModel(
             AccessibilityString(classSymbol.DeclaredAccessibility),
             TypeParameterList(classSymbol),
             contextType,
-            isAsyncMachine,
             new EquatableArray<ContainingTypeModel>(containing.ToImmutableArray()),
             new EquatableArray<StateModel>(states.ToImmutableArray()),
             new EquatableArray<TriggerModel>(triggers.ToImmutable()),
@@ -145,7 +134,6 @@ internal sealed record StateMachineModel(
         string? parentStateName,
         string accessPrefix,
         bool isRoot,
-        bool isAsyncMachine,
         List<StateModel> states,
         HashSet<string> seenStates,
         ImmutableArray<TriggerModel>.Builder triggers,
@@ -153,7 +141,7 @@ internal sealed record StateMachineModel(
         List<DiagnosticInfo> diagnostics,
         CancellationToken ct)
     {
-        CollectTriggers(regionClass, isInSubRegion: !isRoot, isAsyncMachine: isAsyncMachine, triggers, seenTriggers, diagnostics, ct);
+        CollectTriggers(regionClass, isInSubRegion: !isRoot, triggers, seenTriggers, diagnostics, ct);
 
         var localStateNames = new HashSet<string>();
 
@@ -268,7 +256,6 @@ internal sealed record StateMachineModel(
                 parentStateName: validParentForChildren,
                 accessPrefix: nestedAccessPrefix,
                 isRoot: false,
-                isAsyncMachine: isAsyncMachine,
                 states,
                 seenStates,
                 triggers,
@@ -295,7 +282,6 @@ internal sealed record StateMachineModel(
     private static void CollectTriggers(
         INamedTypeSymbol classSymbol,
         bool isInSubRegion,
-        bool isAsyncMachine,
         ImmutableArray<TriggerModel>.Builder triggers,
         HashSet<string> seenTriggers,
         List<DiagnosticInfo> diagnostics,
@@ -338,15 +324,6 @@ internal sealed record StateMachineModel(
                 var loc = methodSyntax?.Identifier.GetLocation() ?? method.Locations.FirstOrDefault();
                 diagnostics.Add(DiagnosticInfo.Create(
                     Descriptors.TriggerMustBePartialVoid,
-                    loc,
-                    method.Name));
-            }
-
-            if (isAsyncMachine && method.Name.EndsWith("Async", StringComparison.Ordinal))
-            {
-                var loc = methodSyntax?.Identifier.GetLocation() ?? method.Locations.FirstOrDefault();
-                diagnostics.Add(DiagnosticInfo.Create(
-                    Descriptors.TriggerNameAsyncSuffix,
                     loc,
                     method.Name));
             }

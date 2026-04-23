@@ -242,25 +242,4 @@ public class DiagnosticTests
         """;
         GetDiagnostics(source).Should().Contain(d => d.Id == "NSS009");
     }
-
-    [Fact]
-    public void NSS010_reported_when_async_trigger_ends_with_Async_suffix()
-    {
-        var source = """
-        using Nalu.SharpState;
-
-        namespace Sample;
-
-        public class Ctx { }
-
-        [StateMachineDefinition(typeof(Ctx), Async = true)]
-        public partial class M
-        {
-            [StateTriggerDefinition] static partial void InspectAsync();
-
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
-        }
-        """;
-        GetDiagnostics(source).Should().Contain(d => d.Id == "NSS010");
-    }
 }

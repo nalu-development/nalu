@@ -200,6 +200,30 @@ public class StateMachineEngineTests
 
         ctx.Log.Should().Equal("exit:A", "enter:B");
     }
+
+    [Fact]
+    public void Fire_throws_when_reentered_from_callback()
+    {
+        StateMachineEngine<TestContext, FlatState, FlatTrigger>? engine = null;
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A]
+                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
+            map[FlatState.B]
+                .OnEntry(_ => engine!.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty));
+        });
+
+        engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext())
+        {
+            OnUnhandled = null,
+        };
+
+        var act = () => engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*cannot be fired while another trigger is still being processed*");
+        engine.CurrentState.Should().Be(FlatState.B);
+    }
 }
 
 internal static class TestConfiguratorExtensions
@@ -208,6 +232,7 @@ internal static class TestConfiguratorExtensions
         this TestStateConfigurator<TContext, TState, TTrigger> self,
         TTrigger trigger,
         IReadOnlyList<Transition<TContext, TState>> transitions)
+        where TContext : class
         where TState : struct, Enum
         where TTrigger : struct, Enum
     {

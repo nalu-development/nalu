@@ -32,12 +32,4 @@ public sealed class StateMachineDefinitionAttribute : Attribute
     /// </summary>
     public Type ContextType { get; }
 
-    /// <summary>
-    /// When <c>true</c>, every generated trigger method on the <c>Instance</c> class returns <see cref="ValueTask"/>
-    /// and dispatches through <see cref="StateMachineEngine{TContext, TState, TTrigger}.FireAsync"/>, and the
-    /// generated configurator exposes the async-only builder interface (<c>InvokeAsync</c>).
-    /// When <c>false</c> (default), triggers return <c>void</c> and the configurator exposes the sync-only builder
-    /// interface (<c>Invoke</c>).
-    /// </summary>
-    public bool Async { get; init; }
 }

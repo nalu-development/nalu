@@ -39,18 +39,17 @@ public class SnapshotTests
     }
 
     [Fact]
-    public Task Async_trigger()
+    public Task Reaction_callback()
     {
         var source = """
         using Nalu.SharpState;
-        using System.Threading.Tasks;
 
         namespace Sample;
 
         public class Ctx { }
 
-        [StateMachineDefinition(typeof(Ctx), Async = true)]
-        public partial class AsyncMachine
+        [StateMachineDefinition(typeof(Ctx))]
+        public partial class ReactionMachine
         {
             [StateTriggerDefinition] static partial void Start();
             [StateTriggerDefinition] static partial void Sync(long revision);
@@ -61,7 +60,7 @@ public class SnapshotTests
 
             [StateDefinition]
             private static IStateConfiguration Running => ConfigureState()
-                .OnSync(t => t.Stay().InvokeAsync((_, _) => default));
+                .OnSync(t => t.Stay().ReactAsync((_, _) => default));
         }
         """;
         var result = GeneratorDriverHelper.RunGenerator(source, out _);
