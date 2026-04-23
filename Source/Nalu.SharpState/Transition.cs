@@ -11,8 +11,6 @@ namespace Nalu.SharpState;
 public sealed class Transition<TContext, TState>
     where TState : struct, Enum
 {
-    private readonly TState _target;
-
     internal Transition(
         TState target,
         bool isInternal,
@@ -20,7 +18,7 @@ public sealed class Transition<TContext, TState>
         Action<TContext, TriggerArgs>? syncAction,
         Func<TContext, TriggerArgs, ValueTask>? reactionAsync)
     {
-        _target = target;
+        Target = target;
         IsInternal = isInternal;
         Guard = guard;
         SyncAction = syncAction;
@@ -39,7 +37,7 @@ public sealed class Transition<TContext, TState>
     /// </summary>
     public TState Target => IsInternal
         ? throw new InvalidOperationException("Internal transitions do not have a target state.")
-        : _target;
+        : field;
 
     /// <summary>
     /// Optional guard predicate. When <c>null</c>, the transition always fires.
