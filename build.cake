@@ -57,7 +57,7 @@ Task("Test")
                         $"trx;LogFileName={project.GetFilenameWithoutExtension()}.trx",
                         $"html;LogFileName={project.GetFilenameWithoutExtension()}.html",
                     },
-                    NoBuild = true,
+                    NoBuild = false,
                     NoRestore = true,
                     ResultsDirectory = artefactsDirectory,
                 });
@@ -77,7 +77,7 @@ Task("Pack")
                 {
                     ContinuousIntegrationBuild = !BuildSystem.IsLocalBuild,
                 },
-                NoBuild = true,
+                NoBuild = false,
                 NoRestore = true,
                 OutputDirectory = artefactsDirectory,
             });
