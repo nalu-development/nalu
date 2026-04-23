@@ -24,7 +24,7 @@ namespace Sample
             Sync,
         }
         
-        protected interface IStateConfiguration : global::Nalu.SharpState.IStateConfiguration<global::Sample.Ctx, State, Trigger>
+        protected interface IStateConfiguration : global::Nalu.SharpState.IStateConfiguration<global::Sample.Ctx, State, Trigger, IActor>
         {
         }
         
@@ -32,7 +32,7 @@ namespace Sample
         {
             /// <summary>
             /// Declares a synchronous callback to run after the machine enters this state.
-            /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Ctx, State, Trigger>.SetEntryAction(Action<global::Sample.Ctx>)"/>.
+            /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Ctx, State, Trigger, IActor>.SetEntryAction(Action<global::Sample.Ctx>)"/>.
             /// </summary>
             /// <param name="action">The callback to run after the state is entered.</param>
             /// <returns>The same configurator for chaining.</returns>
@@ -40,7 +40,7 @@ namespace Sample
             
             /// <summary>
             /// Declares a synchronous callback to run before the machine exits this state.
-            /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Ctx, State, Trigger>.SetExitAction(Action<global::Sample.Ctx>)"/>.
+            /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Ctx, State, Trigger, IActor>.SetExitAction(Action<global::Sample.Ctx>)"/>.
             /// </summary>
             /// <param name="action">The callback to run before the state is exited.</param>
             /// <returns>The same configurator for chaining.</returns>
@@ -49,16 +49,16 @@ namespace Sample
             /// <summary>
             /// Configures what happens when <see cref="IActor.Start()"/> is invoked.
             /// </summary>
-            /// <param name="configure">Configures the <see cref="global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State>"/> used by <see cref="IActor.Start()"/>.</param>
+            /// <param name="configure">Configures the <see cref="global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, IActor>"/> used by <see cref="IActor.Start()"/>.</param>
             /// <returns>The same configurator for chaining.</returns>
-            IStateConfigurator OnStart(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State>> configure);
+            IStateConfigurator OnStart(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, IActor>> configure);
             
             /// <summary>
             /// Configures what happens when <see cref="IActor.Sync(long)"/> is invoked.
             /// </summary>
-            /// <param name="configure">Configures the <see cref="global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, long>"/> used by <see cref="IActor.Sync(long)"/>.</param>
+            /// <param name="configure">Configures the <see cref="global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, IActor, long>"/> used by <see cref="IActor.Sync(long)"/>.</param>
             /// <returns>The same configurator for chaining.</returns>
-            IStateConfigurator OnSync(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, long>> configure);
+            IStateConfigurator OnSync(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, IActor, long>> configure);
         }
         
         /// <summary>
@@ -115,11 +115,11 @@ namespace Sample
         
         protected static IStateConfigurator ConfigureState() => new GeneratedStateConfigurator();
         
-        private static readonly global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger> _definition = BuildDefinition();
+        private static readonly global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger, IActor> _definition = BuildDefinition();
         
-        private static global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger> BuildDefinition()
+        private static global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger, IActor> BuildDefinition()
         {
-            var map = new Dictionary<State, global::Nalu.SharpState.IStateConfiguration<global::Sample.Ctx, State, Trigger>>();
+            var map = new Dictionary<State, global::Nalu.SharpState.IStateConfiguration<global::Sample.Ctx, State, Trigger, IActor>>();
             {
                 var c = (GeneratedStateConfigurator)Idle;
                 map[State.Idle] = c;
@@ -128,7 +128,7 @@ namespace Sample
                 var c = (GeneratedStateConfigurator)Running;
                 map[State.Running] = c;
             }
-            return new global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger>(map);
+            return new global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger, IActor>(map);
         }
         
         /// <summary>
@@ -141,11 +141,11 @@ namespace Sample
         
         private sealed class Actor : IActor
         {
-            private readonly global::Nalu.SharpState.StateMachineEngine<global::Sample.Ctx, State, Trigger> _engine;
+            private readonly global::Nalu.SharpState.StateMachineEngine<global::Sample.Ctx, State, Trigger, IActor> _engine;
             
-            internal Actor(global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger> definition, State currentState, global::Sample.Ctx context)
+            internal Actor(global::Nalu.SharpState.StateMachineDefinition<global::Sample.Ctx, State, Trigger, IActor> definition, State currentState, global::Sample.Ctx context)
             {
-                _engine = new global::Nalu.SharpState.StateMachineEngine<global::Sample.Ctx, State, Trigger>(definition, currentState, context);
+                _engine = new global::Nalu.SharpState.StateMachineEngine<global::Sample.Ctx, State, Trigger, IActor>(definition, currentState, context, this);
             }
             
             public State CurrentState => _engine.CurrentState;
@@ -177,7 +177,7 @@ namespace Sample
             public void Sync(long revision) => _engine.Fire(Trigger.Sync, global::Nalu.SharpState.TriggerArgs.From(revision));
         }
         
-        private sealed class GeneratedStateConfigurator : global::Nalu.SharpState.StateConfigurator<global::Sample.Ctx, State, Trigger>, IStateConfigurator
+        private sealed class GeneratedStateConfigurator : global::Nalu.SharpState.StateConfigurator<global::Sample.Ctx, State, Trigger, IActor>, IStateConfigurator
         {
             internal void ApplyParent(State parent) => SetParent(parent);
             
@@ -195,18 +195,18 @@ namespace Sample
                 return this;
             }
             
-            public IStateConfigurator OnStart(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State>> configure)
+            public IStateConfigurator OnStart(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, IActor>> configure)
             {
-                var builder = new global::Nalu.SharpState.StateTriggerBuilder<global::Sample.Ctx, State>();
+                var builder = new global::Nalu.SharpState.StateTriggerBuilder<global::Sample.Ctx, State, IActor>();
                 configure(builder);
                 builder.Validate();
                 AddTransitions(Trigger.Start, builder.BuildTransitions());
                 return this;
             }
             
-            public IStateConfigurator OnSync(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, long>> configure)
+            public IStateConfigurator OnSync(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Ctx, State, IActor, long>> configure)
             {
-                var builder = new global::Nalu.SharpState.StateTriggerBuilder<global::Sample.Ctx, State, long>();
+                var builder = new global::Nalu.SharpState.StateTriggerBuilder<global::Sample.Ctx, State, IActor, long>();
                 configure(builder);
                 builder.Validate();
                 AddTransitions(Trigger.Sync, builder.BuildTransitions());

@@ -1,36 +1,36 @@
 namespace Nalu.SharpState.Tests.Runtime;
 
-internal sealed class TestStateConfigurator<TContext, TState, TTrigger>
-    : StateConfigurator<TContext, TState, TTrigger>
+internal sealed class TestStateConfigurator<TContext, TState, TTrigger, TActor>
+    : StateConfigurator<TContext, TState, TTrigger, TActor>
     where TContext : class
     where TState : struct, Enum
     where TTrigger : struct, Enum
 {
-    public TestStateConfigurator<TContext, TState, TTrigger> On(TTrigger trigger, Transition<TContext, TState> transition)
+    public TestStateConfigurator<TContext, TState, TTrigger, TActor> On(TTrigger trigger, Transition<TContext, TState, TActor> transition)
     {
         AddTransitions(trigger, [transition]);
         return this;
     }
 
-    public TestStateConfigurator<TContext, TState, TTrigger> Parent(TState parent)
+    public TestStateConfigurator<TContext, TState, TTrigger, TActor> Parent(TState parent)
     {
         SetParent(parent);
         return this;
     }
 
-    public TestStateConfigurator<TContext, TState, TTrigger> AsStateMachine(TState initial)
+    public TestStateConfigurator<TContext, TState, TTrigger, TActor> AsStateMachine(TState initial)
     {
         SetInitialChild(initial);
         return this;
     }
 
-    public TestStateConfigurator<TContext, TState, TTrigger> WhenEntering(Action<TContext> action)
+    public TestStateConfigurator<TContext, TState, TTrigger, TActor> WhenEntering(Action<TContext> action)
     {
         SetEntryAction(action);
         return this;
     }
 
-    public TestStateConfigurator<TContext, TState, TTrigger> WhenExiting(Action<TContext> action)
+    public TestStateConfigurator<TContext, TState, TTrigger, TActor> WhenExiting(Action<TContext> action)
     {
         SetExitAction(action);
         return this;
@@ -40,20 +40,22 @@ internal sealed class TestStateConfigurator<TContext, TState, TTrigger>
 
 internal static class TestTransition
 {
-    public static Transition<TContext, TState> ToTarget<TContext, TState>(
+    public static Transition<TContext, TState, TActor> ToTarget<TContext, TState, TActor>(
         TState target,
         Func<TContext, TriggerArgs, bool>? guard = null,
         Action<TContext, TriggerArgs>? syncAction = null,
-        Func<TContext, TriggerArgs, ValueTask>? reactionAsync = null)
+        Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null)
         where TContext : class
         where TState : struct, Enum
         => new(target, false, guard, syncAction, reactionAsync);
 
-    public static Transition<TContext, TState> Stay<TContext, TState>(
+    public static Transition<TContext, TState, TActor> Stay<TContext, TState, TActor>(
         Action<TContext, TriggerArgs>? syncAction = null,
-        Func<TContext, TriggerArgs, ValueTask>? reactionAsync = null,
+        Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null,
         Func<TContext, TriggerArgs, bool>? guard = null)
         where TContext : class
         where TState : struct, Enum
         => new(default, true, guard, syncAction, reactionAsync);
 }
+
+internal sealed class TestActor;

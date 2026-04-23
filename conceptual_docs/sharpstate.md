@@ -233,9 +233,10 @@ private static IStateConfiguration Saving => ConfigureState()
     .OnSaved(t => t
         .Target(State.Ready)
         .Invoke(ctx => ctx.LastSavedAt = DateTimeOffset.UtcNow)
-        .ReactAsync(async ctx =>
+        .ReactAsync(async (actor, ctx) =>
         {
             await ctx.Analytics.TrackSavedAsync();
+            // actor.PublishCompleted();
         }));
 ```
 
@@ -248,7 +249,7 @@ For external transitions, the order is:
 5. `StateChanged`
 6. `ReactAsync(...)`
 
-`ReactAsync(...)` captures the current `SynchronizationContext` when the trigger is fired. If the background reaction throws, the exception is surfaced through `ReactionFailed`.
+`ReactAsync(...)` captures the current `SynchronizationContext` when the trigger is fired. The callback receives the generated actor instance first, so it can trigger additional transitions after the awaited work completes. If the background reaction throws, the exception is surfaced through `ReactionFailed`.
 
 ## What next?
 

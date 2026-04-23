@@ -46,7 +46,8 @@ public class EndToEndTests
         machine.CurrentState.Should().Be(ReactionMachine.State.Idle);
         ctx.Inspections.Should().Be(0);
         syncContext.Drain();
-        ctx.Inspections.Should().Be(1);
+        machine.CurrentState.Should().Be(ReactionMachine.State.Done);
+        ctx.Inspections.Should().Be(11);
     }
 
     [Fact]

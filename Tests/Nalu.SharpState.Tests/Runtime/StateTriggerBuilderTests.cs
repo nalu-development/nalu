@@ -7,7 +7,7 @@ public class StateTriggerBuilderTests
     [Fact]
     public void Validate_requires_Target_or_Stay()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState>();
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
         var act = () => builder.Validate();
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Target*Stay*");
@@ -16,8 +16,8 @@ public class StateTriggerBuilderTests
     [Fact]
     public void Validate_rejects_Target_and_Stay_together()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState>();
-        ISyncStateTriggerBuilder<TestContext, FlatState> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor> sync = builder;
         sync.Target(FlatState.B).Stay();
         var act = () => builder.Validate();
         act.Should().Throw<InvalidOperationException>();
@@ -26,8 +26,8 @@ public class StateTriggerBuilderTests
     [Fact]
     public void BuildTransitions_produces_single_transition_with_target()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState>();
-        ISyncStateTriggerBuilder<TestContext, FlatState> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor> sync = builder;
         sync.Target(FlatState.B);
         builder.Validate();
 
@@ -42,8 +42,8 @@ public class StateTriggerBuilderTests
     [Fact]
     public void BuildTransitions_produces_internal_transition_on_Stay()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState>();
-        ISyncStateTriggerBuilder<TestContext, FlatState> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor> sync = builder;
         sync.Stay();
         builder.Validate();
 
@@ -56,8 +56,8 @@ public class StateTriggerBuilderTests
     [Fact]
     public void One_arg_builder_unpacks_argument()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState, string>();
-        ISyncStateTriggerBuilder<TestContext, FlatState, string> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, string>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, string> sync = builder;
         sync
             .Target(FlatState.B)
             .When((_, arg) => arg == "ok")
@@ -75,8 +75,8 @@ public class StateTriggerBuilderTests
     [Fact]
     public void Two_arg_builder_unpacks_both_arguments()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState, string, int>();
-        ISyncStateTriggerBuilder<TestContext, FlatState, string, int> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, string, int>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, string, int> sync = builder;
         sync
             .Target(FlatState.B)
             .When((_, s, i) => s.Length == i)
@@ -94,29 +94,30 @@ public class StateTriggerBuilderTests
     [Fact]
     public async Task ReactAsync_stores_background_reaction()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState, int>();
-        ISyncStateTriggerBuilder<TestContext, FlatState, int> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, int>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, int> sync = builder;
         sync
             .Target(FlatState.B)
-            .ReactAsync(async (ctx, i) =>
+            .ReactAsync(async (_, ctx, i) =>
             {
                 await Task.Yield();
                 ctx.Counter += i;
             });
         builder.Validate();
 
+        var actor = new TestActor();
         var transition = builder.BuildTransitions()[0];
         transition.ReactionAsync.Should().NotBeNull();
         var ctx = new TestContext { Counter = 10 };
-        await transition.ReactionAsync!(ctx, TriggerArgs.From(5));
+        await transition.ReactionAsync!(actor, ctx, TriggerArgs.From(5));
         ctx.Counter.Should().Be(15);
     }
 
     [Fact]
     public void Ignore_is_syntax_sugar_for_internal_transition()
     {
-        var builder = new StateTriggerBuilder<TestContext, FlatState>();
-        ISyncStateTriggerBuilder<TestContext, FlatState> sync = builder;
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor> sync = builder;
         sync.Ignore();
         builder.Validate();
 

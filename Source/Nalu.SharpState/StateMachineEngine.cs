@@ -7,32 +7,37 @@ namespace Nalu.SharpState;
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
 /// <typeparam name="TTrigger">Enum type listing all triggers of the machine.</typeparam>
-public sealed class StateMachineEngine<TContext, TState, TTrigger>
+/// <typeparam name="TActor">Type of the actor passed into post-transition reactions.</typeparam>
+public sealed class StateMachineEngine<TContext, TState, TTrigger, TActor>
     where TContext : class
     where TState : struct, Enum
     where TTrigger : struct, Enum
 {
     private readonly object _gate = new();
-    private readonly StateMachineDefinition<TContext, TState, TTrigger> _definition;
+    private readonly StateMachineDefinition<TContext, TState, TTrigger, TActor> _definition;
+    private readonly TActor _actor;
     private TState _currentState;
     private bool _isDispatching;
 
     /// <summary>
-    /// Initializes a new <see cref="StateMachineEngine{TContext, TState, TTrigger}"/>.
+    /// Initializes a new <see cref="StateMachineEngine{TContext, TState, TTrigger, TActor}"/>.
     /// If <paramref name="currentState"/> is a composite, its initial child chain is resolved to a leaf before the engine settles.
     /// </summary>
     /// <param name="definition">The immutable definition to dispatch against.</param>
     /// <param name="currentState">The initial state. Composites are resolved to their initial leaf.</param>
     /// <param name="context">The context carried through every transition.</param>
+    /// <param name="actor">The actor instance to pass to post-transition reactions.</param>
     /// <exception cref="ArgumentNullException"><paramref name="definition"/> or <paramref name="context"/> is <c>null</c>.</exception>
     /// <exception cref="KeyNotFoundException"><paramref name="currentState"/> is not registered in the definition.</exception>
     public StateMachineEngine(
-        StateMachineDefinition<TContext, TState, TTrigger> definition,
+        StateMachineDefinition<TContext, TState, TTrigger, TActor> definition,
         TState currentState,
-        TContext context)
+        TContext context,
+        TActor actor)
     {
         _definition = definition ?? throw new ArgumentNullException(nameof(definition));
         Context = context ?? throw new ArgumentNullException(nameof(context));
+        _actor = actor;
 
         if (!_definition.TryGetConfiguration(currentState, out _))
         {
@@ -54,7 +59,7 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
 
     /// <summary>
     /// Raised after a transition has committed. Parameters are the source leaf, the new leaf, and the trigger that caused the change.
-    /// Not raised for internal transitions (<see cref="Transition{TContext, TState}.IsInternal"/>) or unhandled triggers.
+    /// Not raised for internal transitions (<see cref="Transition{TContext, TState, TActor}.IsInternal"/>) or unhandled triggers.
     /// </summary>
     public event StateChangedHandler<TState, TTrigger>? StateChanged;
 
@@ -119,7 +124,7 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
         }
     }
 
-    private (Transition<TContext, TState> Transition, TState Source)? FindMatchingTransition(TTrigger trigger, TriggerArgs args)
+    private (Transition<TContext, TState, TActor> Transition, TState Source)? FindMatchingTransition(TTrigger trigger, TriggerArgs args)
     {
         var source = _currentState;
         var state = source;
@@ -149,7 +154,7 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
     private void CommitTransition(
         TTrigger trigger,
         TState source,
-        Transition<TContext, TState> transition,
+        Transition<TContext, TState, TActor> transition,
         TriggerArgs args,
         System.Threading.SynchronizationContext? synchronizationContext)
     {
@@ -191,7 +196,7 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
         TState source,
         TState destination,
         TTrigger trigger,
-        Transition<TContext, TState> transition,
+        Transition<TContext, TState, TActor> transition,
         TriggerArgs args,
         System.Threading.SynchronizationContext? synchronizationContext)
     {
@@ -215,7 +220,7 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
 #pragma warning disable VSTHRD100
     private async void ExecuteReaction(
 #pragma warning restore VSTHRD100
-        Func<TContext, TriggerArgs, ValueTask> reactionAsync,
+        Func<TActor, TContext, TriggerArgs, ValueTask> reactionAsync,
         TState source,
         TState destination,
         TTrigger trigger,
@@ -223,7 +228,7 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
     {
         try
         {
-            await reactionAsync(Context, args);
+            await reactionAsync(_actor, Context, args);
         }
         catch (Exception exception)
         {
@@ -281,16 +286,16 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger>
 
     private sealed class ReactionWorkItem
     {
-        private readonly StateMachineEngine<TContext, TState, TTrigger> _engine;
-        private readonly Func<TContext, TriggerArgs, ValueTask> _reactionAsync;
+        private readonly StateMachineEngine<TContext, TState, TTrigger, TActor> _engine;
+        private readonly Func<TActor, TContext, TriggerArgs, ValueTask> _reactionAsync;
         private readonly TState _source;
         private readonly TState _destination;
         private readonly TTrigger _trigger;
         private readonly TriggerArgs _args;
 
         public ReactionWorkItem(
-            StateMachineEngine<TContext, TState, TTrigger> engine,
-            Func<TContext, TriggerArgs, ValueTask> reactionAsync,
+            StateMachineEngine<TContext, TState, TTrigger, TActor> engine,
+            Func<TActor, TContext, TriggerArgs, ValueTask> reactionAsync,
             TState source,
             TState destination,
             TTrigger trigger,

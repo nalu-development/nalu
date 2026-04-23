@@ -3,18 +3,19 @@ namespace Nalu.SharpState;
 /// <summary>
 /// Generic base class for per-machine state configurators. Holds the accumulated per-trigger transition list,
 /// the optional hierarchy declarations (<c>Parent</c>, <c>AsStateMachine</c>), and implements
-/// <see cref="IStateConfiguration{TContext, TState, TTrigger}"/> so the chain can be returned directly from a
+/// <see cref="IStateConfiguration{TContext, TState, TTrigger, TActor}"/> so the chain can be returned directly from a
 /// <c>[StateDefinition]</c> property without a separate <c>Build()</c> step.
 /// </summary>
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
 /// <typeparam name="TTrigger">Enum type listing all triggers of the machine.</typeparam>
-public abstract class StateConfigurator<TContext, TState, TTrigger>
-    : IStateConfiguration<TContext, TState, TTrigger>
+/// <typeparam name="TActor">Type of the actor passed into post-transition reactions.</typeparam>
+public abstract class StateConfigurator<TContext, TState, TTrigger, TActor>
+    : IStateConfiguration<TContext, TState, TTrigger, TActor>
     where TState : struct, Enum
     where TTrigger : struct, Enum
 {
-    private readonly Dictionary<TTrigger, List<Transition<TContext, TState>>> _transitions = new();
+    private readonly Dictionary<TTrigger, List<Transition<TContext, TState, TActor>>> _transitions = new();
     private TState? _parent;
     private TState? _initialChild;
     private Action<TContext>? _entryAction;
@@ -33,7 +34,7 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
     public Action<TContext>? ExitAction => _exitAction;
 
     /// <inheritdoc />
-    public bool TryGetTransitions(TTrigger trigger, out IReadOnlyList<Transition<TContext, TState>> transitions)
+    public bool TryGetTransitions(TTrigger trigger, out IReadOnlyList<Transition<TContext, TState, TActor>> transitions)
     {
         if (_transitions.TryGetValue(trigger, out var list))
         {
@@ -41,17 +42,17 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
             return true;
         }
 
-        transitions = Array.Empty<Transition<TContext, TState>>();
+        transitions = Array.Empty<Transition<TContext, TState, TActor>>();
         return false;
     }
 
     /// <summary>
     /// Appends the supplied transitions to the per-trigger bucket. Generated <c>On&lt;Trigger&gt;</c> methods call this
-    /// after running the user's configuration lambda and validating the resulting <see cref="StateTriggerBuilderBase{TContext, TState}"/>.
+    /// after running the user's configuration lambda and validating the resulting <see cref="StateTriggerBuilderBase{TContext, TState, TActor}"/>.
     /// </summary>
     /// <param name="trigger">The trigger the transitions belong to.</param>
     /// <param name="transitions">The transitions to add.</param>
-    protected void AddTransitions(TTrigger trigger, IReadOnlyList<Transition<TContext, TState>> transitions)
+    protected void AddTransitions(TTrigger trigger, IReadOnlyList<Transition<TContext, TState, TActor>> transitions)
     {
         if (transitions.Count == 0)
         {
@@ -60,7 +61,7 @@ public abstract class StateConfigurator<TContext, TState, TTrigger>
 
         if (!_transitions.TryGetValue(trigger, out var list))
         {
-            list = new List<Transition<TContext, TState>>(transitions.Count);
+            list = new List<Transition<TContext, TState, TActor>>(transitions.Count);
             _transitions[trigger] = list;
         }
 

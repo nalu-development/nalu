@@ -8,34 +8,39 @@ public class AsyncTests
     public void Fire_schedules_reaction_after_transition_finishes()
     {
         var syncContext = new RecordingSynchronizationContext();
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
+        var actor = new TestActor();
+        TestActor? observedActor = null;
+        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger, TestActor>>
         {
-            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>()
                 .WhenExiting(ctx => ctx.Log.Add("exit:A"))
-                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(
+                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState, TestActor>(
                     FlatState.B,
                     syncAction: (ctx, _) => ctx.Log.Add("invoke"),
-                    reactionAsync: async (ctx, _) =>
+                    reactionAsync: async (reactionActor, ctx, _) =>
                     {
+                        observedActor = reactionActor;
                         await Task.Yield();
                         ctx.Log.Add("react");
                     })),
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>()
                 .WhenEntering(ctx => ctx.Log.Add("enter:B")),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>()
         };
 
         var ctx = new TestContext();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(
-            new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map),
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(
+            new StateMachineDefinition<TestContext, FlatState, FlatTrigger, TestActor>(map),
             FlatState.A,
-            ctx);
+            ctx,
+            actor);
         engine.StateChanged += (_, _, _, _) => ctx.Log.Add("changed");
 
         RunOn(syncContext, () => engine.Fire(FlatTrigger.Go, TriggerArgs.Empty));
 
         ctx.Log.Should().Equal("exit:A", "invoke", "enter:B", "changed");
         syncContext.Drain();
+        observedActor.Should().BeSameAs(actor);
         ctx.Log.Should().Equal("exit:A", "invoke", "enter:B", "changed", "react");
     }
 
@@ -43,26 +48,27 @@ public class AsyncTests
     public void ReactionFailed_is_raised_when_background_reaction_throws()
     {
         var syncContext = new RecordingSynchronizationContext();
-        var cfg = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>();
-        cfg.On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(
+        var cfg = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>();
+        cfg.On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState, TestActor>(
             FlatState.B,
-            reactionAsync: async (_, _) =>
+            reactionAsync: async (_, _, _) =>
             {
                 await Task.Yield();
                 throw new InvalidOperationException("boom");
             }));
 
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
+        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger, TestActor>>
         {
             [FlatState.A] = cfg,
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>(),
+            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>()
         };
 
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(
-            new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map),
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(
+            new StateMachineDefinition<TestContext, FlatState, FlatTrigger, TestActor>(map),
             FlatState.A,
-            new TestContext());
+            new TestContext(),
+            new TestActor());
         (FlatState from, FlatState to, FlatTrigger trigger, object?[] args, Exception exception)? failure = null;
         engine.ReactionFailed += (from, to, trigger, args, exception) => failure = (from, to, trigger, args, exception);
 
@@ -82,15 +88,15 @@ public class AsyncTests
     [Fact]
     public void Fire_unhandled_trigger_invokes_callback()
     {
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
+        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger, TestActor>>
         {
-            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>(),
+            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>(),
+            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>()
         };
 
-        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger, TestActor>(map);
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
         (FlatState state, FlatTrigger trigger, object?[] args)? captured = null;
         engine.OnUnhandled = (state, trigger, args) => captured = (state, trigger, args);
 
@@ -105,15 +111,15 @@ public class AsyncTests
     [Fact]
     public void Fire_unhandled_with_default_callback_throws()
     {
-        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger>>
+        var map = new Dictionary<FlatState, IStateConfiguration<TestContext, FlatState, FlatTrigger, TestActor>>
         {
-            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>(),
-            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger>()
+            [FlatState.A] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>(),
+            [FlatState.B] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>(),
+            [FlatState.C] = new TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>()
         };
 
-        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(map);
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        var definition = new StateMachineDefinition<TestContext, FlatState, FlatTrigger, TestActor>(map);
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
 
         var act = () => engine.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty);
 

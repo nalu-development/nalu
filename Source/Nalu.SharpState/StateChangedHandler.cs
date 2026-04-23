@@ -1,7 +1,7 @@
 namespace Nalu.SharpState;
 
 /// <summary>
-/// Callback invoked by <see cref="StateMachineEngine{TContext, TState, TTrigger}"/> after a transition commits a new
+/// Callback invoked by <see cref="StateMachineEngine{TContext, TState, TTrigger, TActor}"/> after a transition commits a new
 /// leaf state.
 /// </summary>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>

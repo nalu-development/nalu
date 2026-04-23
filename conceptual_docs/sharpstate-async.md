@@ -10,17 +10,34 @@
 [StateMachineDefinition(typeof(InspectContext))]
 public partial class ReviewMachine
 {
-    [StateTriggerDefinition] static partial void Approve(string id);
+    [StateTriggerDefinition] static partial void RequestApproval(string id);
+    [StateTriggerDefinition] static partial void Approve();
+    [StateTriggerDefinition] static partial void Reject();
 
     [StateDefinition]
     private static IStateConfiguration Pending => ConfigureState()
-        .OnApprove(t => t
-            .Target(State.Done)
-            .Invoke((ctx, id) => ctx.LastApprovedId = id)
-            .ReactAsync(async (ctx, id) =>
+        .OnRequestApproval(t => t
+            .Target(State.Approving)
+            .ReactAsync(async (actor, ctx, id) =>
             {
-                await ctx.Analytics.TrackApprovalAsync(id);
+                try {
+                    await ctx.ApproveService.ApproveAsync(id);
+                    actor.Approve();
+                } catch {
+                    actor.Reject();
+                }
             }));
+
+    [StateDefinition]
+    private static IStateConfiguration Approving => ConfigureState()
+        .OnApprove(t => t.Target(State.Approved))
+        .OnReject(t => t.Target(State.Rejected));
+
+    [StateDefinition]
+    private static IStateConfiguration Approved => ConfigureState();
+
+    [StateDefinition]
+    private static IStateConfiguration Rejected => ConfigureState();
 }
 ```
 
@@ -42,7 +59,7 @@ For internal transitions (`Stay()` / `Ignore()`), only the inline `Invoke(...)` 
 - If a context exists (for example a UI thread), the reaction starts there.
 - If no context exists, the reaction is queued on the thread pool.
 
-This keeps the main trigger path synchronous while still giving UI applications predictable follow-up scheduling.
+This keeps the main trigger path synchronous while still giving UI applications predictable follow-up scheduling. The callback also receives the generated `IActor` instance, so you can trigger additional state changes after the awaited work completes.
 
 ## Failure reporting
 

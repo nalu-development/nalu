@@ -87,7 +87,7 @@ internal static class StateMachineEmitter
             w.WriteBlankLine();
             w.WriteLine("protected static IStateConfigurator ConfigureState() => new GeneratedStateConfigurator();");
             w.WriteBlankLine();
-            w.WriteLine($"private static readonly global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger> _definition = BuildDefinition();");
+            w.WriteLine($"private static readonly global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger, IActor> _definition = BuildDefinition();");
             w.WriteBlankLine();
             EmitBuildDefinition(w, context, m);
             w.WriteBlankLine();
@@ -142,7 +142,7 @@ internal static class StateMachineEmitter
         using (w.Block())
         {
             w.WriteLine(
-                $"internal static void __Register(global::System.Collections.Generic.Dictionary<State, global::Nalu.SharpState.IStateConfiguration<{context}, State, Trigger>> map)");
+                $"internal static void __Register(global::System.Collections.Generic.Dictionary<State, global::Nalu.SharpState.IStateConfiguration<{context}, State, Trigger, IActor>> map)");
             using (w.Block())
             {
                 foreach (var s in node.States)
@@ -221,7 +221,7 @@ internal static class StateMachineEmitter
 
     private static void EmitConfigurationInterface(SourceWriter w, string context)
     {
-        w.WriteLine($"protected interface IStateConfiguration : global::Nalu.SharpState.IStateConfiguration<{context}, State, Trigger>");
+        w.WriteLine($"protected interface IStateConfiguration : global::Nalu.SharpState.IStateConfiguration<{context}, State, Trigger, IActor>");
         using (w.Block())
         { }
     }
@@ -300,10 +300,10 @@ internal static class StateMachineEmitter
 
     private static void EmitBuildDefinition(SourceWriter w, string context, StateMachineModel m)
     {
-        w.WriteLine($"private static global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger> BuildDefinition()");
+        w.WriteLine($"private static global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger, IActor> BuildDefinition()");
         using (w.Block())
         {
-            w.WriteLine($"var map = new Dictionary<State, global::Nalu.SharpState.IStateConfiguration<{context}, State, Trigger>>();");
+            w.WriteLine($"var map = new Dictionary<State, global::Nalu.SharpState.IStateConfiguration<{context}, State, Trigger, IActor>>();");
 
             var root = BuildRegionTree(m);
             foreach (var s in root.States)
@@ -316,7 +316,7 @@ internal static class StateMachineEmitter
                 w.WriteLine($"{child.Name}.__Register(map);");
             }
 
-            w.WriteLine($"return new global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger>(map);");
+            w.WriteLine($"return new global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger, IActor>(map);");
         }
     }
 
@@ -325,14 +325,14 @@ internal static class StateMachineEmitter
         w.WriteLine("private sealed class Actor : IActor");
         using (w.Block())
         {
-            w.WriteLine($"private readonly global::Nalu.SharpState.StateMachineEngine<{context}, State, Trigger> _engine;");
+            w.WriteLine($"private readonly global::Nalu.SharpState.StateMachineEngine<{context}, State, Trigger, IActor> _engine;");
             w.WriteBlankLine();
             w.WriteLine(
-                $"internal Actor(global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger> definition, State currentState, {context} context)");
+                $"internal Actor(global::Nalu.SharpState.StateMachineDefinition<{context}, State, Trigger, IActor> definition, State currentState, {context} context)");
             using (w.Block())
             {
                 w.WriteLine(
-                    $"_engine = new global::Nalu.SharpState.StateMachineEngine<{context}, State, Trigger>(definition, currentState, context);");
+                    $"_engine = new global::Nalu.SharpState.StateMachineEngine<{context}, State, Trigger, IActor>(definition, currentState, context, this);");
             }
 
             w.WriteBlankLine();
@@ -384,7 +384,7 @@ internal static class StateMachineEmitter
     private static void EmitGeneratedConfigurator(SourceWriter w, string context, StateMachineModel m)
     {
         w.WriteLine(
-            $"private sealed class GeneratedStateConfigurator : global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger>, IStateConfigurator");
+            $"private sealed class GeneratedStateConfigurator : global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger, IActor>, IStateConfigurator");
         using (w.Block())
         {
             w.WriteLine("internal void ApplyParent(State parent) => SetParent(parent);");
@@ -465,7 +465,7 @@ internal static class StateMachineEmitter
     {
         w.WriteLine("/// <summary>");
         w.WriteLine("/// Declares a synchronous callback to run after the machine enters this state.");
-        w.WriteLine($"/// See <see cref=\"global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger>.SetEntryAction(Action<{context}>)\"/>.");
+        w.WriteLine($"/// See <see cref=\"global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger, IActor>.SetEntryAction(Action<{context}>)\"/>.");
         w.WriteLine("/// </summary>");
         w.WriteLine("/// <param name=\"action\">The callback to run after the state is entered.</param>");
         w.WriteLine("/// <returns>The same configurator for chaining.</returns>");
@@ -475,7 +475,7 @@ internal static class StateMachineEmitter
     {
         w.WriteLine("/// <summary>");
         w.WriteLine("/// Declares a synchronous callback to run before the machine exits this state.");
-        w.WriteLine($"/// See <see cref=\"global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger>.SetExitAction(Action<{context}>)\"/>.");
+        w.WriteLine($"/// See <see cref=\"global::Nalu.SharpState.StateConfigurator<{context}, State, Trigger, IActor>.SetExitAction(Action<{context}>)\"/>.");
         w.WriteLine("/// </summary>");
         w.WriteLine("/// <param name=\"action\">The callback to run before the state is exited.</param>");
         w.WriteLine("/// <returns>The same configurator for chaining.</returns>");
@@ -497,22 +497,22 @@ internal static class StateMachineEmitter
         const string kind = "ISyncStateTriggerBuilder";
         if (t.Parameters.Count == 0)
         {
-            return $"global::Nalu.SharpState.{kind}<{context}, State>";
+            return $"global::Nalu.SharpState.{kind}<{context}, State, IActor>";
         }
 
         var args = string.Join(", ", t.Parameters.Select(p => p.TypeDisplay));
-        return $"global::Nalu.SharpState.{kind}<{context}, State, {args}>";
+        return $"global::Nalu.SharpState.{kind}<{context}, State, IActor, {args}>";
     }
 
     private static string ConcreteBuilderType(string context, TriggerModel t)
     {
         if (t.Parameters.Count == 0)
         {
-            return $"global::Nalu.SharpState.StateTriggerBuilder<{context}, State>";
+            return $"global::Nalu.SharpState.StateTriggerBuilder<{context}, State, IActor>";
         }
 
         var args = string.Join(", ", t.Parameters.Select(p => p.TypeDisplay));
-        return $"global::Nalu.SharpState.StateTriggerBuilder<{context}, State, {args}>";
+        return $"global::Nalu.SharpState.StateTriggerBuilder<{context}, State, IActor, {args}>";
     }
 
     private static string TriggerArgsFactory(TriggerModel t)

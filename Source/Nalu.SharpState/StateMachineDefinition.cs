@@ -1,7 +1,7 @@
 namespace Nalu.SharpState;
 
 /// <summary>
-/// Immutable, frozen configuration of a state machine type: the per-state <see cref="IStateConfiguration{TContext, TState, TTrigger}"/>
+/// Immutable, frozen configuration of a state machine type: the per-state <see cref="IStateConfiguration{TContext, TState, TTrigger, TActor}"/>
 /// plus the hierarchy maps (<see cref="Parent"/>, <see cref="InitialChild"/>) and derived helpers.
 /// Built once per machine type by the generated <c>BuildDefinition()</c> method and shared across every
 /// <c>CreateActor(...)</c> call.
@@ -9,22 +9,23 @@ namespace Nalu.SharpState;
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
 /// <typeparam name="TTrigger">Enum type listing all triggers of the machine.</typeparam>
-public sealed class StateMachineDefinition<TContext, TState, TTrigger>
+/// <typeparam name="TActor">Type of the actor passed into post-transition reactions.</typeparam>
+public sealed class StateMachineDefinition<TContext, TState, TTrigger, TActor>
     where TState : struct, Enum
     where TTrigger : struct, Enum
 {
-    private readonly IReadOnlyDictionary<TState, IStateConfiguration<TContext, TState, TTrigger>> _states;
+    private readonly IReadOnlyDictionary<TState, IStateConfiguration<TContext, TState, TTrigger, TActor>> _states;
     private readonly Dictionary<TState, TState[]> _ancestorsCache;
 
     /// <summary>
-    /// Initializes a new <see cref="StateMachineDefinition{TContext, TState, TTrigger}"/> by freezing
+    /// Initializes a new <see cref="StateMachineDefinition{TContext, TState, TTrigger, TActor}"/> by freezing
     /// the supplied per-state configurations and validating the hierarchy.
     /// </summary>
     /// <param name="states">Mapping from every declared state to its configuration.</param>
     /// <exception cref="ArgumentNullException"><paramref name="states"/> is <c>null</c>.</exception>
     /// <exception cref="InvalidOperationException">The hierarchy declared by the configurations is inconsistent
     /// (multi-parent, cycle, composite without children, child without a composite parent, etc.).</exception>
-    public StateMachineDefinition(IReadOnlyDictionary<TState, IStateConfiguration<TContext, TState, TTrigger>> states)
+    public StateMachineDefinition(IReadOnlyDictionary<TState, IStateConfiguration<TContext, TState, TTrigger, TActor>> states)
     {
         _states = states ?? throw new ArgumentNullException(nameof(states));
 
@@ -75,23 +76,23 @@ public sealed class StateMachineDefinition<TContext, TState, TTrigger>
     public IReadOnlyCollection<TState> States => (IReadOnlyCollection<TState>) _states.Keys;
 
     /// <summary>
-    /// Retrieves the <see cref="IStateConfiguration{TContext, TState, TTrigger}"/> for a given state.
+    /// Retrieves the <see cref="IStateConfiguration{TContext, TState, TTrigger, TActor}"/> for a given state.
     /// </summary>
     /// <param name="state">The state to look up.</param>
     /// <returns>The configuration associated with <paramref name="state"/>.</returns>
     /// <exception cref="KeyNotFoundException">No configuration exists for <paramref name="state"/>.</exception>
-    public IStateConfiguration<TContext, TState, TTrigger> GetConfiguration(TState state)
+    public IStateConfiguration<TContext, TState, TTrigger, TActor> GetConfiguration(TState state)
         => _states.TryGetValue(state, out var c)
             ? c
             : throw new KeyNotFoundException($"State '{state}' is not registered in the state machine definition.");
 
     /// <summary>
-    /// Attempts to retrieve the <see cref="IStateConfiguration{TContext, TState, TTrigger}"/> for a given state.
+    /// Attempts to retrieve the <see cref="IStateConfiguration{TContext, TState, TTrigger, TActor}"/> for a given state.
     /// </summary>
     /// <param name="state">The state to look up.</param>
     /// <param name="configuration">When the method returns <c>true</c>, the associated configuration.</param>
     /// <returns><c>true</c> if a configuration is registered for <paramref name="state"/>.</returns>
-    public bool TryGetConfiguration(TState state, out IStateConfiguration<TContext, TState, TTrigger> configuration)
+    public bool TryGetConfiguration(TState state, out IStateConfiguration<TContext, TState, TTrigger, TActor> configuration)
         => _states.TryGetValue(state, out configuration!);
 
     /// <summary>

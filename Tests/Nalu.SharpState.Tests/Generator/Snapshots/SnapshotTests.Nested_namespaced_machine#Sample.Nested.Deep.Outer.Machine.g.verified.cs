@@ -25,7 +25,7 @@ namespace Sample.Nested.Deep
                 Go,
             }
             
-            protected interface IStateConfiguration : global::Nalu.SharpState.IStateConfiguration<global::Sample.Nested.Deep.Ctx, State, Trigger>
+            protected interface IStateConfiguration : global::Nalu.SharpState.IStateConfiguration<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>
             {
             }
             
@@ -33,7 +33,7 @@ namespace Sample.Nested.Deep
             {
                 /// <summary>
                 /// Declares a synchronous callback to run after the machine enters this state.
-                /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Nested.Deep.Ctx, State, Trigger>.SetEntryAction(Action<global::Sample.Nested.Deep.Ctx>)"/>.
+                /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>.SetEntryAction(Action<global::Sample.Nested.Deep.Ctx>)"/>.
                 /// </summary>
                 /// <param name="action">The callback to run after the state is entered.</param>
                 /// <returns>The same configurator for chaining.</returns>
@@ -41,7 +41,7 @@ namespace Sample.Nested.Deep
                 
                 /// <summary>
                 /// Declares a synchronous callback to run before the machine exits this state.
-                /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Nested.Deep.Ctx, State, Trigger>.SetExitAction(Action<global::Sample.Nested.Deep.Ctx>)"/>.
+                /// See <see cref="global::Nalu.SharpState.StateConfigurator<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>.SetExitAction(Action<global::Sample.Nested.Deep.Ctx>)"/>.
                 /// </summary>
                 /// <param name="action">The callback to run before the state is exited.</param>
                 /// <returns>The same configurator for chaining.</returns>
@@ -50,9 +50,9 @@ namespace Sample.Nested.Deep
                 /// <summary>
                 /// Configures what happens when <see cref="IActor.Go()"/> is invoked.
                 /// </summary>
-                /// <param name="configure">Configures the <see cref="global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State>"/> used by <see cref="IActor.Go()"/>.</param>
+                /// <param name="configure">Configures the <see cref="global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State, IActor>"/> used by <see cref="IActor.Go()"/>.</param>
                 /// <returns>The same configurator for chaining.</returns>
-                IStateConfigurator OnGo(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State>> configure);
+                IStateConfigurator OnGo(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State, IActor>> configure);
             }
             
             /// <summary>
@@ -103,11 +103,11 @@ namespace Sample.Nested.Deep
             
             protected static IStateConfigurator ConfigureState() => new GeneratedStateConfigurator();
             
-            private static readonly global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger> _definition = BuildDefinition();
+            private static readonly global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor> _definition = BuildDefinition();
             
-            private static global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger> BuildDefinition()
+            private static global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor> BuildDefinition()
             {
-                var map = new Dictionary<State, global::Nalu.SharpState.IStateConfiguration<global::Sample.Nested.Deep.Ctx, State, Trigger>>();
+                var map = new Dictionary<State, global::Nalu.SharpState.IStateConfiguration<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>>();
                 {
                     var c = (GeneratedStateConfigurator)A;
                     map[State.A] = c;
@@ -116,7 +116,7 @@ namespace Sample.Nested.Deep
                     var c = (GeneratedStateConfigurator)B;
                     map[State.B] = c;
                 }
-                return new global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger>(map);
+                return new global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>(map);
             }
             
             /// <summary>
@@ -129,11 +129,11 @@ namespace Sample.Nested.Deep
             
             private sealed class Actor : IActor
             {
-                private readonly global::Nalu.SharpState.StateMachineEngine<global::Sample.Nested.Deep.Ctx, State, Trigger> _engine;
+                private readonly global::Nalu.SharpState.StateMachineEngine<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor> _engine;
                 
-                internal Actor(global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger> definition, State currentState, global::Sample.Nested.Deep.Ctx context)
+                internal Actor(global::Nalu.SharpState.StateMachineDefinition<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor> definition, State currentState, global::Sample.Nested.Deep.Ctx context)
                 {
-                    _engine = new global::Nalu.SharpState.StateMachineEngine<global::Sample.Nested.Deep.Ctx, State, Trigger>(definition, currentState, context);
+                    _engine = new global::Nalu.SharpState.StateMachineEngine<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>(definition, currentState, context, this);
                 }
                 
                 public State CurrentState => _engine.CurrentState;
@@ -163,7 +163,7 @@ namespace Sample.Nested.Deep
                 public void Go() => _engine.Fire(Trigger.Go, global::Nalu.SharpState.TriggerArgs.Empty);
             }
             
-            private sealed class GeneratedStateConfigurator : global::Nalu.SharpState.StateConfigurator<global::Sample.Nested.Deep.Ctx, State, Trigger>, IStateConfigurator
+            private sealed class GeneratedStateConfigurator : global::Nalu.SharpState.StateConfigurator<global::Sample.Nested.Deep.Ctx, State, Trigger, IActor>, IStateConfigurator
             {
                 internal void ApplyParent(State parent) => SetParent(parent);
                 
@@ -181,9 +181,9 @@ namespace Sample.Nested.Deep
                     return this;
                 }
                 
-                public IStateConfigurator OnGo(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State>> configure)
+                public IStateConfigurator OnGo(Action<global::Nalu.SharpState.ISyncStateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State, IActor>> configure)
                 {
-                    var builder = new global::Nalu.SharpState.StateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State>();
+                    var builder = new global::Nalu.SharpState.StateTriggerBuilder<global::Sample.Nested.Deep.Ctx, State, IActor>();
                     configure(builder);
                     builder.Validate();
                     AddTransitions(Trigger.Go, builder.BuildTransitions());

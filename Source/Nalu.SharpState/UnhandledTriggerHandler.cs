@@ -1,7 +1,7 @@
 namespace Nalu.SharpState;
 
 /// <summary>
-/// Callback invoked by <see cref="StateMachineEngine{TContext, TState, TTrigger}"/> when a trigger fires but no
+/// Callback invoked by <see cref="StateMachineEngine{TContext, TState, TTrigger, TActor}"/> when a trigger fires but no
 /// transition matches on the current leaf state nor any of its ancestors.
 /// </summary>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>

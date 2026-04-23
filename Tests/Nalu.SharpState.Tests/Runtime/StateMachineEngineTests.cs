@@ -4,10 +4,10 @@ namespace Nalu.SharpState.Tests.Runtime;
 
 public class StateMachineEngineTests
 {
-    private static StateMachineDefinition<TestContext, FlatState, FlatTrigger> BuildFlat(
-        Action<IDictionary<FlatState, TestStateConfigurator<TestContext, FlatState, FlatTrigger>>>? setup = null)
+    private static StateMachineDefinition<TestContext, FlatState, FlatTrigger, TestActor> BuildFlat(
+        Action<IDictionary<FlatState, TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>>>? setup = null)
     {
-        var map = new Dictionary<FlatState, TestStateConfigurator<TestContext, FlatState, FlatTrigger>>
+        var map = new Dictionary<FlatState, TestStateConfigurator<TestContext, FlatState, FlatTrigger, TestActor>>
         {
             [FlatState.A] = new(),
             [FlatState.B] = new(),
@@ -17,8 +17,8 @@ public class StateMachineEngineTests
 
         var readonlyMap = map.ToDictionary(
             kv => kv.Key,
-            kv => (IStateConfiguration<TestContext, FlatState, FlatTrigger>) kv.Value);
-        return new StateMachineDefinition<TestContext, FlatState, FlatTrigger>(readonlyMap);
+            kv => (IStateConfiguration<TestContext, FlatState, FlatTrigger, TestActor>) kv.Value);
+        return new StateMachineDefinition<TestContext, FlatState, FlatTrigger, TestActor>(readonlyMap);
     }
 
     [Fact]
@@ -28,10 +28,10 @@ public class StateMachineEngineTests
         {
             map[FlatState.A].On(
                 FlatTrigger.Go,
-                TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
+                TestTransition.ToTarget<TestContext, FlatState, TestActor>(FlatState.B));
         });
 
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
         (FlatState from, FlatState to, FlatTrigger trigger, object?[] args)? captured = null;
         engine.StateChanged += (from, to, trig, args) => captured = (from, to, trig, args);
 
@@ -49,7 +49,7 @@ public class StateMachineEngineTests
     public void Fire_unhandled_trigger_invokes_OnUnhandled()
     {
         var definition = BuildFlat();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
         (FlatState state, FlatTrigger trigger, object?[] args)? captured = null;
         engine.OnUnhandled = (s, t, a) => captured = (s, t, a);
 
@@ -66,7 +66,7 @@ public class StateMachineEngineTests
     public void Fire_unhandled_with_default_callback_throws()
     {
         var definition = BuildFlat();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
 
         var act = () => engine.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty);
 
@@ -78,7 +78,7 @@ public class StateMachineEngineTests
     public void Fire_unhandled_with_null_callback_is_silent_noop()
     {
         var definition = BuildFlat();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext())
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor())
         {
             OnUnhandled = null,
         };
@@ -95,12 +95,12 @@ public class StateMachineEngineTests
         var definition = BuildFlat(map =>
         {
             map[FlatState.A].AddAllFor(FlatTrigger.Go, [
-                new Transition<TestContext, FlatState>(FlatState.B, false, (ctx, _) => ctx.Counter > 10, null, null),
-                new Transition<TestContext, FlatState>(FlatState.C, false, null, null, null)
+                new Transition<TestContext, FlatState, TestActor>(FlatState.B, false, (ctx, _) => ctx.Counter > 10, null, null),
+                new Transition<TestContext, FlatState, TestActor>(FlatState.C, false, null, null, null)
             ]);
         });
 
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext { Counter = 5 });
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext { Counter = 5 }, new TestActor());
         engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
         engine.CurrentState.Should().Be(FlatState.C);
     }
@@ -112,12 +112,12 @@ public class StateMachineEngineTests
         {
             map[FlatState.A].On(
                 FlatTrigger.Go,
-                TestTransition.ToTarget<TestContext, FlatState>(
+                TestTransition.ToTarget<TestContext, FlatState, TestActor>(
                     FlatState.B,
                     guard: (ctx, args) => args[0] is int i && i == ctx.Counter));
         });
 
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext { Counter = 42 })
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext { Counter = 42 }, new TestActor())
         {
             OnUnhandled = null,
         };
@@ -135,13 +135,13 @@ public class StateMachineEngineTests
         {
             map[FlatState.A].On(
                 FlatTrigger.Go,
-                TestTransition.ToTarget<TestContext, FlatState>(
+                TestTransition.ToTarget<TestContext, FlatState, TestActor>(
                     FlatState.B,
                     syncAction: (ctx, _) => ctx.Log.Add("action:" + ctx.Counter)));
         });
 
         var ctx = new TestContext { Counter = 1 };
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, ctx);
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, ctx, new TestActor());
         engine.StateChanged += (_, _, _, _) => ctx.Log.Add("changed:" + ctx.Counter);
 
         engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
@@ -155,12 +155,12 @@ public class StateMachineEngineTests
         var definition = BuildFlat(map =>
         {
             map[FlatState.A].AddAllFor(FlatTrigger.Go, [
-                new Transition<TestContext, FlatState>(FlatState.B, false, (_, _) => false, null, null),
-                new Transition<TestContext, FlatState>(FlatState.C, false, (_, _) => false, null, null)
+                new Transition<TestContext, FlatState, TestActor>(FlatState.B, false, (_, _) => false, null, null),
+                new Transition<TestContext, FlatState, TestActor>(FlatState.C, false, (_, _) => false, null, null)
             ]);
         });
 
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext());
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
         FlatState? capturedState = null;
         engine.OnUnhandled = (state, _, _) => capturedState = state;
 
@@ -174,7 +174,7 @@ public class StateMachineEngineTests
     public void Fire_walks_to_parent_when_leaf_has_no_matching_transition()
     {
         var definition = HierarchyTests.CreateStandardHierarchy();
-        var engine = new StateMachineEngine<TestContext, HierState, HierTrigger>(definition, HierState.Authenticated, new TestContext());
+        var engine = new StateMachineEngine<TestContext, HierState, HierTrigger, TestActor>(definition, HierState.Authenticated, new TestContext(), new TestActor());
 
         engine.Fire(HierTrigger.Disconnect, TriggerArgs.Empty);
 
@@ -188,13 +188,13 @@ public class StateMachineEngineTests
         {
             map[FlatState.A]
                 .WhenExiting(ctx => ctx.Log.Add("exit:A"))
-                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
+                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState, TestActor>(FlatState.B));
             map[FlatState.B]
                 .WhenEntering(ctx => ctx.Log.Add("enter:B"));
         });
 
         var ctx = new TestContext();
-        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, ctx);
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, ctx, new TestActor());
 
         engine.Fire(FlatTrigger.Go, TriggerArgs.Empty);
 
@@ -204,16 +204,16 @@ public class StateMachineEngineTests
     [Fact]
     public void Fire_throws_when_reentered_from_callback()
     {
-        StateMachineEngine<TestContext, FlatState, FlatTrigger>? engine = null;
+        StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>? engine = null;
         var definition = BuildFlat(map =>
         {
             map[FlatState.A]
-                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState>(FlatState.B));
+                .On(FlatTrigger.Go, TestTransition.ToTarget<TestContext, FlatState, TestActor>(FlatState.B));
             map[FlatState.B]
                 .WhenEntering(_ => engine!.Fire(FlatTrigger.NoMatch, TriggerArgs.Empty));
         });
 
-        engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger>(definition, FlatState.A, new TestContext())
+        engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor())
         {
             OnUnhandled = null,
         };
@@ -228,10 +228,10 @@ public class StateMachineEngineTests
 
 internal static class TestConfiguratorExtensions
 {
-    public static TestStateConfigurator<TContext, TState, TTrigger> AddAllFor<TContext, TState, TTrigger>(
-        this TestStateConfigurator<TContext, TState, TTrigger> self,
+    public static TestStateConfigurator<TContext, TState, TTrigger, TActor> AddAllFor<TContext, TState, TTrigger, TActor>(
+        this TestStateConfigurator<TContext, TState, TTrigger, TActor> self,
         TTrigger trigger,
-        IReadOnlyList<Transition<TContext, TState>> transitions)
+        IReadOnlyList<Transition<TContext, TState, TActor>> transitions)
         where TContext : class
         where TState : struct, Enum
         where TTrigger : struct, Enum

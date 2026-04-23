@@ -1,14 +1,15 @@
 namespace Nalu.SharpState;
 
 /// <summary>
-/// A single resolved transition built by <see cref="ISyncStateTriggerBuilder{TContext, TState}"/> (or its arity variants).
+/// A single resolved transition built by <see cref="ISyncStateTriggerBuilder{TContext, TState, TActor}"/> (or its arity variants).
 /// Carries the optional guard, optional synchronous transition action, optional asynchronous reaction,
 /// and either a target state (external transition) or the <see cref="IsInternal"/> flag
 /// (internal transition that does not leave the current state).
 /// </summary>
 /// <typeparam name="TContext">Type of the user-supplied context carried by the machine.</typeparam>
 /// <typeparam name="TState">Enum type listing all states of the machine.</typeparam>
-public sealed class Transition<TContext, TState>
+/// <typeparam name="TActor">Type of the actor passed into post-transition reactions.</typeparam>
+public sealed class Transition<TContext, TState, TActor>
     where TState : struct, Enum
 {
     internal Transition(
@@ -16,7 +17,7 @@ public sealed class Transition<TContext, TState>
         bool isInternal,
         Func<TContext, TriggerArgs, bool>? guard,
         Action<TContext, TriggerArgs>? syncAction,
-        Func<TContext, TriggerArgs, ValueTask>? reactionAsync)
+        Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync)
     {
         Target = target;
         IsInternal = isInternal;
@@ -53,5 +54,5 @@ public sealed class Transition<TContext, TState>
     /// <summary>
     /// Optional asynchronous reaction scheduled after the state transition has completed.
     /// </summary>
-    public Func<TContext, TriggerArgs, ValueTask>? ReactionAsync { get; }
+    public Func<TActor, TContext, TriggerArgs, ValueTask>? ReactionAsync { get; }
 }

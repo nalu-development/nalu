@@ -60,7 +60,7 @@ public class SnapshotTests
 
             [StateDefinition]
             private static IStateConfiguration Running => ConfigureState()
-                .OnSync(t => t.Stay().ReactAsync((_, _) => default));
+                .OnSync(t => t.Stay().ReactAsync((_, _, _) => default));
         }
         """;
         var result = GeneratorDriverHelper.RunGenerator(source, out _);
