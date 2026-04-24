@@ -147,6 +147,24 @@ public class StateTriggerBuilderTests
     }
 
     [Fact]
+    public void Repeated_When_registrations_preserve_guard_labels_in_definition_order()
+    {
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, string>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, string> targetPhase = builder;
+        targetPhase
+            .Target(FlatState.B)
+            .When((_, arg) => arg.StartsWith("o", StringComparison.Ordinal), "Starts with o")
+            .When((_, arg) => arg.EndsWith("k", StringComparison.Ordinal));
+        builder.Validate();
+
+        var transition = builder.BuildTransitions()[0];
+
+        transition.GuardConditions.Select(condition => condition.Label)
+            .Should()
+            .Equal("Starts with o", null);
+    }
+
+    [Fact]
     public async Task ReactAsync_stores_background_reaction()
     {
         var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, int>();

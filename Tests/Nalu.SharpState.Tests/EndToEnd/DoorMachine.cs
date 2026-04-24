@@ -29,6 +29,7 @@ public partial class DoorMachine
     private static IStateConfiguration Closed => ConfigureState()
         .OnOpen(t => t
                      .Target(State.Opened)
+                     .When((_, reason) => reason is not "spying", "Not spying")
                      .Invoke((ctx, reason) =>
                          {
                              ctx.OpenCount++;

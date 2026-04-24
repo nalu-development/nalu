@@ -10,6 +10,7 @@ public interface ISyncStateTransitionBuilder<TContext, TState, TActor>
     where TState : struct, Enum
 {
     ISyncStateTransitionBuilder<TContext, TState, TActor> When(Func<TContext, bool> guard);
+    ISyncStateTransitionBuilder<TContext, TState, TActor> When(Func<TContext, bool> guard, string? label);
     ISyncStateTransitionBuilder<TContext, TState, TActor> Invoke(Action<TContext> action);
     ISyncStateTransitionBuilder<TContext, TState, TActor> ReactAsync(Func<TActor, TContext, ValueTask> action);
 }
@@ -35,6 +36,7 @@ public interface ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>
     where TState : struct, Enum
 {
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> When(Func<TContext, TArg0, bool> guard);
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> When(Func<TContext, TArg0, bool> guard, string? label);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> Invoke(Action<TContext, TArg0> action);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ReactAsync(Func<TActor, TContext, TArg0, ValueTask> action);
 }
@@ -60,6 +62,7 @@ public interface ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TA
     where TState : struct, Enum
 {
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> When(Func<TContext, TArg0, TArg1, bool> guard);
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> When(Func<TContext, TArg0, TArg1, bool> guard, string? label);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> Invoke(Action<TContext, TArg0, TArg1> action);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ReactAsync(Func<TActor, TContext, TArg0, TArg1, ValueTask> action);
 }
@@ -85,6 +88,7 @@ public interface ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TA
     where TState : struct, Enum
 {
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> When(Func<TContext, TArg0, TArg1, TArg2, bool> guard);
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> When(Func<TContext, TArg0, TArg1, TArg2, bool> guard, string? label);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> Invoke(Action<TContext, TArg0, TArg1, TArg2> action);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ReactAsync(Func<TActor, TContext, TArg0, TArg1, TArg2, ValueTask> action);
 }
@@ -110,6 +114,7 @@ public interface ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TA
     where TState : struct, Enum
 {
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard);
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard, string? label);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> Invoke(Action<TContext, TArg0, TArg1, TArg2, TArg3> action);
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ReactAsync(Func<TActor, TContext, TArg0, TArg1, TArg2, TArg3, ValueTask> action);
 }

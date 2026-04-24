@@ -134,8 +134,8 @@ public class StateMachineEngineTests
         var definition = BuildFlat(map =>
         {
             map[FlatState.A].AddAllFor(FlatTrigger.Go, [
-                new Transition<TestContext, FlatState, TestActor>(FlatState.B, null, false, (ctx, _) => ctx.Counter > 10, null, null),
-                new Transition<TestContext, FlatState, TestActor>(FlatState.C, null, false, null, null, null)
+                new Transition<TestContext, FlatState, TestActor>(FlatState.B, null, false, (ctx, _) => ctx.Counter > 10, Array.Empty<GuardCondition>(), null, null),
+                new Transition<TestContext, FlatState, TestActor>(FlatState.C, null, false, null, Array.Empty<GuardCondition>(), null, null)
             ]);
         });
 
@@ -244,8 +244,8 @@ public class StateMachineEngineTests
         var definition = BuildFlat(map =>
         {
             map[FlatState.A].AddAllFor(FlatTrigger.Go, [
-                new Transition<TestContext, FlatState, TestActor>(FlatState.B, null, false, (_, _) => false, null, null),
-                new Transition<TestContext, FlatState, TestActor>(FlatState.C, null, false, (_, _) => false, null, null)
+                new Transition<TestContext, FlatState, TestActor>(FlatState.B, null, false, (_, _) => false, Array.Empty<GuardCondition>(), null, null),
+                new Transition<TestContext, FlatState, TestActor>(FlatState.C, null, false, (_, _) => false, Array.Empty<GuardCondition>(), null, null)
             ]);
         });
 

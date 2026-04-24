@@ -17,6 +17,7 @@ public sealed class Transition<TContext, TState, TActor>
         Func<TContext, TriggerArgs, TState>? targetSelector,
         bool isInternal,
         Func<TContext, TriggerArgs, bool>? guard,
+        IReadOnlyList<GuardCondition> guardConditions,
         Action<TContext, TriggerArgs>? syncAction,
         Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync)
     {
@@ -24,6 +25,7 @@ public sealed class Transition<TContext, TState, TActor>
         TargetSelector = targetSelector;
         IsInternal = isInternal;
         Guard = guard;
+        GuardConditions = guardConditions;
         SyncAction = syncAction;
         ReactionAsync = reactionAsync;
     }
@@ -57,6 +59,11 @@ public sealed class Transition<TContext, TState, TActor>
     /// When non-null, the transition fires only if the guard returns <c>true</c>.
     /// </summary>
     public Func<TContext, TriggerArgs, bool>? Guard { get; }
+
+    /// <summary>
+    /// Ordered metadata for every <c>When(...)</c> call that contributed to <see cref="Guard"/>.
+    /// </summary>
+    public IReadOnlyList<GuardCondition> GuardConditions { get; }
 
     /// <summary>
     /// Optional synchronous action executed after the guard passes and before the state change is committed.

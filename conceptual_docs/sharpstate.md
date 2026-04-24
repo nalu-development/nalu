@@ -75,6 +75,7 @@ The generator produces:
 - A nested `public interface IActor` exposing `CanOpen(string)`, `Open(string)`, `CanClose()`, `Close()`, `CurrentState`, `Context`, `IsIn(...)`, `StateChanged`, `ReactionFailed`, and `OnUnhandled`.
 - A nested `public delegate IActor Factory(State currentState, DoorContext context)` for dependency injection and tests.
 - A `public static State GetInitialState()` helper for the root machine.
+- A `public static string ToDot()` helper that renders the machine as a Graphviz DOT graph.
 - A `public static IActor CreateActor(DoorContext context)` helper that starts from the root initial state.
 - A `public static IActor CreateActor(State currentState, DoorContext context)` helper that the factory can point to.
 
@@ -100,6 +101,7 @@ Inside each `[StateDefinition]` property body you call `ConfigureState()` and ch
 | `Stay()` | Run the action but keep the current state (internal transition). `StateChanged` is **not** raised. |
 | `Ignore()` | Syntax sugar for `Stay()` with no action, useful when a trigger should be accepted but do nothing. This ends the fluent chain. |
 | `When(predicate)` | Available after `Target(...)` or `Stay()`. Guards the transition. The predicate receives the context and trigger arguments. Repeated calls are combined with logical AND in declaration order. |
+| `When(predicate, "label")` | Same as `When(predicate)`, but also preserves a human-readable guard label for DOT graph rendering. Unlabeled guards are rendered as numbered `Unnamed guard N` labels inside the trigger node. |
 | `Invoke(action)` | Available after `Target(...)` or `Stay()`. Runs side effects before the state commits. Repeated calls run in declaration order. |
 | `ReactAsync(action)` | Available after `Target(...)` or `Stay()`. Schedules fire-and-forget work after the transition commits and after `StateChanged` fires. Repeated calls run sequentially in declaration order. |
 
@@ -166,6 +168,17 @@ Console.WriteLine(door.IsIn(DoorMachine.State.Opened)); // true
 | `OnUnhandled` | Invoked when a trigger has no matching transition on the leaf nor on any ancestor. |
 | `Can<Trigger>(...)` | Returns whether the corresponding trigger currently has a matching transition for the supplied arguments. |
 | `<Trigger>(...)` | One strongly-typed `void` method per trigger. |
+
+### Graphviz export
+
+Every generated machine also exposes `ToDot()`:
+
+```csharp
+var dot = DoorMachine.ToDot();
+Console.WriteLine(dot);
+```
+
+The exported graph uses rectangles for states, ellipses for triggers, appends `When(...)` conditions inside the trigger label (for example `Open\\n[Not spying]`), uses cluster subgraphs for nested regions, and includes `start` / `end` markers for the root initial state and terminal states.
 
 ### Testability
 

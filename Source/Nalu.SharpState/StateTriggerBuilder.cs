@@ -14,6 +14,7 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
     private bool _hasTarget;
     private bool _stay;
     private Func<TContext, TriggerArgs, bool>? _guard;
+    private readonly List<GuardCondition> _guardConditions = [];
     private Action<TContext, TriggerArgs>? _syncAction;
     private Func<TActor, TContext, TriggerArgs, ValueTask>? _reactionAsync;
 
@@ -34,12 +35,13 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
 
     protected void SetStay() => _stay = true;
 
-    protected void SetGuard(Func<TContext, TriggerArgs, bool> guard)
+    protected void SetGuard(Func<TContext, TriggerArgs, bool> guard, string? label = null)
     {
         var previous = _guard;
         _guard = previous is null
             ? guard
             : (context, args) => previous(context, args) && guard(context, args);
+        _guardConditions.Add(new GuardCondition(label));
     }
 
     protected void SetSyncAction(Action<TContext, TriggerArgs> action)
@@ -89,6 +91,7 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
                 _targetSelector,
                 _stay,
                 _guard,
+                _guardConditions.AsReadOnly(),
                 _syncAction,
                 _reactionAsync)
         };
@@ -128,9 +131,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor> :
     void ISyncStateTriggerBuilder<TContext, TState, TActor>.Ignore() => SetStay();
 
     ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTransitionBuilder<TContext, TState, TActor>.When(Func<TContext, bool> guard)
+        => ((ISyncStateTransitionBuilder<TContext, TState, TActor>) this).When(guard, null);
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTransitionBuilder<TContext, TState, TActor>.When(Func<TContext, bool> guard, string? label)
     {
         ArgumentNullException.ThrowIfNull(guard);
-        SetGuard((context, _) => guard(context));
+        SetGuard((context, _) => guard(context), label);
         return this;
     }
 
@@ -181,9 +187,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0> :
     void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Ignore() => SetStay();
 
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>.When(Func<TContext, TArg0, bool> guard)
+        => ((ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>) this).When(guard, null);
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>.When(Func<TContext, TArg0, bool> guard, string? label)
     {
         ArgumentNullException.ThrowIfNull(guard);
-        SetGuard((context, args) => guard(context, (TArg0)args[0]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!), label);
         return this;
     }
 
@@ -234,9 +243,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> 
     void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Ignore() => SetStay();
 
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>.When(Func<TContext, TArg0, TArg1, bool> guard)
+        => ((ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>) this).When(guard, null);
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>.When(Func<TContext, TArg0, TArg1, bool> guard, string? label)
     {
         ArgumentNullException.ThrowIfNull(guard);
-        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!), label);
         return this;
     }
 
@@ -287,9 +299,12 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, 
     void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Ignore() => SetStay();
 
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.When(Func<TContext, TArg0, TArg1, TArg2, bool> guard)
+        => ((ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>) this).When(guard, null);
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.When(Func<TContext, TArg0, TArg1, TArg2, bool> guard, string? label)
     {
         ArgumentNullException.ThrowIfNull(guard);
-        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
+        SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!), label);
         return this;
     }
 
@@ -341,10 +356,13 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, 
     void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Ignore() => SetStay();
 
     ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard)
+        => ((ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>) this).When(guard, null);
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard, string? label)
     {
         ArgumentNullException.ThrowIfNull(guard);
         SetGuard((context, args) =>
-            guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!));
+            guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!), label);
         return this;
     }
 

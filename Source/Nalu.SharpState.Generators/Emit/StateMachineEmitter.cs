@@ -96,6 +96,9 @@ internal static class StateMachineEmitter
             EmitGetInitialStateDocs(w);
             w.WriteLine($"public static State GetInitialState() => State.{m.RootInitialState};");
             w.WriteBlankLine();
+            EmitToDotDocs(w);
+            w.WriteLine($"public static string ToDot() => global::Nalu.SharpState.StateMachineDotExporter.ToDot(_definition, GetInitialState(), \"{m.ClassName}\");");
+            w.WriteBlankLine();
             EmitCreateActorDocs(w, context, withCurrentState: false);
             w.WriteLine($"public static IActor CreateActor({context} context) => CreateActor(GetInitialState(), context);");
             w.WriteBlankLine();
@@ -523,6 +526,14 @@ internal static class StateMachineEmitter
 
         w.WriteLine($"/// <param name=\"context\">The shared <see cref=\"{context}\"/> passed to guards, actions, and reactions.</param>");
         w.WriteLine("/// <returns>A new <see cref=\"IActor\"/> instance.</returns>");
+    }
+
+    private static void EmitToDotDocs(SourceWriter w)
+    {
+        w.WriteLine("/// <summary>");
+        w.WriteLine("/// Renders this generated state machine as a Graphviz DOT graph.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <returns>The DOT source representing the machine graph.</returns>");
     }
 
     private static void EmitWhenEnteringDocs(SourceWriter w, string context)

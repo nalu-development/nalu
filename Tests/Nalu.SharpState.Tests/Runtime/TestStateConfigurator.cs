@@ -43,28 +43,31 @@ internal static class TestTransition
     public static Transition<TContext, TState, TActor> ToTarget<TContext, TState, TActor>(
         TState target,
         Func<TContext, TriggerArgs, bool>? guard = null,
+        IReadOnlyList<GuardCondition>? guardConditions = null,
         Action<TContext, TriggerArgs>? syncAction = null,
         Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null)
         where TContext : class
         where TState : struct, Enum
-        => new(target, null, false, guard, syncAction, reactionAsync);
+        => new(target, null, false, guard, guardConditions ?? Array.Empty<GuardCondition>(), syncAction, reactionAsync);
 
     public static Transition<TContext, TState, TActor> ToDynamicTarget<TContext, TState, TActor>(
         Func<TContext, TriggerArgs, TState> targetSelector,
         Func<TContext, TriggerArgs, bool>? guard = null,
+        IReadOnlyList<GuardCondition>? guardConditions = null,
         Action<TContext, TriggerArgs>? syncAction = null,
         Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null)
         where TContext : class
         where TState : struct, Enum
-        => new(default!, targetSelector, false, guard, syncAction, reactionAsync);
+        => new(default!, targetSelector, false, guard, guardConditions ?? Array.Empty<GuardCondition>(), syncAction, reactionAsync);
 
     public static Transition<TContext, TState, TActor> Stay<TContext, TState, TActor>(
         Action<TContext, TriggerArgs>? syncAction = null,
         Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null,
-        Func<TContext, TriggerArgs, bool>? guard = null)
+        Func<TContext, TriggerArgs, bool>? guard = null,
+        IReadOnlyList<GuardCondition>? guardConditions = null)
         where TContext : class
         where TState : struct, Enum
-        => new(default!, null, true, guard, syncAction, reactionAsync);
+        => new(default!, null, true, guard, guardConditions ?? Array.Empty<GuardCondition>(), syncAction, reactionAsync);
 }
 
 internal sealed class TestActor;

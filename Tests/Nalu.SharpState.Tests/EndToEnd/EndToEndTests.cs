@@ -25,6 +25,50 @@ public class EndToEndTests
     }
 
     [Fact]
+    public void ToDot_renders_guard_conditions_inside_trigger_labels()
+    {
+        var dot = DoorMachine.ToDot();
+
+        dot.Should().Contain("label = \"DoorMachine\";");
+        dot.Should().Contain("start [shape=Mdiamond,label=\"Closed\"];");
+        dot.Should().NotContain("shape=rectangle,label=\"Closed\"");
+        dot.Should().Contain("shape=rectangle,label=\"Opened\"");
+        dot.Should().Contain(@"shape=ellipse,label=""Open\n[Not spying]""");
+        dot.Should().Contain("start -> trigger_");
+        dot.Should().Contain("-> start;");
+    }
+
+    [Fact]
+    public void ToDot_renders_terminal_states_as_msquares()
+    {
+        var dot = ReactionMachine.ToDot();
+
+        dot.Should().Contain("shape=Msquare,label=\"Done\"");
+        dot.Should().NotContain("end [shape=Msquare]");
+        dot.Should().NotContain("-> end;");
+    }
+
+    [Fact]
+    public void ToDot_renders_hierarchical_regions_as_clusters()
+    {
+        var dot = NetworkMachine.ToDot();
+
+        dot.Should().Contain("compound = true;");
+        dot.Should().Contain("start [shape=Mdiamond,label=\"Idle\"];");
+        dot.Should().Contain("subgraph cluster_");
+        dot.Should().Contain("label = \"Connected\";");
+        dot.Should().Contain("label = \"Authenticated\";");
+        dot.Should().NotContain("shape=rectangle,label=\"Idle\"");
+        dot.Should().NotContain("shape=rectangle,label=\"Connected\"");
+        dot.Should().NotContain("shape=rectangle,label=\"Authenticated\"");
+        dot.Should().Contain("shape=Mdiamond,label=\"Authenticating\"");
+        dot.Should().Contain("shape=Mdiamond,label=\"Browsing\"");
+        dot.Should().Contain("-> start;");
+        dot.Should().NotContain("label=\"Message\"");
+        dot.Should().NotContain("end [shape=Msquare]");
+    }
+
+    [Fact]
     public void CanTrigger_methods_reflect_current_generated_actor_state()
     {
         var door = DoorMachine.CreateActor(DoorMachine.State.Closed, new DoorContext());

@@ -158,6 +158,12 @@ namespace Sample
         public static State GetInitialState() => State.Idle;
         
         /// <summary>
+        /// Renders this generated state machine as a Graphviz DOT graph.
+        /// </summary>
+        /// <returns>The DOT source representing the machine graph.</returns>
+        public static string ToDot() => global::Nalu.SharpState.StateMachineDotExporter.ToDot(_definition, GetInitialState(), "Hooks");
+        
+        /// <summary>
         /// Creates a new <see cref="IActor"/> bound to this generated state machine definition.
         /// </summary>
         /// <param name="context">The shared context used to create an actor starting from <see cref="GetInitialState()"/>.</param>
