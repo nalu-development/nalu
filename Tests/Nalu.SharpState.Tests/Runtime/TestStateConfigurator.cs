@@ -47,7 +47,16 @@ internal static class TestTransition
         Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null)
         where TContext : class
         where TState : struct, Enum
-        => new(target, false, guard, syncAction, reactionAsync);
+        => new(target, null, false, guard, syncAction, reactionAsync);
+
+    public static Transition<TContext, TState, TActor> ToDynamicTarget<TContext, TState, TActor>(
+        Func<TContext, TriggerArgs, TState> targetSelector,
+        Func<TContext, TriggerArgs, bool>? guard = null,
+        Action<TContext, TriggerArgs>? syncAction = null,
+        Func<TActor, TContext, TriggerArgs, ValueTask>? reactionAsync = null)
+        where TContext : class
+        where TState : struct, Enum
+        => new(default!, targetSelector, false, guard, syncAction, reactionAsync);
 
     public static Transition<TContext, TState, TActor> Stay<TContext, TState, TActor>(
         Action<TContext, TriggerArgs>? syncAction = null,
@@ -55,7 +64,7 @@ internal static class TestTransition
         Func<TContext, TriggerArgs, bool>? guard = null)
         where TContext : class
         where TState : struct, Enum
-        => new(default, true, guard, syncAction, reactionAsync);
+        => new(default!, null, true, guard, syncAction, reactionAsync);
 }
 
 internal sealed class TestActor;

@@ -2,7 +2,7 @@
 
 [![Nalu.SharpState NuGet Package](https://img.shields.io/nuget/v/Nalu.SharpState.svg)](https://www.nuget.org/packages/Nalu.SharpState/) [![Nalu.SharpState NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.SharpState)](https://www.nuget.org/packages/Nalu.SharpState/)
 
-A compile-time, AOT-friendly state machine for .NET built on a Roslyn source generator. You declare states and triggers with attributes, describe transitions with a strongly-typed fluent API, and the generator emits a ready-to-use `Actor` class with typed trigger methods.
+A compile-time, AOT-friendly state machine for .NET built on a Roslyn source generator. You declare states and triggers with attributes, describe transitions with a strongly-typed fluent API, and the generator emits a ready-to-use `IActor` surface with typed trigger methods.
 
 ## Why SharpState?
 
@@ -90,16 +90,19 @@ Console.WriteLine(door.Context.OpenCount); // 1
 
 ## Describing transitions
 
-Inside each `[StateDefinition]` property body you call `ConfigureState()` and chain one `On<TriggerName>(t => ...)` per trigger the state reacts to. The builder `t` exposes four methods:
+Inside each `[StateDefinition]` property body you call `ConfigureState()` and chain one `On<TriggerName>(t => ...)` per trigger the state reacts to. The builder is split into two phases:
 
 | Method | Purpose |
 |--------|---------|
 | `Target(State s)` | Move to `s` when the trigger fires. If `s` is composite, its initial-child chain is resolved to a leaf. |
+| `Target((ctx, args...) => State.X)` | Compute the target at fire time from the context and trigger arguments. |
 | `Stay()` | Run the action but keep the current state (internal transition). `StateChanged` is **not** raised. |
-| `Ignore()` | Syntax sugar for `Stay()` with no action, useful when a trigger should be accepted but do nothing. |
-| `When(predicate)` | Guard the transition. The predicate receives the context and trigger arguments. |
-| `Invoke(action)` | Run side effects before the state commits. The signature mirrors the trigger's parameters. |
-| `ReactAsync(action)` | Schedule fire-and-forget work after the transition commits and after `StateChanged` fires. |
+| `Ignore()` | Syntax sugar for `Stay()` with no action, useful when a trigger should be accepted but do nothing. This ends the fluent chain. |
+| `When(predicate)` | Available after `Target(...)` or `Stay()`. Guards the transition. The predicate receives the context and trigger arguments. Repeated calls are combined with logical AND in declaration order. |
+| `Invoke(action)` | Available after `Target(...)` or `Stay()`. Runs side effects before the state commits. Repeated calls run in declaration order. |
+| `ReactAsync(action)` | Available after `Target(...)` or `Stay()`. Schedules fire-and-forget work after the transition commits and after `StateChanged` fires. Repeated calls run sequentially in declaration order. |
+
+If a dynamic `Target(...)` resolves to the current leaf state for a specific fire, SharpState treats that fire like an internal transition: no exit hooks, no state commit, no entry hooks, and no `StateChanged`.
 
 You can register multiple transitions for the same trigger in the same state; the first one whose guard passes (or has no guard) wins:
 
@@ -248,6 +251,7 @@ door.StateChanged += (from, to, trigger, args) => { /* log, react, ... */ };
 It is **not** raised when:
 
 - The transition is internal (`.Stay()`).
+- A dynamic `Target(...)` resolves to the current leaf, so that fire collapses into internal behavior.
 - The trigger was unhandled (`OnUnhandled` is raised instead).
 
 ## Guards and actions

@@ -7,6 +7,12 @@ public class DiagnosticTests
 {
     private static IReadOnlyList<Diagnostic> GetDiagnostics(string source) => GeneratorDriverHelper.RunGenerator(source, out _).Diagnostics;
 
+    private static IReadOnlyList<Diagnostic> GetCompilationErrors(string source)
+    {
+        GeneratorDriverHelper.RunGenerator(source, out var outputCompilation);
+        return outputCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+    }
+
     [Fact]
     public void NSS001_reported_when_class_is_not_partial()
     {
@@ -241,5 +247,41 @@ public class DiagnosticTests
         }
         """;
         GetDiagnostics(source).Should().Contain(d => d.Id == "NSS009");
+    }
+
+    [Fact]
+    public void Generated_surface_supports_dynamic_targets_and_two_phase_builder()
+    {
+        var source = """
+        using Nalu.SharpState;
+
+        namespace Sample;
+
+        public class Ctx
+        {
+            public bool UseB { get; set; }
+            public int Counter { get; set; }
+        }
+
+        [StateMachineDefinition(typeof(Ctx))]
+        public partial class DynamicMachine
+        {
+            [StateTriggerDefinition] static partial void Go(int step);
+
+            [StateDefinition]
+            private static IStateConfiguration A => ConfigureState()
+                .OnGo(t => t
+                    .Target((ctx, step) => ctx.UseB && step == ctx.Counter ? State.B : State.C)
+                    .When((ctx, step) => step >= 0)
+                    .Invoke((ctx, step) => ctx.Counter += step)
+                    .ReactAsync((_, _, _) => default));
+
+            [StateDefinition] private static IStateConfiguration B => ConfigureState();
+            [StateDefinition] private static IStateConfiguration C => ConfigureState();
+        }
+        """;
+
+        GetDiagnostics(source).Should().BeEmpty();
+        GetCompilationErrors(source).Should().BeEmpty();
     }
 }

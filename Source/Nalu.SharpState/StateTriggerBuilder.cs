@@ -10,7 +10,8 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
     where TState : struct, Enum
 {
     private TState _target = default;
-    private bool _targetSet;
+    private Func<TContext, TriggerArgs, TState>? _targetSelector;
+    private bool _hasTarget;
     private bool _stay;
     private Func<TContext, TriggerArgs, bool>? _guard;
     private Action<TContext, TriggerArgs>? _syncAction;
@@ -19,26 +20,61 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
     protected void SetTarget(TState target)
     {
         _target = target;
-        _targetSet = true;
+        _targetSelector = null;
+        _hasTarget = true;
+    }
+
+    protected void SetTarget(Func<TContext, TriggerArgs, TState> targetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(targetSelector);
+        _target = default;
+        _targetSelector = targetSelector;
+        _hasTarget = true;
     }
 
     protected void SetStay() => _stay = true;
 
-    protected void SetGuard(Func<TContext, TriggerArgs, bool> guard) => _guard = guard;
+    protected void SetGuard(Func<TContext, TriggerArgs, bool> guard)
+    {
+        var previous = _guard;
+        _guard = previous is null
+            ? guard
+            : (context, args) => previous(context, args) && guard(context, args);
+    }
 
-    protected void SetSyncAction(Action<TContext, TriggerArgs> action) => _syncAction = action;
+    protected void SetSyncAction(Action<TContext, TriggerArgs> action)
+    {
+        var previous = _syncAction;
+        _syncAction = previous is null
+            ? action
+            : (context, args) =>
+            {
+                previous(context, args);
+                action(context, args);
+            };
+    }
 
-    protected void SetReactionAsync(Func<TActor, TContext, TriggerArgs, ValueTask> action) => _reactionAsync = action;
+    protected void SetReactionAsync(Func<TActor, TContext, TriggerArgs, ValueTask> action)
+    {
+        var previous = _reactionAsync;
+        _reactionAsync = previous is null
+            ? action
+            : async (actor, context, args) =>
+            {
+                await previous(actor, context, args);
+                await action(actor, context, args);
+            };
+    }
 
     public void Validate()
     {
-        if (_targetSet && _stay)
+        if (_hasTarget && _stay)
         {
             throw new InvalidOperationException(
                 "A transition cannot declare both a Target and Stay(). Choose one.");
         }
 
-        if (!_targetSet && !_stay)
+        if (!_hasTarget && !_stay)
         {
             throw new InvalidOperationException(
                 "A transition must declare either a Target state or Stay() for an internal transition.");
@@ -50,6 +86,7 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
         {
             new Transition<TContext, TState, TActor>(
                 _target,
+                _targetSelector,
                 _stay,
                 _guard,
                 _syncAction,
@@ -64,43 +101,47 @@ public abstract class StateTriggerBuilderBase<TContext, TState, TActor>
 /// </summary>
 public sealed class StateTriggerBuilder<TContext, TState, TActor> :
     StateTriggerBuilderBase<TContext, TState, TActor>,
-    ISyncStateTriggerBuilder<TContext, TState, TActor>
+    ISyncStateTriggerBuilder<TContext, TState, TActor>,
+    ISyncStateTransitionBuilder<TContext, TState, TActor>
     where TContext : class
     where TState : struct, Enum
 {
-    ISyncStateTriggerBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Target(TState target)
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Target(TState target)
     {
         SetTarget(target);
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Stay()
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Target(Func<TContext, TState> targetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(targetSelector);
+        SetTarget((context, _) => targetSelector(context));
+        return this;
+    }
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Stay()
     {
         SetStay();
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Ignore()
-    {
-        SetStay();
-        return this;
-    }
+    void ISyncStateTriggerBuilder<TContext, TState, TActor>.Ignore() => SetStay();
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.When(Func<TContext, bool> guard)
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTransitionBuilder<TContext, TState, TActor>.When(Func<TContext, bool> guard)
     {
         ArgumentNullException.ThrowIfNull(guard);
         SetGuard((context, _) => guard(context));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.Invoke(Action<TContext> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTransitionBuilder<TContext, TState, TActor>.Invoke(Action<TContext> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetSyncAction((context, _) => action(context));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor> ISyncStateTriggerBuilder<TContext, TState, TActor>.ReactAsync(Func<TActor, TContext, ValueTask> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor> ISyncStateTransitionBuilder<TContext, TState, TActor>.ReactAsync(Func<TActor, TContext, ValueTask> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetReactionAsync((actor, context, _) => action(actor, context));
@@ -113,43 +154,47 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor> :
 /// </summary>
 public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0> :
     StateTriggerBuilderBase<TContext, TState, TActor>,
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>
+    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>,
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>
     where TContext : class
     where TState : struct, Enum
 {
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Target(TState target)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Target(TState target)
     {
         SetTarget(target);
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Stay()
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Target(Func<TContext, TArg0, TState> targetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(targetSelector);
+        SetTarget((context, args) => targetSelector(context, (TArg0)args[0]!));
+        return this;
+    }
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Stay()
     {
         SetStay();
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Ignore()
-    {
-        SetStay();
-        return this;
-    }
+    void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Ignore() => SetStay();
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.When(Func<TContext, TArg0, bool> guard)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>.When(Func<TContext, TArg0, bool> guard)
     {
         ArgumentNullException.ThrowIfNull(guard);
         SetGuard((context, args) => guard(context, (TArg0)args[0]!));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.Invoke(Action<TContext, TArg0> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>.Invoke(Action<TContext, TArg0> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetSyncAction((context, args) => action(context, (TArg0)args[0]!));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0>.ReactAsync(Func<TActor, TContext, TArg0, ValueTask> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0>.ReactAsync(Func<TActor, TContext, TArg0, ValueTask> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetReactionAsync((actor, context, args) => action(actor, context, (TArg0)args[0]!));
@@ -162,43 +207,47 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0> :
 /// </summary>
 public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> :
     StateTriggerBuilderBase<TContext, TState, TActor>,
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>
+    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>,
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>
     where TContext : class
     where TState : struct, Enum
 {
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Target(TState target)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Target(TState target)
     {
         SetTarget(target);
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Stay()
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Target(Func<TContext, TArg0, TArg1, TState> targetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(targetSelector);
+        SetTarget((context, args) => targetSelector(context, (TArg0)args[0]!, (TArg1)args[1]!));
+        return this;
+    }
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Stay()
     {
         SetStay();
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Ignore()
-    {
-        SetStay();
-        return this;
-    }
+    void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Ignore() => SetStay();
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.When(Func<TContext, TArg0, TArg1, bool> guard)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>.When(Func<TContext, TArg0, TArg1, bool> guard)
     {
         ArgumentNullException.ThrowIfNull(guard);
         SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.Invoke(Action<TContext, TArg0, TArg1> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>.Invoke(Action<TContext, TArg0, TArg1> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetSyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1>.ReactAsync(Func<TActor, TContext, TArg0, TArg1, ValueTask> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1>.ReactAsync(Func<TActor, TContext, TArg0, TArg1, ValueTask> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetReactionAsync((actor, context, args) => action(actor, context, (TArg0)args[0]!, (TArg1)args[1]!));
@@ -211,43 +260,47 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1> 
 /// </summary>
 public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> :
     StateTriggerBuilderBase<TContext, TState, TActor>,
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>
+    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>,
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>
     where TContext : class
     where TState : struct, Enum
 {
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Target(TState target)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Target(TState target)
     {
         SetTarget(target);
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Stay()
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Target(Func<TContext, TArg0, TArg1, TArg2, TState> targetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(targetSelector);
+        SetTarget((context, args) => targetSelector(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
+        return this;
+    }
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Stay()
     {
         SetStay();
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Ignore()
-    {
-        SetStay();
-        return this;
-    }
+    void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Ignore() => SetStay();
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.When(Func<TContext, TArg0, TArg1, TArg2, bool> guard)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.When(Func<TContext, TArg0, TArg1, TArg2, bool> guard)
     {
         ArgumentNullException.ThrowIfNull(guard);
         SetGuard((context, args) => guard(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Invoke(Action<TContext, TArg0, TArg1, TArg2> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.Invoke(Action<TContext, TArg0, TArg1, TArg2> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetSyncAction((context, args) => action(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.ReactAsync(Func<TActor, TContext, TArg0, TArg1, TArg2, ValueTask> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2>.ReactAsync(Func<TActor, TContext, TArg0, TArg1, TArg2, ValueTask> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetReactionAsync((actor, context, args) => action(actor, context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!));
@@ -260,29 +313,34 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, 
 /// </summary>
 public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> :
     StateTriggerBuilderBase<TContext, TState, TActor>,
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>
+    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>,
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>
     where TContext : class
     where TState : struct, Enum
 {
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Target(TState target)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Target(TState target)
     {
         SetTarget(target);
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Stay()
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Target(Func<TContext, TArg0, TArg1, TArg2, TArg3, TState> targetSelector)
+    {
+        ArgumentNullException.ThrowIfNull(targetSelector);
+        SetTarget((context, args) =>
+            targetSelector(context, (TArg0)args[0]!, (TArg1)args[1]!, (TArg2)args[2]!, (TArg3)args[3]!));
+        return this;
+    }
+
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Stay()
     {
         SetStay();
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Ignore()
-    {
-        SetStay();
-        return this;
-    }
+    void ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Ignore() => SetStay();
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.When(Func<TContext, TArg0, TArg1, TArg2, TArg3, bool> guard)
     {
         ArgumentNullException.ThrowIfNull(guard);
         SetGuard((context, args) =>
@@ -290,7 +348,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, 
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Invoke(Action<TContext, TArg0, TArg1, TArg2, TArg3> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.Invoke(Action<TContext, TArg0, TArg1, TArg2, TArg3> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetSyncAction((context, args) =>
@@ -298,7 +356,7 @@ public sealed class StateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, 
         return this;
     }
 
-    ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTriggerBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.ReactAsync(Func<TActor, TContext, TArg0, TArg1, TArg2, TArg3, ValueTask> action)
+    ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3> ISyncStateTransitionBuilder<TContext, TState, TActor, TArg0, TArg1, TArg2, TArg3>.ReactAsync(Func<TActor, TContext, TArg0, TArg1, TArg2, TArg3, ValueTask> action)
     {
         ArgumentNullException.ThrowIfNull(action);
         SetReactionAsync((actor, context, args) =>

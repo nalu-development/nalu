@@ -52,6 +52,8 @@ For external transitions, the execution order is:
 
 For internal transitions (`Stay()` / `Ignore()`), only the inline `Invoke(...)` runs before the background reaction is scheduled.
 
+If you use a dynamic `Target((ctx, args...) => ...)` and it resolves to the current leaf for a specific fire, that fire also behaves like an internal transition.
+
 ## Synchronization context behavior
 
 `ReactAsync(...)` captures the current `SynchronizationContext` when the trigger is fired.
@@ -60,6 +62,8 @@ For internal transitions (`Stay()` / `Ignore()`), only the inline `Invoke(...)` 
 - If no context exists, the reaction is queued on the thread pool.
 
 This keeps the main trigger path synchronous while still giving UI applications predictable follow-up scheduling. The callback also receives the generated `IActor` instance, so you can trigger additional state changes after the awaited work completes.
+
+If `ReactAsync(...)` is registered multiple times on the same transition, the callbacks are awaited sequentially in declaration order.
 
 ## Failure reporting
 

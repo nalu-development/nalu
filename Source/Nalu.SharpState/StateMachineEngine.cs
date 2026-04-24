@@ -158,6 +158,26 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger, TActor>
         TriggerArgs args,
         System.Threading.SynchronizationContext? synchronizationContext)
     {
+        if (transition.TargetSelector is not null)
+        {
+            var resolvedTarget = transition.TargetSelector(Context, args);
+            var resolvedLeaf = _definition.LeafOf(resolvedTarget);
+            if (EqualityComparer<TState>.Default.Equals(resolvedLeaf, source))
+            {
+                transition.SyncAction?.Invoke(Context, args);
+                ScheduleReaction(source, source, trigger, transition, args, synchronizationContext);
+                return;
+            }
+
+            InvokeExitActions(source, resolvedLeaf);
+            transition.SyncAction?.Invoke(Context, args);
+            _currentState = resolvedLeaf;
+            InvokeEntryActions(source, resolvedLeaf);
+            StateChanged?.Invoke(source, resolvedLeaf, trigger, args.ToArray());
+            ScheduleReaction(source, resolvedLeaf, trigger, transition, args, synchronizationContext);
+            return;
+        }
+
         if (transition.IsInternal)
         {
             transition.SyncAction?.Invoke(Context, args);

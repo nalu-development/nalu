@@ -95,8 +95,8 @@ public class StateMachineEngineTests
         var definition = BuildFlat(map =>
         {
             map[FlatState.A].AddAllFor(FlatTrigger.Go, [
-                new Transition<TestContext, FlatState, TestActor>(FlatState.B, false, (ctx, _) => ctx.Counter > 10, null, null),
-                new Transition<TestContext, FlatState, TestActor>(FlatState.C, false, null, null, null)
+                new Transition<TestContext, FlatState, TestActor>(FlatState.B, null, false, (ctx, _) => ctx.Counter > 10, null, null),
+                new Transition<TestContext, FlatState, TestActor>(FlatState.C, null, false, null, null, null)
             ]);
         });
 
@@ -150,13 +150,63 @@ public class StateMachineEngineTests
     }
 
     [Fact]
+    public void Fire_dynamic_target_uses_context_and_args()
+    {
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A].On(
+                FlatTrigger.Go,
+                TestTransition.ToDynamicTarget<TestContext, FlatState, TestActor>(
+                    (ctx, args) => (int)args[0]! == ctx.Counter ? FlatState.B : FlatState.C));
+        });
+
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(
+            definition,
+            FlatState.A,
+            new TestContext { Counter = 7 },
+            new TestActor());
+
+        engine.Fire(FlatTrigger.Go, TriggerArgs.From(7));
+        engine.CurrentState.Should().Be(FlatState.B);
+    }
+
+    [Fact]
+    public void Fire_dynamic_target_to_current_state_behaves_like_internal_transition()
+    {
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A]
+                .WhenEntering(ctx => ctx.Log.Add("enter:A"))
+                .WhenExiting(ctx => ctx.Log.Add("exit:A"))
+                .On(
+                    FlatTrigger.Go,
+                    TestTransition.ToDynamicTarget<TestContext, FlatState, TestActor>(
+                        (_, args) => (bool)args[0]! ? FlatState.A : FlatState.B,
+                        syncAction: (ctx, _) => ctx.Log.Add("invoke")));
+            map[FlatState.B]
+                .WhenEntering(ctx => ctx.Log.Add("enter:B"));
+        });
+
+        var ctx = new TestContext();
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, ctx, new TestActor());
+        var changed = false;
+        engine.StateChanged += (_, _, _, _) => changed = true;
+
+        engine.Fire(FlatTrigger.Go, TriggerArgs.From(true));
+
+        engine.CurrentState.Should().Be(FlatState.A);
+        changed.Should().BeFalse();
+        ctx.Log.Should().Equal("invoke");
+    }
+
+    [Fact]
     public void Fire_when_all_guards_fail_invokes_unhandled()
     {
         var definition = BuildFlat(map =>
         {
             map[FlatState.A].AddAllFor(FlatTrigger.Go, [
-                new Transition<TestContext, FlatState, TestActor>(FlatState.B, false, (_, _) => false, null, null),
-                new Transition<TestContext, FlatState, TestActor>(FlatState.C, false, (_, _) => false, null, null)
+                new Transition<TestContext, FlatState, TestActor>(FlatState.B, null, false, (_, _) => false, null, null),
+                new Transition<TestContext, FlatState, TestActor>(FlatState.C, null, false, (_, _) => false, null, null)
             ]);
         });
 

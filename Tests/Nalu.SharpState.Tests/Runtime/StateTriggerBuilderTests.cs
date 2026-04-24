@@ -8,7 +8,7 @@ public class StateTriggerBuilderTests
     public void Validate_requires_Target_or_Stay()
     {
         var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
-        var act = () => builder.Validate();
+        var act = builder.Validate;
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*Target*Stay*");
     }
@@ -17,8 +17,9 @@ public class StateTriggerBuilderTests
     public void Validate_rejects_Target_and_Stay_together()
     {
         var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor>();
-        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor> sync = builder;
-        sync.Target(FlatState.B).Stay();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor> targetPhase = builder;
+        targetPhase.Target(FlatState.B);
+        ((ISyncStateTriggerBuilder<TestContext, FlatState, TestActor>)builder).Stay();
         var act = () => builder.Validate();
         act.Should().Throw<InvalidOperationException>();
     }
@@ -37,6 +38,24 @@ public class StateTriggerBuilderTests
         var transition = list[0];
         transition.IsInternal.Should().BeFalse();
         transition.Target.Should().Be(FlatState.B);
+    }
+
+    [Fact]
+    public void BuildTransitions_produces_single_transition_with_dynamic_target()
+    {
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, int>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, int> targetPhase = builder;
+        targetPhase.Target((ctx, step) => ctx.Counter == step ? FlatState.B : FlatState.C);
+        builder.Validate();
+
+        var transition = builder.BuildTransitions()[0];
+
+        transition.TargetSelector.Should().NotBeNull();
+        transition.TargetSelector!(new TestContext { Counter = 3 }, TriggerArgs.From(3)).Should().Be(FlatState.B);
+        transition.TargetSelector!(new TestContext { Counter = 1 }, TriggerArgs.From(3)).Should().Be(FlatState.C);
+        var act = () => _ = transition.Target;
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*dispatch time*");
     }
 
     [Fact]
@@ -92,6 +111,42 @@ public class StateTriggerBuilderTests
     }
 
     [Fact]
+    public void Repeated_When_and_Invoke_registrations_compose_in_definition_order()
+    {
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, string>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, string> targetPhase = builder;
+        targetPhase
+            .Target(FlatState.B)
+            .When((ctx, arg) =>
+            {
+                ctx.Log.Add("guard:1");
+                return arg.StartsWith("o", StringComparison.Ordinal);
+            })
+            .When((ctx, arg) =>
+            {
+                ctx.Log.Add("guard:2");
+                return arg.EndsWith("k", StringComparison.Ordinal);
+            })
+            .Invoke((ctx, arg) => ctx.Log.Add("action:1:" + arg))
+            .Invoke((ctx, arg) => ctx.Log.Add("action:2:" + arg));
+        builder.Validate();
+
+        var transition = builder.BuildTransitions()[0];
+        var ctx = new TestContext();
+
+        transition.Guard!(ctx, TriggerArgs.From("ok")).Should().BeTrue();
+        ctx.Log.Should().Equal("guard:1", "guard:2");
+
+        ctx.Log.Clear();
+        transition.Guard!(ctx, TriggerArgs.From("no")).Should().BeFalse();
+        ctx.Log.Should().Equal("guard:1");
+
+        ctx.Log.Clear();
+        transition.SyncAction!(ctx, TriggerArgs.From("ok"));
+        ctx.Log.Should().Equal("action:1:ok", "action:2:ok");
+    }
+
+    [Fact]
     public async Task ReactAsync_stores_background_reaction()
     {
         var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, int>();
@@ -111,6 +166,32 @@ public class StateTriggerBuilderTests
         var ctx = new TestContext { Counter = 10 };
         await transition.ReactionAsync!(actor, ctx, TriggerArgs.From(5));
         ctx.Counter.Should().Be(15);
+    }
+
+    [Fact]
+    public async Task Repeated_ReactAsync_registrations_compose_in_definition_order()
+    {
+        var builder = new StateTriggerBuilder<TestContext, FlatState, TestActor, int>();
+        ISyncStateTriggerBuilder<TestContext, FlatState, TestActor, int> targetPhase = builder;
+        targetPhase
+            .Target(FlatState.B)
+            .ReactAsync(async (_, ctx, value) =>
+            {
+                await Task.Yield();
+                ctx.Log.Add("reaction:1:" + value);
+            })
+            .ReactAsync(async (_, ctx, value) =>
+            {
+                await Task.Yield();
+                ctx.Log.Add("reaction:2:" + value);
+            });
+        builder.Validate();
+
+        var transition = builder.BuildTransitions()[0];
+        var ctx = new TestContext();
+
+        await transition.ReactionAsync!(new TestActor(), ctx, TriggerArgs.From(7));
+        ctx.Log.Should().Equal("reaction:1:7", "reaction:2:7");
     }
 
     [Fact]
