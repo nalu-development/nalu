@@ -207,7 +207,7 @@ public sealed class StateMachineDefinition<TContext, TState, TTrigger, TActor>
             if (!InitialChild.ContainsKey(parent))
             {
                 throw new InvalidOperationException(
-                    $"State '{child}' declares parent '{parent}' but '{parent}' does not declare an initial child via [SubStateMachine(parent: {parent}, initial: ...)].");
+                    $"State '{child}' declares parent '{parent}' but '{parent}' does not declare an initial child via a nested [SubStateMachine(parent: {parent})] region with one [StateDefinition(Initial = true)] child.");
             }
         }
 
@@ -224,7 +224,7 @@ public sealed class StateMachineDefinition<TContext, TState, TTrigger, TActor>
             if (!Parent.TryGetValue(initial, out var initialsParent) || !comparer.Equals(initialsParent, composite))
             {
                 throw new InvalidOperationException(
-                    $"State '{composite}' declares initial child '{initial}', but '{initial}' is not nested inside a [SubStateMachine(parent: {composite}, ...)] region.");
+                    $"State '{composite}' declares initial child '{initial}', but '{initial}' is not nested inside a [SubStateMachine(parent: {composite})] region.");
             }
         }
 

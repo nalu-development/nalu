@@ -20,7 +20,7 @@ public partial class NetworkMachine
 
     [StateTriggerDefinition] static partial void Save();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState()
         .OnConnect(t => t.Target(State.Connected));
 
@@ -28,10 +28,10 @@ public partial class NetworkMachine
     private static IStateConfiguration Connected => ConfigureState()
         .OnDisconnect(t => t.Target(State.Idle));
 
-    [SubStateMachine(parent: State.Connected, initial: State.Authenticating)]
+    [SubStateMachine(parent: State.Connected)]
     private partial class ConnectedRegion
     {
-        [StateDefinition]
+        [StateDefinition(Initial = true)]
         private static IStateConfiguration Authenticating => ConfigureState()
             .OnAuthOk(t => t.Target(State.Authenticated));
 
@@ -39,10 +39,10 @@ public partial class NetworkMachine
         private static IStateConfiguration Authenticated => ConfigureState()
             .OnMessage(t => t.Stay().Invoke((ctx, text) => ctx.Log.Add(text)));
 
-        [SubStateMachine(parent: State.Authenticated, initial: State.Browsing)]
+        [SubStateMachine(parent: State.Authenticated)]
         private partial class AuthenticatedRegion
         {
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Browsing => ConfigureState()
                 .OnStartEdit(t => t.Target(State.Editing));
 

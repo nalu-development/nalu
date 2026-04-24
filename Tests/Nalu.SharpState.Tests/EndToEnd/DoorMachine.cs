@@ -25,7 +25,7 @@ public partial class DoorMachine
     /// <summary>
     /// The door is currently closed.
     /// </summary>
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Closed => ConfigureState()
         .OnOpen(t => t
                      .Target(State.Opened)

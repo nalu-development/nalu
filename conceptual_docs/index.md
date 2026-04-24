@@ -180,7 +180,7 @@ public partial class DoorMachine
 ```
 
 ```csharp
-var door = DoorMachine.CreateActor(DoorMachine.State.Closed, new DoorContext());
+var door = DoorMachine.CreateActor(new DoorContext());
 door.Open("delivery");
 Console.WriteLine(door.CurrentState); // Opened
 ```
@@ -188,6 +188,6 @@ Console.WriteLine(door.CurrentState); // Opened
 - **Strongly typed** trigger methods, guards, and actions — no `object[]` bags, no reflection.
 - **Hierarchical state machines** via nested `[SubStateMachine]` partial classes with strict scoping rules.
 - **Sync or async** machines with one flag on the definition attribute.
-- **Compile-time diagnostics** (`NSS001`-`NSS009`) catch mistakes before you ship.
+- **Compile-time diagnostics** (`NSS001`-`NSS010`) catch mistakes before you ship.
 
 **Find out more on the [SharpState Wiki](sharpstate.md)**.

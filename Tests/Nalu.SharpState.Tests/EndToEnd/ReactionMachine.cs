@@ -12,7 +12,7 @@ public partial class ReactionMachine
 
     [StateTriggerDefinition] static partial void Finish();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState()
         .OnInspect(t => t
             .Stay()

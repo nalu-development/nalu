@@ -44,7 +44,7 @@ public partial class NoArgsMachine
 {
     [StateTriggerDefinition] static partial void Ping();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState()
         .OnPing(t => t.Ignore());
 }
@@ -54,7 +54,7 @@ public partial class OneArgMachine
 {
     [StateTriggerDefinition] static partial void Record(int _);
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState()
         .OnRecord(t => t.Stay().Invoke((ctx, recordedValue) => ctx.Counter = recordedValue));
 }
@@ -64,17 +64,17 @@ public partial class HierMachine
 {
     [StateTriggerDefinition] static partial void Reset();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState();
 
     [StateDefinition]
     private static IStateConfiguration Running => ConfigureState()
         .OnReset(t => t.Target(State.Idle));
 
-    [SubStateMachine(parent: State.Running, initial: State.Active)]
+    [SubStateMachine(parent: State.Running)]
     private partial class RunningRegion
     {
-        [StateDefinition]
+        [StateDefinition(Initial = true)]
         private static IStateConfiguration Active => ConfigureState();
     }
 }

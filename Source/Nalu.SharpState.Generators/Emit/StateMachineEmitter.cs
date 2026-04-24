@@ -93,7 +93,13 @@ internal static class StateMachineEmitter
             w.WriteBlankLine();
             EmitBuildDefinition(w, context, m);
             w.WriteBlankLine();
-            EmitCreateActorDocs(w, context);
+            EmitGetInitialStateDocs(w);
+            w.WriteLine($"public static State GetInitialState() => State.{m.RootInitialState};");
+            w.WriteBlankLine();
+            EmitCreateActorDocs(w, context, withCurrentState: false);
+            w.WriteLine($"public static IActor CreateActor({context} context) => CreateActor(GetInitialState(), context);");
+            w.WriteBlankLine();
+            EmitCreateActorDocs(w, context, withCurrentState: true);
             w.WriteLine($"public static IActor CreateActor(State currentState, {context} context) => new Actor(_definition, currentState, context);");
             w.WriteBlankLine();
             EmitActorClass(w, context, m);
@@ -255,7 +261,7 @@ internal static class StateMachineEmitter
         w.WriteLine($"/// <see cref=\"{machineTypeCref}\"/> runtime actor.");
         w.WriteLine("/// </summary>");
         w.WriteLine("/// <remarks>");
-        w.WriteLine($"/// Use <see cref=\"CreateActor(State, {context})\"/> to create an instance.");
+        w.WriteLine($"/// Use <see cref=\"CreateActor({context})\"/> or <see cref=\"CreateActor(State, {context})\"/> to create an instance.");
         w.WriteLine("/// </remarks>");
         w.WriteLine("public interface IActor");
         using (w.Block())
@@ -294,6 +300,8 @@ internal static class StateMachineEmitter
 
             foreach (var t in m.Triggers)
             {
+                w.WriteBlankLine();
+                EmitActorInterfaceCanTriggerMethod(w, t);
                 w.WriteBlankLine();
                 EmitActorInterfaceTriggerMethod(w, t);
             }
@@ -383,9 +391,18 @@ internal static class StateMachineEmitter
             foreach (var t in m.Triggers)
             {
                 w.WriteBlankLine();
+                EmitActorCanTriggerMethod(w, t);
+                w.WriteBlankLine();
                 EmitActorTriggerMethod(w, t);
             }
         }
+    }
+
+    private static void EmitActorCanTriggerMethod(SourceWriter w, TriggerModel t)
+    {
+        var paramList = string.Join(", ", t.Parameters.Select(p => $"{p.TypeDisplay} {p.Name}"));
+        var triggerArgs = TriggerArgsFactory(t);
+        w.WriteLine($"public bool Can{t.Name}({paramList}) => _engine.CanFire(Trigger.{t.Name}, {triggerArgs});");
     }
 
     private static void EmitActorTriggerMethod(SourceWriter w, TriggerModel t)
@@ -465,12 +482,45 @@ internal static class StateMachineEmitter
         w.WriteLine($"void {t.Name}({paramList});");
     }
 
-    private static void EmitCreateActorDocs(SourceWriter w, string context)
+    private static void EmitActorInterfaceCanTriggerMethod(SourceWriter w, TriggerModel t)
+    {
+        var paramList = string.Join(", ", t.Parameters.Select(p => $"{p.TypeDisplay} {p.Name}"));
+        var actorMethodCref = ActorMethodCref(t);
+        w.WriteLine("/// <summary>");
+        w.WriteLine($"/// Determines whether <see cref=\"{actorMethodCref}\"/> can be invoked from the current state.");
+        w.WriteLine("/// </summary>");
+        foreach (var parameter in t.Parameters)
+        {
+            w.WriteLine($"/// <param name=\"{parameter.Name}\">The value to test with the trigger.</param>");
+        }
+        w.WriteLine("/// <returns><c>true</c> when a matching transition exists; otherwise <c>false</c>.</returns>");
+        w.WriteLine($"bool Can{t.Name}({paramList});");
+    }
+
+    private static void EmitGetInitialStateDocs(SourceWriter w)
+    {
+        w.WriteLine("/// <summary>");
+        w.WriteLine("/// Gets the initial root <see cref=\"State\"/> of this generated state machine.");
+        w.WriteLine("/// </summary>");
+        w.WriteLine("/// <returns>The initial root <see cref=\"State\"/>.</returns>");
+    }
+
+    private static void EmitCreateActorDocs(SourceWriter w, string context, bool withCurrentState)
     {
         w.WriteLine("/// <summary>");
         w.WriteLine("/// Creates a new <see cref=\"IActor\"/> bound to this generated state machine definition.");
         w.WriteLine("/// </summary>");
-        w.WriteLine("/// <param name=\"currentState\">The starting state. Composite states resolve to their initial leaf.</param>");
+        if (withCurrentState)
+        {
+            w.WriteLine("/// <param name=\"currentState\">The starting state. Composite states resolve to their initial leaf.</param>");
+        }
+        else
+        {
+            w.WriteLine("/// <param name=\"context\">The shared context used to create an actor starting from <see cref=\"GetInitialState()\"/>.</param>");
+            w.WriteLine("/// <returns>A new <see cref=\"IActor\"/> instance at the machine's initial state.</returns>");
+            return;
+        }
+
         w.WriteLine($"/// <param name=\"context\">The shared <see cref=\"{context}\"/> passed to guards, actions, and reactions.</param>");
         w.WriteLine("/// <returns>A new <see cref=\"IActor\"/> instance.</returns>");
     }

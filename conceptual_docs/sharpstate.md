@@ -12,7 +12,7 @@ Classic state machine libraries rely on reflection, dictionaries keyed by string
 
 - **Declarative**: states and triggers are C# constructs (a `static partial` method is a trigger, a `static` property is a state).
 - **Strongly typed**: trigger parameters become method parameters on the generated actor. Guards and actions see the exact types you declared.
-- **Compile-time validated**: duplicate names, unreachable hierarchies, and misconfigured sub-machines become build errors via dedicated `NSS001`-`NSS009` diagnostics.
+- **Compile-time validated**: duplicate names, unreachable hierarchies, and misconfigured sub-machines become build errors via dedicated `NSS001`-`NSS010` diagnostics.
 - **AOT / trim friendly**: zero reflection at runtime. The generator emits the registration tables at compile time.
 - **Hierarchical**: composite states are modeled as nested `[SubStateMachine]` partial classes with strict scoping rules.
 - **Sync-first**: generated actors stay synchronous, with optional fire-and-forget `ReactAsync(...)` callbacks for post-transition work.
@@ -52,7 +52,7 @@ public partial class DoorMachine
     [StateTriggerDefinition] static partial void Open(string reason);
     [StateTriggerDefinition] static partial void Close();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Closed => ConfigureState()
         .OnOpen(t => t
             .Target(State.Opened)
@@ -72,15 +72,16 @@ The generator produces:
 
 - A `State` enum with the values `Closed, Opened`.
 - A `Trigger` enum with the values `Open, Close`.
-- A nested `public interface IActor` exposing `Open(string)`, `Close()`, `CurrentState`, `Context`, `IsIn(...)`, `StateChanged`, `ReactionFailed`, and `OnUnhandled`.
+- A nested `public interface IActor` exposing `CanOpen(string)`, `Open(string)`, `CanClose()`, `Close()`, `CurrentState`, `Context`, `IsIn(...)`, `StateChanged`, `ReactionFailed`, and `OnUnhandled`.
 - A nested `public delegate IActor Factory(State currentState, DoorContext context)` for dependency injection and tests.
+- A `public static State GetInitialState()` helper for the root machine.
+- A `public static IActor CreateActor(DoorContext context)` helper that starts from the root initial state.
 - A `public static IActor CreateActor(State currentState, DoorContext context)` helper that the factory can point to.
 
 Usage:
 
 ```csharp
-DoorMachine.Factory createDoor = DoorMachine.CreateActor;
-var door = createDoor(DoorMachine.State.Closed, new DoorContext());
+var door = DoorMachine.CreateActor(new DoorContext());
 
 door.Open("delivery");
 
@@ -158,11 +159,12 @@ Console.WriteLine(door.IsIn(DoorMachine.State.Opened)); // true
 | Member | Description |
 |--------|-------------|
 | `CurrentState` | Current **leaf** state. When the machine is in a nested composite it always reports the leaf. |
-| `Context` | The context instance supplied to `CreateActor`. |
+| `Context` | The context instance supplied to `CreateActor(...)`. |
 | `IsIn(State s)` | `true` if `CurrentState` equals `s` **or** is a descendant of `s`. Use this to query composites. |
 | `StateChanged` | `StateChangedHandler<State, Trigger>` raised **after** a non-internal transition commits. |
 | `ReactionFailed` | Raised when a background `ReactAsync(...)` callback throws after the transition already completed. |
 | `OnUnhandled` | Invoked when a trigger has no matching transition on the leaf nor on any ancestor. |
+| `Can<Trigger>(...)` | Returns whether the corresponding trigger currently has a matching transition for the supplied arguments. |
 | `<Trigger>(...)` | One strongly-typed `void` method per trigger. |
 
 ### Testability
@@ -312,4 +314,4 @@ For external transitions, the order is:
 - [Benchmarks](../Tests/Nalu.SharpState.Benchmarks/) — measure trigger dispatch and allocations on your machine.
 - [Hierarchical State Machines](sharpstate-hierarchy.md) — nested composite states via `[SubStateMachine]`.
 - [Post-Transition Reactions](sharpstate-async.md) — background `ReactAsync(...)` work and `ReactionFailed`.
-- [Diagnostics & Troubleshooting](sharpstate-diagnostics.md) — generator errors (`NSS001`-`NSS009`) and common pitfalls.
+- [Diagnostics & Troubleshooting](sharpstate-diagnostics.md) — generator errors (`NSS001`-`NSS010`) and common pitfalls.

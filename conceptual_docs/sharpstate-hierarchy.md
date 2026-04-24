@@ -7,10 +7,10 @@ Real-world behavior rarely fits into a flat list of states. Think of a network c
 A region is a `partial class` nested inside either the root `[StateMachineDefinition]` class or another `[SubStateMachine]` region. It refines a **composite state** declared in its immediately enclosing scope.
 
 ```csharp
-[SubStateMachine(parent: State.Connected, initial: State.Authenticating)]
+[SubStateMachine(parent: State.Connected)]
 private partial class ConnectedRegion
 {
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Authenticating => ConfigureState()
         .OnAuthOk(t => t.Target(State.Authenticated));
 
@@ -22,14 +22,13 @@ private partial class ConnectedRegion
 }
 ```
 
-The attribute takes two **mandatory** constructor arguments:
+The attribute takes one mandatory constructor argument:
 
 | Argument | Meaning | Scoping rule |
 |----------|---------|--------------|
 | `parent` | The composite state this region refines. | Must be a `[StateDefinition]` declared in the immediately enclosing class (root or outer region). |
-| `initial` | The default leaf entered when the composite is targeted. | Must be a `[StateDefinition]` declared **inside** this region. |
 
-Every `[StateDefinition]` inside the class is treated as a child of `parent`. Entering `parent` automatically resolves to `initial`; if `initial` is itself a composite, resolution continues until a real leaf is reached.
+Every `[StateDefinition]` inside the class is treated as a child of `parent`. Exactly one state in the region must be marked with `[StateDefinition(Initial = true)]`. Entering `parent` automatically resolves to that initial child; if it is itself a composite, resolution continues until a real leaf is reached.
 
 > **Triggers must live on the root machine.** Placing `[StateTriggerDefinition]` inside a `[SubStateMachine]` class is a build error (`NSS009`). Regions describe structure, not new inputs.
 
@@ -53,7 +52,7 @@ public partial class NetworkMachine
     [StateTriggerDefinition] static partial void StartEdit();
     [StateTriggerDefinition] static partial void Save();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState()
         .OnConnect(t => t.Target(State.Connected));
 
@@ -61,10 +60,10 @@ public partial class NetworkMachine
     private static IStateConfiguration Connected => ConfigureState()
         .OnDisconnect(t => t.Target(State.Idle));
 
-    [SubStateMachine(parent: State.Connected, initial: State.Authenticating)]
+    [SubStateMachine(parent: State.Connected)]
     private partial class ConnectedRegion
     {
-        [StateDefinition]
+        [StateDefinition(Initial = true)]
         private static IStateConfiguration Authenticating => ConfigureState()
             .OnAuthOk(t => t.Target(State.Authenticated));
 
@@ -72,10 +71,10 @@ public partial class NetworkMachine
         private static IStateConfiguration Authenticated => ConfigureState()
             .OnMessage(t => t.Stay().Invoke((ctx, msg) => ctx.Log.Add(msg)));
 
-        [SubStateMachine(parent: State.Authenticated, initial: State.Browsing)]
+        [SubStateMachine(parent: State.Authenticated)]
         private partial class AuthenticatedRegion
         {
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Browsing => ConfigureState()
                 .OnStartEdit(t => t.Target(State.Editing));
 
@@ -105,7 +104,7 @@ Three rules govern how the runtime walks this tree.
 ### 1. Targeting a composite resolves to its initial leaf
 
 ```csharp
-var machine = NetworkMachine.CreateActor(NetworkMachine.State.Idle, new NetworkContext());
+var machine = NetworkMachine.CreateActor(new NetworkContext());
 
 machine.Connect();
 // Target(Connected) -> initial Authenticating -> Authenticating has no deeper initial
@@ -152,10 +151,10 @@ This is how you write predicates like *"can we Save right now?"* without caring 
 Every region sees the single `State` enum generated for the root machine. Inside `AuthenticatedRegion` you can still write `State.Connected` or `State.Idle` — the generator emits the enum on the outer machine class and every nested partial shares it.
 
 ```csharp
-[SubStateMachine(parent: State.Authenticated, initial: State.Browsing)]
+[SubStateMachine(parent: State.Authenticated)]
 private partial class AuthenticatedRegion
 {
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Editing => ConfigureState()
         .OnSave(t => t.Target(State.Browsing))
         // ancestor handles Disconnect, so no need to re-declare it here
@@ -168,7 +167,7 @@ private partial class AuthenticatedRegion
 Sub-state machines only make sense when they describe a strict containment tree. The generator enforces this at compile time:
 
 - `parent` **must** be a state declared in the immediately enclosing region. Pointing to a distant or sibling state produces `NSS007`.
-- `initial` **must** be a state declared **inside** this region. Referencing a state from another region produces `NSS008`.
+- Every region **must** declare exactly one `[StateDefinition(Initial = true)]`. Missing one produces `NSS008`; declaring more than one produces `NSS010`.
 - The region class must be `partial` and nested in a valid container (root `[StateMachineDefinition]` or another `[SubStateMachine]`). Free-standing regions produce `NSS005`.
 - `[StateTriggerDefinition]` is not allowed inside a region — add it on the root class instead. Violations produce `NSS009`.
 

@@ -63,6 +63,45 @@ public class StateMachineEngineTests
     }
 
     [Fact]
+    public void CanFire_returns_true_when_transition_matches_current_state()
+    {
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A].On(
+                FlatTrigger.Go,
+                TestTransition.ToTarget<TestContext, FlatState, TestActor>(FlatState.B));
+        });
+
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(definition, FlatState.A, new TestContext(), new TestActor());
+
+        engine.CanFire(FlatTrigger.Go, TriggerArgs.Empty).Should().BeTrue();
+        engine.CanFire(FlatTrigger.NoMatch, TriggerArgs.Empty).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanFire_respects_guards_without_mutating_state()
+    {
+        var definition = BuildFlat(map =>
+        {
+            map[FlatState.A].On(
+                FlatTrigger.Go,
+                TestTransition.ToTarget<TestContext, FlatState, TestActor>(
+                    FlatState.B,
+                    guard: (ctx, args) => ctx.Counter == (int)args[0]!));
+        });
+
+        var engine = new StateMachineEngine<TestContext, FlatState, FlatTrigger, TestActor>(
+            definition,
+            FlatState.A,
+            new TestContext { Counter = 4 },
+            new TestActor());
+
+        engine.CanFire(FlatTrigger.Go, TriggerArgs.From(3)).Should().BeFalse();
+        engine.CanFire(FlatTrigger.Go, TriggerArgs.From(4)).Should().BeTrue();
+        engine.CurrentState.Should().Be(FlatState.A);
+    }
+
+    [Fact]
     public void Fire_unhandled_with_default_callback_throws()
     {
         var definition = BuildFlat();

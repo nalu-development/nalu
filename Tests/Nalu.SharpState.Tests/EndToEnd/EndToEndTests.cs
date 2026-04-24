@@ -8,13 +8,34 @@ public class EndToEndTests
     public void Trigger_advances_state_and_runs_action_with_args()
     {
         var ctx = new DoorContext();
-        var door = DoorMachine.CreateActor(DoorMachine.State.Closed, ctx);
+        var door = DoorMachine.CreateActor(ctx);
 
         door.Open("delivery");
 
         door.CurrentState.Should().Be(DoorMachine.State.Opened);
         ctx.OpenCount.Should().Be(1);
         ctx.LastReason.Should().Be("delivery");
+    }
+
+    [Fact]
+    public void GetInitialState_returns_generated_root_initial_state()
+    {
+        DoorMachine.GetInitialState().Should().Be(DoorMachine.State.Closed);
+        NetworkMachine.GetInitialState().Should().Be(NetworkMachine.State.Idle);
+    }
+
+    [Fact]
+    public void CanTrigger_methods_reflect_current_generated_actor_state()
+    {
+        var door = DoorMachine.CreateActor(DoorMachine.State.Closed, new DoorContext());
+
+        door.CanOpen("delivery").Should().BeTrue();
+        door.CanClose().Should().BeFalse();
+
+        door.Open("delivery");
+
+        door.CanOpen("again").Should().BeFalse();
+        door.CanClose().Should().BeTrue();
     }
 
     [Fact]

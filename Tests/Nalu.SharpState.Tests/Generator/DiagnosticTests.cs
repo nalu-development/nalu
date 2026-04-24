@@ -27,7 +27,7 @@ public class DiagnosticTests
         public class NotPartial
         {
             [StateTriggerDefinition] static partial void Go();
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
         }
         """;
         GetDiagnostics(source).Should().Contain(d => d.Id == "NSS001");
@@ -49,7 +49,7 @@ public class DiagnosticTests
             [StateTriggerDefinition] static partial void Go();
             [StateTriggerDefinition] static partial void Go(int x);
 
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
         }
         """;
         GetDiagnostics(source).Should().Contain(d => d.Id == "NSS002");
@@ -91,7 +91,7 @@ public class DiagnosticTests
         {
             [StateTriggerDefinition] static partial void Go();
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static global::Nalu.SharpState.IStateConfiguration<Ctx, State, Trigger> A => ConfigureState();
         }
         """;
@@ -113,7 +113,7 @@ public class DiagnosticTests
         public partial class BadTrigger
         {
             [StateTriggerDefinition] static void Go() { }
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
         }
         """;
         GetDiagnostics(source).Should().Contain(d => d.Id == "NSS004");
@@ -134,10 +134,10 @@ public class DiagnosticTests
         {
             [StateTriggerDefinition] static partial void Go();
 
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
             [StateDefinition] private static IStateConfiguration B => ConfigureState();
 
-            [SubStateMachine(parent: State.A, initial: State.B)]
+            [SubStateMachine(parent: State.A)]
             private class NotPartialRegion { }
         }
         """;
@@ -160,7 +160,7 @@ public class DiagnosticTests
             public partial class M
             {
                 [StateTriggerDefinition] static partial void Go();
-                [StateDefinition] private static IStateConfiguration A => ConfigureState();
+                [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
             }
         }
         """;
@@ -182,12 +182,12 @@ public class DiagnosticTests
         {
             [StateTriggerDefinition] static partial void Go();
 
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
 
-            [SubStateMachine(parent: State.Nowhere, initial: State.B)]
+            [SubStateMachine(parent: State.Nowhere)]
             private partial class Region
             {
-                [StateDefinition] private static IStateConfiguration B => ConfigureState();
+                [StateDefinition(Initial = true)] private static IStateConfiguration B => ConfigureState();
             }
         }
         """;
@@ -195,7 +195,7 @@ public class DiagnosticTests
     }
 
     [Fact]
-    public void NSS008_reported_when_initial_is_not_defined_inside_region()
+    public void NSS008_reported_when_region_has_no_initial_state()
     {
         var source = """
         using Nalu.SharpState;
@@ -209,9 +209,9 @@ public class DiagnosticTests
         {
             [StateTriggerDefinition] static partial void Go();
 
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
 
-            [SubStateMachine(parent: State.A, initial: State.Ghost)]
+            [SubStateMachine(parent: State.A)]
             private partial class Region
             {
                 [StateDefinition] private static IStateConfiguration B => ConfigureState();
@@ -236,13 +236,13 @@ public class DiagnosticTests
         {
             [StateTriggerDefinition] static partial void Go();
 
-            [StateDefinition] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
 
-            [SubStateMachine(parent: State.A, initial: State.B)]
+            [SubStateMachine(parent: State.A)]
             private partial class Region
             {
+                [StateDefinition(Initial = true)] private static IStateConfiguration B => ConfigureState();
                 [StateTriggerDefinition] static partial void Nope();
-                [StateDefinition] private static IStateConfiguration B => ConfigureState();
             }
         }
         """;
@@ -268,7 +268,7 @@ public class DiagnosticTests
         {
             [StateTriggerDefinition] static partial void Go(int step);
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration A => ConfigureState()
                 .OnGo(t => t
                     .Target((ctx, step) => ctx.UseB && step == ctx.Counter ? State.B : State.C)
@@ -283,5 +283,28 @@ public class DiagnosticTests
 
         GetDiagnostics(source).Should().BeEmpty();
         GetCompilationErrors(source).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NSS010_reported_when_region_has_multiple_initial_states()
+    {
+        var source = """
+        using Nalu.SharpState;
+
+        namespace Sample;
+
+        public class Ctx { }
+
+        [StateMachineDefinition(typeof(Ctx))]
+        public partial class M
+        {
+            [StateTriggerDefinition] static partial void Go();
+
+            [StateDefinition(Initial = true)] private static IStateConfiguration A => ConfigureState();
+            [StateDefinition(Initial = true)] private static IStateConfiguration B => ConfigureState();
+        }
+        """;
+
+        GetDiagnostics(source).Should().Contain(d => d.Id == "NSS010");
     }
 }

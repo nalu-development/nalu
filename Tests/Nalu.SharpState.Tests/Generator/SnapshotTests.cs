@@ -25,7 +25,7 @@ public class SnapshotTests
             [StateTriggerDefinition] static partial void Connect(string deviceId);
             [StateTriggerDefinition] static partial void Disconnect();
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Idle => ConfigureState()
                 .OnConnect(t => t.Target(State.Connected).Invoke((ctx, id) => ctx.DeviceId = id));
 
@@ -54,7 +54,7 @@ public class SnapshotTests
             [StateTriggerDefinition] static partial void Start();
             [StateTriggerDefinition] static partial void Sync(long revision);
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Idle => ConfigureState()
                 .OnStart(t => t.Target(State.Running));
 
@@ -89,7 +89,7 @@ public class SnapshotTests
             [StateTriggerDefinition] static partial void AuthOk();
             [StateTriggerDefinition] static partial void Message(string m);
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Idle => ConfigureState()
                 .OnConnect(t => t.Target(State.Connected));
 
@@ -97,10 +97,10 @@ public class SnapshotTests
             private static IStateConfiguration Connected => ConfigureState()
                 .OnDisconnect(t => t.Target(State.Idle));
 
-            [SubStateMachine(parent: State.Connected, initial: State.Authenticating)]
+            [SubStateMachine(parent: State.Connected)]
             private partial class ConnectedRegion
             {
-                [StateDefinition]
+                [StateDefinition(Initial = true)]
                 private static IStateConfiguration Authenticating => ConfigureState()
                     .OnAuthOk(t => t.Target(State.Authenticated));
 
@@ -137,7 +137,7 @@ public class SnapshotTests
             [StateTriggerDefinition] static partial void StartEdit();
             [StateTriggerDefinition] static partial void Save();
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Idle => ConfigureState()
                 .OnConnect(t => t.Target(State.Connected));
 
@@ -145,20 +145,20 @@ public class SnapshotTests
             private static IStateConfiguration Connected => ConfigureState()
                 .OnDisconnect(t => t.Target(State.Idle));
 
-            [SubStateMachine(parent: State.Connected, initial: State.Authenticating)]
+            [SubStateMachine(parent: State.Connected)]
             private partial class ConnectedRegion
             {
-                [StateDefinition]
+                [StateDefinition(Initial = true)]
                 private static IStateConfiguration Authenticating => ConfigureState()
                     .OnAuthOk(t => t.Target(State.Authenticated));
 
                 [StateDefinition]
                 private static IStateConfiguration Authenticated => ConfigureState();
 
-                [SubStateMachine(parent: State.Authenticated, initial: State.Browsing)]
+                [SubStateMachine(parent: State.Authenticated)]
                 private partial class AuthenticatedRegion
                 {
-                    [StateDefinition]
+                    [StateDefinition(Initial = true)]
                     private static IStateConfiguration Browsing => ConfigureState()
                         .OnStartEdit(t => t.Target(State.Editing));
 
@@ -190,7 +190,7 @@ public class SnapshotTests
             {
                 [StateTriggerDefinition] static partial void Go();
 
-                [StateDefinition]
+                [StateDefinition(Initial = true)]
                 private static IStateConfiguration A => ConfigureState()
                     .OnGo(t => t.Target(State.B));
 
@@ -223,7 +223,7 @@ public class SnapshotTests
             [StateTriggerDefinition] static partial void Start();
             [StateTriggerDefinition] static partial void Ping();
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Idle => ConfigureState()
                 .WhenExiting(ctx => ctx.Exits++)
                 .OnStart(t => t.Target(State.Running));
@@ -262,7 +262,7 @@ public class SnapshotTests
             /// <summary>
             /// The machine is currently closed.
             /// </summary>
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration Closed => ConfigureState()
                 .OnOpen(t => t.Target(State.Opened));
 
@@ -290,7 +290,7 @@ public class SnapshotTests
         {
             [StateTriggerDefinition] static partial void Go();
 
-            [StateDefinition]
+            [StateDefinition(Initial = true)]
             private static IStateConfiguration A => ConfigureState()
                 .OnGo(t => t.Target(State.B));
 

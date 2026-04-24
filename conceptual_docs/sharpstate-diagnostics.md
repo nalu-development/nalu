@@ -113,27 +113,36 @@ The `parent` argument must be a `[StateDefinition]` declared in the **immediatel
 
 ```csharp
 // Wrong: Browsing lives inside ConnectedRegion, not at the root
-[SubStateMachine(parent: State.Browsing, initial: State.Foo)]
+[SubStateMachine(parent: State.Browsing)]
 private partial class BadRegion { ... }
 ```
 
-### `NSS008` — `[SubStateMachine]` initial must be defined inside the region
+### `NSS008` — Every region must declare an initial state
 
 ```
-[SubStateMachine] on 'ConnectedRegion' declares Initial 'Idle' which is not a [StateDefinition]
-declared inside the region
+Region '[SubStateMachine] 'ConnectedRegion'' must declare exactly one
+[StateDefinition(Initial = true)] state
 ```
 
-The `initial` argument must name a `[StateDefinition]` declared **inside** the same region class. That is the state the runtime enters when the composite is targeted.
+Every root machine and every `[SubStateMachine(parent: ...)]` region must mark exactly one local state with `[StateDefinition(Initial = true)]`.
 
 ```csharp
-[SubStateMachine(parent: State.Connected, initial: State.Authenticating)]
+[SubStateMachine(parent: State.Connected)]
 private partial class ConnectedRegion
 {
-    [StateDefinition] // <-- Initial must point here or to another [StateDefinition] below
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Authenticating => ConfigureState()...;
 }
 ```
+
+### `NSS010` — Only one initial state is allowed per region
+
+```
+Region 'DoorMachine' declares multiple [StateDefinition(Initial = true)] states;
+only one is allowed
+```
+
+Mark only one local state per region as initial.
 
 ### `NSS009` — Triggers cannot be declared inside a `[SubStateMachine]`
 
@@ -153,7 +162,7 @@ On top of compile-time diagnostics, a few exceptions surface misconfigurations t
 | `NotSupportedException: Trigger 'X' is not handled from state 'Y'` | A trigger fires with no matching transition on the leaf nor on any ancestor, **and** `OnUnhandled` is the default. | Either configure the transition, set `OnUnhandled` to a custom handler, or assign `OnUnhandled = null` to silence it. See [Unhandled triggers](sharpstate.md#unhandled-triggers). |
 | `KeyNotFoundException: State 'X' is not registered in the state machine definition` | You passed a `State` to `CreateActor` that does not appear in the definition. | Use a value from the generated `State` enum; do not cast arbitrary integers to `State`. |
 | `ArgumentNullException` on `CreateActor` | `context` or the internal `definition` was `null`. | Pass a non-null context. The definition is injected by the generator and is never null in practice. |
-| `InvalidOperationException: State 'X' declares parent 'Y' but 'Y' does not declare an initial child via [SubStateMachine(parent: Y, initial: ...)]` | A runtime-built definition has a dangling parent reference. | For generated definitions this is enforced at compile time; for hand-built ones, always pair a parent with a region that sets `initial`. |
+| `InvalidOperationException: State 'X' declares parent 'Y' but 'Y' does not declare an initial child via a nested [SubStateMachine(parent: Y)] region with one [StateDefinition(Initial = true)] child.` | A runtime-built definition has a dangling parent reference. | For generated definitions this is enforced at compile time; for hand-built ones, always pair a parent with a region that has exactly one initial child. |
 
 ## Common pitfalls
 

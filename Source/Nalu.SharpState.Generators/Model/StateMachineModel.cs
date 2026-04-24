@@ -19,6 +19,7 @@ internal sealed record StateMachineModel(
     string TypeParameters,
     string ContextTypeDisplay,
     EquatableArray<ContainingTypeModel> ContainingTypes,
+    string? RootInitialState,
     EquatableArray<StateModel> States,
     EquatableArray<TriggerModel> Triggers,
     EquatableArray<DiagnosticInfo> Diagnostics)
@@ -91,7 +92,7 @@ internal sealed record StateMachineModel(
         var states = new List<StateModel>();
         var seenStates = new HashSet<string>();
 
-        CollectRegion(
+        var rootInitialState = CollectRegion(
             regionClass: classSymbol,
             parentStateName: null,
             accessPrefix: string.Empty,
@@ -124,12 +125,13 @@ internal sealed record StateMachineModel(
             TypeParameterList(classSymbol),
             contextType,
             new EquatableArray<ContainingTypeModel>(containing.ToImmutableArray()),
+            rootInitialState,
             new EquatableArray<StateModel>(states.ToImmutableArray()),
             new EquatableArray<TriggerModel>(triggers.ToImmutable()),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutableArray()));
     }
 
-    private static void CollectRegion(
+    private static string? CollectRegion(
         INamedTypeSymbol regionClass,
         string? parentStateName,
         string accessPrefix,
@@ -144,6 +146,7 @@ internal sealed record StateMachineModel(
         CollectTriggers(regionClass, isInSubRegion: !isRoot, triggers, seenTriggers, diagnostics, ct);
 
         var localStateNames = new HashSet<string>();
+        string? regionInitialState = null;
 
         foreach (var member in regionClass.GetMembers())
         {
@@ -193,12 +196,43 @@ internal sealed record StateMachineModel(
 
             localStateNames.Add(property.Name);
             var regionPath = accessPrefix.TrimEnd('.');
+            var isInitial = IsInitialState(stateAttr);
+            if (isInitial)
+            {
+                if (regionInitialState is null)
+                {
+                    regionInitialState = property.Name;
+                }
+                else
+                {
+                    var loc = propertySyntax?.Identifier.GetLocation() ?? property.Locations.FirstOrDefault();
+                    diagnostics.Add(DiagnosticInfo.Create(
+                        Descriptors.MultipleInitialStates,
+                        loc,
+                        RegionDisplayName(regionClass, isRoot)));
+                }
+            }
+
             states.Add(new StateModel(
                 property.Name,
                 parentStateName,
                 InitialChildState: null,
+                IsInitial: isInitial,
                 regionPath,
                 DocumentationCommentId(property, ct)));
+        }
+
+        if (regionInitialState is null)
+        {
+            var loc = regionClass.DeclaringSyntaxReferences
+                .Select(sr => sr.GetSyntax(ct))
+                .OfType<TypeDeclarationSyntax>()
+                .FirstOrDefault()?.Identifier.GetLocation()
+                ?? regionClass.Locations.FirstOrDefault();
+            diagnostics.Add(DiagnosticInfo.Create(
+                Descriptors.SubStateMachineInitialScope,
+                loc,
+                RegionDisplayName(regionClass, isRoot)));
         }
 
         foreach (var nested in regionClass.GetTypeMembers())
@@ -227,7 +261,7 @@ internal sealed record StateMachineModel(
                     nested.Name));
             }
 
-            ParseSubStateMachineArgs(subAttr, out var regionParent, out var regionInitial);
+            var regionParent = ParseSubStateMachineParent(subAttr);
 
             var attrLocation = subAttr.ApplicationSyntaxReference?.GetSyntax(ct).GetLocation()
                 ?? nested.Locations.FirstOrDefault();
@@ -246,17 +280,12 @@ internal sealed record StateMachineModel(
                 else
                 {
                     validParentForChildren = regionParent;
-                    var parentIndex = states.FindIndex(s => s.Name == regionParent);
-                    if (parentIndex >= 0 && regionInitial is not null && states[parentIndex].InitialChildState is null)
-                    {
-                        states[parentIndex] = states[parentIndex] with { InitialChildState = regionInitial };
-                    }
                 }
             }
 
             var nestedAccessPrefix = accessPrefix + nested.Name + ".";
 
-            CollectRegion(
+            var nestedInitialState = CollectRegion(
                 regionClass: nested,
                 parentStateName: validParentForChildren,
                 accessPrefix: nestedAccessPrefix,
@@ -268,20 +297,17 @@ internal sealed record StateMachineModel(
                 diagnostics,
                 ct);
 
-            // Validate that `initial` names a state that was just collected inside this region (direct child).
-            if (regionInitial is not null && validParentForChildren is not null)
+            if (nestedInitialState is not null && validParentForChildren is not null)
             {
-                var initialFound = states.Any(s => s.Name == regionInitial && s.ParentState == validParentForChildren);
-                if (!initialFound)
+                var parentIndex = states.FindIndex(s => s.Name == validParentForChildren);
+                if (parentIndex >= 0)
                 {
-                    diagnostics.Add(DiagnosticInfo.Create(
-                        Descriptors.SubStateMachineInitialScope,
-                        attrLocation,
-                        nested.Name,
-                        regionInitial));
+                    states[parentIndex] = states[parentIndex] with { InitialChildState = nestedInitialState };
                 }
             }
         }
+
+        return regionInitialState;
     }
 
     private static void CollectTriggers(
@@ -363,15 +389,13 @@ internal sealed record StateMachineModel(
             ? null
             : Microsoft.CodeAnalysis.DocumentationCommentId.CreateDeclarationId(symbol);
 
-    private static void ParseSubStateMachineArgs(AttributeData attr, out string? parent, out string? initial)
+    private static string? ParseSubStateMachineParent(AttributeData attr)
     {
-        parent = null;
-        initial = null;
+        string? parent = null;
 
         var syntaxRef = attr.ApplicationSyntaxReference;
         if (syntaxRef?.GetSyntax() is AttributeSyntax attrSyntax && attrSyntax.ArgumentList is { } argList)
         {
-            var positional = 0;
             foreach (var arg in argList.Arguments)
             {
                 var nameColon = arg.NameColon?.Name.Identifier.ValueText;
@@ -379,34 +403,10 @@ internal sealed record StateMachineModel(
                 var name = nameColon ?? nameEquals;
                 var value = ExtractIdentifierTail(arg.Expression);
 
-                string? target;
-                if (name is null)
-                {
-                    target = positional switch
-                    {
-                        0 => "parent",
-                        1 => "initial",
-                        _ => null
-                    };
-                    positional++;
-                }
-                else
-                {
-                    target = name.ToLowerInvariant() switch
-                    {
-                        "parent" => "parent",
-                        "initial" => "initial",
-                        _ => null
-                    };
-                }
-
-                if (target == "parent" && value is not null)
+                var target = name?.ToLowerInvariant();
+                if ((target is null || target == "parent") && value is not null)
                 {
                     parent = value;
-                }
-                else if (target == "initial" && value is not null)
-                {
-                    initial = value;
                 }
             }
         }
@@ -415,11 +415,15 @@ internal sealed record StateMachineModel(
         {
             parent = ExtractEnumName(attr.ConstructorArguments[0]);
         }
-        if (initial is null && attr.ConstructorArguments.Length > 1)
-        {
-            initial = ExtractEnumName(attr.ConstructorArguments[1]);
-        }
+
+        return parent;
     }
+
+    private static bool IsInitialState(AttributeData stateAttr)
+        => stateAttr.NamedArguments.Any(arg => arg.Key == "Initial" && arg.Value.Value is true);
+
+    private static string RegionDisplayName(INamedTypeSymbol regionClass, bool isRoot)
+        => isRoot ? regionClass.Name : $"[SubStateMachine] '{regionClass.Name}'";
 
     private static string? ExtractIdentifierTail(ExpressionSyntax expr) => expr switch
     {

@@ -124,6 +124,18 @@ public sealed class StateMachineEngine<TContext, TState, TTrigger, TActor>
         }
     }
 
+    /// <summary>
+    /// Determines whether the specified trigger currently has a matching transition.
+    /// Guards are evaluated against the current state and supplied arguments, but no actions run and no state changes are committed.
+    /// </summary>
+    public bool CanFire(TTrigger trigger, TriggerArgs args)
+    {
+        lock (_gate)
+        {
+            return FindMatchingTransition(trigger, args).HasValue;
+        }
+    }
+
     private (Transition<TContext, TState, TActor> Transition, TState Source)? FindMatchingTransition(TTrigger trigger, TriggerArgs args)
     {
         var source = _currentState;

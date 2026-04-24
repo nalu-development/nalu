@@ -12,7 +12,7 @@ public partial class HookMachine
 
     [StateTriggerDefinition] static partial void Ping();
 
-    [StateDefinition]
+    [StateDefinition(Initial = true)]
     private static IStateConfiguration Idle => ConfigureState()
         .WhenExiting(ctx => ctx.Log.Add("exit:Idle"))
         .OnStart(t => t.Target(State.Running));

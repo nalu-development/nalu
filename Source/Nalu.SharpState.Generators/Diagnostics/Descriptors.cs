@@ -64,8 +64,8 @@ internal static class Descriptors
 
     public static readonly DiagnosticDescriptor SubStateMachineInitialScope = new(
         id: "NSS008",
-        title: "[SubStateMachine] initial must be defined inside the region",
-        messageFormat: "[SubStateMachine] on '{0}' declares Initial '{1}' which is not a [StateDefinition] declared inside the region",
+        title: "Each region must declare an initial state",
+        messageFormat: "Region '{0}' must declare exactly one [StateDefinition(Initial = true)] state",
         category: _category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -74,6 +74,14 @@ internal static class Descriptors
         id: "NSS009",
         title: "Triggers cannot be declared inside a [SubStateMachine]",
         messageFormat: "[StateTriggerDefinition] '{0}' is declared inside [SubStateMachine] '{1}'; triggers must live on the root [StateMachineDefinition] class",
+        category: _category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor MultipleInitialStates = new(
+        id: "NSS010",
+        title: "Only one initial state is allowed per region",
+        messageFormat: "Region '{0}' declares multiple [StateDefinition(Initial = true)] states; only one is allowed",
         category: _category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
