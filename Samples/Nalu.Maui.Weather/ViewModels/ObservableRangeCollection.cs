@@ -8,6 +8,7 @@ namespace Nalu.Maui.Weather.ViewModels;
 //
 // Copyright (c) 2017 James Montemagno
 //
+// See THIRD-PARTY-NOTICES.md for full license information.
 // See more at: https://github.com/jamesmontemagno/mvvm-helpers
 
 /// <summary>

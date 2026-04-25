@@ -21,10 +21,18 @@ worldwide, royalty-free copyright license to reproduce, prepare derivative
 works of, publicly display, publicly perform, sublicense, and distribute the
 Software and such derivative works in source or object form.
 
-This grant is based on the permissions of the Apache License 2.0, but it is
-limited to Non-Commercial Use only. It is not an open-source license approved
-by the Open Source Initiative and must not be represented as the unmodified
-Apache License 2.0.
+This grant is based on the copyright permission structure of the Apache License
+2.0, but it is limited to Non-Commercial Use only and does not independently
+incorporate the standard Apache License 2.0. It is not an open-source license
+approved by the Open Source Initiative and must not be represented as the
+unmodified Apache License 2.0.
+
+For reference, the standard Apache License 2.0 is available at:
+
+https://www.apache.org/licenses/LICENSE-2.0
+
+The standard Apache License 2.0 does not apply independently to the Software;
+the non-commercial restriction and the additional terms in this license apply.
 
 For Non-Commercial Use, you may:
 
@@ -84,7 +92,8 @@ Commercial Use includes, but is not limited to:
 ## 3. Sponsor License Terms
 
 While you maintain an active qualifying sponsorship, you are granted a
-non-exclusive, non-transferable, revocable license to:
+non-exclusive, non-transferable license, terminable only as described in this
+license, to:
 
 - Use, copy, modify, and integrate the Software
 - Use the Software in proprietary or closed-source projects
@@ -95,6 +104,11 @@ If the sponsorship is cancelled, expires, is charged back, or no longer
 qualifies for the applicable commercial use case, the Sponsor License ends
 automatically for any future development, distribution, deployment, or
 commercial use.
+
+The Sponsor License may also be terminated if you breach this license,
+including by redistributing, sublicensing, selling, renting, leasing, or
+offering the Software itself as a standalone, competing, hosted, packaged, or
+white-label product.
 
 Legacy Use and Business Termination: if a commercial entity ceases active
 operations, such as business closure or dissolution, compiled applications
@@ -130,7 +144,7 @@ d'autore. Il pagamento attribuisce esclusivamente diritti di utilizzo.
 Il pagamento non acquista, include o remunera alcun servizio di consulenza,
 sviluppo su commissione, personalizzazione, integrazione, formazione,
 manutenzione, assistenza tecnica, supporto, correzione di bug, richiesta di
-funzionalita, SLA, obbligo operativo, prestazione professionale o altra
+funzionalità, SLA, obbligo operativo, prestazione professionale o altra
 prestazione di fare.
 
 This section describes the contractual nature of the license grant. It is not
@@ -148,7 +162,7 @@ security fixes, compatibility updates, or any other work.
 
 L'autore non assume alcun obbligo di prestare servizi nei confronti di
 sponsor, licenziatari, utenti o distributori. L'unico effetto del pagamento
-commerciale qualificante e la concessione temporanea del diritto d'uso
+commerciale qualificante è la concessione temporanea del diritto d'uso
 commerciale del Software nei limiti della presente licenza.
 
 ---
