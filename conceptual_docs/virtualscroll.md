@@ -6,11 +6,11 @@ A high-performance virtualized scrolling view designed to replace the traditiona
 
 > VirtualScroll is the result of over a year of platform-level engineering and performance optimizations derived from my experience contributing core improvements to **.NET MAUI**.
 >
-> **Licensing:** This package is available under a **Dual License**. It is free for non-commercial use (MIT), while commercial use requires an active **[GitHub Sponsors subscription](https://github.com/sponsors/albyrock87)**. This model allows me to continue maintaining and improving high-performance components for the MAUI ecosystem. 
+> **Licensing:** This package is available under a **Dual License**. It is free for non-commercial use under an Apache 2.0-Based Non-Commercial License, while commercial use requires an active **[GitHub Sponsors subscription](https://github.com/sponsors/albyrock87)** at a qualifying tier. Commercial tiers grant usage rights only and do not include support, maintenance, consulting, custom development, bug fixes, feature requests, SLA, or other services.
 > 
 > Please refer to the [LICENSE.md](https://github.com/albyrock87/nalu/blob/main/Source/Nalu.Maui.VirtualScroll/LICENSE.md) for full terms.
 
-If this library is valuable to your work, consider supporting its continued development and maintenance ❤️
+If this library is valuable to your work, use GitHub Sponsors to support the project or obtain the commercial-use license that fits your use case.
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github&style=for-the-badge)](https://github.com/sponsors/albyrock87)
 
