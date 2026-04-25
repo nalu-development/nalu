@@ -8,7 +8,7 @@
 
 ➡️ **[Nalu.Maui Documentation Website](https://nalu-development.github.io/nalu/)** ⬅️
 
-If `Nalu.Maui` is valuable to your work, consider supporting its continued development and maintenance ❤️
+If `Nalu.Maui` is valuable to your work, consider sponsoring the author on GitHub ❤️
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github&style=for-the-badge)](https://github.com/sponsors/albyrock87)
 
@@ -24,9 +24,9 @@ If `Nalu.Maui` is valuable to your work, consider supporting its continued devel
     *   Includes useful cross-platform controls like `InteractableCanvasView` (a `SKCanvasView` with enhanced touch support) and `DurationWheel` (a `TimeSpan?` editor).
 *   **VirtualScroll** [![Nalu.Maui.VirtualScroll NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.VirtualScroll.svg)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.VirtualScroll)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/)
     * A high-performance alternative to the .NET MAUI `CollectionView`, leveraging native `RecyclerView` (Android) and `UICollectionView` (iOS). Supports dynamic sizing, `ObservableCollection<T>`, pull-to-refresh, section templates and carousel mode.
-    * ⚖️ **Dual Licensed**: 
-        * **Non-Commercial:** Free under the MIT License (personal, educational, or non-commercial open-source use).
-        * **Commercial:** Requires an active [GitHub Sponsors subscription](https://github.com/sponsors/albyrock87).
+    * ⚖️ **Dual Licensed**:
+        * **Non-Commercial:** Free under the Apache 2.0-Based Non-Commercial License (personal, educational, or non-commercial open-source use).
+        * **Commercial:** Requires an active [GitHub Sponsors subscription](https://github.com/sponsors/albyrock87) for usage rights only; no services are included.
     * By installing this package, you agree to the terms in the `LICENSE.md`. Commercial use includes for-profit entities, internal tools, and contract work.
 
 We encourage you to explore the [full documentation](https://nalu-development.github.io/nalu/) for detailed information on how to integrate and utilize these features in your projects.

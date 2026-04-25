@@ -8,7 +8,7 @@ This license applies to the entire repository **EXCEPT** for the
 `Source/Nalu.Maui.VirtualScroll` directory.
 
 `Nalu.Maui.VirtualScroll` is released under a **dual license**:
-- MIT License for non-commercial use
+- Apache 2.0-Based Non-Commercial License for non-commercial use
 - Sponsor License for commercial use
 
 See `Source/Nalu.Maui.VirtualScroll/LICENSE.md` for details.

@@ -3,8 +3,8 @@
     <Product>Nalu.Maui.VirtualScroll</Product>
     <Description>
       High-performance virtualized scrolling for .NET MAUI.
-      Free for non-commercial use (MIT License).
-      Commercial use requires an active GitHub Sponsors subscription (https://github.com/sponsors/albyrock87); no services or support are included.
+      Free for non-commercial use under an Apache 2.0-Based Non-Commercial License.
+      Commercial use requires an active GitHub Sponsors subscription (https://github.com/sponsors/albyrock87); no services are included.
       By installing this package, you agree to the terms outlined in the LICENSE.md.
     </Description>
     <PackageTags>MAUI</PackageTags>
@@ -13,7 +13,7 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <IsAotCompatible>true</IsAotCompatible>
-    <!-- Override license for this project - Dual License MIT and Sponsor License -->
+    <!-- Custom dual license: Apache 2.0-Based Non-Commercial License and Sponsor License -->
     <PackageLicenseExpression></PackageLicenseExpression>
   </PropertyGroup>
 

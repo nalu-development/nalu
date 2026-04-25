@@ -89,7 +89,7 @@ Bind **DragHandler** to the same adapter as **ItemsSource** (adapters implement 
 
 ## Caveats
 
-- **License**: Non-commercial use (MIT); commercial requires [GitHub Sponsors](https://github.com/sponsors/albyrock87). See package LICENSE.
+- **License**: Non-commercial use under an Apache 2.0-Based Non-Commercial License; commercial usage rights require [GitHub Sponsors](https://github.com/sponsors/albyrock87). See package LICENSE.
 - **Platform**: Android and iOS/Mac Catalyst only; no Windows.
 - **AOT**: Must use `IVirtualScrollAdapter` (e.g. from factory); binding `ObservableCollection` directly throws in AOT.
 
