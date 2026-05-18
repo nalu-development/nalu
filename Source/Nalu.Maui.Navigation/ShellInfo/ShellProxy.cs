@@ -105,7 +105,7 @@ internal partial class ShellProxy : IShellProxy, IDisposable
             targetState = string.Concat(Enumerable.Repeat("../", popCount));
         }
 
-        await _shell.GoToAsync(targetState + "?nalu");
+        await _shell.GoToAsync(targetState + "?nalu", true);
 
         await Task.Yield();
 
