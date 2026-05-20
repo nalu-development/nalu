@@ -72,7 +72,7 @@
         <PackageReference Include="SkiaSharp" Version="3.119.1" />
         <PackageReference Include="Svg.Skia" Version="3.2.1" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.51" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.60" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
     </ItemGroup>
 
