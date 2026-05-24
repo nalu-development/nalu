@@ -179,6 +179,13 @@ public abstract class ViewBoxBase : View, IViewBox, ISafeAreaView
         _contentView = content;
 
         OnContentPropertyChanged(oldContent, content);
+
+        if (content is null)
+        {
+            // When clearing the content we have to invalidate the measure.
+            // This is being automatically invoked when materializing a new content to platform.
+            InvalidateMeasure();
+        }
     }
 
     private static void ContentBindingContextPropertyChanged(BindableObject bindable, object? oldvalue, object? newvalue)
