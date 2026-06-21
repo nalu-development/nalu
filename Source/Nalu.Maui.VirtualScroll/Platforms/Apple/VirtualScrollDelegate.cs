@@ -45,8 +45,6 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
             var item = _virtualScroll.Adapter?.GetItem(sectionIndex, itemIndex);
             var dragInfo = new VirtualScrollDragInfo(item, sectionIndex, itemIndex);
             dragHandler.OnDragInitiating(dragInfo);
-            // Ensure any changes from initiating are applied before the drag starts
-            (_virtualScroll.Handler as VirtualScrollHandler)?.Notifier?.ApplyPendingChanges();
             return dragInfo;
         }
         

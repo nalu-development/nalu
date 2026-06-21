@@ -8,6 +8,9 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
 {
     private int _snapshotSectionsCount = virtualScrollAdapter.GetSectionCount();
     private readonly List<int> _snapshotSectionsItemsCount = [.. Enumerable.Range(0, virtualScrollAdapter.GetSectionCount()).Select(virtualScrollAdapter.GetItemCount)];
+    
+    internal int SnapshotSectionsCount => _snapshotSectionsCount;
+    internal IReadOnlyList<int> SnapshotSectionsItemsCount => _snapshotSectionsItemsCount;
 
     public void UpdateCounts()
     {

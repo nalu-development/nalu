@@ -14,7 +14,6 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
     private IDisposable _subscription;
     private int _previousSectionCount;
     private bool _disposed;
-    private RunLoopBatcher? _batcher;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VirtualScrollPlatformDataSourceNotifier" /> class.
@@ -26,48 +25,14 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         _collectionView = collectionView ?? throw new ArgumentNullException(nameof(collectionView));
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
         _previousSectionCount = adapter.GetSectionCount();
-        _subscription = adapter.Subscribe(BatchChanges);
+        _subscription = adapter.Subscribe(OnAdapterChanged);
     }
+    
+    private VirtualScrollPlatformDataSource? DataSource => _collectionView.DataSource as VirtualScrollPlatformDataSource;
 
-    private void BatchChanges(VirtualScrollChangeSet changeSet)
-    {
-        if (_disposed)
-        {
-            return;
-        }
-        
-        if (!NSThread.Current.IsMainThread)
-        {
-            throw new InvalidOperationException("Changes on the data source must be applied and notified on the main thread.");
-        }
-        
-        _pendingChanges.AddRange(changeSet.Changes);
-        _batcher ??= new RunLoopBatcher(ApplyPendingChanges);
-    }
+    private void UpdateSourceCount() => DataSource?.UpdateCounts();
 
-    internal void ApplyPendingChanges()
-    {
-        if (_pendingChanges.Count == 0)
-        {
-            return;
-        }
-
-        _collectionView.PerformBatchUpdates(
-            () =>
-            {
-                OnAdapterChanged();
-                UpdateSourceCount();
-            },
-            null
-        );
-
-        _batcher?.Dispose();
-        _batcher = null;
-    }
-
-    private void UpdateSourceCount() => (_collectionView.DataSource as VirtualScrollPlatformDataSource)?.UpdateCounts();
-
-    private void OnAdapterChanged()
+    private void OnAdapterChanged(VirtualScrollChangeSet changeSet)
     {
         if (_disposed)
         {
@@ -80,10 +45,12 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         }
 
         var newSectionCount = _adapter.GetSectionCount();
+        var pendingChanges = changeSet.Changes.ToList();
         
         // If Reset is present, handle section count changes and reload
-        if (_pendingChanges.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
+        if (pendingChanges.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
         {
+            UpdateSourceCount();
             var currentSectionCount = _previousSectionCount;
 
             if (currentSectionCount > newSectionCount)
@@ -111,15 +78,15 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         }
         else
         {
-            foreach (var change in _pendingChanges)
+            foreach (var change in pendingChanges)
             {
+                UpdateSourceCount();
                 ApplyChange(change);
             }
         }
 
         // Update tracked section count
         _previousSectionCount = newSectionCount;
-        _pendingChanges.Clear();
     }
 
     private void ApplyChange(VirtualScrollChange change)
@@ -236,8 +203,6 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         {
             _subscription.Dispose();
             _subscription = null!;
-            _batcher?.Dispose();
-            _batcher = null;
             _adapter = null!;
             _collectionView = null!;
             _disposed = true;

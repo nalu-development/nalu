@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -22,7 +21,7 @@ public partial class ElevenPageModel : ObservableObject
     public ElevenPageModel()
     {
         Groups = new ObservableCollection<ElevenGroup>(
-            Enumerable.Range(1, 5).Select(_ => CreateGroup())
+            Enumerable.Range(1, 10).Select(_ => CreateGroup())
         );
 
         Adapter = VirtualScroll.CreateObservableCollectionAdapter(Groups, g => g.Items);
@@ -32,7 +31,7 @@ public partial class ElevenPageModel : ObservableObject
     private ElevenGroup CreateGroup()
     {
         var groupId = ++_groupIdCounter;
-        var items = Enumerable.Range(1, Random.Shared.Next(3, 8))
+        var items = Enumerable.Range(1, Random.Shared.Next(3, 33))
             .Select(_ => new ElevenItem($"Item {++_itemIdCounter}"))
             .ToList();
         return new ElevenGroup($"Group {groupId}", items);
@@ -98,9 +97,34 @@ public partial class ElevenPageModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ClearGroups()
+    private async void ClearGroups()
     {
-        Groups.Clear();
+        var random = new Random();
+        while (Groups.Count > 0)
+        {
+            await Task.Delay(random.Next(100, 1500));
+            // pick a random group
+            lock (this)
+            {
+                if (Groups.Count > 0)
+                {
+                    var index = random.Next(0, Groups.Count - 1);
+                    var group = Groups[index];
+
+                    if (group.Items.Count <= 2)
+                    {
+                        Groups.RemoveAt(index);
+                    }
+                    else
+                    {
+                        index = random.Next(0, group.Items.Count - 1);
+                        group.Items.RemoveAt(index);
+                        index = random.Next(0, group.Items.Count - 1);
+                        group.Items.RemoveAt(index);
+                    }
+                }
+            }
+        }
     }
 }
 
