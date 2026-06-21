@@ -1,3 +1,4 @@
+#if IOS || MACCATALYST
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using CoreFoundation;
@@ -88,3 +89,4 @@ internal static class Dlfcn
     [DllImport("/usr/lib/libSystem.dylib")]
     public static extern IntPtr dlopen(string path, int mode);
 }
+#endif
