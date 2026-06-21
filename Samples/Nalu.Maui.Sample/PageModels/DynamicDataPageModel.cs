@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -6,66 +6,71 @@ using DynamicData;
 
 namespace Nalu.Maui.Sample.PageModels;
 
-public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IDisposable
+public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IAppearingAware, IDisposable
 {
     private readonly IMessenger _messenger;
     private static int _instanceCount;
 
     private int _idCounter;
-    private readonly IDisposable _subscription;
+    private IDisposable? _subscription;
     
     public string Message { get; } = "This is DynamicData page - using SourceList!";
 
     public int InstanceCount { get; } = Interlocked.Increment(ref _instanceCount);
-    
-    public SourceList<DynamicDataItem> SourceList { get; }
-    private readonly ReadOnlyObservableCollection<DynamicDataItem> _readOnlyItems;
-    public ReadOnlyObservableCollection<DynamicDataItem> Items => _readOnlyItems;
 
-    public DynamicDataPageModel(IMessenger messenger)
+    private readonly SourceList<DynamicDataItem> _sourceList;
+    private readonly IObservable<IChangeSet<DynamicDataItem>> _sourceListObservable;
+    private CancellationTokenSource? _autoChangesCts;
+
+    public IVirtualScrollAdapter Adapter { get; }
+
+    public DynamicDataPageModel(IMessenger messenger, IDispatcher dispatcher)
     {
         _messenger = messenger;
-        SourceList = new SourceList<DynamicDataItem>();
+
+        // Initialize with items
+        _sourceList = new SourceList<DynamicDataItem>();
+        var initialItems = Enumerable.Range(1, 200).Select(i => new DynamicDataItem($"Item {i}"));
+        _sourceList.AddRange(initialItems);
         
         // Bind SourceList to ObservableCollection for VirtualScroll
-        _subscription = SourceList.Connect()
-            .Bind(out _readOnlyItems)
-            .Subscribe();
+        _sourceListObservable = _sourceList.Connect()
+                                           .ObserveOn(new DispatcherScheduler(dispatcher))
+                                           .Bind(out var items);
+
+        Adapter = VirtualScroll.CreateObservableCollectionAdapter(items);
         
-        // Initialize with items
-        var initialItems = Enumerable.Range(1, 30).Select(i => new DynamicDataItem($"Item {i}"));
-        SourceList.AddRange(initialItems);
-        _idCounter = SourceList.Count;
+        _idCounter = _sourceList.Count;
     }
 
     [RelayCommand]
     private void AddItem()
     {
-        if (SourceList.Count > 0)
+        if (_sourceList.Count > 0)
         {
-            var randomIndex = Random.Shared.Next(SourceList.Count);
-            SourceList.Insert(randomIndex, new DynamicDataItem($"Item {_idCounter++}"));
+            var randomIndex = Random.Shared.Next(_sourceList.Count);
+            _sourceList.Insert(randomIndex, new DynamicDataItem($"Item {_idCounter++}"));
         }
         else
         {
-            SourceList.Add(new DynamicDataItem($"Item {_idCounter++}"));
+            _sourceList.Add(new DynamicDataItem($"Item {_idCounter++}"));
         }
     }
 
     [RelayCommand]
     private void RemoveItem()
     {
-        if (SourceList.Count > 0)
+        if (_sourceList.Count > 0)
         {
-            var randomIndex = Random.Shared.Next(SourceList.Count);
-            SourceList.RemoveAt(randomIndex);
+            var randomIndex = Random.Shared.Next(_sourceList.Count);
+            _sourceList.RemoveAt(randomIndex);
         }
     }
 
     [RelayCommand]
     private void ClearItems()
     {
-        SourceList.Clear();
+        _sourceList.Clear();
     }
 
     [RelayCommand]
@@ -73,36 +78,36 @@ public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IDi
     {
         var newItems = Enumerable.Range(1, Random.Shared.Next(10, 40))
             .Select(i => new DynamicDataItem($"Replaced Item {i}"));
-        SourceList.Edit(innerList =>
+        _sourceList.Edit(innerList =>
         {
             innerList.Clear();
             innerList.AddRange(newItems);
         });
-        _idCounter = SourceList.Count;
+        _idCounter = _sourceList.Count;
     }
 
     [RelayCommand]
     private void MoveItem()
     {
-        if (SourceList.Count > 1)
+        if (_sourceList.Count > 1)
         {
-            var fromIndex = Random.Shared.Next(SourceList.Count);
+            var fromIndex = Random.Shared.Next(_sourceList.Count);
             int toIndex;
-            while ((toIndex = Random.Shared.Next(SourceList.Count)) == fromIndex)
+            while ((toIndex = Random.Shared.Next(_sourceList.Count)) == fromIndex)
             {
                 // Ensure toIndex is different from fromIndex
             }
 
-            SourceList.Move(fromIndex, toIndex);
+            _sourceList.Move(fromIndex, toIndex);
         }
     }
     
     [RelayCommand]
     private void ScrollToItem()
     {
-        if (SourceList.Count > 0)
+        if (_sourceList.Count > 0)
         {
-            var randomIndex = Random.Shared.Next(SourceList.Count);
+            var randomIndex = Random.Shared.Next(_sourceList.Count);
             _messenger.Send(new DynamicDataPageScrollToItemMessage(randomIndex));
         }
     }
@@ -116,7 +121,7 @@ public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IDi
             await Task.Delay(2000);
             
             // Simulate refreshing data - add a new item at the beginning
-            SourceList.Insert(0, new DynamicDataItem($"Refreshed Item {_idCounter++}"));
+            _sourceList.Insert(0, new DynamicDataItem($"Refreshed Item {_idCounter++}"));
         }
         finally
         {
@@ -124,8 +129,6 @@ public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IDi
             completionCallback();
         }
     }
-
-    private CancellationTokenSource? _autoChangesCts;
 
     [RelayCommand]
     private async void ToggleAutoChanges()
@@ -161,7 +164,13 @@ public partial class DynamicDataPageModel : ObservableObject, ILeavingAware, IDi
     public void Dispose()
     {
         _subscription?.Dispose();
-        SourceList?.Dispose();
+        _sourceList?.Dispose();
+    }
+
+    public ValueTask OnAppearingAsync()
+    {
+        _subscription ??= _sourceListObservable.Subscribe();
+        return ValueTask.CompletedTask;
     }
 }
 
@@ -183,4 +192,3 @@ public partial class DynamicDataItem : ObservableObject
         Name = name;
     }
 }
-

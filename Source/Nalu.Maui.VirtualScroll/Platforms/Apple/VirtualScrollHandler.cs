@@ -24,6 +24,8 @@ public partial class VirtualScrollHandler
     private UILongPressGestureRecognizer? _dragGestureRecognizer;
     private CGSize _lastBounds;
 
+    internal VirtualScrollPlatformDataSourceNotifier? Notifier => _notifier;
+
     /// <summary>
     /// Gets the <see cref="UICollectionView"/> platform view.
     /// </summary>
@@ -126,7 +128,7 @@ public partial class VirtualScrollHandler
             ? virtualScrollLayout.ScrollDirection
             : UICollectionViewScrollDirection.Vertical;
         
-        _delegate = new VirtualScrollDelegate(virtualScroll, scrollDirection, virtualScroll.FadingEdgeLength);
+        _delegate = new VirtualScrollDelegate(virtualScroll, collectionView, scrollDirection, virtualScroll.FadingEdgeLength);
         collectionView.Delegate = _delegate;
 
         // Wrap collection view in a container view for fading edge support

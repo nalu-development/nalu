@@ -44,7 +44,7 @@
 
             <vs:VirtualScroll Grid.Row="1"
                                 x:Name="VirtualScroll"
-                                ItemsSource="{Binding Items}"
+                                ItemsSource="{Binding Adapter}"
                                 IsRefreshEnabled="True"
                                 FadingEdgeLength="32"
                                 RefreshCommand="{Binding RefreshCommand}"

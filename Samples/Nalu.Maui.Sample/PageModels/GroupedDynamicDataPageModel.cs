@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DynamicData;
@@ -27,16 +28,18 @@ public sealed class SampleItemGroup : IDisposable
     public ItemCategory Category { get; }
     public ReadOnlyObservableCollection<SampleItem> Items => _items;
 
-    public SampleItemGroup(ItemCategory category, IObservableCache<SampleItem, int> groupCache)
+    public SampleItemGroup(ItemCategory category, IObservableCache<SampleItem, int> groupCache, DispatcherScheduler dispatcherScheduler)
     {
         Category = category;
         _groupCache = groupCache;
+
         _subscription = groupCache.Connect()
-            .SortAndBind(
-                out _items,
-                SortExpressionComparer<SampleItem>.Ascending(item => item.Name)
-            )
-            .Subscribe();
+                                  .ObserveOn(dispatcherScheduler)
+                                  .SortAndBind(
+                                      out _items,
+                                      SortExpressionComparer<SampleItem>.Ascending(item => item.Name)
+                                  )
+                                  .Subscribe();
     }
 
     public void Dispose()
@@ -46,11 +49,12 @@ public sealed class SampleItemGroup : IDisposable
     }
 }
 
-public partial class GroupedDynamicDataPageModel : ObservableObject, IDisposable
+public partial class GroupedDynamicDataPageModel : ObservableObject, IDisposable, IAppearingAware
 {
     private static int _instanceCount;
+    private readonly IObservable<IChangeSet<SampleItemGroup, ItemCategory>> _groupObservable;
     private int _itemIdCounter;
-    private readonly IDisposable _groupedSubscription;
+    private IDisposable? _groupedSubscription;
 
     public string Message { get; } = "Grouped DynamicData Demo";
 
@@ -60,22 +64,9 @@ public partial class GroupedDynamicDataPageModel : ObservableObject, IDisposable
 
     public IVirtualScrollAdapter Adapter { get; }
 
-    public GroupedDynamicDataPageModel()
+    public GroupedDynamicDataPageModel(IDispatcher dispatcher)
     {
         SourceCache = new SourceCache<SampleItem, int>(item => item.Id);
-
-        _groupedSubscription = SourceCache.Connect()
-            .GroupOnProperty(item => item.Category)
-            .Transform(group => new SampleItemGroup(group.Key, group.Cache))
-            .SortAndBind(
-                out var groupedItems,
-                SortExpressionComparer<SampleItemGroup>.Ascending(g => g.Category)
-            )
-            .DisposeMany()
-            .Subscribe();
-
-        Adapter = VirtualScroll.CreateObservableCollectionAdapter(groupedItems, group => group.Items);
-
         // Seed with a few items in each category
         var categories = Enum.GetValues<ItemCategory>();
         for (var i = 0; i < 3; i++)
@@ -85,6 +76,20 @@ public partial class GroupedDynamicDataPageModel : ObservableObject, IDisposable
                 SourceCache.AddOrUpdate(CreateItem(category));
             }
         }
+
+        var dispatcherScheduler = new DispatcherScheduler(dispatcher);
+
+        _groupObservable = SourceCache.Connect()
+                                      .GroupOnProperty(item => item.Category)
+                                      .ObserveOn(dispatcherScheduler)
+                                      .Transform(group => new SampleItemGroup(group.Key, group.Cache, dispatcherScheduler))
+                                      .SortAndBind(
+                                          out var groupedItems,
+                                          SortExpressionComparer<SampleItemGroup>.Ascending(g => g.Category)
+                                      )
+                                      .DisposeMany();
+
+        Adapter = VirtualScroll.CreateObservableCollectionAdapter(groupedItems, group => group.Items);
     }
 
     private SampleItem CreateItem(ItemCategory category)
@@ -114,12 +119,18 @@ public partial class GroupedDynamicDataPageModel : ObservableObject, IDisposable
     private void MoveItem()
     {
         if (SourceCache.Count < 2)
+        {
             return;
+        }
+
         var keys = SourceCache.Keys.ToList();
         var fromKey = keys[Random.Shared.Next(keys.Count)];
         var toKey = keys[Random.Shared.Next(keys.Count)];
         if (fromKey == toKey)
+        {
             return;
+        }
+
         var item = SourceCache.Lookup(fromKey).Value;
         SourceCache.Remove(fromKey);
         SourceCache.AddOrUpdate(item);
@@ -144,8 +155,14 @@ public partial class GroupedDynamicDataPageModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        _groupedSubscription.Dispose();
+        _groupedSubscription?.Dispose();
         SourceCache.Dispose();
+    }
+
+    public ValueTask OnAppearingAsync()
+    {
+        _groupedSubscription ??= _groupObservable.Subscribe();
+        return ValueTask.CompletedTask;
     }
 }
 

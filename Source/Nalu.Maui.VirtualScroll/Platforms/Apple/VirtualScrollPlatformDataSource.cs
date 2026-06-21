@@ -6,6 +6,16 @@ namespace Nalu;
 
 internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScrollAdapter, IVirtualScroll virtualScroll, VirtualScrollPlatformReuseIdManager reuseIdManager) : UICollectionViewDataSource
 {
+    private int _snapshotSectionsCount = virtualScrollAdapter.GetSectionCount();
+    private readonly List<int> _snapshotSectionsItemsCount = [.. Enumerable.Range(0, virtualScrollAdapter.GetSectionCount()).Select(virtualScrollAdapter.GetItemCount)];
+
+    public void UpdateCounts()
+    {
+        _snapshotSectionsCount = virtualScrollAdapter.GetSectionCount();
+        _snapshotSectionsItemsCount.Clear();
+        _snapshotSectionsItemsCount.AddRange(Enumerable.Range(0, _snapshotSectionsCount).Select(virtualScrollAdapter.GetItemCount));
+    }
+    
     public override UICollectionViewCell GetCell(UICollectionView collectionView, NSIndexPath indexPath)
     {
         var sectionIndex = indexPath.Section;
@@ -70,13 +80,13 @@ internal class VirtualScrollPlatformDataSource(IVirtualScrollAdapter virtualScro
 
     public override IntPtr GetItemsCount(UICollectionView collectionView, IntPtr section)
     {
-        var itemsCount = virtualScrollAdapter.GetItemCount(section.ToInt32());
+        var itemsCount = _snapshotSectionsItemsCount[section.ToInt32()];
         return itemsCount;
     }
 
     public override IntPtr NumberOfSections(UICollectionView collectionView)
     {
-        var count = virtualScrollAdapter.GetSectionCount();
+        var count = _snapshotSectionsCount;
         return count;
     }
 

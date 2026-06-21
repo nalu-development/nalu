@@ -386,7 +386,10 @@ public partial class NaluTabBar
 
     private volatile int _navigating;
     
-    private void TapGestureRecognizer_OnTapped(object? sender, TappedEventArgs e)
+#pragma warning disable VSTHRD100
+    // ReSharper disable once AsyncVoidEventHandlerMethod
+    private async void TapGestureRecognizer_OnTapped(object? sender, TappedEventArgs e)
+#pragma warning restore VSTHRD100
     {
         if (sender is not View { BindingContext: ShellSection shellSection })
         {
@@ -401,7 +404,7 @@ public partial class NaluTabBar
         try
         {
             // ReSharper disable once ArrangeStaticMemberQualifier
-            NaluTabBar.GoTo(shellSection);
+            await NaluTabBar.GoToAsync(shellSection);
         }
         finally
         {
@@ -417,11 +420,18 @@ public partial class NaluTabBar
     /// This method is useful when creating a completely custom tab bar that doesn't inherit from <see cref="NaluTabBar"/>.
     /// Call this method when a tab button is pressed to trigger navigation.
     /// </remarks>
-    public static void GoTo(ShellSection shellSection)
-    {
-        var shellItem = shellSection.Parent as ShellItem ?? throw new InvalidOperationException("ShellSection does not have a parent ShellItem.");
-        shellItem.SetValueFromRenderer(ShellItem.CurrentItemProperty, shellSection);
-    }
+    public static Task GoToAsync(ShellSection shellSection) => Shell.Current.GoToAsync($"//{shellSection.CurrentItem.Route}");
+    
+    /// <summary>
+    /// Navigates to the specified shell section.
+    /// </summary>
+    /// <param name="shellSection">The shell section to navigate to.</param>
+    /// <remarks>
+    /// This method is useful when creating a completely custom tab bar that doesn't inherit from <see cref="NaluTabBar"/>.
+    /// Call this method when a tab button is pressed to trigger navigation.
+    /// </remarks>
+    [Obsolete("Use NaluTabBar.GoToAsync(ShellSection) instead")]
+    public static void GoTo(ShellSection shellSection) => _ = GoToAsync(shellSection);
 
     /// <inheritdoc/>
     protected override ILayoutManager CreateLayoutManager()

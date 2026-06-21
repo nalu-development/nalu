@@ -9,15 +9,17 @@ namespace Nalu;
 internal class VirtualScrollDelegate : UICollectionViewDelegate
 {
     private IVirtualScroll? _virtualScroll;
+    private VirtualScrollCollectionView? _collectionView;
     private IVirtualScrollController? _controller;
     private bool _scrollEventsEnabled;
     private readonly FadingEdgeController _fadingEdgeController = new();
     private ItemsLayoutOrientation _orientation;
     private double _fadingEdgeLength;
 
-    public VirtualScrollDelegate(IVirtualScroll virtualScroll, UICollectionViewScrollDirection scrollDirection, double fadingEdgeLength)
+    public VirtualScrollDelegate(IVirtualScroll virtualScroll, VirtualScrollCollectionView collectionView, UICollectionViewScrollDirection scrollDirection, double fadingEdgeLength)
     {
         _virtualScroll = virtualScroll;
+        _collectionView = collectionView;
         _controller = virtualScroll as IVirtualScrollController ?? throw new InvalidOperationException("VirtualView must implement IVirtualScrollController.");
         
         // Cache initial orientation from scroll direction
@@ -43,12 +45,14 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
             var item = _virtualScroll.Adapter?.GetItem(sectionIndex, itemIndex);
             var dragInfo = new VirtualScrollDragInfo(item, sectionIndex, itemIndex);
             dragHandler.OnDragInitiating(dragInfo);
+            // Ensure any changes from initiating are applied before the drag starts
+            (_virtualScroll.Handler as VirtualScrollHandler)?.Notifier?.ApplyPendingChanges();
             return dragInfo;
         }
         
         return null;
     }
-    
+
     public void ItemDragStarted(NSIndexPath indexPath)
     {
         if (_virtualScroll?.DragHandler is { } dragHandler)
@@ -77,6 +81,7 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
 
         _currentDragItem = null;
         _currentDragIndexPath = null;
+        UpdateSourceCounts();
     }
 
     /// <inheritdoc/>
@@ -213,6 +218,8 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
             SendScrollEnded(scrollView);
         }
     }
+    
+    private void UpdateSourceCounts() => (_collectionView?.DataSource as VirtualScrollPlatformDataSource)?.UpdateCounts();
 
     private void SendScrollStarted(UIScrollView scrollView)
         => _controller?.ScrollStarted(
@@ -241,6 +248,7 @@ internal class VirtualScrollDelegate : UICollectionViewDelegate
         if (disposing)
         {
             _controller = null;
+            _collectionView = null;
             _virtualScroll = null;
         }
 
