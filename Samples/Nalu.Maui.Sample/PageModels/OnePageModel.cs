@@ -76,13 +76,18 @@ public partial class OnePageModel(
         Result3 = null;
         Result4 = null;
 
-        var parallelRequestTask1 = SendRequestAsync(CreateTestLongRequest());
-        Result1 = "waiting...";
-        var parallelRequestTask2 = SendRequestAsync(CreateTestLongRequest(4000));
-        Result2 = "waiting...";
+        var random = new Random();
 
-        Result1 = await parallelRequestTask1;
-        Result2 = await parallelRequestTask2;
+        Result1 = "processing...";
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(async _ => {
+            var r = await SendRequestAsync(CreateTestLongRequest(random.Next(500, 1500)));
+            lock (this)
+            {
+                Result1 += $"\n{r}";
+            }
+        }));
+        Result2 = "waiting...";
+        Result2 = await SendRequestAsync(CreateTestLongRequest(4000));
 
         var followUpRequest = SendRequestAsync(CreateTestLongRequest());
         Result3 = "waiting...";

@@ -6,11 +6,11 @@ internal class NSUrlRequestHandle(
     string identifier,
     CookieContainer? cookieContainer,
     string? contentFile,
-    CancellationTokenRegistration cancellationTokenRegistration,
     bool isLostRequest = false
 )
 {
     private readonly TaskCompletionSource _completedCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Lock _completionLock = new();
     private bool _completed;
     public TaskCompletionSource<HttpResponseMessage> ResponseCompletionSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task CompletedTask => _completedCompletionSource.Task;
@@ -19,16 +19,22 @@ internal class NSUrlRequestHandle(
     public CookieContainer? CookieContainer => cookieContainer;
     public string? ResponseContentFile { get; set; }
 
+    public CancellationTokenRegistration? CancellationTokenRegistration;
+
     public void Complete()
     {
-        if (_completed)
+        lock (_completionLock)
         {
-            return;
+            if (_completed)
+            {
+                return;
+            }
+
+            _completed = true;
         }
 
-        _completed = true;
-        cancellationTokenRegistration.Dispose();
-        _completedCompletionSource.SetResult();
+        CancellationTokenRegistration?.Dispose();
+        _completedCompletionSource.TrySetResult();
 
         if (File.Exists(contentFile))
         {

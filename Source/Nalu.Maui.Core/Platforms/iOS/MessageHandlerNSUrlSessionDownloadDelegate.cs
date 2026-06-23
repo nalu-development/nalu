@@ -37,7 +37,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     private static MessageHandlerNSUrlSessionDownloadDelegate? _instance;
     private readonly ILogger _emptyLogger = CreateEmptyLogger();
     private NSUrlSession? _nsUrlSession;
-    private Action? _processingInBackgroundCompletionHandler;
+    private volatile Action? _processingInBackgroundCompletionHandler;
     private long _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
 
     private ILogger Logger
@@ -70,7 +70,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 config.TimeoutIntervalForRequest = 24 * 60 * 60;
                 config.TimeoutIntervalForResource = 24 * 60 * 60;
 
-                _nsUrlSession = NSUrlSession.FromConfiguration(config, this, new NSOperationQueue());
+                // The delegate callback queue MUST be serial. NSOperationQueue defaults to a
+                // concurrent queue, which lets DidFinishDownloading/DidCompleteWithError (and
+                // callbacks for different tasks) run simultaneously, racing the shared handler
+                // state. A serial queue restores Apple's documented callback ordering guarantees.
+                var delegateQueue = new NSOperationQueue { MaxConcurrentOperationCount = 1 };
+
+                _nsUrlSession = NSUrlSession.FromConfiguration(config, this, delegateQueue);
             }
 
             return _nsUrlSession!;
@@ -137,14 +143,16 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             Logger.LogDebug("Created download task for {RequestName}", requestIdentifier);
         }
 
-        var cancellationTokenRegistration = cancellationToken.Register(() =>
+        var requestHandle = new NSUrlRequestHandle(requestIdentifier, cookieContainer, contentPath);
+        requestHandle.CancellationTokenRegistration = cancellationToken.Register(() =>
             {
                 task.Cancel();
+                // ReSharper disable once AccessToModifiedClosure
+                requestHandle.ResponseCompletionSource.TrySetCanceled(cancellationToken);
                 Logger.LogDebug("Cancellation requested for {RequestName} task", requestIdentifier);
             }
         );
 
-        var requestHandle = new NSUrlRequestHandle(requestIdentifier, cookieContainer, contentPath, cancellationTokenRegistration);
         _pendingRequests[requestIdentifier] = requestHandle;
 
         task.TaskDescription = requestIdentifier;
@@ -152,7 +160,18 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         await Task.Yield();
 
-        return await requestHandle.ResponseCompletionSource.Task.ConfigureAwait(false);
+        try
+        {
+            return await requestHandle.ResponseCompletionSource.Task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The native completion callback may never arrive for a canceled background task,
+            // so proactively release the handle and its temporary files to avoid leaking them.
+            CompleteAndRemoveHandle(requestHandle);
+
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -170,7 +189,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// <inheritdoc />
     public override void DidCompleteWithError(NSUrlSession session, NSUrlSessionTask task, NSError? error)
     {
-        _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
+        Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
 
         Logger.LogDebug("DidCompleteWithError {TaskDescription} with {State}", task.TaskDescription, task.State);
 
@@ -183,9 +202,24 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         var requestIdentifier = task.TaskDescription!;
 
+        // A successful completion is finalized by DidFinishDownloading and the subsequent
+        // disposal of the response content stream (see AcknowledgingStreamContent). There is
+        // nothing to do here, and we must NOT fabricate and re-insert a handle: it would never
+        // be completed, leaking in _pendingRequests and stalling background-processing waits.
+        if (task is { State: NSUrlSessionTaskState.Completed, Error: null })
+        {
+            if (!_pendingRequests.ContainsKey(requestIdentifier))
+            {
+                Logger.LogDebug("Task {RequestIdentifier} completed successfully with no pending handle", requestIdentifier);
+            }
+
+            return;
+        }
+
+        // Abnormal completion (error/cancel/unexpected state): ensure we have a handle to fault.
         if (!_pendingRequests.TryGetValue(requestIdentifier, out var handle))
         {
-            handle = new NSUrlRequestHandle(requestIdentifier, null, null, default, true);
+            handle = new NSUrlRequestHandle(requestIdentifier, null, null, true);
             _pendingRequests[requestIdentifier] = handle;
         }
 
@@ -277,7 +311,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// <inheritdoc />
     public override void DidFinishDownloading(NSUrlSession session, NSUrlSessionDownloadTask task, NSUrl location)
     {
-        _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
+        Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
 
         if (string.IsNullOrWhiteSpace(task.TaskDescription))
         {
@@ -291,7 +325,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (!_pendingRequests.TryGetValue(requestIdentifier, out var handle))
         {
-            handle = new NSUrlRequestHandle(requestIdentifier, null, null, default, true);
+            handle = new NSUrlRequestHandle(requestIdentifier, null, null, true);
             _pendingRequests[requestIdentifier] = handle;
         }
 
@@ -386,7 +420,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         finally
         {
             // This might have taken a while, so let's update the last completed task timestamp
-            _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
+            Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
         }
 
         var httpResponseMessage = new HttpResponseMessage(task.GetHttpStatusCode())
@@ -429,7 +463,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         Logger.LogDebug("HandleEventsForBackgroundUrl");
         _processingInBackgroundCompletionHandler = completionHandler;
-        _lastCompletedTaskTimestamp = Stopwatch.GetTimestamp();
+        Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
         WaitEventsProcessingAndNotify();
 
         return true;
@@ -449,22 +483,33 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             return;
         }
 
-        var maxWaitTime = 6500;
-
-        while (Stopwatch.GetElapsedTime(_lastCompletedTaskTimestamp) < _eventProcessingWaitThreshold)
+        try
         {
-            await Task.Delay(200).ConfigureAwait(false);
-            maxWaitTime -= 200;
+            var maxWaitTime = 6500;
+
+            while (Stopwatch.GetElapsedTime(Volatile.Read(ref _lastCompletedTaskTimestamp)) < _eventProcessingWaitThreshold)
+            {
+                await Task.Delay(200).ConfigureAwait(false);
+                maxWaitTime -= 200;
+            }
+
+            var acknowledgeTasks = _processingInBackgroundHandles.Values.Select(h => h.CompletedTask).ToList();
+            await Task.WhenAny(Task.WhenAll(acknowledgeTasks), Task.Delay(Math.Max(500, maxWaitTime))).ConfigureAwait(false);
         }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error while waiting for background events processing");
+        }
+        finally
+        {
+            _processingInBackgroundHandles.Clear();
+            _processingInBackgroundCompletionHandler = null;
+            Logger.LogDebug("WaitEventsProcessingAndNotify Completed");
 
-        var acknowledgeTasks = _processingInBackgroundHandles.Values.Select(h => h.CompletedTask).ToList();
-        await Task.WhenAny(Task.WhenAll(acknowledgeTasks), Task.Delay(Math.Max(500, maxWaitTime))).ConfigureAwait(false);
-
-        _processingInBackgroundHandles.Clear();
-        _processingInBackgroundCompletionHandler = null;
-        Logger.LogDebug("WaitEventsProcessingAndNotify Completed");
-
-        DispatchQueue.MainQueue.DispatchAsync(completionHandler);
+            // The system-provided completion handler MUST always be invoked, otherwise iOS may
+            // throttle or stop delivering background URL session events to the app.
+            DispatchQueue.MainQueue.DispatchAsync(completionHandler);
+        }
     }
 
     private HttpRequestMessage? CreateHttpRequestMessage(NSUrlRequest? taskRequest)
