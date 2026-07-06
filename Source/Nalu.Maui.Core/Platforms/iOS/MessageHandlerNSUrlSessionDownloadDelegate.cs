@@ -146,10 +146,21 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var requestHandle = new NSUrlRequestHandle(requestIdentifier, cookieContainer, contentPath);
         requestHandle.CancellationTokenRegistration = cancellationToken.Register(() =>
             {
-                task.Cancel();
-                // ReSharper disable once AccessToModifiedClosure
-                requestHandle.ResponseCompletionSource.TrySetCanceled(cancellationToken);
                 Logger.LogDebug("Cancellation requested for {RequestName} task", requestIdentifier);
+
+                try
+                {
+                    task.Cancel();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Failed to cancel native task {RequestName}", requestIdentifier);
+                }
+                finally
+                {
+                    requestHandle.ResponseCompletionSource.TrySetCanceled(cancellationToken);
+                    requestHandle.Complete();
+                }
             }
         );
 
