@@ -166,6 +166,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         _pendingRequests[requestIdentifier] = requestHandle;
 
+        cancellationToken.ThrowIfCancellationRequested();
+        
         task.TaskDescription = requestIdentifier;
         task.Resume();
 
