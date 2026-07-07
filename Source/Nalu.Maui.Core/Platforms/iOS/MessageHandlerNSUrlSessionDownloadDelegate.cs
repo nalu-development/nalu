@@ -114,21 +114,10 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (request.Content is { } content)
         {
-            if (content is MultipartContent or StreamContent)
-            {
-                contentPath = GetRequestBodyPath(requestIdentifier);
-                await using var fileStream = File.Create(contentPath);
-                await content.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
-                Logger.LogDebug("MultipartContent or StreamContent for request {RequestName}", requestIdentifier);
-            }
-            else
-            {
-                await using var memoryStream = new MemoryStream();
-                await content.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
-                var body = memoryStream.ToArray();
-                nativeHttpRequest.Body = NSData.FromArray(body);
-                Logger.LogDebug("BufferedContent for request {RequestName} with size {Size}", requestIdentifier, body.Length);
-            }
+            contentPath = GetRequestBodyPath(requestIdentifier);
+            await using var fileStream = File.Create(contentPath);
+            await content.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+            Logger.LogDebug("Content for {RequestName} stored on a {FileSize} bytes file", requestIdentifier, GetSafeFileStreamLength(fileStream));
         }
         else
         {
@@ -194,6 +183,18 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             CompleteAndRemoveHandle(requestHandle);
 
             throw;
+        }
+    }
+
+    private static long GetSafeFileStreamLength(FileStream fileStream)
+    {
+        try
+        {
+            return fileStream.Length;
+        }
+        catch
+        {
+            return -1;
         }
     }
 
