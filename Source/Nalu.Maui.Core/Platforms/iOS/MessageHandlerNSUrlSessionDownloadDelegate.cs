@@ -98,6 +98,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var requestUrl = BuildNativeUrl(request.RequestUri);
         var requestIdentifier = TryGetRequestIdentifier(request, out var id) ? id : Guid.NewGuid().ToString("N");
 
+        Logger.LogDebug("SendAsync {RequestName} for [{Method}] {Url}", requestIdentifier, request.Method.Method, request.RequestUri);
+
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
                                 {
                                     HttpMethod = request.Method.Method
@@ -117,6 +119,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 contentPath = GetRequestBodyPath(requestIdentifier);
                 await using var fileStream = File.Create(contentPath);
                 await content.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                Logger.LogDebug("MultipartContent or StreamContent for request {RequestName}", requestIdentifier);
             }
             else
             {
@@ -124,7 +127,12 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 await content.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
                 var body = memoryStream.ToArray();
                 nativeHttpRequest.Body = NSData.FromArray(body);
+                Logger.LogDebug("BufferedContent for request {RequestName} with size {Size}", requestIdentifier, body.Length);
             }
+        }
+        else
+        {
+            Logger.LogDebug("No content for request {RequestName}", requestIdentifier);
         }
 
         nativeHttpRequest.Headers = GetPlatformHeaders(request, cookieContainer);
@@ -170,6 +178,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         
         task.TaskDescription = requestIdentifier;
         task.Resume();
+        
+        Logger.LogDebug("Task resumed for request {RequestName}", requestIdentifier);
 
         await Task.Yield();
 

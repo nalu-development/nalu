@@ -111,16 +111,24 @@ public partial class ElevenPageModel : ObservableObject
                     var index = random.Next(0, Groups.Count - 1);
                     var group = Groups[index];
 
-                    if (group.Items.Count <= 2)
+                    var removeCount = random.Next(1, 2);
+
+                    if (removeCount == 1 || group.Items.Count == 1)
                     {
-                        Groups.RemoveAt(index);
+                        var i = random.Next(0, group.Items.Count - 1);
+                        group.Items.RemoveAt(i);
                     }
                     else
                     {
-                        index = random.Next(0, group.Items.Count - 1);
-                        group.Items.RemoveAt(index);
-                        index = random.Next(0, group.Items.Count - 1);
-                        group.Items.RemoveAt(index);
+                        var i = random.Next(0, group.Items.Count - 1);
+                        group.Items.RemoveAt(i);
+                        i = random.Next(0, group.Items.Count - 1);
+                        group.Items.RemoveAt(i);
+                    }
+                    
+                    if (group.Items.Count == 0)
+                    {
+                        Groups.RemoveAt(index);
                     }
                 }
             }
