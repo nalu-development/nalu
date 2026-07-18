@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Nalu.Maui.UITests</RootNamespace>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Experimental preview: version pinned on purpose, bump deliberately.
+         All usages of the Driver API must go through Infrastructure/NaluApp.cs
+         so preview breaking changes only affect one file. -->
+    <PackageReference Include="Microsoft.Maui.DevFlow.Driver" Version="0.1.0-preview.12.26358.3" />
+  </ItemGroup>
+
+</Project>
