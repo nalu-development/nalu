@@ -3,6 +3,7 @@ using SkiaSharp.Views.Maui.Controls.Hosting;
 
 #if DEBUG
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.DevFlow.Agent;
 #endif
 
 namespace Nalu.Maui.TestApp;
@@ -47,6 +48,10 @@ public static class MauiProgram
         builder.Logging.AddDebug();
         builder.Logging.AddSimpleConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
+        // DevFlow in-app agent: exposes visual tree, screenshots, interactions and logs
+        // to the `maui devflow` CLI / MCP server and to the UITests.DevFlow test project.
+        builder.AddMauiDevFlowAgent();
 #endif
 
         return builder.Build();

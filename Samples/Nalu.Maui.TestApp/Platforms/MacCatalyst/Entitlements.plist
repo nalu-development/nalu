@@ -9,6 +9,9 @@
         <!-- When App Sandbox is enabled, this value is required to open outgoing network connections. -->
         <key>com.apple.security.network.client</key>
         <true/>
+        <!-- Required by the DevFlow in-app agent (DEBUG builds) to accept localhost connections. -->
+        <key>com.apple.security.network.server</key>
+        <true/>
     </dict>
 </plist>
 
