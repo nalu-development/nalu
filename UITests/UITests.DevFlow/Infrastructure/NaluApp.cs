@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Maui.DevFlow.Driver;
+using Xunit;
 
 namespace Nalu.Maui.UITests.Infrastructure;
 
