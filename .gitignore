@@ -360,3 +360,5 @@ Artefacts/
 _site/
 obj/docfx/
 api/
+# Cowork/AI: files staged for manual deletion (device bridge cannot delete)
+_to_delete/
