@@ -67,8 +67,4 @@
     <File Path="UITests/Directory.Build.props" />
     <Project Path="UITests/UITests.DevFlow/UITests.DevFlow.csproj" />
   </Folder>
-  <Folder Name="/Utils/">
-    <Project Path="Utils/VisualTestUtils/VisualTestUtils.csproj" />
-    <Project Path="Utils/VisualTestUtils.MagickNet/VisualTestUtils.MagickNet.csproj" />
-  </Folder>
 </Solution>
