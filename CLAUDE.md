@@ -3,6 +3,10 @@
 Nalu.Maui is a set of .NET MAUI libraries: `Core`, `Navigation`, `Layouts`, `Controls`, `VirtualScroll` (see `Source/`).
 Solution file: `Nalu.slnx` (XML solution format). Packable subset: `Nalu.Pack.slnf`. Unit tests: `Tests/Nalu.Maui.Test`.
 
+> **Skill available**: the `maui-devflow-uitests` skill (`.claude/skills/maui-devflow-uitests/`)
+> contains the full DevFlow reference (AgentClient API, CLI/MCP usage, testing patterns).
+> Consult it whenever writing or debugging UI tests.
+
 ## UI testing architecture (DevFlow)
 
 UI tests live in `UITests/UITests.DevFlow` (xUnit v3, `net10.0`) and drive the **Nalu.Maui.TestApp**
@@ -30,14 +34,9 @@ activated in DEBUG builds in `MauiProgram.cs`, default port **9223**).
 ### Dev loop: writing and verifying a test autonomously
 
 1. Build & launch the TestApp (DEBUG) on the target platform:
-   - iOS simulator: `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios "-t:Build;Run"`
-   - Mac Catalyst: `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-maccatalyst "-t:Build;Run"`
-   - Android emulator: `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-android "-t:Build;Run"`, then **`adb reverse tcp:9223 tcp:9223`**
-
-   Quote the argument: an unquoted `;` is a command separator in bash/zsh.
-   And note `-t:Run` alone *replaces* the default `Build` target, so on a clean `bin/` it fails with
-   `MSB3073 ... Nalu.Maui.TestApp.app couldn't be opened because there is no such file`.
-   Use `"-t:Build;Run"` (or build once without `-t`, then `-t:Run` to relaunch an unchanged app).
+   - iOS simulator: `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios -t:Run`
+   - Mac Catalyst: `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-maccatalyst -t:Run`
+   - Android emulator: `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-android -t:Run`, then **`adb reverse tcp:9223 tcp:9223`**
    (the `maui` CLI from dotnet tools also offers device/emulator management: `dotnet tool run maui -- --help`)
 2. Use the DevFlow MCP tools (or `dotnet tool run maui -- devflow ...` CLI) to explore the running app:
    screenshot, visual tree, tap, assert. Verify manually that the scenario you are about to encode actually works.
