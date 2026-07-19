@@ -90,6 +90,12 @@ Symptom → likely cause:
   stable anchor element instead of adding delays.
 - Everything times out after a preview bump → Driver API changed; fix `NaluApp.cs` (compiler
   errors) and re-check endpoint behavior (runtime nulls/falses).
+- Agent unreachable AND the red ResetButton overlay is missing on test pages → you are
+  running a STALE binary (predates the DevFlow commits) or a Release build: `pkill -f
+  Nalu.Maui.TestApp`, then rebuild with `"-t:Build;Run"` (plain `-t:Run` does NOT rebuild).
+- Healthcheck: use `curl http://localhost:9223/api/v1/agent/capabilities` — the root `/`
+  and `/json` return 404 BY DESIGN and are not valid probes.
+- The red dot bottom-right on test pages is the harness ResetButton, not a DevFlow indicator.
 
 ## Platform matrix discipline
 

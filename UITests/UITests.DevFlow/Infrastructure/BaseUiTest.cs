@@ -3,6 +3,10 @@ using Xunit;
 
 [assembly: AssemblyFixture(typeof(NaluApp))]
 
+// All test classes drive the SAME running app instance (global UI state):
+// force a single collection so classes never run in parallel.
+[assembly: CollectionBehavior(CollectionBehavior.CollectionPerAssembly)]
+
 namespace Nalu.Maui.UITests.Infrastructure;
 
 /// <summary>

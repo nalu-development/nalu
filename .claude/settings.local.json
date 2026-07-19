@@ -1,7 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet test *)"
+      "Bash(dotnet test *)",
+      "mcp__maui-devflow__maui_query",
+      "mcp__maui-devflow__maui_fill",
+      "mcp__maui-devflow__maui_tap",
+      "mcp__maui-devflow__maui_screenshot",
+      "mcp__maui-devflow__maui_tree",
+      "Bash(pkill -f Nalu.Maui.TestApp)",
+      "Bash(dotnet build *)",
+      "Bash(curl -s -m 3 http://localhost:9223/)",
+      "Bash(curl -s -m 3 http://localhost:9223/json)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" -m 3 http://localhost:9223/)",
+      "mcp__maui-devflow__maui_element"
     ]
   }
 }
