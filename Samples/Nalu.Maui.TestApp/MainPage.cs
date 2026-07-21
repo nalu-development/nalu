@@ -17,7 +17,7 @@ public class MainPage : ContentPage
                        RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
                        RowSpacing = 8
                    };
-        
+
         var label = new Label
                     {
                         Text = "Nalu.Maui.TestApp",
@@ -27,7 +27,7 @@ public class MainPage : ContentPage
                         VerticalOptions = LayoutOptions.Center
                     };
         grid.Add(label);
-        
+
         var entry = new Entry
                     {
                         Placeholder = "Type test name here",
@@ -61,7 +61,7 @@ public class MainPage : ContentPage
                 DisplayAlertAsync("Error", $"Test '{testName}' not found.", "OK");
             }
         };
-        
+
         var runGrid = new Grid
                       {
                           ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
@@ -72,7 +72,7 @@ public class MainPage : ContentPage
                       };
         runGrid.Add(entry);
         runGrid.Add(button, 1);
-        
+
         grid.Add(runGrid, 0, 1);
 
         var virtualScroll = new VirtualScroll
@@ -92,9 +92,9 @@ public class MainPage : ContentPage
                                     }
                                 ),
                             };
-        
+
         grid.Add(virtualScroll, 0, 2);
-        
+
         Content = grid;
     }
 }
@@ -116,6 +116,68 @@ public partial class TestPageItem
     private void Open()
     {
         var page = _factory();
+        TestPageDecorator.Decorate(page);
         Application.Current!.Windows[0].Page = page;
+    }
+}
+
+/// <summary>
+/// Adds a small cross-platform "ResetButton" overlay to test pages so that
+/// UI tests (DevFlow) can navigate back to the <see cref="MainPage"/> without restarting the app.
+/// </summary>
+internal static class TestPageDecorator
+{
+    private const string TestPageRootAutomationId = "TestPageRoot";
+
+    public static void Decorate(Page page)
+    {
+        switch (page)
+        {
+            case NavigationPage navigationPage:
+                DecorateContentPage(navigationPage.CurrentPage as ContentPage);
+                navigationPage.Pushed += (_, e) => DecorateContentPage(e.Page as ContentPage);
+                break;
+
+            case ContentPage contentPage:
+                DecorateContentPage(contentPage);
+                break;
+
+            // Shell / other page types are left untouched:
+            // tests relying on them should restart the app to reset state.
+        }
+    }
+
+    private static void DecorateContentPage(ContentPage? contentPage)
+    {
+        if (contentPage?.Content is not { } content || content.AutomationId == TestPageRootAutomationId)
+        {
+            return;
+        }
+
+        var resetButton = new Button
+                          {
+                              Text = "⟲",
+                              AutomationId = "ResetButton",
+                              FontSize = 14,
+                              Padding = new Thickness(0),
+                              WidthRequest = 32,
+                              HeightRequest = 32,
+                              CornerRadius = 16,
+                              Opacity = 0.6,
+                              BackgroundColor = Colors.Red,
+                              TextColor = Colors.White,
+                              HorizontalOptions = LayoutOptions.End,
+                              VerticalOptions = LayoutOptions.End,
+                              Margin = new Thickness(8)
+                          };
+        resetButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
+
+        contentPage.Content = null;
+
+        var grid = new Grid { AutomationId = TestPageRootAutomationId };
+        grid.Add(content);
+        grid.Add(resetButton);
+
+        contentPage.Content = grid;
     }
 }

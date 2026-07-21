@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "maui-devflow": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": ["tool", "run", "maui", "--", "devflow", "mcp"]
+    }
+  }
+}

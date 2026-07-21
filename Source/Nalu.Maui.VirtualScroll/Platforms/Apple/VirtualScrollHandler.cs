@@ -1,3 +1,4 @@
+using CoreFoundation;
 using CoreGraphics;
 using Foundation;
 using Microsoft.Maui.Controls.Handlers.Items;
@@ -679,39 +680,26 @@ public partial class VirtualScrollHandler
 
         var collectionView = handler.PlatformCollectionView;
         NSIndexPath indexPath;
-        
+
         // If itemIndex is -1, scroll to section header (or first item if no header)
         if (itemIndex == -1)
         {
             var layoutInfo = virtualScroll as IVirtualScrollLayoutInfo;
-            
+
             // Check if section headers are enabled
             if (layoutInfo?.HasSectionHeader == true)
             {
-                // Try scrolling to section supplementary element directly for better accuracy
-                indexPath = NSIndexPath.FromItemSection(0, sectionIndex);
-                collectionView.CollectionViewLayout.PrepareLayout();
-                var attributes = collectionView.GetLayoutAttributesForSupplementaryElement(
-                    UICollectionElementKindSectionKey.Header,
-                    indexPath);
-
-                if (attributes is not null)
-                {
-                    var headerFrame = attributes.Frame;
-                    var contentOffset = collectionView.ContentOffset;
-                    contentOffset.Y = headerFrame.Y - collectionView.ContentInset.Top;
-                    collectionView.SetContentOffset(contentOffset, animated);
-                    return;
-                }
+                handler.ScrollToSectionHeader(sectionIndex, position, animated);
+                return;
             }
-            
-            // Fallback: scroll to first item in section (either no header or header not found)
+
+            // Fallback: scroll to first item in section (no header configured)
             var itemCount = virtualScroll.Adapter.GetItemCount(sectionIndex);
             if (itemCount == 0)
             {
                 return;
             }
-            
+
             indexPath = NSIndexPath.FromItemSection(0, sectionIndex);
         }
         else
@@ -731,18 +719,160 @@ public partial class VirtualScrollHandler
             indexPath = NSIndexPath.FromItemSection(itemIndex, sectionIndex);
         }
         
-        // Get scroll direction from layout
-        var scrollDirection = UICollectionViewScrollDirection.Vertical;
-        if (collectionView.CollectionViewLayout is VirtualScrollCollectionViewLayout layout)
-        {
-            scrollDirection = layout.ScrollDirection;
-        }
-
         // Convert ScrollToPosition to UICollectionViewScrollPosition
-        var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
+        var scrollPosition = position.ToCollectionViewScrollPosition(GetScrollDirection(collectionView), false);
 
         collectionView.ScrollToItem(indexPath, scrollPosition, animated);
     }
+
+    /// <summary>
+    /// Scrolls so that the header of the given section satisfies <paramref name="position"/>.
+    /// </summary>
+    /// <remarks>
+    /// With self-sizing cells the layout attributes of far-away supplementary elements are based
+    /// on estimated sizes (and the compositional layout re-anchors the content offset while cells
+    /// get measured), so a single SetContentOffset to the header frame lands short.
+    /// <see cref="UICollectionView.ScrollToItem"/> does compensate for estimation, so we first
+    /// scroll to the section's first item, wait for the offset to settle, then fix up the offset
+    /// using the now-measured header frame (iterating, as each jump can re-measure cells).
+    /// </remarks>
+    private void ScrollToSectionHeader(int sectionIndex, ScrollToPosition position, bool animated)
+    {
+        var collectionView = PlatformCollectionView;
+        var itemCount = VirtualView?.Adapter?.GetItemCount(sectionIndex) ?? 0;
+
+        if (itemCount > 0)
+        {
+            var scrollDirection = GetScrollDirection(collectionView);
+            var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
+            collectionView.ScrollToItem(NSIndexPath.FromItemSection(0, sectionIndex), scrollPosition, animated);
+        }
+
+        // 25 x 80ms ≈ 2s upper bound for the settle wait (animated scrolls take ~300-500ms).
+        AdjustOffsetToSectionHeaderWhenSettled(sectionIndex, position, collectionView.ContentOffset, checksLeft: 25);
+    }
+
+    private void AdjustOffsetToSectionHeaderWhenSettled(int sectionIndex, ScrollToPosition position, CGPoint lastOffset, int checksLeft)
+        => DispatchQueue.MainQueue.DispatchAfter(
+            new DispatchTime(DispatchTime.Now, 80_000_000L /* 80ms in ns */),
+            () =>
+            {
+                if (_collectionView is not { } collectionView)
+                {
+                    return;
+                }
+
+                var offset = collectionView.ContentOffset;
+                var settled = Math.Abs(offset.X - lastOffset.X) < 0.5 && Math.Abs(offset.Y - lastOffset.Y) < 0.5;
+
+                if (settled || checksLeft <= 0)
+                {
+                    AdjustOffsetToSectionHeader(sectionIndex, position, attemptsLeft: 3);
+                }
+                else
+                {
+                    AdjustOffsetToSectionHeaderWhenSettled(sectionIndex, position, offset, checksLeft - 1);
+                }
+            }
+        );
+
+    private void AdjustOffsetToSectionHeader(int sectionIndex, ScrollToPosition position, int attemptsLeft)
+    {
+        if (_collectionView is not { } collectionView
+            || VirtualView?.Adapter is not { } adapter
+            || sectionIndex >= adapter.GetSectionCount())
+        {
+            return;
+        }
+
+        collectionView.LayoutIfNeeded();
+
+        var attributes = collectionView.GetLayoutAttributesForSupplementaryElement(
+            UICollectionElementKindSectionKey.Header,
+            NSIndexPath.FromItemSection(0, sectionIndex));
+
+        if (attributes is null)
+        {
+            return;
+        }
+
+        var contentOffset = collectionView.ContentOffset;
+        var inset = collectionView.AdjustedContentInset;
+        double target;
+        double current;
+
+        if (GetScrollDirection(collectionView) == UICollectionViewScrollDirection.Vertical)
+        {
+            current = contentOffset.Y;
+            target = ComputeSupplementaryTargetOffset(
+                position, attributes.Frame.Y, attributes.Frame.Height, current,
+                collectionView.Bounds.Height, inset.Top, inset.Bottom, collectionView.ContentSize.Height);
+        }
+        else
+        {
+            current = contentOffset.X;
+            target = ComputeSupplementaryTargetOffset(
+                position, attributes.Frame.X, attributes.Frame.Width, current,
+                collectionView.Bounds.Width, inset.Left, inset.Right, collectionView.ContentSize.Width);
+        }
+
+        if (Math.Abs(target - current) < 0.5)
+        {
+            return;
+        }
+
+        if (GetScrollDirection(collectionView) == UICollectionViewScrollDirection.Vertical)
+        {
+            contentOffset.Y = (nfloat) target;
+        }
+        else
+        {
+            contentOffset.X = (nfloat) target;
+        }
+
+        collectionView.SetContentOffset(contentOffset, false);
+
+        if (attemptsLeft > 1)
+        {
+            // The jump may materialize cells whose measured sizes shift the layout again.
+            DispatchQueue.MainQueue.DispatchAsync(() => AdjustOffsetToSectionHeader(sectionIndex, position, attemptsLeft - 1));
+        }
+    }
+
+    private static double ComputeSupplementaryTargetOffset(
+        ScrollToPosition position,
+        double elementStart,
+        double elementSize,
+        double currentOffset,
+        double viewportSize,
+        double leadingInset,
+        double trailingInset,
+        double contentSize)
+    {
+        var minOffset = -leadingInset;
+        var maxOffset = Math.Max(contentSize + trailingInset - viewportSize, minOffset);
+        var visibleSize = viewportSize - leadingInset - trailingInset;
+
+        var target = position switch
+        {
+            ScrollToPosition.Center => elementStart + (elementSize / 2) - leadingInset - (visibleSize / 2),
+            ScrollToPosition.End => elementStart + elementSize - viewportSize + trailingInset,
+            ScrollToPosition.MakeVisible when elementStart >= currentOffset + leadingInset
+                                              && elementStart + elementSize <= currentOffset + viewportSize - trailingInset
+                => currentOffset,
+            ScrollToPosition.MakeVisible when elementStart + elementSize > currentOffset + viewportSize - trailingInset
+                                              && elementStart >= currentOffset + leadingInset
+                => elementStart + elementSize - viewportSize + trailingInset,
+            _ => elementStart - leadingInset
+        };
+
+        return Math.Clamp(target, minOffset, maxOffset);
+    }
+
+    private static UICollectionViewScrollDirection GetScrollDirection(UICollectionView collectionView)
+        => collectionView.CollectionViewLayout is VirtualScrollCollectionViewLayout layout
+            ? layout.ScrollDirection
+            : UICollectionViewScrollDirection.Vertical;
 
     /// <summary>
     /// Maps the scroll event enabled state from the virtual scroll to the platform collection view delegate.

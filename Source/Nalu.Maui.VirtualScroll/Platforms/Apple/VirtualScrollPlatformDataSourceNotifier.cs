@@ -46,43 +46,64 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
 
         var newSectionCount = _adapter.GetSectionCount();
         var pendingChanges = changeSet.Changes.ToList();
-        
+
+        // The data source snapshot must reflect the state AFTER the whole change set,
+        // and every mutation of the change set must land in a SINGLE update transaction:
+        // UICollectionView validates section/item counts per transaction, so applying the
+        // changes one-by-one (or the reset's delete/reload/insert as separate transactions)
+        // throws NSInternalInconsistencyException whenever a change set alters the counts
+        // in more than one step (e.g. a DynamicData Bind escalating a large changeset to
+        // a Reset notification while more sections were added in the same main-loop pass).
+        UpdateSourceCount();
+
         // If Reset is present, handle section count changes and reload
         if (pendingChanges.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
         {
-            UpdateSourceCount();
             var currentSectionCount = _previousSectionCount;
 
-            if (currentSectionCount > newSectionCount)
-            {
-                // Sections were removed - delete them
-                var removeRange = NSIndexSet.FromNSRange(new NSRange(newSectionCount, currentSectionCount - newSectionCount));
-                _collectionView.DeleteSections(removeRange);
-            }
+            _collectionView.PerformBatchUpdates(() =>
+                {
+                    if (currentSectionCount > newSectionCount)
+                    {
+                        // Sections were removed - delete them
+                        var removeRange = NSIndexSet.FromNSRange(new NSRange(newSectionCount, currentSectionCount - newSectionCount));
+                        _collectionView.DeleteSections(removeRange);
+                    }
 
-            // Reload all existing sections that will exist after the reset
-            var remainingSectionCount = Math.Min(currentSectionCount, newSectionCount);
-            if (remainingSectionCount > 0)
-            {
-                var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
-                _collectionView.ReloadSections(reloadRange);
-            }
+                    // Reload all existing sections that will exist after the reset
+                    var remainingSectionCount = Math.Min(currentSectionCount, newSectionCount);
+                    if (remainingSectionCount > 0)
+                    {
+                        var reloadRange = NSIndexSet.FromNSRange(new NSRange(0, remainingSectionCount));
+                        _collectionView.ReloadSections(reloadRange);
+                    }
 
-            if (currentSectionCount < newSectionCount)
-            {
-                // Sections were added - insert them
-                var addedCount = newSectionCount - currentSectionCount;
-                var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
-                _collectionView.InsertSections(insertRange);
-            }
+                    if (currentSectionCount < newSectionCount)
+                    {
+                        // Sections were added - insert them
+                        var addedCount = newSectionCount - currentSectionCount;
+                        var insertRange = NSIndexSet.FromNSRange(new NSRange(currentSectionCount, addedCount));
+                        _collectionView.InsertSections(insertRange);
+                    }
+                },
+                null
+            );
         }
-        else
+        else if (pendingChanges.Count == 1)
         {
-            foreach (var change in pendingChanges)
-            {
-                UpdateSourceCount();
-                ApplyChange(change);
-            }
+            ApplyChange(pendingChanges[0]);
+        }
+        else if (pendingChanges.Count > 1)
+        {
+            _collectionView.PerformBatchUpdates(() =>
+                {
+                    foreach (var change in pendingChanges)
+                    {
+                        ApplyChange(change);
+                    }
+                },
+                null
+            );
         }
 
         // Update tracked section count

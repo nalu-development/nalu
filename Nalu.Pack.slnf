@@ -1,6 +1,6 @@
-﻿{
+{
   "solution": {
-    "path": "Nalu.sln",
+    "path": "Nalu.slnx",
     "projects": [
       "Source\\Nalu.Maui.Core\\Nalu.Maui.Core.csproj",
       "Source\\Nalu.Maui.Controls\\Nalu.Maui.Controls.csproj",

@@ -119,12 +119,14 @@ internal class FadingEdgeController
         {
             case FadeGradient.Right:
             case FadeGradient.Bottom:
-                gradientLayer.Locations = [0, endFadeWidth];
+                // At the end edge: only the start side fades (its length follows the distance scrolled from start).
+                gradientLayer.Locations = [0, startFadeWidth];
                 gradientLayer.Colors = [UIColor.Clear.CGColor, UIColor.Black.CGColor];
                 break;
             case FadeGradient.Left:
             case FadeGradient.Top:
-                gradientLayer.Locations = [1 - startFadeWidth, 1];
+                // At the start edge: only the end side fades (its length follows the remaining scrollable distance).
+                gradientLayer.Locations = [1 - endFadeWidth, 1];
                 gradientLayer.Colors = [UIColor.Black.CGColor, UIColor.Clear.CGColor];
                 break;
             case FadeGradient.LeftRight:
