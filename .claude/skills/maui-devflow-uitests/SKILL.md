@@ -44,8 +44,10 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
    minimal and deterministic, unique `AutomationId` on everything a test touches.
 4. **Write the test** in `UITests/UITests.DevFlow/Tests/` using the `NaluApp` wrapper —
    never call `AgentClient` from a test; extend the wrapper instead.
-5. **Run** `dotnet test UITests/UITests.DevFlow` (app must be running;
-   `DEVFLOW_HOST`/`DEVFLOW_PORT` override `localhost:9223`).
+5. **Run** `dotnet test UITests/UITests.DevFlow` (app must be running; `NaluApp` self-discovers
+   the agent on 9223 → 10223, `DEVFLOW_HOST`/`DEVFLOW_PORT` override). After a relaunch, wait
+   for readiness with a no-op MCP call (e.g. `maui_query`) retried until it responds —
+   never curl-probe ports.
 6. **On failure**: screenshot + visual tree via MCP, read the wrapper's TimeoutException (it lists
    the AutomationIds actually present), fix test/page/library, repeat.
 

@@ -66,5 +66,7 @@ dotnet tool run maui -- devflow MAUI tree
 ## Multiple apps / non-default port
 
 The broker assigns ports when several agent-enabled apps run simultaneously
-(`maui devflow broker …`, agent discovery via `maui devflow agent …`). Our test suite assumes
-the single TestApp on 9223; export `DEVFLOW_PORT` before `dotnet test` if it differs.
+(`maui devflow broker …`, agent discovery via `maui devflow agent …`). MCP tools auto-discover
+the running agent (omit `agentPort`; use a retried no-op `maui_query` as the readiness probe
+after relaunching the app). The test suite's `NaluApp` self-discovers 9223 → 10223 (the
+relaunch-fallback port); export `DEVFLOW_PORT` before `dotnet test` only for custom ports.

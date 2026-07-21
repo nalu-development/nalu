@@ -43,40 +43,64 @@ public sealed class NaluApp : IAsyncLifetime
     private static readonly TimeSpan _defaultTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan _pollInterval = TimeSpan.FromMilliseconds(250);
 
-    private readonly AgentClient _client;
+    private AgentClient _client;
 
     public NaluApp()
     {
         var host = Environment.GetEnvironmentVariable("DEVFLOW_HOST") ?? "localhost";
-        var port = int.TryParse(Environment.GetEnvironmentVariable("DEVFLOW_PORT"), out var p) ? p : 9223;
-        _client = new AgentClient(host, port);
+        _client = new AgentClient(host, CandidatePorts()[0]);
     }
+
+    /// <summary>
+    /// DEVFLOW_PORT when set; otherwise 9223 plus 10223 — the port the agent falls back to
+    /// when the app is relaunched while 9223 lingers in TIME_WAIT.
+    /// </summary>
+    private static int[] CandidatePorts()
+        => int.TryParse(Environment.GetEnvironmentVariable("DEVFLOW_PORT"), out var p) ? [p] : [9223, 10223];
 
     public async ValueTask InitializeAsync()
     {
         var stopwatch = Stopwatch.StartNew();
         var timeout = TimeSpan.FromSeconds(30);
+        var host = Environment.GetEnvironmentVariable("DEVFLOW_HOST") ?? "localhost";
+        var candidatePorts = CandidatePorts();
 
         while (true)
         {
-            try
+            foreach (var port in candidatePorts)
             {
-                var status = await _client.GetStatusAsync().ConfigureAwait(false);
+                var client = _client.BaseUrl.EndsWith($":{port}", StringComparison.Ordinal) ? _client : new AgentClient(host, port);
 
-                if (status is not null)
+                try
                 {
-                    return;
+                    var status = await client.GetStatusAsync().ConfigureAwait(false);
+
+                    if (status is not null)
+                    {
+                        if (!ReferenceEquals(client, _client))
+                        {
+                            _client.Dispose();
+                            _client = client;
+                        }
+
+                        return;
+                    }
                 }
-            }
-            catch (Exception) when (stopwatch.Elapsed < timeout)
-            {
-                // Agent not reachable yet: keep polling.
+                catch (Exception) when (stopwatch.Elapsed < timeout)
+                {
+                    // Agent not reachable on this port yet: keep polling.
+                }
+
+                if (!ReferenceEquals(client, _client))
+                {
+                    client.Dispose();
+                }
             }
 
             if (stopwatch.Elapsed >= timeout)
             {
                 throw new InvalidOperationException(
-                    $"Cannot reach the DevFlow agent at {_client.BaseUrl}. " +
+                    $"Cannot reach the DevFlow agent at {host} on port(s) {string.Join(", ", candidatePorts)}. " +
                     "Make sure Nalu.Maui.TestApp is running in DEBUG on the target platform. " +
                     "For Android emulators run 'adb reverse tcp:9223 tcp:9223' first. " +
                     "Host/port can be overridden with DEVFLOW_HOST / DEVFLOW_PORT.");

@@ -53,6 +53,53 @@ public class VirtualScrollPushMutationTests(NaluApp app) : BaseUiTest(app)
         (await App.WaitForElementAsync("PushHeader")).IsVisible.Should().BeTrue();
     }
 
+    [Theory]
+    // One section (with 3 items) added per tick: 3 + 15 = 18 sections.
+    [InlineData("PushGroupAddButton", "Done 18", "G1i1")]
+    // TWO section adds in the SAME main-loop pass per tick: 3 + 30 = 33 sections.
+    [InlineData("PushGroupBurstButton", "Done 33", "G1i1")]
+    // THREE section adds + item adds to first/last section, all in one pass: 3 + 45 = 48.
+    // "G1x0" is the first extra item appended to section G1 (visible near the top).
+    [InlineData("PushGroupBurstItemsButton", "Done 48", "G1x0")]
+    // Two adds + one removal of the FIRST section per pass: G1..G15 removed, G16 ends on top.
+    [InlineData("PushGroupAddRemoveButton", "Done 18", "PH G16")]
+    public async Task MutatingGroupedSectionsWhilePushingDoesNotCrash(string scenarioButton, string expectedStatus, string expectedElement)
+    {
+        await OpenPageAsync();
+
+        await App.TapAsync(scenarioButton);
+
+        await App.WaitForTextAsync("MutationStatusLabel", expectedStatus, _mutationTimeout);
+
+        (await App.WaitForElementAsync(expectedElement)).IsVisible.Should().BeTrue();
+        (await App.WaitForElementAsync("PushGroupedHeader")).IsVisible.Should().BeTrue();
+    }
+
+    [Theory]
+    // DynamicData SourceCache → Group → inner Binds into ReadOnlyObservableCollections
+    // (grouped NotifyCollectionChanged adapter), mutated through the push animation.
+    // 6 items across 2 NEW groups per changeset: 3 seed + 30 groups.
+    [InlineData("PushDDBurstButton", "Done 33")]
+    // Large changesets escalate DynamicData Bind to Reset notifications (>25 changes):
+    // pre-populated 30-item group, inner Reset on an existing group, outer Reset from
+    // 30 new groups at once. This exact recipe crashed with
+    // NSInternalInconsistencyException before the batched notifier fix.
+    [InlineData("PushDDResetButton", "Done 46")]
+    // Re-grouping items empties and removes groups, then removals empty the target group.
+    [InlineData("PushDDMoveButton", "Done 7")]
+    public async Task MutatingDynamicDataPipelineWhilePushingDoesNotCrash(string scenarioButton, string expectedStatus)
+    {
+        await OpenPageAsync();
+
+        await App.TapAsync(scenarioButton);
+
+        await App.WaitForTextAsync("MutationStatusLabel", expectedStatus, _mutationTimeout);
+
+        // DynamicData group/item ordering is nondeterministic (cache-based), so assert on
+        // the global header plus overall responsiveness rather than specific rows.
+        (await App.WaitForElementAsync("PushDDHeader")).IsVisible.Should().BeTrue();
+    }
+
     [Fact]
     public async Task MutatingWhilePoppingDoesNotCrash()
     {

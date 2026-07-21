@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using DynamicData;
 using JetBrains.Annotations;
 
 namespace Nalu.Maui.TestApp.Tests;
@@ -37,6 +38,13 @@ public class VirtualScrollPushMutationController : ContentPage
         stack.Add(MakeButton("Push + clear", "PushClearButton", () => PushAndMutate("clear")));
         stack.Add(MakeButton("Push + mixed", "PushMixedButton", () => PushAndMutate("mixed")));
         stack.Add(MakeButton("Push + pop while mutating", "PushPopButton", () => PushAndMutate("mixed", popWhileMutating: true)));
+        stack.Add(MakeButton("Push grouped + add sections", "PushGroupAddButton", () => PushGroupedAndMutate("addSection")));
+        stack.Add(MakeButton("Push grouped + burst sections", "PushGroupBurstButton", () => PushGroupedAndMutate("burst2")));
+        stack.Add(MakeButton("Push grouped + burst & items", "PushGroupBurstItemsButton", () => PushGroupedAndMutate("burst3AndItems")));
+        stack.Add(MakeButton("Push grouped + add & remove", "PushGroupAddRemoveButton", () => PushGroupedAndMutate("addRemove")));
+        stack.Add(MakeButton("Push DynamicData + bursts", "PushDDBurstButton", () => PushDynamicDataAndMutate("ddBurst")));
+        stack.Add(MakeButton("Push DynamicData + resets", "PushDDResetButton", () => PushDynamicDataAndMutate("ddReset")));
+        stack.Add(MakeButton("Push DynamicData + regroup", "PushDDMoveButton", () => PushDynamicDataAndMutate("ddMove")));
         stack.Add(_rootStatusLabel);
         stack.Add(_mutationDoneLabel);
 
@@ -90,6 +98,203 @@ public class VirtualScrollPushMutationController : ContentPage
             // animation runs and after the page is gone.
             await Navigation.PopAsync(animated: true);
             _rootStatusLabel.Text = "Popped";
+        }
+    }
+
+#pragma warning disable VSTHRD100 // async void event handler
+    private async void PushGroupedAndMutate(string scenario)
+#pragma warning restore VSTHRD100
+    {
+        _rootStatusLabel.Text = "Pushing";
+        _mutationDoneLabel.Text = "-";
+
+        var page = new MutatingGroupedVirtualScrollPage();
+        var mutator = new GroupedCollectionMutator(page.Sections, scenario);
+
+        var ticks = 0;
+        var timer = Dispatcher.CreateTimer();
+        timer.Interval = _tickInterval;
+        timer.Tick += (_, _) =>
+        {
+            // Each tick applies MULTIPLE changes synchronously (bursts): several
+            // CollectionChanged notifications reach the adapter in the same main-loop
+            // pass, while the push animation is still running.
+            mutator.Tick(ticks++);
+
+            if (ticks >= TickCount)
+            {
+                timer.Stop();
+                var doneText = $"Done {page.Sections.Count}";
+                page.SetStatus(doneText);
+                _mutationDoneLabel.Text = doneText;
+            }
+        };
+        timer.Start();
+
+        await Navigation.PushAsync(page, animated: true);
+        _rootStatusLabel.Text = "Pushed";
+    }
+
+#pragma warning disable VSTHRD100 // async void event handler
+    private async void PushDynamicDataAndMutate(string scenario)
+#pragma warning restore VSTHRD100
+    {
+        _rootStatusLabel.Text = "Pushing";
+        _mutationDoneLabel.Text = "-";
+
+        var page = new MutatingDynamicDataGroupedPage();
+        var mutator = new DynamicDataMutator(page.Cache);
+
+        var ticks = 0;
+        var timer = Dispatcher.CreateTimer();
+        timer.Interval = _tickInterval;
+        timer.Tick += (_, _) =>
+        {
+            // Every AddOrUpdate call emits one DynamicData changeset that fans out
+            // synchronously through Group/Transform/Bind on this same main-loop pass:
+            // the outer AND the inner ReadOnlyObservableCollections all mutate at once,
+            // with Bind escalating large changesets (>25) to a Reset notification.
+            mutator.Tick(scenario, ticks++);
+
+            if (ticks >= TickCount)
+            {
+                timer.Stop();
+                var doneText = $"Done {page.Sections.Count}";
+                page.SetStatus(doneText);
+                _mutationDoneLabel.Text = doneText;
+            }
+        };
+        timer.Start();
+
+        await Navigation.PushAsync(page, animated: true);
+        _rootStatusLabel.Text = "Pushed";
+    }
+
+    private sealed class DynamicDataMutator(SourceCache<PushDataRecord, string> cache)
+    {
+        private int _next;
+
+        private PushDataRecord NewRecord(string groupName) => new($"N{++_next}", groupName);
+
+        public void Tick(string scenario, int tick)
+        {
+            switch (scenario)
+            {
+                case "ddBurst":
+                    // 6 items spanning 2 NEW groups in a single changeset.
+                    cache.AddOrUpdate(new[]
+                        {
+                            NewRecord($"B{tick}a"), NewRecord($"B{tick}a"), NewRecord($"B{tick}a"),
+                            NewRecord($"B{tick}b"), NewRecord($"B{tick}b"), NewRecord($"B{tick}b")
+                        }
+                    );
+
+                    break;
+
+                case "ddReset":
+                    switch (tick)
+                    {
+                        case 0:
+                            // 30 items into one NEW group: the section arrives pre-populated.
+                            cache.AddOrUpdate(Enumerable.Range(0, 30).Select(_ => NewRecord("DBIG")).ToArray());
+
+                            break;
+
+                        case 3:
+                            // 30 more items into the EXISTING group: the inner Bind escalates to Reset.
+                            cache.AddOrUpdate(Enumerable.Range(0, 30).Select(_ => NewRecord("DBIG")).ToArray());
+
+                            break;
+
+                        case 6:
+                            // 30 items each in its own NEW group: the outer Bind escalates to Reset.
+                            cache.AddOrUpdate(Enumerable.Range(0, 30).Select(i => NewRecord($"R{i}")).ToArray());
+
+                            break;
+
+                        default:
+                            cache.AddOrUpdate(NewRecord($"S{tick}"));
+
+                            break;
+                    }
+
+                    break;
+
+                case "ddMove":
+                    switch (tick)
+                    {
+                        case < 5:
+                            // Re-group seed items into "DM" (D1 empties and its group vanishes).
+                            cache.AddOrUpdate(new PushDataRecord($"I{tick + 1}", "DM"));
+
+                            break;
+
+                        case < 10:
+                            // Remove the re-grouped items ("DM" empties and vanishes).
+                            cache.Remove($"I{tick - 4}");
+
+                            break;
+
+                        default:
+                            cache.AddOrUpdate(NewRecord($"M{tick}"));
+
+                            break;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private sealed class GroupedCollectionMutator(ObservableCollection<VirtualScrollSection> sections, string scenario)
+    {
+        private int _nextSection = 3;
+
+        private VirtualScrollSection NewSection()
+        {
+            var name = $"G{++_nextSection}";
+
+            return new VirtualScrollSection(name, Enumerable.Range(1, 3).Select(i => new VirtualScrollListItem($"{name}i{i}")));
+        }
+
+        public void Tick(int tick)
+        {
+            switch (scenario)
+            {
+                case "addSection":
+                    sections.Add(NewSection());
+
+                    break;
+
+                case "burst2":
+                    // Two section adds back-to-back in the same main-loop pass.
+                    sections.Add(NewSection());
+                    sections.Add(NewSection());
+
+                    break;
+
+                case "burst3AndItems":
+                    // Three section adds plus item-level adds, all in the same pass.
+                    sections.Add(NewSection());
+                    sections.Add(NewSection());
+                    sections.Add(NewSection());
+                    sections[0].Items.Add(new VirtualScrollListItem($"G1x{tick}"));
+                    sections[^1].Items.Add(new VirtualScrollListItem($"tailx{tick}"));
+
+                    break;
+
+                case "addRemove":
+                    // Add two sections and remove the first one in the same pass.
+                    sections.Add(NewSection());
+                    sections.Add(NewSection());
+
+                    if (sections.Count > 1)
+                    {
+                        sections.RemoveAt(0);
+                    }
+
+                    break;
+            }
         }
     }
 
@@ -173,6 +378,194 @@ public class VirtualScrollPushMutationController : ContentPage
             }
         }
     }
+}
+
+public record PushDataRecord(string Id, string GroupName);
+
+/// <summary>
+/// A section view-model fed by a DynamicData group: its own Bind writes into the inner
+/// ReadOnlyObservableCollection, mirroring real-world SourceCache + Group pipelines.
+/// </summary>
+public sealed class DynamicDataSection : IDisposable
+{
+    private readonly ReadOnlyObservableCollection<VirtualScrollListItem> _items;
+    private readonly IDisposable _subscription;
+
+    public string Name { get; }
+    public ReadOnlyObservableCollection<VirtualScrollListItem> Items => _items;
+
+    public DynamicDataSection(IGroup<PushDataRecord, string, string> group)
+    {
+        Name = group.Key;
+        _subscription = group.Cache.Connect()
+                             .Transform(r => new VirtualScrollListItem(r.Id))
+                             .Bind(out _items)
+                             .Subscribe();
+    }
+
+    public void Dispose() => _subscription.Dispose();
+}
+
+/// <summary>
+/// Reproduces the DynamicData shape that crashed in the field: SourceCache → Group →
+/// Transform(section with its own inner Bind) → Bind(out ReadOnlyObservableCollection),
+/// consumed through the grouped NotifyCollectionChanged adapter, mutated during push.
+/// </summary>
+public class MutatingDynamicDataGroupedPage : ContentPage
+{
+    private readonly Label _statusLabel;
+    private readonly IDisposable _subscription;
+    private readonly ReadOnlyObservableCollection<DynamicDataSection> _sections;
+
+    public SourceCache<PushDataRecord, string> Cache { get; } = new(r => r.Id);
+
+    public ReadOnlyObservableCollection<DynamicDataSection> Sections => _sections;
+
+    public MutatingDynamicDataGroupedPage()
+    {
+        // Seed: I1-I3 → D1, I4-I6 → D2, I7-I9 → D3.
+        Cache.AddOrUpdate(Enumerable.Range(1, 9).Select(i => new PushDataRecord($"I{i}", $"D{((i - 1) / 3) + 1}")));
+
+        _subscription = Cache.Connect()
+                             .Group(r => r.GroupName)
+                             .Transform(g => new DynamicDataSection(g))
+                             .DisposeMany()
+                             .Bind(out _sections)
+                             .Subscribe();
+
+        _statusLabel = new Label { AutomationId = "MutationStatusLabel", FontSize = 14, Text = "Running", Padding = new Thickness(16, 8) };
+
+        var virtualScroll = new VirtualScroll
+                            {
+                                AutomationId = "PushDDScroll",
+                                ItemsSource = VirtualScroll.CreateObservableCollectionAdapter(_sections, s => s.Items),
+
+                                HeaderTemplate = new DataTemplate(() => new Label
+                                    {
+                                        AutomationId = "PushDDHeader",
+                                        Text = "DynamicData push header",
+                                        FontAttributes = FontAttributes.Bold,
+                                        HorizontalOptions = LayoutOptions.Center
+                                    }
+                                ),
+
+                                SectionHeaderTemplate = new DataTemplate(() =>
+                                    {
+                                        var label = new Label
+                                                    {
+                                                        FontSize = 16,
+                                                        FontAttributes = FontAttributes.Bold,
+                                                        BackgroundColor = Colors.LightGray,
+                                                        Padding = new Thickness(10, 4)
+                                                    };
+                                        label.SetBinding(Label.TextProperty, nameof(DynamicDataSection.Name));
+                                        label.SetBinding(AutomationIdProperty, new Binding(nameof(DynamicDataSection.Name), stringFormat: "DD {0}"));
+
+                                        return label;
+                                    }
+                                ),
+
+                                ItemTemplate = new DataTemplate(() =>
+                                    {
+                                        var label = new Label { FontSize = 14, Margin = new Thickness(16, 6) };
+                                        label.SetBinding(Label.TextProperty, nameof(VirtualScrollListItem.Name));
+                                        label.SetBinding(AutomationIdProperty, nameof(VirtualScrollListItem.Name));
+
+                                        return label;
+                                    }
+                                )
+                            };
+
+        var grid = new Grid
+                   {
+                       RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
+                   };
+        grid.Add(_statusLabel);
+        grid.Add(virtualScroll, 0, 1);
+
+        Content = grid;
+    }
+
+    public void SetStatus(string text) => _statusLabel.Text = text;
+}
+
+public class MutatingGroupedVirtualScrollPage : ContentPage
+{
+    private readonly Label _statusLabel;
+
+    public ObservableCollection<VirtualScrollSection> Sections { get; } = new(
+        new[] { "G1", "G2", "G3" }.Select(name =>
+            new VirtualScrollSection(name, Enumerable.Range(1, 3).Select(i => new VirtualScrollListItem($"{name}i{i}"))))
+    );
+
+    public MutatingGroupedVirtualScrollPage()
+    {
+        _statusLabel = new Label { AutomationId = "MutationStatusLabel", FontSize = 14, Text = "Running", Padding = new Thickness(16, 8) };
+
+        var adapter = VirtualScroll.CreateObservableCollectionAdapter(Sections, s => s.Items);
+
+        var virtualScroll = new VirtualScroll
+                            {
+                                AutomationId = "PushGroupedScroll",
+                                ItemsSource = adapter,
+
+                                HeaderTemplate = new DataTemplate(() => new Label
+                                    {
+                                        AutomationId = "PushGroupedHeader",
+                                        Text = "Grouped push header",
+                                        FontAttributes = FontAttributes.Bold,
+                                        HorizontalOptions = LayoutOptions.Center
+                                    }
+                                ),
+
+                                SectionHeaderTemplate = new DataTemplate(() =>
+                                    {
+                                        var label = new Label
+                                                    {
+                                                        FontSize = 16,
+                                                        FontAttributes = FontAttributes.Bold,
+                                                        BackgroundColor = Colors.LightGray,
+                                                        Padding = new Thickness(10, 4)
+                                                    };
+                                        label.SetBinding(Label.TextProperty, nameof(VirtualScrollSection.Name));
+                                        label.SetBinding(AutomationIdProperty, new Binding(nameof(VirtualScrollSection.Name), stringFormat: "PH {0}"));
+
+                                        return label;
+                                    }
+                                ),
+
+                                SectionFooterTemplate = new DataTemplate(() =>
+                                    {
+                                        var label = new Label { FontSize = 12, FontAttributes = FontAttributes.Italic, Padding = new Thickness(10, 2) };
+                                        label.SetBinding(Label.TextProperty, new Binding(nameof(VirtualScrollSection.Name), stringFormat: "end {0}"));
+                                        label.SetBinding(AutomationIdProperty, new Binding(nameof(VirtualScrollSection.Name), stringFormat: "PF {0}"));
+
+                                        return label;
+                                    }
+                                ),
+
+                                ItemTemplate = new DataTemplate(() =>
+                                    {
+                                        var label = new Label { FontSize = 14, Margin = new Thickness(16, 6) };
+                                        label.SetBinding(Label.TextProperty, nameof(VirtualScrollListItem.Name));
+                                        label.SetBinding(AutomationIdProperty, nameof(VirtualScrollListItem.Name));
+
+                                        return label;
+                                    }
+                                )
+                            };
+
+        var grid = new Grid
+                   {
+                       RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
+                   };
+        grid.Add(_statusLabel);
+        grid.Add(virtualScroll, 0, 1);
+
+        Content = grid;
+    }
+
+    public void SetStatus(string text) => _statusLabel.Text = text;
 }
 
 public class MutatingVirtualScrollPage : ContentPage

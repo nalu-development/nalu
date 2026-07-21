@@ -57,6 +57,9 @@
 
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.Maui" Version="13.0.0" />
+        <!-- Used by the VirtualScroll push-mutation harness to reproduce real-world
+             SourceCache + Group + Bind(out ReadOnlyObservableCollection) pipelines. -->
+        <PackageReference Include="DynamicData" Version="9.4.33" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="FFImageLoading.Maui" Version="1.3.2" />
         <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />

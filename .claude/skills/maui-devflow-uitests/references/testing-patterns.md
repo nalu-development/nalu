@@ -87,6 +87,12 @@ public class ExpanderTests(NaluApp app) : BaseUiTest(app)
 - Mutation-during-navigation regression harness: see `VirtualScrollPushMutationTests`
   (TestApp page pushes a VirtualScroll page while a UI-thread timer mutates the bound
   ObservableCollection through the push/pop animation; "Done N" label = survived).
+  It includes a DynamicData variant (SourceCache → Group → inner Binds into
+  ReadOnlyObservableCollections) whose >25-change Reset escalation reproduced a real
+  `NSInternalInconsistencyException` ("invalid number of sections") — fixed by applying
+  each adapter change set inside a single `PerformBatchUpdates` in
+  `VirtualScrollPlatformDataSourceNotifier`. When testing collection sources, always
+  include a scenario where a single changeset carries MANY changes (bursts + Reset).
 
 ## Layout assertions (Magnet, ViewBox, ExpanderViewBox…)
 
@@ -111,8 +117,13 @@ Symptom → likely cause:
 - Agent unreachable AND the red ResetButton overlay is missing on test pages → you are
   running a STALE binary (predates the DevFlow commits) or a Release build: `pkill -f
   Nalu.Maui.TestApp`, then rebuild with `"-t:Build;Run"` (plain `-t:Run` does NOT rebuild).
-- Healthcheck: use `curl http://localhost:9223/api/v1/agent/capabilities` — the root `/`
-  and `/json` return 404 BY DESIGN and are not valid probes.
+- Readiness after (re)launching the app: do NOT curl-probe ports. The MCP server auto-discovers
+  the agent — just issue a no-op MCP call (e.g. `maui_query` for `TestName`) and retry until it
+  responds; no `agentPort` parameter needed. `NaluApp` likewise self-discovers 9223 → 10223
+  (relaunch fallback when 9223 lingers in TIME_WAIT), so `dotnet test` needs no `DEVFLOW_PORT`
+  unless the port is truly custom. If a raw probe is ever needed:
+  `curl http://localhost:9223/api/v1/agent/capabilities` (the root `/` and `/json` return 404
+  BY DESIGN and are not valid probes).
 - The red dot bottom-right on test pages is the harness ResetButton, not a DevFlow indicator.
 
 ## Platform matrix discipline

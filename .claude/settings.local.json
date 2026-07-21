@@ -22,7 +22,12 @@
       "mcp__maui-devflow__maui_scroll",
       "Bash(DEVFLOW_PORT=10223 dotnet test UITests/UITests.DevFlow)",
       "Bash(iconv -f UTF-16LE -t UTF-8 /Users/alberto/github/nalu/UITests/UITests.DevFlow/bin/Debug/net10.0/TestResults/UITests.DevFlow_net10.0_arm64.log)",
-      "Bash(git -C /Users/alberto/github/nalu status --short)"
+      "Bash(git -C /Users/alberto/github/nalu status --short)",
+      "Bash(curl -s -m 3 http://localhost:9223/api/v1/agent/capabilities)",
+      "mcp__maui-devflow__maui_logs",
+      "Bash(curl -s https://api.nuget.org/v3-flatcontainer/dynamicdata/index.json)",
+      "Bash(python3 -c \"import json,sys; v=json.load\\(sys.stdin\\)['versions']; print\\([x for x in v if 'beta' not in x and 'preview' not in x][-5:]\\)\")",
+      "Bash(curl -s -m 3 http://localhost:10223/api/v1/agent/capabilities)"
     ]
   }
 }
