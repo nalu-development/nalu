@@ -212,6 +212,64 @@ public sealed class NaluApp : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Waits until the element's text stops changing (two identical consecutive reads),
+    /// e.g. for scroll-event counters to settle before asserting on them.
+    /// </summary>
+    public async Task<string?> WaitForStableTextAsync(string automationId, TimeSpan? timeout = null)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var effectiveTimeout = timeout ?? _defaultTimeout;
+        var previous = (await FindElementAsync(automationId).ConfigureAwait(false))?.Text;
+
+        while (true)
+        {
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+            var current = (await FindElementAsync(automationId).ConfigureAwait(false))?.Text;
+
+            if (current is not null && current == previous)
+            {
+                return current;
+            }
+
+            if (stopwatch.Elapsed >= effectiveTimeout)
+            {
+                throw new TimeoutException(
+                    $"Text of '{automationId}' did not stabilize within {effectiveTimeout.TotalSeconds:0.#}s. Last value: '{current}'");
+            }
+
+            previous = current;
+        }
+    }
+
+    /// <summary>Waits until the element's text satisfies the given predicate.</summary>
+    public async Task<string?> WaitForTextMatchAsync(string automationId, Func<string?, bool> predicate, TimeSpan? timeout = null)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var effectiveTimeout = timeout ?? _defaultTimeout;
+        string? lastText = null;
+
+        while (true)
+        {
+            var element = await FindElementAsync(automationId).ConfigureAwait(false);
+            lastText = element?.Text ?? lastText;
+
+            if (element is not null && predicate(element.Text))
+            {
+                return element.Text;
+            }
+
+            if (stopwatch.Elapsed >= effectiveTimeout)
+            {
+                throw new TimeoutException(
+                    $"Element '{automationId}' text did not satisfy the predicate within {effectiveTimeout.TotalSeconds:0.#}s. " +
+                    $"Last value: '{lastText ?? "<element not found>"}'");
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Reads a property of the underlying MAUI element (e.g. "Text", "IsVisible").</summary>
     public async Task<string?> GetPropertyAsync(string automationId, string propertyName, TimeSpan? timeout = null)
     {
@@ -221,6 +279,11 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>Scrolls (main scrollable when no AutomationId is provided).</summary>
+    /// <remarks>
+    /// Does NOT work on <c>VirtualScroll</c>: its platform root view is a container, not the
+    /// native scroll view, and the DevFlow delta-scroll silently no-ops on it.
+    /// Use <see cref="SwipeAsync"/> (or a page-side ScrollTo control) instead.
+    /// </remarks>
     public async Task ScrollAsync(string? automationId = null, double deltaX = 0, double deltaY = 0)
     {
         string? elementId = null;
@@ -232,6 +295,31 @@ public sealed class NaluApp : IAsyncLifetime
         }
 
         await _client.ScrollAsync(elementId, deltaX, deltaY).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Performs a swipe gesture on the element ("up"/"down"/"left"/"right").
+    /// This is the way to scroll a <c>VirtualScroll</c> by a delta (see <see cref="ScrollAsync"/> remarks).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Direction semantics (verified on iOS DevFlow preview.12): vertically, "up" scrolls FORWARD
+    /// (reveals content below); horizontally, "right" scrolls FORWARD (reveals content to the right).
+    /// </para>
+    /// <para>
+    /// Synthetic swipes move the scroll position and raise Scrolled events, but do NOT emulate
+    /// real touch physics: they cannot trigger pull-to-refresh, carousel paging snap, or
+    /// dragging started/ended platform callbacks.
+    /// </para>
+    /// </remarks>
+    public async Task SwipeAsync(string automationId, string direction, double? distance = null, int? durationMs = null)
+    {
+        var element = await WaitForElementAsync(automationId).ConfigureAwait(false);
+
+        if (!await _client.GestureAsync("swipe", element.Id, direction, distance, durationMs).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException($"Swipe {direction} on '{automationId}' (element {element.Id}) failed.");
+        }
     }
 
     /// <summary>Captures a PNG screenshot (useful when diagnosing failing tests).</summary>

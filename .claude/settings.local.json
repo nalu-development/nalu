@@ -12,7 +12,17 @@
       "Bash(curl -s -m 3 http://localhost:9223/)",
       "Bash(curl -s -m 3 http://localhost:9223/json)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" -m 3 http://localhost:9223/)",
-      "mcp__maui-devflow__maui_element"
+      "mcp__maui-devflow__maui_element",
+      "Bash(xcrun simctl *)",
+      "Bash(/usr/local/share/dotnet/packs/Microsoft.iOS.Sdk.net10.0_26.2/26.2.10191/tools/bin/mlaunch --launchsim /Users/alberto/github/nalu/Samples/Nalu.Maui.TestApp/bin/Debug/net10.0-ios/iossimulator-arm64/Nalu.Maui.TestApp.app --device=:v2:udid=5B9D794A-2184-4F80-8ABA-896479470D9E -sdk 26.2 --sdkroot /Applications/Xcode.app/Contents/Developer)",
+      "Bash(curl -s -m 5 http://localhost:9223/api/v1/agent/capabilities)",
+      "Bash(curl -s -m 5 http://localhost:10223/api/v1/agent/capabilities)",
+      "Bash(python3 -)",
+      "mcp__maui-devflow__maui_gesture",
+      "mcp__maui-devflow__maui_scroll",
+      "Bash(DEVFLOW_PORT=10223 dotnet test UITests/UITests.DevFlow)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 /Users/alberto/github/nalu/UITests/UITests.DevFlow/bin/Debug/net10.0/TestResults/UITests.DevFlow_net10.0_arm64.log)",
+      "Bash(git -C /Users/alberto/github/nalu status --short)"
     ]
   }
 }

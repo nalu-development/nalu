@@ -64,11 +64,29 @@ public class ExpanderTests(NaluApp app) : BaseUiTest(app)
 
 - Offscreen items/header/footer may not exist in the tree at all — that's virtualization working.
   Treat "not in tree" as "not materialized", not as a bug.
-- Reaching an offscreen element: loop `ScrollAsync(deltaY: …)` + `WaitForElementOrDefaultAsync`
-  with a bounded attempt count (see `FooterIsVisibleAfterScrollingToEnd`). Prefer
-  `ScrollAsync(itemIndex: …)` once its semantics are verified on the installed preview.
-- Materialization assertions (recycling checks) can count matching elements via the wrapper
-  (e.g. query by type) — a capability worth adding to `NaluApp` when needed.
+- **Delta-scroll does NOT work on VirtualScroll** (its platform root is a container view, not the
+  native scroll view; DevFlow reports success but nothing moves). Scroll with `SwipeAsync` or a
+  page-side `ScrollTo` control instead.
+- **Swipe direction semantics** (iOS, preview.12): vertical `"up"` scrolls FORWARD (reveals content
+  below); horizontal `"right"` scrolls FORWARD (reveals content to the right).
+- **Synthetic swipes have no touch physics**: they move the offset and raise `Scrolled`, but can
+  NEVER trigger pull-to-refresh, carousel paging snap, drag&drop, or the native dragging
+  callbacks behind `OnScrollStarted`/`OnScrollEnded`. Test those surfaces through page-side
+  helpers (e.g. a button invoking `IVirtualScrollController.Refresh`, carousel `CurrentRange`
+  buttons) and document the gesture path as not harness-testable.
+- **Removed/replaced cells LINGER in the visual tree** (recycler keeps detached views around).
+  Never assert "element gone" after a removal — assert the layout shift of the survivors instead
+  (e.g. `WaitForBoundsAsync("Item 2", b => b.Y == oldItem1.Y)`).
+- `ScrollTo` to a **section header** settles asynchronously on iOS (two-phase scroll + offset
+  fix-up ~100-300ms after the tap): assert with `WaitForBoundsAsync`, not an immediate read.
+- After a swipe, the scroll may still be settling: before reading scroll-dependent state
+  (visible range, counters), wait with `WaitForStableBoundsAsync`/`WaitForStableTextAsync`.
+- The fading edge only fades edges that have scrollable content beyond them (no leading fade at
+  offset 0). Pixel-assert it with `GetPixelColorAsync` near the trailing edge; element screenshots
+  do capture the mask.
+- Mutation-during-navigation regression harness: see `VirtualScrollPushMutationTests`
+  (TestApp page pushes a VirtualScroll page while a UI-thread timer mutates the bound
+  ObservableCollection through the push/pop animation; "Done N" label = survived).
 
 ## Layout assertions (Magnet, ViewBox, ExpanderViewBox…)
 
