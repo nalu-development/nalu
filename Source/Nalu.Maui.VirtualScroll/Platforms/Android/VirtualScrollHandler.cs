@@ -532,6 +532,34 @@ public partial class VirtualScrollHandler
         var position = scrollToArgs.Position;
         var animated = scrollToArgs.Animated;
 
+        // Global header/footer targets are addressed with the VirtualScrollRange sentinel
+        // section indices: in the flattened list they are simply the first/last position.
+        if (sectionIndex is VirtualScrollRange.GlobalHeaderSectionIndex or VirtualScrollRange.GlobalFooterSectionIndex)
+        {
+            var globalLayoutInfo = virtualScroll as IVirtualScrollLayoutInfo;
+            var isGlobalHeader = sectionIndex == VirtualScrollRange.GlobalHeaderSectionIndex;
+
+            if ((isGlobalHeader ? globalLayoutInfo?.HasGlobalHeader == true : globalLayoutInfo?.HasGlobalFooter == true)
+                && handler._recyclerView is { } globalRecyclerView)
+            {
+                var globalFlattenedIndex = isGlobalHeader ? 0 : handler._flattenedAdapter.GetItemCount() - 1;
+
+                if (globalFlattenedIndex >= 0)
+                {
+                    if (animated)
+                    {
+                        globalRecyclerView.ScrollHelper.AnimateScrollToPosition(globalFlattenedIndex, position);
+                    }
+                    else
+                    {
+                        globalRecyclerView.ScrollHelper.JumpScrollToPosition(globalFlattenedIndex, position);
+                    }
+                }
+            }
+
+            return;
+        }
+
         if (sectionIndex < 0 || virtualScroll.Adapter is null)
         {
             return;
