@@ -110,7 +110,11 @@ public interface IVirtualScroll : IView
     /// <summary>
     /// Scrolls to the specified item in the virtual scroll.
     /// </summary>
-    /// <param name="sectionIndex">The index of the section.</param>
+    /// <param name="sectionIndex">
+    /// The index of the section. Use <see cref="VirtualScrollRange.GlobalHeaderSectionIndex"/> or
+    /// <see cref="VirtualScrollRange.GlobalFooterSectionIndex"/> to scroll to the global header/footer
+    /// (the <paramref name="itemIndex"/> is ignored for these targets).
+    /// </param>
     /// <param name="itemIndex">The index of the item within the section. Use -1 to scroll to the section header.</param>
     /// <param name="position">The position to scroll to. Defaults to <see cref="Microsoft.Maui.Controls.ScrollToPosition.MakeVisible"/>.</param>
     /// <param name="animated">Whether the scroll should be animated. Defaults to <c>true</c>.</param>

@@ -666,6 +666,27 @@ public partial class VirtualScrollHandler
         var position = scrollToArgs.Position;
         var animated = scrollToArgs.Animated;
 
+        // Global header/footer targets are addressed with the VirtualScrollRange sentinel
+        // section indices (GlobalHeaderSectionIndex / GlobalFooterSectionIndex).
+        if (sectionIndex is VirtualScrollRange.GlobalHeaderSectionIndex or VirtualScrollRange.GlobalFooterSectionIndex)
+        {
+            var globalLayoutInfo = virtualScroll as IVirtualScrollLayoutInfo;
+            var isGlobalHeader = sectionIndex == VirtualScrollRange.GlobalHeaderSectionIndex;
+
+            if (isGlobalHeader ? globalLayoutInfo?.HasGlobalHeader == true : globalLayoutInfo?.HasGlobalFooter == true)
+            {
+                handler.ScrollToSupplementary(
+                    isGlobalHeader ? SupplementaryScrollTarget.GlobalHeader : SupplementaryScrollTarget.GlobalFooter,
+                    0,
+                    0,
+                    position,
+                    animated
+                );
+            }
+
+            return;
+        }
+
         if (sectionIndex < 0 || virtualScroll.Adapter is null)
         {
             return;
@@ -719,11 +740,44 @@ public partial class VirtualScrollHandler
             indexPath = NSIndexPath.FromItemSection(itemIndex, sectionIndex);
         }
         
+        var targetSection = (int) indexPath.Section;
+        var targetItem = (int) indexPath.Item;
+
+        if (position == ScrollToPosition.MakeVisible)
+        {
+            // MakeVisible is path-dependent (minimal scroll): UICollectionView.ScrollToItem
+            // over/undershoots with estimated far-away sizes and cannot be corrected afterwards
+            // without violating the "don't move when already visible" contract. Compute the
+            // offset directly instead, refining as the region gets measured.
+            handler.ScrollToSupplementary(SupplementaryScrollTarget.Item, targetSection, targetItem, position, animated);
+
+            return;
+        }
+
         // Convert ScrollToPosition to UICollectionViewScrollPosition
         var scrollPosition = position.ToCollectionViewScrollPosition(GetScrollDirection(collectionView), false);
+        var originalOffset = collectionView.ContentOffset;
 
         collectionView.ScrollToItem(indexPath, scrollPosition, animated);
+
+        // Estimated far-away sizes make ScrollToItem land imprecisely: refine once settled.
+        handler.AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget.Item, targetSection, targetItem, position, originalOffset, collectionView.ContentOffset, checksLeft: 25);
     }
+
+    private enum SupplementaryScrollTarget
+    {
+        SectionHeader,
+        GlobalHeader,
+        GlobalFooter,
+        Item
+    }
+
+    private static NSString GetSupplementaryElementKind(SupplementaryScrollTarget target) => target switch
+    {
+        SupplementaryScrollTarget.GlobalHeader => VirtualScrollPlatformLayoutFactory.NSElementKindGlobalHeader,
+        SupplementaryScrollTarget.GlobalFooter => VirtualScrollPlatformLayoutFactory.NSElementKindGlobalFooter,
+        _ => VirtualScrollPlatformLayoutFactory.NSElementKindSectionHeader
+    };
 
     /// <summary>
     /// Scrolls so that the header of the given section satisfies <paramref name="position"/>.
@@ -741,18 +795,45 @@ public partial class VirtualScrollHandler
         var collectionView = PlatformCollectionView;
         var itemCount = VirtualView?.Adapter?.GetItemCount(sectionIndex) ?? 0;
 
-        if (itemCount > 0)
+        // MakeVisible is path-dependent: anchoring the section's first item first would
+        // over-scroll and could not be undone. Use the direct-offset route instead.
+        if (itemCount == 0 || position == ScrollToPosition.MakeVisible)
         {
-            var scrollDirection = GetScrollDirection(collectionView);
-            var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
-            collectionView.ScrollToItem(NSIndexPath.FromItemSection(0, sectionIndex), scrollPosition, animated);
+            ScrollToSupplementary(SupplementaryScrollTarget.SectionHeader, sectionIndex, 0, position, animated);
+
+            return;
         }
 
+        var scrollDirection = GetScrollDirection(collectionView);
+        var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
+        var originalOffset = collectionView.ContentOffset;
+        collectionView.ScrollToItem(NSIndexPath.FromItemSection(0, sectionIndex), scrollPosition, animated);
+
         // 25 x 80ms ≈ 2s upper bound for the settle wait (animated scrolls take ~300-500ms).
-        AdjustOffsetToSectionHeaderWhenSettled(sectionIndex, position, collectionView.ContentOffset, checksLeft: 25);
+        AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget.SectionHeader, sectionIndex, 0, position, originalOffset, collectionView.ContentOffset, checksLeft: 25);
     }
 
-    private void AdjustOffsetToSectionHeaderWhenSettled(int sectionIndex, ScrollToPosition position, CGPoint lastOffset, int checksLeft)
+    /// <summary>
+    /// Scrolls so that the given element satisfies <paramref name="position"/> by computing the
+    /// content offset directly from its layout attributes.
+    /// </summary>
+    /// <remarks>
+    /// The first hop may rely on estimate-based attributes; the settle + adjust passes then
+    /// converge on the exact offset as the region gets measured.
+    /// </remarks>
+    private void ScrollToSupplementary(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, bool animated)
+    {
+        var collectionView = PlatformCollectionView;
+
+        // MakeVisible semantics must be evaluated against the offset the gesture STARTED from:
+        // the estimate-based first hop may move the target into view, and deciding against the
+        // moved offset would freeze there instead of converging on the minimal-scroll edge.
+        var originalOffset = collectionView.ContentOffset;
+        AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated, attemptsLeft: 1);
+        AdjustOffsetToSupplementaryWhenSettled(target, sectionIndex, itemIndex, position, originalOffset, collectionView.ContentOffset, checksLeft: 25);
+    }
+
+    private void AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, CGPoint originalOffset, CGPoint lastOffset, int checksLeft)
         => DispatchQueue.MainQueue.DispatchAfter(
             new DispatchTime(DispatchTime.Now, 80_000_000L /* 80ms in ns */),
             () =>
@@ -767,83 +848,140 @@ public partial class VirtualScrollHandler
 
                 if (settled || checksLeft <= 0)
                 {
-                    AdjustOffsetToSectionHeader(sectionIndex, position, attemptsLeft: 3);
+                    AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated: false, attemptsLeft: 3);
                 }
                 else
                 {
-                    AdjustOffsetToSectionHeaderWhenSettled(sectionIndex, position, offset, checksLeft - 1);
+                    AdjustOffsetToSupplementaryWhenSettled(target, sectionIndex, itemIndex, position, originalOffset, offset, checksLeft - 1);
                 }
             }
         );
 
-    private void AdjustOffsetToSectionHeader(int sectionIndex, ScrollToPosition position, int attemptsLeft)
+    private void AdjustOffsetToSupplementary(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, CGPoint originalOffset, bool animated, int attemptsLeft)
     {
         if (_collectionView is not { } collectionView
-            || VirtualView?.Adapter is not { } adapter
-            || sectionIndex >= adapter.GetSectionCount())
+            || VirtualView?.Adapter is not { } adapter)
         {
             return;
         }
 
         collectionView.LayoutIfNeeded();
 
-        var attributes = collectionView.GetLayoutAttributesForSupplementaryElement(
-            UICollectionElementKindSectionKey.Header,
-            NSIndexPath.FromItemSection(0, sectionIndex));
+        UICollectionViewLayoutAttributes? attributes;
+
+        if (target == SupplementaryScrollTarget.Item)
+        {
+            if (sectionIndex >= adapter.GetSectionCount() || itemIndex >= adapter.GetItemCount(sectionIndex))
+            {
+                return;
+            }
+
+            attributes = collectionView.GetLayoutAttributesForItem(NSIndexPath.FromItemSection(itemIndex, sectionIndex));
+
+            if (attributes is null)
+            {
+                return;
+            }
+        }
+        else if (target == SupplementaryScrollTarget.SectionHeader && sectionIndex >= adapter.GetSectionCount())
+        {
+            return;
+        }
+        else
+        {
+            // Global boundary items are addressed with a single-index path, section items with (item, section).
+            var indexPath = target == SupplementaryScrollTarget.SectionHeader
+                ? NSIndexPath.FromItemSection(0, sectionIndex)
+                : NSIndexPath.FromIndex(0);
+
+            attributes = collectionView.GetLayoutAttributesForSupplementaryElement(
+                GetSupplementaryElementKind(target),
+                indexPath);
+        }
 
         if (attributes is null)
         {
+            // The layout may not provide attributes for far-away boundary elements yet:
+            // jump towards the content extreme where the element lives; the following
+            // settle/adjust passes refine the offset once the region is measured.
+            if (target != SupplementaryScrollTarget.SectionHeader)
+            {
+                var extremeOffset = collectionView.ContentOffset;
+                var extremeInset = collectionView.AdjustedContentInset;
+
+                if (GetScrollDirection(collectionView) == UICollectionViewScrollDirection.Vertical)
+                {
+                    extremeOffset.Y = target == SupplementaryScrollTarget.GlobalHeader
+                        ? (nfloat) (-extremeInset.Top)
+                        : (nfloat) Math.Max(collectionView.ContentSize.Height + extremeInset.Bottom - collectionView.Bounds.Height, -extremeInset.Top);
+                }
+                else
+                {
+                    extremeOffset.X = target == SupplementaryScrollTarget.GlobalHeader
+                        ? (nfloat) (-extremeInset.Left)
+                        : (nfloat) Math.Max(collectionView.ContentSize.Width + extremeInset.Right - collectionView.Bounds.Width, -extremeInset.Left);
+                }
+
+                collectionView.SetContentOffset(extremeOffset, animated);
+            }
+
             return;
         }
 
         var contentOffset = collectionView.ContentOffset;
         var inset = collectionView.AdjustedContentInset;
-        double target;
+        double targetOffset;
         double current;
 
         if (GetScrollDirection(collectionView) == UICollectionViewScrollDirection.Vertical)
         {
             current = contentOffset.Y;
-            target = ComputeSupplementaryTargetOffset(
-                position, attributes.Frame.Y, attributes.Frame.Height, current,
+            targetOffset = ComputeSupplementaryTargetOffset(
+                position, attributes.Frame.Y, attributes.Frame.Height, originalOffset.Y,
                 collectionView.Bounds.Height, inset.Top, inset.Bottom, collectionView.ContentSize.Height);
         }
         else
         {
             current = contentOffset.X;
-            target = ComputeSupplementaryTargetOffset(
-                position, attributes.Frame.X, attributes.Frame.Width, current,
+            targetOffset = ComputeSupplementaryTargetOffset(
+                position, attributes.Frame.X, attributes.Frame.Width, originalOffset.X,
                 collectionView.Bounds.Width, inset.Left, inset.Right, collectionView.ContentSize.Width);
         }
 
-        if (Math.Abs(target - current) < 0.5)
+        if (Math.Abs(targetOffset - current) < 0.5)
         {
             return;
         }
 
         if (GetScrollDirection(collectionView) == UICollectionViewScrollDirection.Vertical)
         {
-            contentOffset.Y = (nfloat) target;
+            contentOffset.Y = (nfloat) targetOffset;
         }
         else
         {
-            contentOffset.X = (nfloat) target;
+            contentOffset.X = (nfloat) targetOffset;
         }
 
-        collectionView.SetContentOffset(contentOffset, false);
+        collectionView.SetContentOffset(contentOffset, animated);
 
         if (attemptsLeft > 1)
         {
             // The jump may materialize cells whose measured sizes shift the layout again.
-            DispatchQueue.MainQueue.DispatchAsync(() => AdjustOffsetToSectionHeader(sectionIndex, position, attemptsLeft - 1));
+            DispatchQueue.MainQueue.DispatchAsync(() => AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated: false, attemptsLeft - 1));
         }
     }
 
+    /// <remarks>
+    /// <paramref name="referenceOffset"/> is the offset the ScrollTo gesture STARTED from —
+    /// MakeVisible ("minimal scroll") is defined relative to it, so that the iterative
+    /// estimate-correcting hops neither freeze mid-way nor move when the element was
+    /// already visible at the start.
+    /// </remarks>
     private static double ComputeSupplementaryTargetOffset(
         ScrollToPosition position,
         double elementStart,
         double elementSize,
-        double currentOffset,
+        double referenceOffset,
         double viewportSize,
         double leadingInset,
         double trailingInset,
@@ -857,11 +995,11 @@ public partial class VirtualScrollHandler
         {
             ScrollToPosition.Center => elementStart + (elementSize / 2) - leadingInset - (visibleSize / 2),
             ScrollToPosition.End => elementStart + elementSize - viewportSize + trailingInset,
-            ScrollToPosition.MakeVisible when elementStart >= currentOffset + leadingInset
-                                              && elementStart + elementSize <= currentOffset + viewportSize - trailingInset
-                => currentOffset,
-            ScrollToPosition.MakeVisible when elementStart + elementSize > currentOffset + viewportSize - trailingInset
-                                              && elementStart >= currentOffset + leadingInset
+            ScrollToPosition.MakeVisible when elementStart >= referenceOffset + leadingInset
+                                              && elementStart + elementSize <= referenceOffset + viewportSize - trailingInset
+                => referenceOffset,
+            ScrollToPosition.MakeVisible when elementStart + elementSize > referenceOffset + viewportSize - trailingInset
+                                              && elementStart >= referenceOffset + leadingInset
                 => elementStart + elementSize - viewportSize + trailingInset,
             _ => elementStart - leadingInset
         };

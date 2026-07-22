@@ -33,7 +33,8 @@
       "mcp__maui-devflow__maui_hittest",
       "mcp__maui-devflow__maui_select_agent",
       "Bash(git stash *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(grep -v \"^  *a \\\\|^--$\")"
     ]
   }
 }
