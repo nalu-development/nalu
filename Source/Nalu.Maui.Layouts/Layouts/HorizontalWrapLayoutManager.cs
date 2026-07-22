@@ -10,6 +10,16 @@ namespace Nalu;
 public class HorizontalWrapLayoutManager : LayoutManager
 {
     /// <summary>
+    /// Tolerance applied to the wrap decision in BOTH the measure and arrange passes.
+    /// The arrange width can differ from the measured constraint by sub-point amounts
+    /// (native frames are pixel-grid aligned, e.g. 1/3 pt on 3x displays): without a
+    /// tolerance a row summing exactly to the measured width re-wraps during arrange,
+    /// overflowing the measured height. Half a point absorbs any pixel rounding while
+    /// remaining visually imperceptible.
+    /// </summary>
+    private const double _wrapTolerance = 0.5;
+
+    /// <summary>
     /// Gets the <see cref="IWrapLayout"/> associated with this layout manager.
     /// </summary>
     public new IWrapLayout Layout { get; }
@@ -65,7 +75,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
             // Check if we need to wrap to the next line
             var widthWithSpacing = isFirstInRow ? childWidth : childWidth + horizontalSpacing;
 
-            if (canWrap && !isFirstInRow && currentRowWidth + widthWithSpacing > availableWidth)
+            if (canWrap && !isFirstInRow && currentRowWidth + widthWithSpacing > availableWidth + _wrapTolerance)
             {
                 // Wrap to next line
                 totalHeight += currentRowHeight + verticalSpacing;
@@ -197,7 +207,7 @@ public class HorizontalWrapLayoutManager : LayoutManager
             var widthWithSpacing = isFirstInRow ? desiredWidth : desiredWidth + horizontalSpacing;
 
             // Check if we need to wrap to the next line
-            if (canWrap && !isFirstInRow && currentRow.TotalWidth + widthWithSpacing > availableWidth)
+            if (canWrap && !isFirstInRow && currentRow.TotalWidth + widthWithSpacing > availableWidth + _wrapTolerance)
             {
                 // Finalize current row and start new one
                 rows.Add(currentRow);

@@ -10,6 +10,16 @@ namespace Nalu;
 public class VerticalWrapLayoutManager : LayoutManager
 {
     /// <summary>
+    /// Tolerance applied to the wrap decision in BOTH the measure and arrange passes.
+    /// The arrange height can differ from the measured constraint by sub-point amounts
+    /// (native frames are pixel-grid aligned, e.g. 1/3 pt on 3x displays): without a
+    /// tolerance a column summing exactly to the measured height re-wraps during arrange,
+    /// overflowing the measured width. Half a point absorbs any pixel rounding while
+    /// remaining visually imperceptible.
+    /// </summary>
+    private const double _wrapTolerance = 0.5;
+
+    /// <summary>
     /// Gets the <see cref="IWrapLayout"/> associated with this layout manager.
     /// </summary>
     public new IWrapLayout Layout { get; }
@@ -65,7 +75,7 @@ public class VerticalWrapLayoutManager : LayoutManager
             // Check if we need to wrap to the next column
             var heightWithSpacing = isFirstInColumn ? childHeight : childHeight + verticalSpacing;
 
-            if (canWrap && !isFirstInColumn && currentColumnHeight + heightWithSpacing > availableHeight)
+            if (canWrap && !isFirstInColumn && currentColumnHeight + heightWithSpacing > availableHeight + _wrapTolerance)
             {
                 // Wrap to next column
                 totalWidth += currentColumnWidth + horizontalSpacing;
@@ -197,7 +207,7 @@ public class VerticalWrapLayoutManager : LayoutManager
             var heightWithSpacing = isFirstInColumn ? desiredHeight : desiredHeight + verticalSpacing;
 
             // Check if we need to wrap to the next column
-            if (canWrap && !isFirstInColumn && currentColumn.TotalHeight + heightWithSpacing > availableHeight)
+            if (canWrap && !isFirstInColumn && currentColumn.TotalHeight + heightWithSpacing > availableHeight + _wrapTolerance)
             {
                 // Finalize current column and start new one
                 columns.Add(currentColumn);

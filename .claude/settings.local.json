@@ -31,7 +31,9 @@
       "mcp__maui-devflow__maui_list_agents",
       "Bash(dotnet tool *)",
       "mcp__maui-devflow__maui_hittest",
-      "mcp__maui-devflow__maui_select_agent"
+      "mcp__maui-devflow__maui_select_agent",
+      "Bash(git stash *)",
+      "Bash(git checkout *)"
     ]
   }
 }
