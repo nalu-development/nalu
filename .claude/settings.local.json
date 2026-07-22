@@ -27,7 +27,11 @@
       "mcp__maui-devflow__maui_logs",
       "Bash(curl -s https://api.nuget.org/v3-flatcontainer/dynamicdata/index.json)",
       "Bash(python3 -c \"import json,sys; v=json.load\\(sys.stdin\\)['versions']; print\\([x for x in v if 'beta' not in x and 'preview' not in x][-5:]\\)\")",
-      "Bash(curl -s -m 3 http://localhost:10223/api/v1/agent/capabilities)"
+      "Bash(curl -s -m 3 http://localhost:10223/api/v1/agent/capabilities)",
+      "mcp__maui-devflow__maui_list_agents",
+      "Bash(dotnet tool *)",
+      "mcp__maui-devflow__maui_hittest",
+      "mcp__maui-devflow__maui_select_agent"
     ]
   }
 }

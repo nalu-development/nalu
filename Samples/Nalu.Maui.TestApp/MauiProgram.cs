@@ -44,6 +44,12 @@ public static class MauiProgram
                .AddSingleton<TimeProvider>(TimeProvider.System)
                .AddSingleton<IPreferences>(Preferences.Default);
 
+#if IOS && !MACCATALYST
+        // Receives background HTTP responses whose originating request no longer exists
+        // (app relaunched): displayed by the manual "Background Http Tests" page.
+        builder.Services.AddSingleton<INSUrlBackgroundSessionLostMessageHandler, Tests.BackgroundHttpLostMessageHandler>();
+#endif
+
 #if DEBUG
         builder.Logging.AddDebug();
         builder.Logging.AddSimpleConsole();

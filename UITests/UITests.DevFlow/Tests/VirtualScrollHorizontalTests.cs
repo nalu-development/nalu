@@ -98,34 +98,42 @@ public class VirtualScrollHorizontalTests(NaluApp app) : BaseUiTest(app)
     {
         await OpenPageAsync();
 
-        // At scroll offset 0 only the TRAILING (right) edge fades: sample near it, fading off.
+        // Differential sampling: compare a pixel deep inside the 60-unit trailing fade zone
+        // with one outside it, in the SAME state. This is robust across machines: no
+        // absolute colors (theme-independent), no viewport-relative positions that could
+        // land on text glyphs (y=12 is above the vertically-centered item text), and no
+        // cross-screenshot comparisons of the same point.
         var bounds = await App.GetBoundsAsync("HScroll");
-        var sampleY = bounds.Height / 2;
-        var trailingX = bounds.Width - 4;
-        var trailingBefore = await App.GetPixelColorAsync("HScroll", trailingX, sampleY);
-        var leadingBefore = await App.GetPixelColorAsync("HScroll", 4, sampleY);
-        var centerBefore = await App.GetPixelColorAsync("HScroll", bounds.Width / 2, sampleY);
+        const double sampleY = 12;
+        var edgeX = bounds.Width - 3;
+        var innerX = bounds.Width - 90;
+
+        // Fading off: the trailing area is uniform item background.
+        var innerColor = await App.GetPixelColorAsync("HScroll", innerX, sampleY);
+        Delta(await App.GetPixelColorAsync("HScroll", edgeX, sampleY), innerColor)
+            .Should().BeLessThan(25, "without fading the trailing area is uniform");
 
         await App.TapAsync("ToggleFadingButton");
         await App.WaitForTextAsync("FadingStateLabel", "Fading: 60");
 
-        // The faded edge blends the item color towards the background: the pixel must change.
+        // Fading on: the edge pixel blends towards the page background, the inner one does not.
         await App.WaitForPixelColorAsync(
-            "HScroll", trailingX, sampleY,
-            c => Delta(c, trailingBefore) > 30);
+            "HScroll", edgeX, sampleY,
+            c => Delta(c, innerColor) > 40);
+        Delta(await App.GetPixelColorAsync("HScroll", innerX, sampleY), innerColor)
+            .Should().BeLessThan(25, "the fade must not affect pixels outside the fade zone");
 
-        // The leading edge (nothing scrolled past yet) and the center must be unaffected.
-        Delta(await App.GetPixelColorAsync("HScroll", 4, sampleY), leadingBefore)
-            .Should().BeLessThan(30, "there is no leading fade at scroll offset 0");
-        Delta(await App.GetPixelColorAsync("HScroll", bounds.Width / 2, sampleY), centerBefore)
-            .Should().BeLessThan(30, "the fading edge must not affect the center of the viewport");
+        // At scroll offset 0 there is no LEADING fade: the header area stays uniform.
+        var leadingInner = await App.GetPixelColorAsync("HScroll", 40, sampleY);
+        Delta(await App.GetPixelColorAsync("HScroll", 3, sampleY), leadingInner)
+            .Should().BeLessThan(25, "there is no leading fade at scroll offset 0");
 
-        // Toggling back restores the edge.
+        // Toggling back restores a uniform trailing edge.
         await App.TapAsync("ToggleFadingButton");
         await App.WaitForTextAsync("FadingStateLabel", "Fading: 0");
         await App.WaitForPixelColorAsync(
-            "HScroll", trailingX, sampleY,
-            c => Delta(c, trailingBefore) < 20);
+            "HScroll", edgeX, sampleY,
+            c => Delta(c, innerColor) < 25);
 
         static int Delta((byte R, byte G, byte B) a, (byte R, byte G, byte B) b)
             => Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B);

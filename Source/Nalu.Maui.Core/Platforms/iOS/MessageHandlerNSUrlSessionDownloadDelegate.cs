@@ -141,9 +141,14 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (contentPath != null)
         {
+            // Download tasks only: their responses land in DidFinishDownloading, which this
+            // delegate handles. Memory-map the body file so large payloads stay off the heap.
             var fileUrl = NSUrl.CreateFileUrl(contentPath, null);
-            task = Session.CreateUploadTask(nativeHttpRequest, fileUrl);
-            Logger.LogDebug("Created upload task for {RequestName} with content stored in {BodyPath}", requestIdentifier, contentPath);
+            // NSDataReadingOptions.Mapped == NSDataReadingMappedIfSafe
+            nativeHttpRequest.Body = NSData.FromUrl(fileUrl, NSDataReadingOptions.Mapped, out var bodyError)
+                                     ?? throw new HttpRequestException($"Failed to read request body file '{contentPath}': {FormatNSError(bodyError)}");
+            task = Session.CreateDownloadTask(nativeHttpRequest);
+            Logger.LogDebug("Created download task for {RequestName} with content stored in {BodyPath}", requestIdentifier, contentPath);
         }
         else
         {
@@ -205,7 +210,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (error != null)
         {
-            Logger.LogError(new InvalidOperationException(error.ToString()), "Exception in DidBecomeInvalid");
+            Logger.LogError(new InvalidOperationException(FormatNSError(error)), "Exception in DidBecomeInvalid");
         }
     }
 
@@ -255,13 +260,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         switch (task.State)
         {
             case NSUrlSessionTaskState.Running:
-                Logger.LogError("Task {RequestIdentifier} completed callback invoked with running state: {Error}", requestIdentifier, error?.ToString());
+                Logger.LogError("Task {RequestIdentifier} completed callback invoked with running state: {Error}", requestIdentifier, FormatNSError(error));
                 handle.ResponseCompletionSource.TrySetException(new InvalidOperationException("Task completed callback invoked with running state"));
                 CompleteAndRemoveHandle(handle);
 
                 break;
             case NSUrlSessionTaskState.Suspended:
-                Logger.LogError("Task {RequestIdentifier} completed callback invoked with suspended state: {Error}", requestIdentifier, error?.ToString());
+                Logger.LogError("Task {RequestIdentifier} completed callback invoked with suspended state: {Error}", requestIdentifier, FormatNSError(error));
                 handle.ResponseCompletionSource.TrySetException(new InvalidOperationException("Task completed callback invoked with suspended state"));
                 CompleteAndRemoveHandle(handle);
 
@@ -282,8 +287,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                     }
                     else
                     {
-                        var e = task.Error;
-                        var msg = e?.ToString();
+                        // NSError.ToString() is just LocalizedDescription (e.g. a bare "unknown error"
+                        // for NSURLErrorDomain -1): surface domain, code and the underlying error chain.
+                        var msg = FormatNSError(task.Error);
                         Logger.LogDebug("Task {RequestIdentifier} completed with error: {Error}", requestIdentifier, msg);
                         handle.ResponseCompletionSource.TrySetException(new HttpRequestException(msg));
                     }
@@ -705,6 +711,47 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         requestIdentifier = null;
 
         return false;
+    }
+
+    private static readonly NSString _failingUrlErrorKey = new("NSErrorFailingURLStringKey");
+
+    /// <summary>
+    /// Formats an <see cref="NSError"/> with its domain, code, failing URL and underlying error
+    /// chain: <c>NSError.ToString()</c> only returns <c>LocalizedDescription</c>, which for
+    /// e.g. <c>NSURLErrorDomain</c> code -1 is a useless bare "unknown error".
+    /// </summary>
+    private static string FormatNSError(NSError? error)
+    {
+        if (error is null)
+        {
+            return "unknown error";
+        }
+
+        var builder = new StringBuilder();
+        AppendNSError(builder, error, 0);
+
+        return builder.ToString();
+    }
+
+    private static void AppendNSError(StringBuilder builder, NSError error, int depth)
+    {
+        builder.Append(error.LocalizedDescription)
+               .Append(" [")
+               .Append(error.Domain)
+               .Append(' ')
+               .Append(error.Code)
+               .Append(']');
+
+        if (error.UserInfo?[_failingUrlErrorKey] is { } failingUrl)
+        {
+            builder.Append(" Url=").Append(failingUrl);
+        }
+
+        if (depth < 3 && error.UserInfo?[NSError.UnderlyingErrorKey] is NSError underlyingError)
+        {
+            builder.Append(" <- ");
+            AppendNSError(builder, underlyingError, depth + 1);
+        }
     }
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate> CreateEmptyLogger()
