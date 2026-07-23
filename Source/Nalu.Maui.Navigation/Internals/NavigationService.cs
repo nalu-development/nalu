@@ -50,6 +50,19 @@ internal class NavigationService : INavigationService, IDisposable
         _semaphore.Dispose();
     }
 
+    /// <summary>
+    /// Drops the reference to a disposed shell's proxy: the navigation service is a singleton,
+    /// so keeping it alive would root the whole disposed shell (and its pages) until the next
+    /// shell initializes.
+    /// </summary>
+    internal void OnShellProxyDisposed(IShellProxy shellProxy)
+    {
+        if (ReferenceEquals(_shellProxy, shellProxy))
+        {
+            _shellProxy = null;
+        }
+    }
+
     public async Task InitializeAsync(IShellProxy shellProxy, string contentSegmentName, object? intent)
     {
         _shellProxy = shellProxy;

@@ -14,7 +14,7 @@ public class MainPage : ContentPage
 
         var grid = new Grid
                    {
-                       RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
+                       RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
                        RowSpacing = 8
                    };
 
@@ -64,7 +64,7 @@ public class MainPage : ContentPage
 
         var runGrid = new Grid
                       {
-                          ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto)],
+                          ColumnDefinitions = [new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Auto)],
                           Padding = new Thickness(16, 8),
                           Margin = new Thickness(0, 8),
                           BackgroundColor = Colors.Beige,
@@ -73,7 +73,50 @@ public class MainPage : ContentPage
         runGrid.Add(entry);
         runGrid.Add(button, 1);
 
+        // Leak verification: forces GC and reports LeakTracker survivors ("Leaked:0" when clean).
+        var leaksLabel = new Label
+                         {
+                             AutomationId = "LeaksLabel",
+                             FontSize = 10,
+                             VerticalOptions = LayoutOptions.Center
+                         };
+        var checkLeaksButton = new Button
+                               {
+                                   Text = "GC",
+                                   AutomationId = "CheckLeaksButton",
+                                   FontSize = 10,
+                                   VerticalOptions = LayoutOptions.Center
+                               };
+
+        checkLeaksButton.Clicked += async (_, _) =>
+        {
+            leaksLabel.Text = "checking";
+            leaksLabel.Text = await Task.Run(LeakTracker.CheckAsync);
+        };
+
+        // Invisible companion for tests: clears surviving entries after a KNOWN platform
+        // leak has been asserted, so later scenarios start from a clean tracker.
+        var forgiveLeaksButton = new Button
+                                 {
+                                     Text = "F",
+                                     AutomationId = "ForgiveLeaksButton",
+                                     FontSize = 10,
+                                     Opacity = 0.2,
+                                     VerticalOptions = LayoutOptions.Center
+                                 };
+        forgiveLeaksButton.Clicked += (_, _) =>
+        {
+            LeakTracker.Forgive();
+            leaksLabel.Text = "forgiven";
+        };
+
+        runGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        runGrid.Add(forgiveLeaksButton, 3);
+        runGrid.Add(checkLeaksButton, 2);
         grid.Add(runGrid, 0, 1);
+
+        leaksLabel.HorizontalOptions = LayoutOptions.Center;
+        grid.Add(leaksLabel, 0, 2);
 
         var virtualScroll = new VirtualScroll
                             {
@@ -93,7 +136,7 @@ public class MainPage : ContentPage
                                 ),
                             };
 
-        grid.Add(virtualScroll, 0, 2);
+        grid.Add(virtualScroll, 0, 3);
 
         Content = grid;
     }

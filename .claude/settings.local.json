@@ -41,7 +41,8 @@
       "mcp__maui-devflow__maui_set_property",
       "Bash(curl -s http://localhost:9223/api/v1/agent/status)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=1\\)\\)\")",
-      "Bash(break)"
+      "Bash(break)",
+      "mcp__maui-devflow__maui_get_property"
     ]
   }
 }

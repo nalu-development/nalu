@@ -38,6 +38,21 @@ public partial class App : Application
 
         // Tear down disposable pages (e.g. NaluShell): leaving them wired would deliver
         // zombie lifecycle events and break the next shell instance's navigation.
-        (currentPage as IDisposable)?.Dispose();
+        // Draining: pages disposed by the shell teardown die with the shell graph, which
+        // MAUI 10 iOS retains after the swap (see LeakTracker remarks) — don't assert them.
+        LeakTracker.Draining = true;
+
+        try
+        {
+            (currentPage as IDisposable)?.Dispose();
+
+            // MAUI does not reliably disconnect the old page's handler tree when Window.Page
+            // is swapped; without this the native view hierarchy keeps the page graph alive.
+            currentPage?.DisconnectHandlers();
+        }
+        finally
+        {
+            LeakTracker.Draining = false;
+        }
     }
 }

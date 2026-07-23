@@ -81,6 +81,9 @@ public abstract class NavPageModelBase : ObservableObject, IEnteringAware, IAppe
 
     public void Dispose()
     {
+        // A model disposed by a navigation must become collectable (its page holds it via
+        // BindingContext, so this also asserts the page itself doesn't leak).
+        LeakTracker.ExpectCollected(this);
         NavLog.Add($"{Name}-X");
         NavLog.Changed -= OnLogChanged;
         GC.SuppressFinalize(this);

@@ -15,9 +15,38 @@ namespace Nalu.Maui.UITests.Tests;
 /// The shell harness has no harness ResetButton (Shell pages are not decorated):
 /// every page exposes an Exit{Name} button invoking the app-level reset instead.
 /// </remarks>
-public class NavigationTests(NaluApp app) : BaseUiTest(app)
+public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
     private const string PageName = "Navigation Tests";
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Known-leak override: tests hitting a documented PLATFORM leak set this to the exact
+    /// expected residue instead of "Leaked:0" (see AbsoluteRootIgnoringGuardsPopsGuardedStack).
+    /// </summary>
+    private string _expectedLeakReport = "Leaked:0";
+
+    /// <summary>
+    /// Runs after EVERY test (xUnit creates one class instance per test): leaves the shell
+    /// (disposing it) and asserts that every page model Nalu disposed during the scenario —
+    /// and therefore its page, held via BindingContext — has been garbage-collected.
+    /// Pages alive at exit die with the shell teardown and are excluded: MAUI 10 iOS retains
+    /// discarded Shell instances even when vanilla (see the TestApp's "Plain Shell" page).
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await App.ResetAsync();
+        await App.TapAsync("CheckLeaksButton");
+        await App.WaitForTextAsync("LeaksLabel", _expectedLeakReport, TimeSpan.FromSeconds(15));
+
+        if (_expectedLeakReport != "Leaked:0")
+        {
+            // Drop the asserted residue so subsequent scenarios start from a clean tracker.
+            await App.TapAsync("ForgiveLeaksButton");
+            await App.WaitForTextAsync("LeaksLabel", "forgiven");
+        }
+    }
 
     private async Task OpenShellAsync()
     {
@@ -250,6 +279,13 @@ public class NavigationTests(NaluApp app) : BaseUiTest(app)
         log.Should().NotContain("Editor?G", "IgnoreGuards must skip the guard entirely");
         AssertOrdered(log, "Editor-L", "Detail-L", "Home+A");
         log.Should().Contain("Editor-X").And.Contain("Detail-X");
+
+        // KNOWN PLATFORM LEAK (MAUI 10 iOS): popping MULTIPLE pages in a single commit
+        // triggers a native pop-to-root, whose per-page renderer trackers are not cleaned
+        // up — the popped pages stay rooted even though Nalu disposed them correctly
+        // (single-pop scenarios collect fine). Assert the exact residue so any change in
+        // behavior (fix or worsening) is caught.
+        _expectedLeakReport = "Leaked:2 NavEditorPageModel,NavDetailPageModel";
     }
 
     [Fact]

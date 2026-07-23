@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Nalu.Internals;
 
 namespace Nalu;
 
@@ -255,6 +256,29 @@ internal class ShellProxy : IShellProxy, IDisposable
 
     public void Dispose()
     {
+        // Tear down all live pages: their navigation contexts (DI scope, page model
+        // disposal) are otherwise never released when an app discards the whole shell
+        // (e.g. a logout/login flow swapping the window page).
+        foreach (var section in Items.SelectMany(item => item.Sections))
+        {
+            foreach (var content in section.Contents)
+            {
+                if (content.Page is not { } contentPage)
+                {
+                    continue;
+                }
+
+                foreach (var stackPage in section.GetNavigationStack(content).Skip(1))
+                {
+                    DisconnectHandlerHelper.DisconnectHandlers(stackPage.Page);
+                    PageNavigationContext.Dispose(stackPage.Page);
+                }
+
+                DisconnectHandlerHelper.DisconnectHandlers(contentPage);
+                content.DestroyContent();
+            }
+        }
+
         foreach (var itemInfo in Items)
         {
             ((IDisposable) itemInfo).Dispose();

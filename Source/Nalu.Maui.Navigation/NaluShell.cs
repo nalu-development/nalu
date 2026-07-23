@@ -86,9 +86,11 @@ public abstract partial class NaluShell : Shell, INaluShell, IDisposable
     /// <param name="disposing">True when disposing managed resources.</param>
     protected virtual void Dispose(bool disposing)
     {
-        if (disposing)
+        if (disposing && _shellProxy is not null)
         {
-            _shellProxy?.Dispose();
+            _shellProxy.Dispose();
+            NavigationService.OnShellProxyDisposed(_shellProxy);
+            _shellProxy = null;
         }
     }
 
