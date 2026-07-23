@@ -51,6 +51,9 @@ internal class VirtualScrollRecyclerViewScrollHelper : RecyclerView.OnScrollList
     /// </summary>
     public void AnimateScrollToPosition(int index, ScrollToPosition scrollToPosition)
     {
+        // NOTE: no StopScroll here — starting a new smooth scroll re-targets the in-flight
+        // one natively; cancelling first would restart nearly-finished animations.
+
         if (scrollToPosition == ScrollToPosition.MakeVisible)
         {
             // MakeVisible matches the Android default of SnapAny, so we can just use the default
@@ -74,6 +77,10 @@ internal class VirtualScrollRecyclerViewScrollHelper : RecyclerView.OnScrollList
     /// </summary>
     public void JumpScrollToPosition(int index, ScrollToPosition scrollToPosition)
     {
+        // A new scroll command supersedes any in-flight smooth scroll,
+        // which would otherwise keep animating towards its old target.
+        _recyclerView.StopScroll();
+
         if (scrollToPosition == ScrollToPosition.MakeVisible)
         {
             // MakeVisible is the default behavior, so we don't need to do anything special

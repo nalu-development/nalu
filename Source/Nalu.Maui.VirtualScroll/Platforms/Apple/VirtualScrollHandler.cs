@@ -18,6 +18,8 @@ public partial class VirtualScrollHandler
     private VirtualScrollPlatformReuseIdManager? _reuseIdManager;
     private VirtualScrollPlatformDataSourceNotifier? _notifier;
     private UIRefreshControl? _refreshControl;
+    private nfloat? _refreshRevealRestoreOffsetY;
+    private int _scrollToGeneration;
     private VirtualScrollDelegate? _delegate;
     private bool _isUpdatingIsRefreshingFromPlatform;
     private VirtualScrollCollectionView? _collectionView;
@@ -160,7 +162,7 @@ public partial class VirtualScrollHandler
         if (virtualView is VirtualScroll virtualScrollElement && _refreshControl is not null)
         {
             _isUpdatingIsRefreshingFromPlatform = true;
-            virtualScrollElement.SetValueFromRenderer(VirtualScroll.IsRefreshEnabledProperty, _refreshControl.Refreshing);
+            virtualScrollElement.SetValueFromRenderer(VirtualScroll.IsRefreshingProperty, _refreshControl.Refreshing);
             _isUpdatingIsRefreshingFromPlatform = false;
         }
             
@@ -627,16 +629,40 @@ public partial class VirtualScrollHandler
         }
 
         var isRefreshing = virtualScroll.IsRefreshing;
-        
+
         if (isRefreshing && !handler._refreshControl.Refreshing)
         {
-            // Programmatically trigger refresh indicator
+            // BeginRefreshing alone does NOT show the spinner: per Apple's recipe for
+            // programmatic refresh, the scroll view must be scrolled to expose the control.
+            // Capture the geometry BEFORE BeginRefreshing (which expands the top inset).
+            var collectionView = handler.PlatformCollectionView;
+            var topInset = collectionView.AdjustedContentInset.Top;
+            var isAtTop = collectionView.ContentOffset.Y <= -topInset + 1;
+            var controlHeight = handler._refreshControl.Frame.Height > 0 ? handler._refreshControl.Frame.Height : 60;
+
             handler._refreshControl.BeginRefreshing();
+
+            // Only auto-reveal when the list rests at the top: revealing from a scrolled
+            // position would yank the content away from what the user is reading.
+            if (isAtTop)
+            {
+                handler._refreshRevealRestoreOffsetY = collectionView.ContentOffset.Y;
+                collectionView.SetContentOffset(new CGPoint(collectionView.ContentOffset.X, -(controlHeight + topInset)), true);
+            }
         }
         else if (!isRefreshing && handler._refreshControl.Refreshing)
         {
             // Stop refresh indicator
             handler._refreshControl.EndRefreshing();
+
+            // Restore the exact pre-reveal offset once EndRefreshing's own asynchronous
+            // adjustments (inset removal + offset compensation) have settled — restoring
+            // earlier races them and lands offset by the control height.
+            if (handler._refreshRevealRestoreOffsetY is { } restoreOffsetY)
+            {
+                handler._refreshRevealRestoreOffsetY = null;
+                handler.RestoreOffsetWhenSettled(restoreOffsetY, handler._collectionView?.ContentOffset ?? CGPoint.Empty, checksLeft: 25);
+            }
         }
         
         // Sync platform state back to IsRefreshing (two-way binding)
@@ -757,12 +783,40 @@ public partial class VirtualScrollHandler
         // Convert ScrollToPosition to UICollectionViewScrollPosition
         var scrollPosition = position.ToCollectionViewScrollPosition(GetScrollDirection(collectionView), false);
         var originalOffset = collectionView.ContentOffset;
+        var generation = ++handler._scrollToGeneration;
 
         collectionView.ScrollToItem(indexPath, scrollPosition, animated);
 
         // Estimated far-away sizes make ScrollToItem land imprecisely: refine once settled.
-        handler.AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget.Item, targetSection, targetItem, position, originalOffset, collectionView.ContentOffset, checksLeft: 25);
+        handler.AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget.Item, targetSection, targetItem, position, originalOffset, collectionView.ContentOffset, checksLeft: 25, generation);
     }
+
+    private void RestoreOffsetWhenSettled(nfloat restoreOffsetY, CGPoint lastOffset, int checksLeft)
+        => DispatchQueue.MainQueue.DispatchAfter(
+            new DispatchTime(DispatchTime.Now, 80_000_000L /* 80ms in ns */),
+            () =>
+            {
+                if (_collectionView is not { } collectionView)
+                {
+                    return;
+                }
+
+                var offset = collectionView.ContentOffset;
+
+                if (Math.Abs(offset.Y - lastOffset.Y) >= 0.5 && checksLeft > 0)
+                {
+                    RestoreOffsetWhenSettled(restoreOffsetY, offset, checksLeft - 1);
+
+                    return;
+                }
+
+                // Skip when the user (or the platform) already moved past the target.
+                if (offset.Y < restoreOffsetY - 0.5)
+                {
+                    collectionView.SetContentOffset(new CGPoint(offset.X, restoreOffsetY), true);
+                }
+            }
+        );
 
     private enum SupplementaryScrollTarget
     {
@@ -807,10 +861,11 @@ public partial class VirtualScrollHandler
         var scrollDirection = GetScrollDirection(collectionView);
         var scrollPosition = position.ToCollectionViewScrollPosition(scrollDirection, false);
         var originalOffset = collectionView.ContentOffset;
+        var generation = ++_scrollToGeneration;
         collectionView.ScrollToItem(NSIndexPath.FromItemSection(0, sectionIndex), scrollPosition, animated);
 
         // 25 x 80ms ≈ 2s upper bound for the settle wait (animated scrolls take ~300-500ms).
-        AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget.SectionHeader, sectionIndex, 0, position, originalOffset, collectionView.ContentOffset, checksLeft: 25);
+        AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget.SectionHeader, sectionIndex, 0, position, originalOffset, collectionView.ContentOffset, checksLeft: 25, generation);
     }
 
     /// <summary>
@@ -829,16 +884,18 @@ public partial class VirtualScrollHandler
         // the estimate-based first hop may move the target into view, and deciding against the
         // moved offset would freeze there instead of converging on the minimal-scroll edge.
         var originalOffset = collectionView.ContentOffset;
-        AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated, attemptsLeft: 1);
-        AdjustOffsetToSupplementaryWhenSettled(target, sectionIndex, itemIndex, position, originalOffset, collectionView.ContentOffset, checksLeft: 25);
+        var generation = ++_scrollToGeneration;
+        AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated, attemptsLeft: 1, generation);
+        AdjustOffsetToSupplementaryWhenSettled(target, sectionIndex, itemIndex, position, originalOffset, collectionView.ContentOffset, checksLeft: 25, generation);
     }
 
-    private void AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, CGPoint originalOffset, CGPoint lastOffset, int checksLeft)
+    private void AdjustOffsetToSupplementaryWhenSettled(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, CGPoint originalOffset, CGPoint lastOffset, int checksLeft, int generation)
         => DispatchQueue.MainQueue.DispatchAfter(
             new DispatchTime(DispatchTime.Now, 80_000_000L /* 80ms in ns */),
             () =>
             {
-                if (_collectionView is not { } collectionView)
+                // A newer ScrollTo command supersedes this chain.
+                if (generation != _scrollToGeneration || _collectionView is not { } collectionView)
                 {
                     return;
                 }
@@ -848,18 +905,20 @@ public partial class VirtualScrollHandler
 
                 if (settled || checksLeft <= 0)
                 {
-                    AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated: false, attemptsLeft: 3);
+                    AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated: false, attemptsLeft: 3, generation);
                 }
                 else
                 {
-                    AdjustOffsetToSupplementaryWhenSettled(target, sectionIndex, itemIndex, position, originalOffset, offset, checksLeft - 1);
+                    AdjustOffsetToSupplementaryWhenSettled(target, sectionIndex, itemIndex, position, originalOffset, offset, checksLeft - 1, generation);
                 }
             }
         );
 
-    private void AdjustOffsetToSupplementary(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, CGPoint originalOffset, bool animated, int attemptsLeft)
+    private void AdjustOffsetToSupplementary(SupplementaryScrollTarget target, int sectionIndex, int itemIndex, ScrollToPosition position, CGPoint originalOffset, bool animated, int attemptsLeft, int generation)
     {
-        if (_collectionView is not { } collectionView
+        // A newer ScrollTo command supersedes this chain.
+        if (generation != _scrollToGeneration
+            || _collectionView is not { } collectionView
             || VirtualView?.Adapter is not { } adapter)
         {
             return;
@@ -967,7 +1026,7 @@ public partial class VirtualScrollHandler
         if (attemptsLeft > 1)
         {
             // The jump may materialize cells whose measured sizes shift the layout again.
-            DispatchQueue.MainQueue.DispatchAsync(() => AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated: false, attemptsLeft - 1));
+            DispatchQueue.MainQueue.DispatchAsync(() => AdjustOffsetToSupplementary(target, sectionIndex, itemIndex, position, originalOffset, animated: false, attemptsLeft - 1, generation));
         }
     }
 

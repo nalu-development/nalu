@@ -34,7 +34,13 @@
       "mcp__maui-devflow__maui_select_agent",
       "Bash(git stash *)",
       "Bash(git checkout *)",
-      "Bash(grep -v \"^  *a \\\\|^--$\")"
+      "Bash(grep -v \"^  *a \\\\|^--$\")",
+      "Bash(adb devices *)",
+      "Bash(adb reverse *)",
+      "Bash(adb forward *)",
+      "mcp__maui-devflow__maui_set_property",
+      "Bash(curl -s http://localhost:9223/api/v1/agent/status)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=1\\)\\)\")"
     ]
   }
 }

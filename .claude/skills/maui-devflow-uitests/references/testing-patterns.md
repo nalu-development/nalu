@@ -94,6 +94,20 @@ public class ExpanderTests(NaluApp app) : BaseUiTest(app)
   `VirtualScrollPlatformDataSourceNotifier`. When testing collection sources, always
   include a scenario where a single changeset carries MANY changes (bursts + Reset).
 
+## Android specifics (verified July 2026)
+
+- Element screenshots re-draw the view offscreen and MISS composited effects (fading edges):
+  `GetPixelColorAsync` samples the FULL screenshot at window coordinates for this reason.
+- Swipes travel a shorter distance per gesture than on iOS: always use bounded
+  swipe-until-visible loops, never a single swipe + assert.
+- RecyclerView item animators (~250ms) race instantaneous bounds reads after add/move/insert:
+  wait for the settled layout (e.g. `WaitForBoundsAsync("Item 2", b => b.Y == oldFirstY)`).
+- Pull-to-refresh: `SwipeRefreshLayout` disables rather than detaches, and its OnRefreshListener
+  cannot be invoked publicly — the refresh page's NativePull emulates the gesture
+  (spinner + controller pipeline); "attached" in NativeStateLabel means "pull possible".
+- After Android work, `adb forward --remove-all` before returning to the iOS simulator,
+  or host 9223 keeps routing to the Android app.
+
 ## Layout assertions (Magnet, ViewBox, ExpanderViewBox…)
 
 `ElementInfo.Bounds` (X/Y/Width/Height in MAUI coordinates) enables real layout tests:
@@ -105,7 +119,7 @@ not Magick.NET.
 ## Flakiness checklist
 
 Symptom → likely cause:
-- Fails only on Android → forgot `adb reverse tcp:9223 tcp:9223` (re-run after emulator restart).
+- Fails only on Android → forgot `adb forward tcp:9223 tcp:9223` (re-run after emulator restart).
 - `InvalidOperationException: Cannot reach the DevFlow agent` → app not running / wrong port /
   Release build (agent is DEBUG-only).
 - Element never appears but page looks right in screenshot → missing/duplicated `AutomationId`,

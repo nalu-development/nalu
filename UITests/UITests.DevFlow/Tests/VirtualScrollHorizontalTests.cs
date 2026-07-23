@@ -82,11 +82,12 @@ public class VirtualScrollHorizontalTests(NaluApp app) : BaseUiTest(app)
         await OpenPageAsync();
 
         // "right" scrolls forward on horizontal lists (see SwipeAsync direction semantics).
+        // A single swipe travels a platform-dependent distance: keep swiping until revealed.
         var revealed = await App.WaitForElementOrDefaultAsync("H8", TimeSpan.FromSeconds(1));
 
-        for (var attempt = 0; revealed is null && attempt < 5; attempt++)
+        for (var attempt = 0; revealed is null && attempt < 10; attempt++)
         {
-            await App.SwipeAsync("HScroll", "right", 200);
+            await App.SwipeAsync("HScroll", "right", 300);
             revealed = await App.WaitForElementOrDefaultAsync("H8", TimeSpan.FromSeconds(1));
         }
 

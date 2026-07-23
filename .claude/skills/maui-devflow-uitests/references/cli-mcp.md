@@ -55,7 +55,7 @@ dotnet tool run maui -- devflow MAUI tree
 ## Recommended interactive workflow
 
 1. App running? `maui_screenshot`. Not reachable → is the TestApp actually launched (DEBUG)?
-   Android: did you run `adb reverse tcp:9223 tcp:9223`?
+   Android: did you run `adb forward tcp:9223 tcp:9223`?
 2. Orient with `maui_tree`; find AutomationIds (harness ids: `TestName`, `RunTestButton`,
    `ResetButton`, plus the page's own ids).
 3. Navigate: fill `TestName` with the `[TestPage]` name, tap `RunTestButton`.

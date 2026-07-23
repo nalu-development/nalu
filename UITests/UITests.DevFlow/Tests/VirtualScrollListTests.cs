@@ -142,10 +142,17 @@ public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
     {
         await OpenPageAsync();
 
-        await App.SwipeAsync("ListScroll", "up", 400);
+        // A single swipe travels a platform-dependent distance: keep swiping until the end shows.
+        var item20 = await App.WaitForElementOrDefaultAsync("Item 20", TimeSpan.FromSeconds(1));
 
-        var item20 = await App.WaitForElementAsync("Item 20");
-        item20.IsVisible.Should().BeTrue("swiping up must reveal the bottom of the 20-item list");
+        for (var attempt = 0; item20 is null && attempt < 8; attempt++)
+        {
+            await App.SwipeAsync("ListScroll", "up", 400);
+            item20 = await App.WaitForElementOrDefaultAsync("Item 20", TimeSpan.FromSeconds(1));
+        }
+
+        item20.Should().NotBeNull("swiping up must reveal the bottom of the 20-item list");
+        item20!.IsVisible.Should().BeTrue();
     }
 
     [Fact]
@@ -153,16 +160,19 @@ public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
     {
         await OpenPageAsync();
 
+        var item1Before = await App.GetBoundsAsync("Item 1");
+
         await App.FillAsync("PositionEntry", "0");
         await App.FillAsync("ExtraEntry", "Added");
         await App.TapAsync("AddItemButton");
 
         await App.WaitForTextAsync("ItemCountLabel", "Count: 21");
-        var added = await App.WaitForElementAsync("Added");
-        var item1 = await App.GetBoundsAsync("Item 1");
 
-        (await App.GetBoundsAsync("Added")).Y.Should().BeLessThan(item1.Y, "the new item was inserted at position 0");
-        added.IsVisible.Should().BeTrue();
+        // The insert animation slides the old first item down: wait for it to settle
+        // (an instantaneous read races the platform item animator).
+        await App.WaitForBoundsAsync("Item 1", b => b.Y >= item1Before.Y + 20);
+
+        (await App.GetBoundsAsync("Added")).Y.Should().BeApproximately(item1Before.Y, 2, "the new item took the old first slot");
     }
 
     [Fact]
@@ -200,14 +210,18 @@ public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
     {
         await OpenPageAsync();
 
+        var item1Before = await App.GetBoundsAsync("Item 1");
+
         // Move "Item 1" from position 0 to position 9.
         await App.FillAsync("PositionEntry", "0");
         await App.FillAsync("ExtraEntry", "9");
         await App.TapAsync("SwapItemButton");
 
-        var item1 = await App.WaitForBoundsAsync("Item 1", b => b.Y > 0);
-        var item2 = await App.GetBoundsAsync("Item 2");
+        // Wait for the move animation to settle: Item 2 slides up into the first slot.
+        await App.WaitForBoundsAsync("Item 2", b => Math.Abs(b.Y - item1Before.Y) <= 2);
 
+        var item1 = await App.GetBoundsAsync("Item 1");
+        var item2 = await App.GetBoundsAsync("Item 2");
         item1.Y.Should().BeGreaterThan(item2.Y, "Item 1 was moved below Item 2");
     }
 

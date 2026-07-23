@@ -39,19 +39,31 @@ public class VirtualScrollViewWrapper : FrameLayout
 
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
-        if (LayoutParameters!.Width == ViewGroup.LayoutParams.MatchParent)
+        // The cell size must come from the MAUI cross-platform measure: the native
+        // FrameLayout measure of the platform child ignores cross-platform layout
+        // (margins, Width/HeightRequest, MAUI layout logic), producing clipped cells.
+        if (VirtualView is not { } virtualView || Context is not { } context)
         {
-            var width = MeasureSpec.GetSize(widthMeasureSpec);
-            widthMeasureSpec = MeasureSpec.MakeMeasureSpec(width, MeasureSpecMode.Exactly);
+            base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
+
+            return;
         }
 
-        if (LayoutParameters!.Height == ViewGroup.LayoutParams.MatchParent)
-        {
-            var height = MeasureSpec.GetSize(heightMeasureSpec);
-            heightMeasureSpec = MeasureSpec.MakeMeasureSpec(height, MeasureSpecMode.Exactly);
-        }
+        var widthMode = MeasureSpec.GetMode(widthMeasureSpec);
+        var heightMode = MeasureSpec.GetMode(heightMeasureSpec);
+        var pixelWidth = MeasureSpec.GetSize(widthMeasureSpec);
+        var pixelHeight = MeasureSpec.GetSize(heightMeasureSpec);
 
-        base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
+        var widthConstraint = widthMode == MeasureSpecMode.Unspecified ? double.PositiveInfinity : context.FromPixels(pixelWidth);
+        var heightConstraint = heightMode == MeasureSpecMode.Unspecified ? double.PositiveInfinity : context.FromPixels(pixelHeight);
+
+        var measured = virtualView.Measure(widthConstraint, heightConstraint);
+
+        // Ceil fractional device-independent sizes so content is never clipped by a sub-pixel.
+        var measuredWidth = widthMode == MeasureSpecMode.Exactly ? pixelWidth : (int) Math.Ceiling(context.ToPixels(measured.Width));
+        var measuredHeight = heightMode == MeasureSpecMode.Exactly ? pixelHeight : (int) Math.Ceiling(context.ToPixels(measured.Height));
+
+        SetMeasuredDimension(measuredWidth, measuredHeight);
     }
 
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)

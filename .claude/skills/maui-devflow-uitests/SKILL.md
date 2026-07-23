@@ -37,7 +37,7 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
 ## The dev loop (write → verify → repeat)
 
 1. **Launch the TestApp** (DEBUG) on the target platform — see commands in
-   `references/devflow-overview.md`. Android needs `adb reverse tcp:9223 tcp:9223`.
+   `references/devflow-overview.md`. Android needs `adb forward tcp:9223 tcp:9223`.
 2. **Explore the running app** via MCP tools or `maui devflow` CLI: take a screenshot, dump the
    visual tree, tap around. Confirm the scenario works manually before encoding it in a test.
 3. **Add/extend a test page** in `Samples/Nalu.Maui.TestApp/Tests/` (`[TestPage("Name")]`),

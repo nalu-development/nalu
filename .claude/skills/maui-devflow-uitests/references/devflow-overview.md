@@ -37,7 +37,7 @@ When bumping the preview: change the version in `Samples/Nalu.Maui.TestApp/Nalu.
 |---|---|---|
 | Mac Catalyst | ✅ full | Direct localhost. Requires `com.apple.security.network.server` entitlement (already added to TestApp) |
 | iOS Simulator | ✅ full | Simulator shares the host network — direct localhost |
-| Android emulator | ✅ full | Requires `adb reverse tcp:9223 tcp:9223` after each app deploy/emulator boot |
+| Android emulator | ✅ full | Requires `adb forward tcp:9223 tcp:9223` after each app deploy/emulator boot |
 | Linux/GTK | ✅ | Not relevant for Nalu today |
 | Windows | ⚠️ partial / in progress | Windows UI tests postponed in this repo |
 
@@ -71,7 +71,7 @@ dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios -t:Run
 
 # Android emulator (start emulator first; `maui` CLI can manage devices)
 dotnet build Samples/Nalu.Maui.TestApp -f net10.0-android -t:Run
-adb reverse tcp:9223 tcp:9223
+adb forward tcp:9223 tcp:9223
 ```
 
 The `maui` CLI also offers environment/device management: `dotnet tool run maui -- --help`.

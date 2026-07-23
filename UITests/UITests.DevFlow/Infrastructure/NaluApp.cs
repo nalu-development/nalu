@@ -34,7 +34,7 @@ public sealed record ElementBounds(double X, double Y, double Width, double Heig
 /// <para>
 /// The wrapper connects to the DevFlow agent hosted inside the running Nalu.Maui.TestApp
 /// (see <c>MauiProgram.AddMauiDevFlowAgent</c>). Start the app on the target platform before
-/// running the tests. For Android emulators run <c>adb reverse tcp:9223 tcp:9223</c> first.
+/// running the tests. For Android emulators run <c>adb forward tcp:9223 tcp:9223</c> first.
 /// Host/port can be overridden with the DEVFLOW_HOST / DEVFLOW_PORT environment variables.
 /// </para>
 /// </remarks>
@@ -102,7 +102,7 @@ public sealed class NaluApp : IAsyncLifetime
                 throw new InvalidOperationException(
                     $"Cannot reach the DevFlow agent at {host} on port(s) {string.Join(", ", candidatePorts)}. " +
                     "Make sure Nalu.Maui.TestApp is running in DEBUG on the target platform. " +
-                    "For Android emulators run 'adb reverse tcp:9223 tcp:9223' first. " +
+                    "For Android emulators run 'adb forward tcp:9223 tcp:9223' first. " +
                     "Host/port can be overridden with DEVFLOW_HOST / DEVFLOW_PORT.");
             }
 
@@ -115,6 +115,29 @@ public sealed class NaluApp : IAsyncLifetime
         _client.Dispose();
 
         return ValueTask.CompletedTask;
+    }
+
+    private string? _platform;
+
+    /// <summary>Gets the running app's platform name (e.g. "iOS", "Android"), cached per run.</summary>
+    public async Task<string> GetPlatformAsync()
+    {
+        if (_platform is null)
+        {
+            var status = await _client.GetStatusAsync().ConfigureAwait(false);
+            _platform = status?.Platform ?? "unknown";
+        }
+
+        return _platform;
+    }
+
+    /// <summary>True when the app runs on iOS or Mac Catalyst.</summary>
+    public async Task<bool> IsAppleAsync()
+    {
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        return platform.Contains("ios", StringComparison.OrdinalIgnoreCase)
+               || platform.Contains("catalyst", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Finds a single element by AutomationId, or null when not present.</summary>
@@ -425,27 +448,61 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>
-    /// Samples the pixel color of an element's screenshot at element-relative coordinates
-    /// (device-independent units). Useful to verify purely-visual behaviors such as clipping.
+    /// Samples the pixel color at element-relative coordinates (device-independent units)
+    /// from a FULL screenshot of the app window.
     /// </summary>
+    /// <remarks>
+    /// Element-scoped screenshots re-draw the view offscreen and can miss composited visual
+    /// effects (verified: Android fading edges only render in the real frame), so sampling
+    /// happens on the full capture using the element's window-space bounds.
+    /// </remarks>
     public async Task<(byte R, byte G, byte B)> GetPixelColorAsync(string automationId, double x, double y)
     {
-        var element = await WaitForElementAsync(automationId).ConfigureAwait(false);
+        var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
 
-        var png = await _client.ScreenshotAsync(elementId: element.Id).ConfigureAwait(false)
-                  ?? throw new InvalidOperationException($"Screenshot capture of '{automationId}' failed.");
+        var png = await _client.ScreenshotAsync().ConfigureAwait(false)
+                  ?? throw new InvalidOperationException("Screenshot capture failed.");
 
         using var bitmap = SKBitmap.Decode(png)
                            ?? throw new InvalidOperationException("Could not decode the screenshot PNG.");
 
-        // Screenshots may be in physical pixels while bounds are in device-independent units.
-        var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
-        var scale = bitmap.Width / bounds.Width;
-        var pixelX = Math.Clamp((int) Math.Round(x * scale), 0, bitmap.Width - 1);
-        var pixelY = Math.Clamp((int) Math.Round(y * scale), 0, bitmap.Height - 1);
+        // Screenshots may be scaled: derive the factor from the window root width.
+        var windowWidth = await GetWindowWidthAsync().ConfigureAwait(false);
+        var scale = bitmap.Width / windowWidth;
+        var pixelX = Math.Clamp((int) Math.Round((bounds.X + x) * scale), 0, bitmap.Width - 1);
+        var pixelY = Math.Clamp((int) Math.Round((bounds.Y + y) * scale), 0, bitmap.Height - 1);
         var color = bitmap.GetPixel(pixelX, pixelY);
 
         return (color.Red, color.Green, color.Blue);
+    }
+
+    private async Task<double> GetWindowWidthAsync()
+    {
+        // The tree root may carry no bounds (observed on Android): use the first bounded element.
+        var tree = await _client.GetTreeAsync(3).ConfigureAwait(false);
+
+        static double? FindWidth(IEnumerable<ElementInfo> elements)
+        {
+            foreach (var element in elements)
+            {
+                var bounds = element.WindowBounds ?? element.Bounds;
+
+                if (bounds is { Width: > 0 })
+                {
+                    return bounds.Width;
+                }
+
+                if (element.Children is { } children && FindWidth(children) is { } width)
+                {
+                    return width;
+                }
+            }
+
+            return null;
+        }
+
+        return FindWidth(tree)
+               ?? throw new InvalidOperationException("Could not determine the window width for pixel sampling.");
     }
 
     /// <summary>Waits until the sampled pixel color satisfies the given predicate (e.g. after a re-render).</summary>
