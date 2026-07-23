@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text;
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Converters;
 using Microsoft.Maui.Layouts;
@@ -419,8 +420,26 @@ public partial class NaluTabBar
     /// <remarks>
     /// This method is useful when creating a completely custom tab bar that doesn't inherit from <see cref="NaluTabBar"/>.
     /// Call this method when a tab button is pressed to trigger navigation.
+    /// Switching to another tab restores its preserved navigation stack (like a native
+    /// tab switch); tapping the current tab navigates back to its root page.
     /// </remarks>
-    public static Task GoToAsync(ShellSection shellSection) => Shell.Current.GoToAsync($"//{shellSection.CurrentItem.Route}");
+    public static Task GoToAsync(ShellSection shellSection)
+    {
+        var route = new StringBuilder("//").Append(shellSection.CurrentItem.Route);
+
+        if (Shell.Current?.CurrentItem?.CurrentItem != shellSection)
+        {
+            foreach (var stackPage in shellSection.Navigation.NavigationStack)
+            {
+                if (stackPage is not null)
+                {
+                    route.Append('/').Append(NavigationSegmentAttribute.GetSegmentName(stackPage.GetType()));
+                }
+            }
+        }
+
+        return Shell.Current!.GoToAsync(route.ToString());
+    }
     
     /// <summary>
     /// Navigates to the specified shell section.

@@ -74,6 +74,21 @@ public class ExpanderTests(NaluApp app) : BaseUiTest(app)
   callbacks behind `OnScrollStarted`/`OnScrollEnded`. Test those surfaces through page-side
   helpers (e.g. a button invoking `IVirtualScrollController.Refresh`, carousel `CurrentRange`
   buttons) and document the gesture path as not harness-testable.
+- **Shell tab bars cannot be tapped natively**: DevFlow's synthetic `Tab` element "tap" sets
+  `Shell.CurrentItem.CurrentItem = section` directly, bypassing the cancelable OnNavigating
+  pipeline (Nalu never sees it — no lifecycle events, desynced state). For tab-switch tests attach
+  **NaluTabBar** (`UseNaluTabBar()` + `NaluShell.SetTabBarView(tabBar, new NaluTabBar())`): its
+  buttons are real MAUI views navigating via `Shell.GoToAsync` — the same cancelable path as a
+  native tap. `NaluApp.TapByTextAsync` prefers visible matches and hit-tests ancestors when the
+  matched Label's TapGestureRecognizer lives on an ancestor Border.
+- **Nalu navigation tests must wait for `+A` log entries between navigations**: Nalu silently
+  ignores a navigation requested while another is committing (`NavigationIgnored`), and page
+  elements appear in the tree at `+E` (before commit) — tapping the next nav button that early is
+  a silent no-op. Wait for the target page's appearing entry (sent post-commit) first.
+- **Empty visual tree in every remaining test = the app crashed**: pull the managed stack with
+  `xcrun simctl spawn <UDID> log show --last 10m --predicate 'processImagePath contains "<AppName>"'`
+  and look for "Unhandled managed exception" (DEBUG FireAndForget rethrows dispatched-navigation
+  failures and kills the app).
 - **Removed/replaced cells LINGER in the visual tree** (recycler keeps detached views around).
   Never assert "element gone" after a removal — assert the layout shift of the survivors instead
   (e.g. `WaitForBoundsAsync("Item 2", b => b.Y == oldItem1.Y)`).

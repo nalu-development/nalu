@@ -26,7 +26,8 @@ public partial class App : Application
     internal async void ResetToMainPage()
     {
         // Close any modal pages (e.g. popups left open by a failed test) before swapping the page.
-        var navigation = Windows[0].Page?.Navigation;
+        var currentPage = Windows[0].Page;
+        var navigation = currentPage?.Navigation;
 
         while (navigation?.ModalStack.Count > 0)
         {
@@ -34,5 +35,9 @@ public partial class App : Application
         }
 
         Windows[0].Page = new MainPage(_serviceProvider);
+
+        // Tear down disposable pages (e.g. NaluShell): leaving them wired would deliver
+        // zombie lifecycle events and break the next shell instance's navigation.
+        (currentPage as IDisposable)?.Dispose();
     }
 }

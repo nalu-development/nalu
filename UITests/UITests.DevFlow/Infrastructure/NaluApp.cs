@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Maui.DevFlow.Driver;
 using SkiaSharp;
 using Xunit;
@@ -183,6 +184,63 @@ public sealed class NaluApp : IAsyncLifetime
             if (stopwatch.Elapsed >= effectiveTimeout)
             {
                 return null;
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Taps the first VISIBLE element whose text matches (e.g. NaluTabBar tab labels).</summary>
+    /// <remarks>
+    /// Text queries also match abstract Shell elements (e.g. <c>Tab</c> nodes, reported
+    /// invisible and unbounded); DevFlow "taps" those by setting <c>Shell.CurrentItem</c>
+    /// directly, bypassing the OnNavigating pipeline. Preferring visible matches makes sure
+    /// we hit the real on-screen view instead. When the matched element itself is not
+    /// tappable (e.g. a Label whose TapGestureRecognizer lives on an ancestor Border, as in
+    /// NaluTabBar), the tap is retried on its ancestors.
+    /// </remarks>
+    public async Task TapByTextAsync(string text, TimeSpan? timeout = null)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var effectiveTimeout = timeout ?? _defaultTimeout;
+
+        while (true)
+        {
+            var matches = await _client.QueryAsync(text: text).ConfigureAwait(false);
+            var element = matches.FirstOrDefault(m => m.IsVisible);
+
+            if (element is not null)
+            {
+                if (await _client.TapAsync(element.Id).ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                // The matched element is not tappable itself: hit-test its center to get the
+                // ancestor stack (innermost first) and tap the first ancestor that accepts it.
+                // (The single-element endpoint drops ParentId, so we cannot walk the tree.)
+                if (element.WindowBounds is { } wb)
+                {
+                    var hitTestJson = await _client.HitTestAsync(wb.X + (wb.Width / 2), wb.Y + (wb.Height / 2)).ConfigureAwait(false);
+                    using var hitTest = JsonDocument.Parse(hitTestJson);
+
+                    foreach (var ancestor in hitTest.RootElement.GetProperty("elements").EnumerateArray().Take(5))
+                    {
+                        var ancestorId = ancestor.GetProperty("id").GetString();
+
+                        if (ancestorId is not null && ancestorId != element.Id && await _client.TapAsync(ancestorId).ConfigureAwait(false))
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                throw new InvalidOperationException($"Tap on element with text '{text}' (element {element.Id}) and its ancestors failed.");
+            }
+
+            if (stopwatch.Elapsed >= effectiveTimeout)
+            {
+                throw new TimeoutException($"Element with text '{text}' did not appear within {effectiveTimeout.TotalSeconds:0.#}s.");
             }
 
             await Task.Delay(_pollInterval).ConfigureAwait(false);
@@ -555,6 +613,18 @@ public sealed class NaluApp : IAsyncLifetime
 
         if (resetButton is null)
         {
+            // Shell-based test pages (e.g. "Navigation Tests") have no decorated ResetButton:
+            // they expose an app-reset button with text "Exit" on every page instead.
+            var exitButton = (await _client.QueryAsync(text: "Exit").ConfigureAwait(false)).FirstOrDefault(e => e.IsVisible);
+
+            if (exitButton is not null)
+            {
+                await _client.TapAsync(exitButton.Id).ConfigureAwait(false);
+                await WaitForElementAsync("TestName").ConfigureAwait(false);
+
+                return;
+            }
+
             // A modal page (e.g. a popup left open by a failed test) may be covering the test page.
             await _client.BackAsync().ConfigureAwait(false);
             resetButton = await WaitForElementOrDefaultAsync("ResetButton", TimeSpan.FromSeconds(2)).ConfigureAwait(false);

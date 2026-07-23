@@ -1,10 +1,9 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Text.RegularExpressions;
 
 namespace Nalu;
 
-internal partial class ShellProxy : IShellProxy, IDisposable
+internal class ShellProxy : IShellProxy, IDisposable
 {
     private readonly NaluShell _shell;
     private readonly ShellRouteFactory _routeFactory = new();
@@ -86,26 +85,28 @@ internal partial class ShellProxy : IShellProxy, IDisposable
         _navigationCurrentSection = null;
 
         var currentState = _shell.CurrentState.Location.OriginalString;
-        var currentContentState = TrimRouteToContent(currentState);
-        var targetContentState = TrimRouteToContent(targetState);
 
-        if (targetContentState.StartsWith(currentContentState))
+        if (!contentChanged)
         {
-            if (targetContentState.Length != currentContentState.Length)
-            {
-                var commonPathLength = currentContentState.Length + 1; // includes path separator which we don't want
-                targetState = targetContentState[commonPathLength..];
-            }
+            // The navigation stayed within the current shell content (no SelectContentAsync):
+            // navigate relatively (pop to the common prefix, then push the rest).
+            // Committing an absolute deep route here would make MAUI re-process the whole stack,
+            // which mis-handles duplicate route names (e.g. replacing a page with another
+            // instance of a page type already in the stack) and re-requests pages from the
+            // route factory. Segments are compared over the full route (item/section/content
+            // included), so this never confuses hierarchy segments with stack segments.
+            var currentSegments = currentState.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var targetSegments = targetState.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            var commonCount = currentSegments.Zip(targetSegments).TakeWhile(pair => pair.First == pair.Second).Count();
 
-            // else: do nothing, we're already at the target state
+            targetState = string.Concat(Enumerable.Repeat("../", currentSegments.Length - commonCount))
+                          + string.Join('/', targetSegments.Skip(commonCount));
         }
-        else if (currentContentState.StartsWith(targetContentState))
+
+        if (targetState.Length > 0)
         {
-            var popCount = currentContentState[targetContentState.Length..].Count(c => c == '/');
-            targetState = string.Concat(Enumerable.Repeat("../", popCount));
+            await _shell.GoToAsync(targetState + "?nalu");
         }
-
-        await _shell.GoToAsync(targetState + "?nalu");
 
         await Task.Yield();
 
@@ -213,6 +214,12 @@ internal partial class ShellProxy : IShellProxy, IDisposable
         _navigationTarget = contentProxy.Parent.GetNavigationStack(contentProxy).LastOrDefault()?.Route
                             ?? $"//{item.Route}/{section.Route}/{content.Route}";
 
+        // The navigation target now points into the selected content's section:
+        // subsequent pops must trim the target route (PopAsync) instead of silently
+        // removing pages, otherwise the commit navigates to a route whose page was
+        // just removed and MAUI asks the route factory to re-create it (crash).
+        _navigationCurrentSection = contentProxy.Parent;
+
         return Task.CompletedTask;
     }
 
@@ -259,6 +266,16 @@ internal partial class ShellProxy : IShellProxy, IDisposable
         {
             observableCollection.CollectionChanged -= OnItemsCollectionChanged;
         }
+
+        // Routing.RegisterRoute is MAUI-global: without unregistering, a new shell instance
+        // (e.g. after a logout/login flow) re-registers the same segments with different
+        // factories and MAUI throws ArgumentException ("Duplicated Route") on the first push.
+        foreach (var segmentName in _registeredSegments)
+        {
+            Routing.UnRegisterRoute(segmentName);
+        }
+
+        _registeredSegments.Clear();
     }
 
     private void ShellOnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -275,8 +292,4 @@ internal partial class ShellProxy : IShellProxy, IDisposable
         CurrentItem = Items.First(i => i.SegmentName == currentSegmentName);
     }
 
-    private static string TrimRouteToContent(string uri) => TrimRouteToContentRegex().Replace(uri, string.Empty);
-
-    [GeneratedRegex("^//[^/]+/[^/]+/")]
-    private static partial Regex TrimRouteToContentRegex();
 }

@@ -538,7 +538,13 @@ internal class NavigationService : INavigationService, IDisposable
         }
 
         await shellProxy.CommitNavigationAsync().ConfigureAwait(true);
-        await NavigationHelper.SendAppearingAsync(ShellProxy, targetContentPage, intent, Configuration).ConfigureAwait(true);
+
+        // When the target section preserved a navigation stack (e.g. switching back to a
+        // tab with pushed pages), the page actually appearing is the top of that stack,
+        // not the section's root content page.
+        var targetTopPage = targetStack.Count > 0 ? targetStack[^1].Page : targetContentPage;
+        var targetTopIntent = targetTopPage == targetContentPage ? intent : null;
+        await NavigationHelper.SendAppearingAsync(ShellProxy, targetTopPage, targetTopIntent, Configuration).ConfigureAwait(true);
 
         return true;
     }
