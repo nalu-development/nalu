@@ -77,6 +77,7 @@
       <ProjectReference Include="..\..\Source\Nalu.Maui.Controls\Nalu.Maui.Controls.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Scaffold\Nalu.Maui.Scaffold.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.VirtualScroll\Nalu.Maui.VirtualScroll.csproj" />
     </ItemGroup>
 </Project>

@@ -408,3 +408,31 @@ public class NavShell : NaluShell
         FlyoutBehavior = FlyoutBehavior.Disabled;
     }
 }
+
+/// <summary>
+/// Scaffold harness mirroring <see cref="NavShell"/>: the same pages and models, hosted by the
+/// Nalu Scaffold instead of MAUI Shell. P0: no chrome yet — tab/area switching happens through
+/// the pages' own navigation buttons (absolute navigations).
+/// </summary>
+[UsedImplicitly]
+[TestPage("Scaffold Navigation Tests")]
+public class NavScaffold : Scaffold
+{
+    public NavScaffold()
+    {
+        NavLog.Clear();
+
+        Areas.Add(
+            new ScaffoldTabBar
+            {
+                Roots =
+                {
+                    new ScaffoldRoot { Title = "HomeTab", PageType = typeof(NavHomePage) },
+                    new ScaffoldRoot { Title = "SearchTab", PageType = typeof(NavSearchPage) }
+                }
+            }
+        );
+
+        Areas.Add(new ScaffoldRoot { Title = "SettingsItem", PageType = typeof(NavSettingsPage) });
+    }
+}

@@ -53,9 +53,10 @@ public class ScaffoldRoot : Element
 
     /// <summary>
     /// Gets the live navigation stack hosted by this root — the state the Scaffold's navigation
-    /// proxies mutate and the platform presenter realizes.
+    /// proxies mutate and the platform presenter realizes. Pages in the stack are parented as
+    /// logical children of this root.
     /// </summary>
-    internal ScaffoldNavigationStack NavigationStack { get; } = new();
+    internal ScaffoldNavigationStack NavigationStack => field ??= new ScaffoldNavigationStack(this);
 
     /// <summary>Gets or sets the display title used by the default tab bar template.</summary>
     public string? Title

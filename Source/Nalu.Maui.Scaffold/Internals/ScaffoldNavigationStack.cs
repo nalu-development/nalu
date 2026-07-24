@@ -7,29 +7,74 @@ namespace Nalu;
 /// pushes/pops per commit are normal in Nalu), then the platform presenter
 /// (<see cref="IScaffoldPresenter"/>) synchronizes to it once. It never touches platform APIs.
 /// </summary>
-internal sealed class ScaffoldNavigationStack
+/// <remarks>
+/// Every page entering the stack is parented as a logical child of the hosting
+/// <see cref="Scaffold"/> (MAUI requires a page's parent to be a page), so pages participate in
+/// the MAUI element tree: window resolution, visual-tree walks and tooling all work.
+/// </remarks>
+internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
 {
     private readonly List<NavigationStackPage> _pushedPages = [];
+    private Page? _rootPage;
 
     /// <summary>
     /// Gets or sets the root page instance. Lifecycle is owned by the content-level proxy
     /// (created lazily from <see cref="ScaffoldRoot.PageType"/>, destroyable while not displayed).
     /// </summary>
-    public Page? RootPage { get; set; }
+    public Page? RootPage
+    {
+        get => _rootPage;
+        set
+        {
+            if (ReferenceEquals(_rootPage, value))
+            {
+                return;
+            }
+
+            if (_rootPage is not null)
+            {
+                FindHostPage()?.RemoveLogicalChild(_rootPage);
+            }
+
+            _rootPage = value;
+
+            if (value is not null)
+            {
+                FindHostPage()?.AddLogicalChild(value);
+            }
+        }
+    }
 
     /// <summary>Gets the pages pushed on top of the root page, bottom-first (modals always on top).</summary>
     public IReadOnlyList<NavigationStackPage> PushedPages => _pushedPages;
 
     /// <summary>Appends a newly pushed page.</summary>
-    public void Push(NavigationStackPage entry) => _pushedPages.Add(entry);
+    public void Push(NavigationStackPage entry)
+    {
+        _pushedPages.Add(entry);
+        FindHostPage()?.AddLogicalChild(entry.Page);
+    }
 
     /// <summary>Removes and returns the top page.</summary>
     public NavigationStackPage Pop()
     {
         var entry = _pushedPages[^1];
         _pushedPages.RemoveAt(_pushedPages.Count - 1);
+        FindHostPage()?.RemoveLogicalChild(entry.Page);
 
         return entry;
+    }
+
+    private Page? FindHostPage()
+    {
+        Element? element = owner;
+
+        while (element is not null and not Page)
+        {
+            element = element.Parent;
+        }
+
+        return element as Page;
     }
 
     /// <summary>

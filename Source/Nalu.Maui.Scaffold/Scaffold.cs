@@ -33,8 +33,20 @@ namespace Nalu;
 /// </code>
 /// </remarks>
 [ContentProperty(nameof(Areas))]
-public class Scaffold : Page
+public partial class Scaffold : ContentPage, IDisposable
 {
+    private bool _initialized;
+
+    /// <summary>Occurs when a navigation lifecycle event is triggered.</summary>
+    public event EventHandler<NavigationLifecycleEventArgs>? NavigationEvent;
+
+    internal NavigationService? NavigationService { get; private set; }
+
+    internal ScaffoldProxy? Proxy { get; private set; }
+
+    /// <summary>The platform presenter realizing navigation; assigned by the Scaffold handler.</summary>
+    internal IScaffoldPresenter? Presenter { get; set; }
+
     private static readonly BindablePropertyKey _currentAreaPropertyKey =
         BindableProperty.CreateReadOnly(nameof(CurrentArea), typeof(ScaffoldArea), typeof(Scaffold), null);
 
@@ -149,4 +161,77 @@ public class Scaffold : Page
 
     /// <summary>Sets whether the tab bar is visible for a page.</summary>
     public static void SetTabBarVisible(BindableObject bindable, bool value) => bindable.SetValue(TabBarVisibleProperty, value);
+
+    /// <inheritdoc />
+    protected override void OnHandlerChanged()
+    {
+        base.OnHandlerChanged();
+
+        if (Handler?.MauiContext?.Services is { } services)
+        {
+            EnsurePresenter();
+            _ = InitializeAndPresentAsync(services);
+        }
+    }
+
+    /// <summary>Creates the platform presenter; implemented per platform.</summary>
+    partial void EnsurePresenter();
+
+    private async Task InitializeAndPresentAsync(IServiceProvider services)
+    {
+        await InitializeAsync(services);
+
+        // Initial display: synchronize the presenter with the startup destination.
+        if (Presenter is { } presenter && Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy currentRoot)
+        {
+            await presenter.SynchronizeAsync(currentRoot.Root, ScaffoldPresentationHint.None);
+        }
+    }
+
+    /// <summary>
+    /// Builds the navigation host proxy and initializes the Nalu navigation engine on the
+    /// startup destination. Idempotent; invoked automatically when the handler attaches.
+    /// </summary>
+    internal Task InitializeAsync(IServiceProvider services)
+    {
+        if (_initialized)
+        {
+            return Task.CompletedTask;
+        }
+
+        _initialized = true;
+
+        var navigationService = (NavigationService)services.GetRequiredService<INavigationService>();
+        NavigationService = navigationService;
+
+        var proxy = new ScaffoldProxy(this, navigationService);
+        Proxy = proxy;
+
+        var initialSegmentName = proxy.ResolveInitialSegmentName(InitialRootPageType, navigationService.Configuration);
+        proxy.InitializeWithContent(initialSegmentName);
+
+        return navigationService.InitializeAsync(proxy, initialSegmentName, null);
+    }
+
+    internal void SendNavigationLifecycleEvent(NavigationLifecycleEventArgs args)
+        => NavigationEvent?.Invoke(this, args);
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>Disposes the scaffold's live pages, DI scopes and page models.</summary>
+    /// <param name="disposing">True when disposing managed resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing && Proxy is { } proxy)
+        {
+            proxy.Dispose();
+            NavigationService?.OnShellProxyDisposed(proxy);
+            Proxy = null;
+        }
+    }
 }
