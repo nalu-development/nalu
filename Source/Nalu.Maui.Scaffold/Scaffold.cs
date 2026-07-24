@@ -132,6 +132,10 @@ public partial class Scaffold : ContentPage, IDisposable
     public Scaffold()
     {
         Areas = new ScaffoldElementCollection<ScaffoldArea>(this);
+
+        // Hosted pages chain their Page.Navigation to this proxy (they are logical children):
+        // pops requested through the classic INavigation API route into the engine.
+        ((Microsoft.Maui.Controls.Internals.INavigationProxy)this).NavigationProxy.Inner = new ScaffoldNavigationImpl(this);
     }
 
     /// <summary>Gets the start-edge flyout content attached to an element.</summary>
@@ -169,9 +173,29 @@ public partial class Scaffold : ContentPage, IDisposable
     // callback registered in the Android partial: it routes through the Nalu navigation engine
     // (guards and lifecycle always run) and leaves root pages to the platform default — the app
     // backgrounds with the native predictive back-to-home preview intact.
-    // Page.OnBackButtonPressed is deliberately NOT supported: it only fires for hardware back,
-    // so confirmation logic written there is silently bypassed by on-screen pops.
+    // Page.OnBackButtonPressed on hosted pages is deliberately NOT supported: it only fires for
+    // hardware back, so confirmation logic written there is silently bypassed by on-screen pops.
     // ILeavingGuard is the one confirmation mechanism, covering every leave path uniformly.
+
+    /// <summary>
+    /// Routes back requests arriving through MAUI's legacy/synthetic channel (e.g. automation
+    /// drivers, platforms without dispatcher-based back) into the navigation engine, matching
+    /// the behavior of the Android dispatcher callback. Guards and lifecycle always run.
+    /// </summary>
+    /// <returns>True when a pop was dispatched.</returns>
+    protected override bool OnBackButtonPressed()
+    {
+        if (NavigationService is { } navigationService
+            && Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
+            && rootProxy.Root.NavigationStack.PushedPages.Count > 0)
+        {
+            Dispatcher.Dispatch(() => navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).FireAndForget(Handler));
+
+            return true;
+        }
+
+        return base.OnBackButtonPressed();
+    }
 
     /// <inheritdoc />
     protected override void OnHandlerChanged()

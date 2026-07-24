@@ -458,14 +458,19 @@ The Scaffold must own, with exact ordering:
 
 ### P0 — seam spike (de-risk, throwaway-quality allowed)
 
-> **Status (July 2026): substantially complete.** Contracts stay internal (IVT), engine untouched
-> (531 pre-existing unit tests green). Real `ScaffoldProxy` + area/root proxies implemented and
-> unit-tested against the real engine (7 tests: multi-push single-sync, pop, cross-area, tab
-> preservation, dispose). P0 presenters implemented: iOS child-UIViewController containment,
-> Android fragment hosting — both verified live on simulator/emulator via the `NavScaffold`
-> TestApp harness with **identical lifecycle logs to the Shell host** (push/pop/dispose, guard
-> deny+allow, cross-area teardown). Remaining: point the DevFlow `NavigationTests` UI suite at
-> `NavScaffold` (NaluApp wrapper support) for the formal exit gate.
+> **Status (July 2026): COMPLETE — exit gate passed.** Contracts stay internal (IVT), engine
+> untouched (538 unit tests green). Real `ScaffoldProxy` + area/root proxies unit-tested against
+> the real engine; presenters: iOS child-UIViewController containment, Android fragment hosting;
+> system back via `OnBackPressedDispatcher` (guard-aware, preview-preserving at root);
+> `INavigation` bridge (`page.Navigation` truthful stack + pops routed through the engine);
+> scroll/entry state verified preserved across push/pop on both platforms.
+> **Exit gate: the DevFlow `NavigationTests` suite runs against BOTH hosts
+> (`NavigationTests` = NavShell, `ScaffoldNavigationTests` = NavScaffold) and is green on iOS
+> and Android** — 35 passed / 0 failed per platform. Skips (by design until P1/P2): the tab-bar
+> chrome test on the Scaffold; native-back on Scaffold-iOS (no nav bar yet); native-back on
+> Shell-Android (upstream: MAUI Shell still uses the legacy back channel, dead under
+> predictive-back enforcement). Bonus: the Scaffold does NOT exhibit Shell's documented iOS
+> multi-pop leak (asserted at `Leaked:0`).
 - Contracts promoted/renamed in Nalu.Maui.Navigation; the two `NaluShell` couplings removed; Shell host still green.
 - Bare `Scaffold`: one `ScaffoldArea`/one stack, push/pop with a simple slide, modal push.
 - Correct Appearing/Disappearing, DI scopes, handler disconnect, leak detector.

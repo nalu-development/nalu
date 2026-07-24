@@ -71,7 +71,16 @@
       "WebFetch(domain:codetraveler.io)",
       "WebFetch(domain:github.com)",
       "mcp__maui-devflow__maui_status",
-      "Bash(curl -s -m 3 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:9223/status)"
+      "Bash(curl -s -m 3 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:9223/status)",
+      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-class Nalu.Maui.UITests.Tests.ScaffoldNavigationTests --filter-class Nalu.Maui.UITests.Tests.NavigationTests)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 \"/Users/alberto/github/nalu/UITests/UITests.DevFlow/bin/Debug/net10.0/TestResults/UITests.DevFlow_net10.0_arm64.log\")",
+      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-class Nalu.Maui.UITests.Tests.ScaffoldNavigationTests)",
+      "mcp__maui-devflow__maui_back",
+      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-class Nalu.Maui.UITests.Tests.NavigationTests)",
+      "Bash(git worktree *)",
+      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-class Nalu.Maui.UITests.Tests.NavigationTests --filter-class Nalu.Maui.UITests.Tests.ScaffoldNavigationTests)",
+      "Bash(adb uninstall *)",
+      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-method \"*.NavigationTests.NativeTabSwitchPreservesPushedPages\")"
     ]
   }
 }

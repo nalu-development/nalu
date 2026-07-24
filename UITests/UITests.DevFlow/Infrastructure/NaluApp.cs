@@ -204,6 +204,8 @@ public sealed class NaluApp : IAsyncLifetime
         var stopwatch = Stopwatch.StartNew();
         var effectiveTimeout = timeout ?? _defaultTimeout;
 
+        var found = false;
+
         while (true)
         {
             var matches = await _client.QueryAsync(text: text).ConfigureAwait(false);
@@ -211,6 +213,8 @@ public sealed class NaluApp : IAsyncLifetime
 
             if (element is not null)
             {
+                found = true;
+
                 if (await _client.TapAsync(element.Id).ConfigureAwait(false))
                 {
                     return;
@@ -221,7 +225,13 @@ public sealed class NaluApp : IAsyncLifetime
                 // (The single-element endpoint drops ParentId, so we cannot walk the tree.)
                 if (element.WindowBounds is { } wb)
                 {
-                    var hitTestJson = await _client.HitTestAsync(wb.X + (wb.Width / 2), wb.Y + (wb.Height / 2)).ConfigureAwait(false);
+                    // Integral coordinates only: fractional values get culture-mangled somewhere
+                    // in the transport (it-IT decimal comma → "249,3" reparsed as 2493 → empty
+                    // off-screen hit test). Element centers don't need sub-dp precision anyway.
+                    var hitTestJson = await _client.HitTestAsync(
+                        Math.Round(wb.X + (wb.Width / 2)),
+                        Math.Round(wb.Y + (wb.Height / 2))
+                    ).ConfigureAwait(false);
                     using var hitTest = JsonDocument.Parse(hitTestJson);
 
                     foreach (var ancestor in hitTest.RootElement.GetProperty("elements").EnumerateArray().Take(5))
@@ -235,12 +245,16 @@ public sealed class NaluApp : IAsyncLifetime
                     }
                 }
 
-                throw new InvalidOperationException($"Tap on element with text '{text}' (element {element.Id}) and its ancestors failed.");
+                // A failed tap can mean the click handler THREW (the agent maps handler
+                // exceptions to a generic tap failure) — e.g. a tab tap navigating while the
+                // previous Shell animation is still committing. Transient: retry until timeout.
             }
 
             if (stopwatch.Elapsed >= effectiveTimeout)
             {
-                throw new TimeoutException($"Element with text '{text}' did not appear within {effectiveTimeout.TotalSeconds:0.#}s.");
+                throw found
+                    ? new InvalidOperationException($"Tap on element with text '{text}' (and its ancestors) kept failing for {effectiveTimeout.TotalSeconds:0.#}s.")
+                    : new TimeoutException($"Element with text '{text}' did not appear within {effectiveTimeout.TotalSeconds:0.#}s.");
             }
 
             await Task.Delay(_pollInterval).ConfigureAwait(false);
@@ -595,7 +609,41 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>Navigates back (also closes the top-most modal page, e.g. a popup).</summary>
+    /// <remarks>
+    /// The agent's Back command only understands NavigationPage/Shell stacks: it refuses
+    /// ("stack may be empty") on custom hosts like the Nalu Scaffold. Use
+    /// <see cref="SystemBackAsync"/> to exercise the platform's real back channel.
+    /// </remarks>
     public Task BackAsync() => _client.BackAsync();
+
+    /// <summary>
+    /// Presses the platform's system back button. On Android this injects a real key event via
+    /// adb — exercising the OnBackPressedDispatcher exactly like a user would, host-agnostic.
+    /// On other platforms it falls back to the agent's Back command.
+    /// </summary>
+    public async Task SystemBackAsync()
+    {
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        if (platform.Contains("android", StringComparison.OrdinalIgnoreCase))
+        {
+            var startInfo = new ProcessStartInfo("adb")
+            {
+                ArgumentList = { "shell", "input", "keyevent", "4" },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var process = Process.Start(startInfo)
+                                ?? throw new InvalidOperationException("Could not start 'adb' to send the system back key.");
+
+            await process.WaitForExitAsync().ConfigureAwait(false);
+
+            return;
+        }
+
+        await _client.BackAsync().ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Brings the app back to the test-selection page.
