@@ -197,22 +197,11 @@ public partial class Scaffold : ContentPage, IDisposable
         return base.OnBackButtonPressed();
     }
 
-    /// <inheritdoc />
-    protected override void OnHandlerChanged()
-    {
-        base.OnHandlerChanged();
-
-        if (Handler?.MauiContext?.Services is { } services)
-        {
-            EnsurePresenter();
-            _ = InitializeAndPresentAsync(services);
-        }
-    }
-
-    /// <summary>Creates the platform presenter; implemented per platform.</summary>
-    partial void EnsurePresenter();
-
-    private async Task InitializeAndPresentAsync(IServiceProvider services)
+    /// <summary>
+    /// Bootstraps the navigation engine and synchronizes the presenter with the startup
+    /// destination. Invoked by <see cref="ScaffoldHandler"/> on every handler connection.
+    /// </summary>
+    internal async Task InitializeAndPresentAsync(IServiceProvider services)
     {
         await InitializeAsync(services);
 

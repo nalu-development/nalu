@@ -3,6 +3,7 @@ using AndroidX.AppCompat.App;
 using AndroidX.Fragment.App;
 using Microsoft.Maui.Platform;
 using AView = Android.Views.View;
+using AViewGroup = Android.Views.ViewGroup;
 
 namespace Nalu;
 
@@ -16,14 +17,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 {
     private const int _settleTimeoutMs = 2000;
 
-    private ContentViewGroup? _hostPlatformView;
+    private ScaffoldLayout? _hostPlatformView;
     private FragmentContainerView? _container;
     private ScaffoldPageFragment? _currentFragment;
     private Page? _currentPage;
 
     public async Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint)
     {
-        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ContentViewGroup platformView, MauiContext: { } mauiContext } ||
+        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext } ||
             platformView.Context?.GetActivity() is not AppCompatActivity activity)
         {
             return;
@@ -63,7 +64,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         scaffold.UpdateBackCallbackEnabled();
     }
 
-    private FragmentContainerView EnsureContainer(ContentViewGroup platformView)
+    private FragmentContainerView EnsureContainer(ScaffoldLayout platformView)
     {
         // The host platform view changes when the activity is recreated (system back at root,
         // configuration change): the old container and mounted fragment died with it.
@@ -76,20 +77,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _currentFragment = null;
         _currentPage = null;
 
-        // The page's ContentViewGroup only arranges MAUI children: the natively added
-        // fragment container is measured/laid out manually to fill the host.
+        // ScaffoldLayout is a FrameLayout: a match-parent child is measured and laid out natively.
         var container = new FragmentContainerView(platformView.Context!) { Id = AView.GenerateViewId() };
         _container = container;
-        platformView.AddView(container);
-        platformView.LayoutChange += (_, e) =>
-        {
-            var width = e.Right - e.Left;
-            var height = e.Bottom - e.Top;
-            container.Measure(
-                AView.MeasureSpec.MakeMeasureSpec(width, MeasureSpecMode.Exactly),
-                AView.MeasureSpec.MakeMeasureSpec(height, MeasureSpecMode.Exactly));
-            container.Layout(0, 0, width, height);
-        };
+        platformView.AddView(container, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
 
         return container;
     }

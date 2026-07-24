@@ -28,6 +28,7 @@ public static class MauiProgram
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseNaluTabBar()
+            .UseNaluScaffold()
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()

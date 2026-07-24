@@ -8,8 +8,6 @@ public partial class Scaffold
 {
     private ScaffoldBackCallback? _backCallback;
 
-    partial void EnsurePresenter() => Presenter ??= new ScaffoldPresenter(this);
-
     /// <summary>
     /// Registers the system-back handler on the activity's OnBackPressedDispatcher.
     /// This is the only reliable back channel on modern Android (predictive-back enforcement,
