@@ -26,8 +26,15 @@ internal interface IScaffoldPresenter
     /// <summary>
     /// Brings the platform view hierarchy in sync with the given root's
     /// <see cref="ScaffoldRoot.NavigationStack"/> model, animating per <paramref name="hint"/>.
+    /// Closes any open flyout first (navigation dismisses drawers).
     /// </summary>
     Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint);
+
+    /// <summary>Presents the given content as a flyout sliding in from the given side (scrim behind).</summary>
+    Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content);
+
+    /// <summary>Dismisses the open flyout, if any.</summary>
+    Task CloseFlyoutAsync();
 }
 
 /// <summary>How a <see cref="IScaffoldPresenter.SynchronizeAsync"/> pass should be animated.</summary>

@@ -1,8 +1,44 @@
 # Nalu.Maui.Scaffold — implementation strategy
 
-> Status: **draft for review** — planning document, no implementation started.
+> Status: **implementation in progress** — P0 complete (exit gate passed on both platforms),
+> P1 partially done. Living document: per-section status blocks record what's implemented.
 > Targets: **Android + iOS only** (Windows/Mac Catalyst out of scope).
-> Date: 2026-07-23
+> Created 2026-07-23 · last updated 2026-07-25
+
+## 0. Status at a glance
+
+**Done (verified on iOS simulator + Android emulator, all suites green):**
+
+- Library `Source/Nalu.Maui.Scaffold` in `Nalu.slnx` (net10.0 / -android / -ios26.0; iOS floor 12.2;
+  deliberately NOT in `Nalu.Pack.slnf` nor the `Nalu.Maui` meta package until releasable).
+- Public structure API (§3): `Scaffold` → `ScaffoldArea`/`ScaffoldTabBar` → `ScaffoldRoot`,
+  terse XAML via implicit conversions, engine-owned read-only selection
+  (`CurrentArea`/`CurrentRoot`/`IsSelected`), template metadata quintet
+  (`Title`/`Icon`/`SelectedIcon`/`CurrentIcon`), `IsVisible` (chrome-only), `InitialRootPageType`.
+- Host implementation (§4.1): stack model → proxies → presenter seam → platform presenters →
+  lean `ScaffoldHandler` (`UseNaluScaffold()` registers it — required).
+- System back on Android (§6), `INavigation` bridge (reads + pops), flyout structure (§5.5).
+- Test net: 7 proxy unit tests (538 total green); DevFlow `NavigationTests` parameterized over
+  BOTH hosts (`NavShell` + `NavScaffold`) — 35/35 per platform; state preservation
+  (scroll offset + entry text across push/pop) verified on both platforms.
+
+**Next steps, in recommended order:**
+
+1. **Tab bar** (§5.3): default template consuming the metadata quintet, selection through the
+   engine, active-tab-pops-to-root, bottom-inset contribution per §5.4 — opening with the
+   styling-API design review (owner: Alberto).
+2. **Flyout completion** (§5.5): default template over `Areas`, width/styling API, RTL mapping;
+   edge-swipe open lands with the transition engine (P2).
+3. **Nav bar** (§5.2, hard-minimal) + §5.4 inset distribution in `ScaffoldViewController` /
+   `ScaffoldLayout` (incl. Android fragment-container insets participation).
+4. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
+5. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
+   interactive pop, predictive-back seeking — androidx seeking-version check still pending).
+6. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
+
+**Known open issue (Shell host, not Scaffold):** NaluTabBar renders full-height tab items on the
+Android API 37 emulator (visually broken, taps may fail; files untouched since commit `66c626f`) —
+likely an Android 16/17 behavior change; needs its own investigation.
 
 ## 1. Goals
 
@@ -31,9 +67,15 @@ Build a complete replacement for MAUI `Shell` on mobile platforms that:
 ## 2. Packaging & positioning
 
 - New package **`Nalu.Maui.Scaffold`**, depends on `Nalu.Maui.Navigation` (and `Nalu.Maui.Core`).
-- `Nalu.Maui.Navigation` keeps working with MAUI Shell exactly as today — existing users unaffected.
-- The host-abstraction contracts (today's `IShellProxy` family) get promoted so both hosts implement them (see §4).
-- Registration mirrors the existing pattern: `.UseNaluScaffold(...)` alongside `.UseNaluNavigation(...)`.
+  IMPLEMENTED: net10.0 / net10.0-android / net10.0-ios26.0 (net11 later); iOS floor 12.2, Android 21
+  (repo low-floor policy — native sheets would be runtime-guarded, §7.2); `InternalsVisibleTo`
+  grants from Core and Navigation; **not** in `Nalu.Pack.slnf` / `Nalu.Maui` meta package until
+  there is something releasable (avoids publishing a stub on the next release tag).
+- `Nalu.Maui.Navigation` keeps working with MAUI Shell exactly as today — existing users unaffected
+  (verified: zero engine changes; all pre-existing tests green throughout).
+- The host-abstraction contracts stay `internal`, consumed via IVT (see §4).
+- Registration mirrors the existing pattern: `.UseNaluScaffold()` alongside `.UseNaluNavigation(...)` —
+  IMPLEMENTED and **required** (it registers the `ScaffoldHandler`).
 
 ---
 
@@ -119,6 +161,40 @@ Contract obligations the Scaffold must honor (the engine relies on these):
 - `SendNavigationLifecycleEvent` telemetry passthrough.
 - Change notification when current item/stack/root changes (engine watches structure).
 
+### 4.1 Host architecture (as built)
+
+Layering, bottom-up — each layer testable without the one below:
+
+1. **`ScaffoldNavigationStack`** (per `ScaffoldRoot`, platform-free): lazily created `RootPage`
+   + pushed `NavigationStackPage` entries. Every page entering a stack is logically parented to
+   the hosting `Scaffold` (MAUI requires a page's parent to be a page — Shell's `BaseShellItem`
+   carve-out doesn't apply to us), giving window resolution, tree visibility and tooling for free.
+2. **Proxies** (`ScaffoldProxy`/`ScaffoldAreaProxy`/`ScaffoldRootProxy`): thin engine adapters;
+   `ScaffoldRootProxy` implements section AND content contracts (the synthesized third level).
+   Batching nuance discovered against the real engine: **pops apply to the model immediately**
+   (the engine has already run leaving lifecycle and disposes those pages — deferring leaves
+   ghost entries), while **pushes stay pending until commit** so a multi-push batch presents as
+   ONE transition. Selection state (`CurrentArea`/`CurrentRoot`/`IsSelected`) is written only here.
+3. **`IScaffoldPresenter`** (platform seam): synchronize-to-model with a direction hint
+   (`None`/`Push`/`Pop` — direction is not derivable from a stack diff on replace/cross-area
+   batches, so the proxy passes intent). One awaited synchronization per commit; deterministic
+   completion (no `Task.Delay` hacks). Also owns the flyout layer (§5.5).
+4. **Platform presenters**: iOS = child-`UIViewController` containment (single visible page,
+   covered pages detached NEVER destroyed — scroll/entry state verified preserved);
+   Android = fragment-per-visible-page (`Replace`, no back stack yet — predictive-back
+   integration will build on it), animator-based transitions via `OnCreateAnimator`.
+5. **`ScaffoldHandler`**: lean `ViewHandler` (NOT `PageHandler` — page pipeline carries hidden
+   behaviors; Shell ships its own renderer for the same reason). iOS reimplements
+   `IPlatformViewHandler` to expose its own `ScaffoldViewController` (the window root VC —
+   MAUI installs it, so UIKit containment/safe-area propagation is native); Android owns a plain
+   `FrameLayout` root (`ScaffoldLayout`) so overlay/chrome children lay out natively.
+   Presenter lifetime = one per handler connection (activity recreation / re-attach safe).
+6. **`ScaffoldNavigationImpl`** (`INavigation` bridge, installed as NavigationProxy inner —
+   Shell/NavigationPage's integration point): truthful `NavigationStack`, pops routed through the
+   engine (guard-aware aliases of `Relative().Pop()`), pushes/modals throw with guidance toward
+   `INavigationService`. Kept deliberately: DevFlow-style automation used by customers drives
+   back/pop through this channel.
+
 ---
 
 ## 5. Chrome (all Nalu-drawn)
@@ -153,12 +229,14 @@ Contract obligations the Scaffold must honor (the engine relies on these):
 
 ### 5.3 Tab bar
 
-- `ScaffoldTabBar` ships with a **default Nalu template** that auto-renders its `ScaffoldStack`s from
-  `Title`/`Icon` (NaluTabBar's visual featureset is the starting point: shapes, blur, shadow, scroll padding…).
+- `ScaffoldTabBar` ships with a **default Nalu template** that auto-renders its `ScaffoldRoot`s from
+  the metadata quintet (`Title`/`Icon`/`SelectedIcon`/`CurrentIcon`/`IsSelected`, honoring
+  `IsVisible`) — NaluTabBar's visual featureset is the starting point (shapes, blur, shadow,
+  scroll padding…).
 - **Full replacement supported**: user provides their own virtual view (DataTemplate or direct view);
-  the Scaffold supplies a binding context exposing the stacks, selected index, and a select command.
+  the Scaffold supplies a binding context exposing the roots, selection state, and a select command.
   Tab selection routes through `NavigationService` (guards respected) — never a direct view swap.
-- Tapping the active tab pops that stack to root (existing NaluTabBar behavior, preserved).
+- Tapping the active tab pops that root's stack to its root page (existing NaluTabBar behavior, preserved).
 - Current `NaluTabBar` + its Shell renderers stay in `Nalu.Maui.Navigation` for Shell users;
   the Scaffold version is a fresh implementation without renderer gymnastics (it's just a view in the
   Scaffold's own layout).
@@ -215,6 +293,15 @@ Consequences and requirements:
 
 ### 5.5 Flyout(s) — "it's just a drawer"
 
+> **Status (July 2026): structure IMPLEMENTED and verified on both platforms.**
+> `FlyoutStart`/`FlyoutEnd` attached properties with Page → Area → Scaffold resolution
+> (disabled by default — null at every level); contents are plain MAUI views, logically
+> parented at their attachment point (per-page flyouts inherit the page's BindingContext);
+> `Scaffold.OpenFlyoutAsync(side)`/`CloseFlyoutAsync()`; presenters render scrim + slide-in
+> panel, tap-scrim closes, any navigation auto-closes. Still pending (P1): default template
+> over Areas, edge-swipe open (transition-engine territory), width/styling API (design review),
+> RTL mapping of Start/End.
+
 - **Two drawers: `Start` and `End`** (logical directions, RTL-aware), independently configurable.
 - Content model:
   - **Default template**: auto-renders the Scaffold's `ScaffoldArea`s (title/icon) as navigation entries;
@@ -253,6 +340,12 @@ Notes:
 - "Guarded ⇒ no interactive gesture" is v1 policy; a later option is drag-then-confirm-at-release,
   the engine design (seekable animations, §8) keeps that door open.
 - Tab/flyout selection also routes through the engine, so cross-stack guards keep working exactly as today.
+- **Learned (July 2026)**: modern Android (predictive-back enforcement, targetSdk 36+) never
+  dispatches the legacy `KEYCODE_BACK`/`onBackPressed` channel — MAUI's own
+  `Page.OnBackButtonPressed` contract is dead there app-wide (Shell included). The dispatcher
+  callback's `Enabled` flag must be maintained ahead of the gesture (updated after every
+  presenter synchronization). Automation drivers (DevFlow Back) don't press the system key
+  either — they go through `INavigation`, served by the §4.1 bridge.
 
 ---
 
@@ -438,6 +531,13 @@ The Scaffold must own, with exact ordering:
 - Window/host integration: `Scaffold` sits as `Window.Page`; app backgrounding, theme change, safe-area
   change, and keyboard insets must propagate to the visible page and chrome.
 
+> **Status**: engine-driven lifecycle (Entering/Appearing/Disappearing/Leaving/guards/dispose)
+> verified byte-identical to the Shell host on both platforms (the `NavLog` sequences match).
+> Verified: covered pages are detached, never destroyed — platform view state (scroll offset,
+> entry text) survives push/pop on both platforms; disposal-on-pop asserted by the leak checks.
+> Still pending: forwarding `ViewDidAppear`/`Disappear` from `ScaffoldViewController` into MAUI's
+> page-appearing events for the scaffold page itself (lands with the chrome work).
+
 ---
 
 ## 11. Testing strategy
@@ -445,6 +545,12 @@ The Scaffold must own, with exact ordering:
 - Every behavior lands with a **TestApp page** (`Samples/Nalu.Maui.TestApp/Tests/`, `[TestPage]`)
   and a **DevFlow UI test** (`UITests/UITests.DevFlow`, via the `NaluApp` wrapper — extend the wrapper,
   never call `AgentClient` from tests). See the `maui-devflow-uitests` skill.
+- IMPLEMENTED: the navigation UI suite is an abstract base (`NavigationTestsBase`) parameterized by
+  harness — `NavigationTests` (NavShell) and `ScaffoldNavigationTests` (NavScaffold) run the SAME
+  scenarios against both hosts, with per-host variance points (tab-bar chrome availability,
+  native-back support, multi-pop leak expectation — the Scaffold asserts `Leaked:0` where Shell-iOS
+  has its documented residue). Harness fixtures for state preservation (`HomeStateEntry`, filler
+  rows) and flyouts (`GlobalFlyout`/`SettingsFlyout` + open buttons) are in place for future tests.
 - **P0 exit criterion**: the existing `NavigationTests` suite passes against a Scaffold-hosted TestApp
   variant (proves the host seam holds).
 - Transitions: DevFlow recording for visual verification; assertions on end-state + lifecycle event
@@ -477,9 +583,19 @@ The Scaffold must own, with exact ordering:
 - **Exit**: existing DevFlow `NavigationTests` pass on the Scaffold-hosted TestApp.
 
 ### P1 — structure & chrome
+
+> **Status (July 2026): in progress.**
+> ✅ Full hierarchy incl. cross-area/root navigation with stack preservation (exercised by the
+>   shared UI suite). ✅ Back policy per §6. ✅ Flyout STRUCTURE (attached props, resolution,
+>   open/close, scrim, auto-close on navigation) — templates/styling pending.
+> ⬜ Tab bar (next up — starts with the styling-API design review).
+> ⬜ Flyout default template, width/styling API, RTL.
+> ⬜ Minimal nav bar + §5.4 inset distribution.
+> ⬜ Modal pages (§7.1).
+
 - Full hierarchy: `ScaffoldArea` base, `ScaffoldTabBar` (default template + custom view replacement,
-  stack preservation, active-tab-pops-to-root), `ScaffoldArea`, cross-item/stack navigation.
-- Start/End flyouts with resolution order (Page → Item → global), default template + custom content.
+  stack preservation, active-tab-pops-to-root), cross-item/stack navigation.
+- Start/End flyouts with resolution order (Page → Area → global), default template + custom content.
 - Minimal nav bar (title, TitleView, back button, toolbar items, visibility), safe-area/edge-to-edge.
 - Back policy per §6 (system back interception; no gestures yet).
 - **Exit**: a real-world sample app shape (tabs + drawer + modals) fully navigable with guards.
@@ -509,8 +625,10 @@ The Scaffold must own, with exact ordering:
 | Seekable-animation requirement discovered late | Baked into engine design from PoC gates (retrofit ≈ rewrite). |
 | `androidx.transition` seeking insufficient for predictive back | PoC B explicitly verifies; fallback = custom `ValueAnimator` orchestration (same technique as iOS spike). |
 | STJ under trimming/NativeAOT | `IIntentSerializer` injection point + source-gen context option from day one. |
-| Contract promotion breaks Shell host subtly | Shell host kept green in CI/unit tests throughout P0. |
+| Contract promotion breaks Shell host subtly | Shell host kept green in CI/unit tests throughout P0 (verified: zero engine changes needed). |
 | Two tab bars to maintain (Shell NaluTabBar + Scaffold) | Accepted short-term; Shell variant is feature-frozen once Scaffold ships. |
+| Newest-Android behavior drift (predictive-back enforcement killed legacy back; suspected NaluTabBar layout regression on API 37) | Keep an up-to-date emulator in the local test loop; the parameterized UI suite catches host-visible drift on both hosts. |
+| Automation tooling (DevFlow) hard-codes Shell/NavigationPage assumptions | `INavigation` bridge serves the pop/stack channel; system-back tests use the real dispatcher path; revisit when DevFlow matures. |
 
 ---
 
@@ -528,3 +646,62 @@ The Scaffold must own, with exact ordering:
 6. Snapshot storage location & retention policy (cache dir, single slot vs per-build slot).
 7. Does `Scaffold` need a Shell-style "current page changed" public event surface beyond the existing
    `NavigationEvent` telemetry? (Consumers may want it for analytics.)
+8. `Scaffold` currently derives `ContentPage` only as a historical artifact (its `Content` is dead
+   weight since the lean handler ignores it) — drop to `Page` at the next API review?
+9. Flyout API naming/shape (`OpenFlyoutAsync`/`ScaffoldFlyoutSide`, width/scrim styling,
+   explicit "none" sentinel to suppress an inherited flyout) — design review.
+10. Should `ScaffoldViewController` forward appearing/disappearing to the scaffold page's MAUI
+    events (parity with PageHandler-hosted pages)?
+
+---
+
+## 15. Field notes — hard-won facts from the implementation
+
+Platform and framework behaviors discovered while building P0/P1; they shaped decisions above and
+will bite again if forgotten:
+
+- **MAUI element tree**: `Page.OnParentSet` throws unless the parent is a Page, Window/Application,
+  or `BaseShellItem` (Shell's private carve-out). Scaffold-hosted pages are therefore logically
+  parented to the **Scaffold itself**, wired inside the stack model so every mutation path stays
+  correct. Without logical parenting, pages are invisible to the visual tree (DevFlow) and lose
+  `Window` resolution.
+- **Predictive-back enforcement** (Android 16+/targetSdk 36): the legacy back channel
+  (`KEYCODE_BACK` → `onBackPressed` → MAUI `Page.OnBackButtonPressed`) is never dispatched.
+  `OnBackPressedDispatcher` is the only channel, and the callback's `Enabled` state is consulted
+  BEFORE the gesture — any "ask the page at event time" contract is structurally impossible at
+  stack roots. This drove §6: `ILeavingGuard` as the one confirmation mechanism.
+- **Back-at-root finishes the activity** (observed API 37): relaunch = new activity over a live
+  process. Presenters must treat "host platform view changed" as full reset; handler-owned
+  presenter-per-connection makes this structural. Same path covers configuration changes.
+- **Fragment hosting traps** (PoC-discovered, revalidated in the library): only async
+  `Commit`/`CommitAllowingStateLoss` (MAUI's own `ScopedFragment` transaction may be executing);
+  managed `androidx.transition.Transition` subclasses crash on `Transition.clone()` (managed peer
+  loss) — animator-based `Fragment.OnCreateAnimator` is the supported, seekable path;
+  `IOnBackStackChangedListener` requires implementing ALL newer default interface methods.
+- **Android binding overload traps**: `LinearGradient(..., int, int, ...)` silently binds to the
+  color-long overload → runtime ColorSpace crash; prefer array overloads.
+- **iOS window-root hosting**: MAUI installs the handler's `IPlatformViewHandler.ViewController`
+  as the window's root VC — a lean `ViewHandler` + interface reimplementation (ShellRenderer
+  pattern) beats `PageHandler` (hidden page-pipeline behaviors). Child-VC containment then gives
+  safe-area/appearance propagation natively; the same chain is the future carrier of
+  `AdditionalSafeAreaInsets` chrome contributions (§5.4). Constraint: this holds because the
+  Scaffold is the window root — document it (Shell has the same constraint).
+- **State preservation model**: covered pages are detached, never destroyed — the page handler
+  owns the platform view; presenters reparent the same instance (iOS: same VC re-added; Android:
+  same platform view re-hosted by a NEW fragment). Verified: scroll offset and entry text survive
+  push/pop on both platforms. Corollary: window-attachment-driven state (running animations,
+  video surfaces) pauses while covered — same as Shell.
+- **DevFlow's synthetic Back** is not the system key: it drives NavigationPage/Shell/`INavigation`.
+  The Scaffold serves it via the `INavigation` bridge; MAUI's default `NavigationProxy` (no inner)
+  would otherwise silently manipulate a FAKE stack — worse than throwing.
+- **Engine batching truth** (from `ExecuteRelativeNavigationAsync`): guard checks commit
+  mid-navigation and re-begin (an extra presenter sync showing the intermediate state is correct
+  and required); pops run leaving lifecycle BEFORE `PopAsync` and the engine disposes those pages
+  — the host model must reflect pops immediately or re-entry crashes on ghost entries.
+- **Multi-pop leak**: Shell-iOS's documented pop-to-root renderer-tracker leak does NOT exist in
+  the Scaffold (asserted `Leaked:0` in the shared suite) — evidence the leak is Shell-adapter
+  specific, not engine-caused.
+- **DevFlow environment**: two agent-enabled apps collide on port 9223 with half-registered
+  brokers (kill the other app; `adb forward` vs iOS-simulator binds conflict on the HOST port —
+  remove forwards when switching platforms). Identical-byte screenshots are the tell for a stale
+  agent connection.

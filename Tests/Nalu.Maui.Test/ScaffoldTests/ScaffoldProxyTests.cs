@@ -69,6 +69,10 @@ public class ScaffoldProxyTests
 
             return Task.CompletedTask;
         }
+
+        public Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content) => Task.CompletedTask;
+
+        public Task CloseFlyoutAsync() => Task.CompletedTask;
     }
 
     private readonly ServiceProvider _serviceProvider;

@@ -15,8 +15,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 {
     private const double _transitionDurationSeconds = 0.25;
 
+    // Provisional chrome metrics (final styling surface arrives with the P1 API review).
+    private const double _flyoutWidthRatio = 0.85;
+    private const double _flyoutMaxWidth = 360;
+    private const float _flyoutScrimAlpha = 0.4f;
+
     private Page? _currentPage;
     private UIViewController? _currentController;
+    private UIView? _flyoutScrim;
+    private UIView? _flyoutPanel;
+    private ScaffoldFlyoutSide _flyoutSide;
 
     public async Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint)
     {
@@ -24,6 +32,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         {
             return;
         }
+
+        // Navigation dismisses any open flyout.
+        await CloseFlyoutAsync();
 
         var stack = root.NavigationStack;
         var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
@@ -75,5 +86,66 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             previousController.View?.RemoveFromSuperview();
             previousController.RemoveFromParentViewController();
         }
+    }
+
+    public async Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content)
+    {
+        if (_flyoutPanel is not null
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: { } container, MauiContext: { } mauiContext })
+        {
+            return;
+        }
+
+        var containerWidth = container.Bounds.Width;
+        var containerHeight = container.Bounds.Height;
+        var width = Math.Min(containerWidth * _flyoutWidthRatio, _flyoutMaxWidth);
+
+        var scrim = new UIView(container.Bounds)
+        {
+            BackgroundColor = UIColor.Black,
+            Alpha = 0,
+            AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight
+        };
+        scrim.AddGestureRecognizer(new UITapGestureRecognizer(() => _ = CloseFlyoutAsync()));
+        container.AddSubview(scrim);
+
+        var panel = content.ToPlatform(mauiContext);
+        var offscreenX = side == ScaffoldFlyoutSide.Start ? -width : containerWidth;
+        var openX = side == ScaffoldFlyoutSide.Start ? 0 : containerWidth - width;
+        panel.Frame = new CGRect(offscreenX, 0, width, containerHeight);
+        container.AddSubview(panel);
+
+        _flyoutScrim = scrim;
+        _flyoutPanel = panel;
+        _flyoutSide = side;
+
+        await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+        {
+            scrim.Alpha = _flyoutScrimAlpha;
+            panel.Frame = new CGRect(openX, 0, width, containerHeight);
+        });
+    }
+
+    public async Task CloseFlyoutAsync()
+    {
+        if (_flyoutPanel is not { } panel || _flyoutScrim is not { } scrim)
+        {
+            return;
+        }
+
+        _flyoutPanel = null;
+        _flyoutScrim = null;
+
+        var containerWidth = panel.Superview?.Bounds.Width ?? panel.Frame.Width;
+        var offscreenX = _flyoutSide == ScaffoldFlyoutSide.Start ? -panel.Frame.Width : containerWidth;
+
+        await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+        {
+            scrim.Alpha = 0;
+            panel.Frame = new CGRect(offscreenX, panel.Frame.Y, panel.Frame.Width, panel.Frame.Height);
+        });
+
+        panel.RemoveFromSuperview();
+        scrim.RemoveFromSuperview();
     }
 }

@@ -58,17 +58,19 @@ public partial class Scaffold : ContentPage, IDisposable
     /// Attached property holding the start-edge (leading) flyout content.
     /// Resolution order, most specific wins: current <see cref="Page"/> →
     /// current <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> itself (global).
-    /// No value at any level means the drawer does not exist.
+    /// No value at any level means the flyout is disabled (the default).
+    /// The content is a plain MAUI view, logically parented to the element it is attached to
+    /// (a per-page flyout inherits that page's BindingContext).
     /// </summary>
     public static readonly BindableProperty FlyoutStartProperty =
-        BindableProperty.CreateAttached(nameof(FlyoutStart), typeof(View), typeof(Scaffold), null);
+        BindableProperty.CreateAttached(nameof(FlyoutStart), typeof(View), typeof(Scaffold), null, propertyChanged: OnFlyoutContentChanged);
 
     /// <summary>
     /// Attached property holding the end-edge (trailing) flyout content.
     /// Same resolution rules as <see cref="FlyoutStartProperty"/>.
     /// </summary>
     public static readonly BindableProperty FlyoutEndProperty =
-        BindableProperty.CreateAttached(nameof(FlyoutEnd), typeof(View), typeof(Scaffold), null);
+        BindableProperty.CreateAttached(nameof(FlyoutEnd), typeof(View), typeof(Scaffold), null, propertyChanged: OnFlyoutContentChanged);
 
     /// <summary>
     /// Attached property replacing the navigation bar title view for a <see cref="Page"/>.
@@ -149,6 +151,53 @@ public partial class Scaffold : ContentPage, IDisposable
 
     /// <summary>Sets the end-edge flyout content attached to an element.</summary>
     public static void SetFlyoutEnd(BindableObject bindable, View? value) => bindable.SetValue(FlyoutEndProperty, value);
+
+    private static void OnFlyoutContentChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        // Flyout content participates in the element tree at its attachment point:
+        // BindingContext/resource inheritance and tooling visibility come for free.
+        if (bindable is Element element)
+        {
+            if (oldValue is View oldView)
+            {
+                element.RemoveLogicalChild(oldView);
+            }
+
+            if (newValue is View newView)
+            {
+                element.AddLogicalChild(newView);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Opens the flyout for the given side, resolving its content from the current page,
+    /// then the current area, then the scaffold's own value. No-op when no content is
+    /// configured at any level or the scaffold is not presented yet.
+    /// </summary>
+    /// <param name="side">The edge the flyout slides in from.</param>
+    public Task OpenFlyoutAsync(ScaffoldFlyoutSide side)
+        => Presenter is { } presenter && ResolveFlyoutContent(side) is { } content
+            ? presenter.OpenFlyoutAsync(side, content)
+            : Task.CompletedTask;
+
+    /// <summary>Closes the open flyout, if any.</summary>
+    public Task CloseFlyoutAsync()
+        => Presenter is { } presenter ? presenter.CloseFlyoutAsync() : Task.CompletedTask;
+
+    internal View? ResolveFlyoutContent(ScaffoldFlyoutSide side)
+    {
+        var property = side == ScaffoldFlyoutSide.Start ? FlyoutStartProperty : FlyoutEndProperty;
+        var currentRoot = (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root;
+        var stack = currentRoot?.NavigationStack;
+        var currentPage = stack is null ? null
+            : stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page
+            : stack.RootPage;
+
+        return (currentPage?.GetValue(property) as View)
+               ?? (CurrentArea?.GetValue(property) as View)
+               ?? GetValue(property) as View;
+    }
 
     /// <summary>Gets the navigation bar title view attached to a page.</summary>
     public static View? GetTitleView(BindableObject bindable) => (View?)bindable.GetValue(TitleViewProperty);
