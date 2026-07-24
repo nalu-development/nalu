@@ -51,6 +51,12 @@ public class ScaffoldRoot : Element
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     public Type? PageType { get; set; }
 
+    /// <summary>
+    /// Gets the live navigation stack hosted by this root — the state the Scaffold's navigation
+    /// proxies mutate and the platform presenter realizes.
+    /// </summary>
+    internal ScaffoldNavigationStack NavigationStack { get; } = new();
+
     /// <summary>Gets or sets the display title used by the default tab bar template.</summary>
     public string? Title
     {
