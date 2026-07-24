@@ -241,7 +241,9 @@ Single policy, enforced because we own every entry point:
 | Back trigger | Behavior |
 |---|---|
 | Nav-bar back button | Routes through `Navigation.Relative().Pop()` → guards run normally. |
-| Android hardware/system back | Intercepted (`OnBackPressedDispatcher`), routed through Pop → guards run. |
+| Android hardware/system back | Intercepted (`OnBackPressedDispatcher` — the only channel under predictive-back enforcement, targetSdk 36+; works on all Android versions), routed through Pop → guards run. IMPLEMENTED. |
+| Android back at stack root | Always the platform default: callback disabled → app backgrounds with the native predictive back-to-home preview intact. No interception hook by design. IMPLEMENTED. |
+| `Page.OnBackButtonPressed` | **Deliberately unsupported** (decided): it only fires for hardware back, so confirmation logic written there is silently bypassed by on-screen pops — a bug factory. `ILeavingGuard` is the one confirmation mechanism, covering every leave path uniformly (back, buttons, absolute navigations, tab switches). Root exit-confirmation is a non-goal (modern-Android anti-pattern; no iOS equivalent). |
 | Android predictive back (preview animation) | **Enabled only when the current page has no guard** (`HasGuard` is known synchronously). Guarded page ⇒ gesture registered as non-predictive back → guard runs on commit. |
 | iOS interactive edge-swipe | Implemented by our transition engine (percent-driven). **Disabled when the current page has a guard** (decided). |
 | iOS long-press back menu | Does not exist (no UINavigationBar). Not reimplemented (decided). |
@@ -455,6 +457,15 @@ The Scaffold must own, with exact ordering:
 ## 12. Phasing
 
 ### P0 — seam spike (de-risk, throwaway-quality allowed)
+
+> **Status (July 2026): substantially complete.** Contracts stay internal (IVT), engine untouched
+> (531 pre-existing unit tests green). Real `ScaffoldProxy` + area/root proxies implemented and
+> unit-tested against the real engine (7 tests: multi-push single-sync, pop, cross-area, tab
+> preservation, dispose). P0 presenters implemented: iOS child-UIViewController containment,
+> Android fragment hosting — both verified live on simulator/emulator via the `NavScaffold`
+> TestApp harness with **identical lifecycle logs to the Shell host** (push/pop/dispose, guard
+> deny+allow, cross-area teardown). Remaining: point the DevFlow `NavigationTests` UI suite at
+> `NavScaffold` (NaluApp wrapper support) for the formal exit gate.
 - Contracts promoted/renamed in Nalu.Maui.Navigation; the two `NaluShell` couplings removed; Shell host still green.
 - Bare `Scaffold`: one `ScaffoldArea`/one stack, push/pop with a simple slide, modal push.
 - Correct Appearing/Disappearing, DI scopes, handler disconnect, leak detector.

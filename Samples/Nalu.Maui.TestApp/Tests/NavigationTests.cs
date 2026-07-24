@@ -261,15 +261,27 @@ public class NavHomePage : ContentPage
         var resolvedLabel = new Label { AutomationId = "ResolvedLabel", FontSize = 14 };
         resolvedLabel.SetBinding(Label.TextProperty, nameof(NavHomePageModel.ResolvedValue));
 
+        // State-preservation fixtures: transient platform state (entry text, scroll offset)
+        // must survive being covered by a push and restored by a pop.
+        var stateEntry = new Entry { AutomationId = "HomeStateEntry", Placeholder = "state", FontSize = 11 };
+
+        var fillers = Enumerable.Range(0, 40)
+                                .Select(i => (View) new Label { Text = $"Filler {i}", AutomationId = $"HomeFiller{i}", FontSize = 11 })
+                                .ToArray();
+
         var inner = NavPageFactory.BuildContent(
             "Home",
-            resolvedLabel,
-            NavPageFactory.MakeButton("Push Detail", "PushDetailButton", model.PushDetail),
-            NavPageFactory.MakeButton("Push Detail + intent", "PushDetailIntentButton", model.PushDetailWithIntent),
-            NavPageFactory.MakeButton("Resolve pick", "ResolvePickButton", model.ResolvePick),
-            NavPageFactory.MakeButton("Go Search root", "GoSearchRootButton", model.GoSearchRoot),
-            NavPageFactory.MakeButton("Go Settings root", "GoSettingsRootButton", model.GoSettingsRoot),
-            NavPageFactory.MakeButton("Go Search + Editor", "GoSearchAddEditorButton", model.GoSearchRootAddEditor)
+            [
+                resolvedLabel,
+                stateEntry,
+                NavPageFactory.MakeButton("Push Detail", "PushDetailButton", model.PushDetail),
+                NavPageFactory.MakeButton("Push Detail + intent", "PushDetailIntentButton", model.PushDetailWithIntent),
+                NavPageFactory.MakeButton("Resolve pick", "ResolvePickButton", model.ResolvePick),
+                NavPageFactory.MakeButton("Go Search root", "GoSearchRootButton", model.GoSearchRoot),
+                NavPageFactory.MakeButton("Go Settings root", "GoSettingsRootButton", model.GoSettingsRoot),
+                NavPageFactory.MakeButton("Go Search + Editor", "GoSearchAddEditorButton", model.GoSearchRootAddEditor),
+                .. fillers
+            ]
         );
 
         Title = "Home";

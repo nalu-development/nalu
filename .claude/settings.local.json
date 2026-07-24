@@ -69,7 +69,9 @@
       "Bash(dotnet sln *)",
       "WebSearch",
       "WebFetch(domain:codetraveler.io)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__maui-devflow__maui_status",
+      "Bash(curl -s -m 3 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:9223/status)"
     ]
   }
 }

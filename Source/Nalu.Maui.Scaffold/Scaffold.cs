@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Nalu.Internals;
 
 namespace Nalu;
 
@@ -90,6 +91,7 @@ public partial class Scaffold : ContentPage, IDisposable
     public static readonly BindableProperty TabBarVisibleProperty =
         BindableProperty.CreateAttached("TabBarVisible", typeof(bool), typeof(Scaffold), true);
 
+
     /// <summary>
     /// Gets or sets the page type of the root to open at startup. Optional: when not set, the
     /// first root of the first area is opened. Must match the <see cref="ScaffoldRoot.PageType"/>
@@ -161,6 +163,15 @@ public partial class Scaffold : ContentPage, IDisposable
 
     /// <summary>Sets whether the tab bar is visible for a page.</summary>
     public static void SetTabBarVisible(BindableObject bindable, bool value) => bindable.SetValue(TabBarVisibleProperty, value);
+
+
+    // System back (Android hardware/gesture back) is handled by the OnBackPressedDispatcher
+    // callback registered in the Android partial: it routes through the Nalu navigation engine
+    // (guards and lifecycle always run) and leaves root pages to the platform default — the app
+    // backgrounds with the native predictive back-to-home preview intact.
+    // Page.OnBackButtonPressed is deliberately NOT supported: it only fires for hardware back,
+    // so confirmation logic written there is silently bypassed by on-screen pops.
+    // ILeavingGuard is the one confirmation mechanism, covering every leave path uniformly.
 
     /// <inheritdoc />
     protected override void OnHandlerChanged()

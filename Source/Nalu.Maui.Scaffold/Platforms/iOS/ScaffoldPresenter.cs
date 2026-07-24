@@ -13,16 +13,14 @@ namespace Nalu;
 /// </summary>
 internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 {
-    private const double TransitionDurationSeconds = 0.25;
+    private const double _transitionDurationSeconds = 0.25;
 
     private Page? _currentPage;
     private UIViewController? _currentController;
 
     public async Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint)
     {
-        if (scaffold.Handler is not IPlatformViewHandler { ViewController: { } parentController } handler
-            || handler.PlatformView is not { } container
-            || handler.MauiContext is not { } mauiContext)
+        if (scaffold.Handler is not IPlatformViewHandler { ViewController: { } parentController, PlatformView: { } container, MauiContext: { } mauiContext })
         {
             return;
         }
@@ -53,14 +51,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 container.AddSubview(newView);
                 newController.DidMoveToParentViewController(parentController);
                 newView.Transform = CGAffineTransform.MakeTranslation(width, 0);
-                await UIView.AnimateAsync(TransitionDurationSeconds, () => newView.Transform = CGAffineTransform.MakeIdentity());
+                await UIView.AnimateAsync(_transitionDurationSeconds, () => newView.Transform = CGAffineTransform.MakeIdentity());
 
                 break;
 
             case ScaffoldPresentationHint.Pop when previousController?.View is { } previousView:
                 container.InsertSubviewBelow(newView, previousView);
                 newController.DidMoveToParentViewController(parentController);
-                await UIView.AnimateAsync(TransitionDurationSeconds, () => previousView.Transform = CGAffineTransform.MakeTranslation(width, 0));
+                await UIView.AnimateAsync(_transitionDurationSeconds, () => previousView.Transform = CGAffineTransform.MakeTranslation(width, 0));
 
                 break;
 
