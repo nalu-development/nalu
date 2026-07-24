@@ -142,9 +142,6 @@ internal class ShellProxy : IShellProxy, IDisposable
         throw new KeyNotFoundException($"Could not find content with segment name '{name}'");
     }
 
-    public Color GetToolbarIconColor(Page page) =>
-        Shell.GetTitleColor(page.IsSet(Shell.TitleColorProperty) ? page : _shell);
-
     public Task PushAsync(string segmentName, Page page)
     {
         if (_navigationTarget == null)

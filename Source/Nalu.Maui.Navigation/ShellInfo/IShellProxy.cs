@@ -9,7 +9,6 @@ internal interface IShellProxy
     Task CommitNavigationAsync(Action? completeAction = null);
     IShellItemProxy CurrentItem { get; }
     IReadOnlyList<IShellItemProxy> Items { get; }
-    Color GetToolbarIconColor(Page page);
     IShellContentProxy GetContent(string segmentName);
     Task SelectContentAsync(string segmentName);
     void InitializeWithContent(string segmentName);

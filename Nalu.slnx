@@ -54,6 +54,7 @@
     <Project Path="Source/Nalu.Maui.Core/Nalu.Maui.Core.csproj" />
     <Project Path="Source/Nalu.Maui.Layouts/Nalu.Maui.Layouts.csproj" />
     <Project Path="Source/Nalu.Maui.Navigation/Nalu.Maui.Navigation.csproj" />
+    <Project Path="Source/Nalu.Maui.Scaffold/Nalu.Maui.Scaffold.csproj" />
     <Project Path="Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj" />
   </Folder>
   <Folder Name="/Tests/">
