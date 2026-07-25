@@ -24,6 +24,7 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
 
     private readonly TaskCompletionSource _presented = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _dismissed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private ScaffoldPresentationHint _removalHint = ScaffoldPresentationHint.None;
 
     /// <summary>Completes when the fragment's view is laid out and its enter animation (if any) finished.</summary>
     public Task PresentedTask => _presented.Task;
@@ -31,8 +32,21 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
     /// <summary>Completes when the fragment's exit animation finished (or immediately when it has none).</summary>
     public Task DismissedTask => _dismissed.Task;
 
-    /// <summary>Whether this fragment's entry is animated (its presented signal comes from the animator end).</summary>
-    private bool HasAnimatedEnter => hint is ScaffoldPresentationHint.Push or ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd;
+    /// <summary>
+    /// Whether this fragment's entry is animated by OUR animator (its presented signal comes from
+    /// the animator end). A shared-element entry never is: the fragment framework IGNORES
+    /// animators on fragments involved in a transition, so the postponed path signals presented
+    /// at first pre-draw and rides the transition framework for any page motion.
+    /// </summary>
+    private bool HasAnimatedEnter => !postponeForSharedElements
+        && hint is ScaffoldPresentationHint.Push or ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd;
+
+    /// <summary>
+    /// Called by the presenter right before this fragment is replaced: the CURRENT navigation's
+    /// hint decides the exit choreography (a pop slides the removed page out; a push leaves it
+    /// static beneath the incoming slide) — the creation hint says nothing about how we leave.
+    /// </summary>
+    public void PrepareRemoval(ScaffoldPresentationHint removalHint) => _removalHint = removalHint;
 
     public override AView OnCreateView(LayoutInflater inflater, ViewGroup? parent, Bundle? savedInstanceState)
     {
@@ -102,6 +116,13 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
             return null;
         }
 
+        if (enter && postponeForSharedElements)
+        {
+            // Involved in a shared-element transition: the framework would ignore this animator
+            // anyway — page motion comes from the transition set; presented fires at pre-draw.
+            return null;
+        }
+
         if (enter && hint == ScaffoldPresentationHint.Push)
         {
             return BuildAnimator(view, fromX: width, toX: 0, elevate: true, _presented);
@@ -116,7 +137,7 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
             return BuildAnimator(view, fromX: fromX, toX: 0, elevate: true, _presented);
         }
 
-        if (!enter && IsRemoving && hint == ScaffoldPresentationHint.Pop)
+        if (!enter && IsRemoving && _removalHint == ScaffoldPresentationHint.Pop)
         {
             return BuildAnimator(view, fromX: 0, toX: width, elevate: true, _dismissed);
         }

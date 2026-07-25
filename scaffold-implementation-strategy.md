@@ -558,6 +558,16 @@ Key facts anchoring the decision:
 >   Transition subclasses break on clone), `postponeEnterTransition` + pre-draw as the
 >   readiness gate. Both push AND pop wire pairs as enter transitions (Replace-based, no back
 >   stack).
+> - Android gotchas (measured with logcat timing, July 2026): the fragment framework IGNORES
+>   `OnCreateAnimator` animators on transition-involved fragments, so (a) the incoming page's
+>   slide must be a transition-framework `Slide` set as `EnterTransition` (shared pairs are
+>   excluded from it automatically), and (b) the presented signal fires at first pre-draw for
+>   postponed fragments — wiring it to the (never-running) animator end made every SET push eat
+>   the full 2 s settle timeout, which blocked the engine and silently swallowed pop taps
+>   (perceived "freeze on pop"). Also: exit choreography must come from the CURRENT
+>   navigation's hint (`PrepareRemoval(hint)` on the outgoing fragment), not the hint the
+>   fragment was created with — the creation-hint test made the old page slide out on push and
+>   left real pops with no exit slide.
 > - Verified: mid-flight frames captured on both platforms; `ScaffoldTransitionChromeTests`
 >   (end-geometry + flight cleanup restoration + repeated round trips) green on both.
 > - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option, interactive

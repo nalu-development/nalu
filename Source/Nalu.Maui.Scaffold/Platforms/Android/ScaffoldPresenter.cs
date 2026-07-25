@@ -141,6 +141,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 var outgoingTagged = ScaffoldTransitions.Collect(previousPage!);
                 fragment.SharedElementEnterTransition = CreateSharedElementTransition();
 
+                // The fragment framework IGNORES animators on transition-involved fragments, so
+                // the incoming page's slide must ride the transition framework too (the shared
+                // element pairs are excluded from it and follow the SET instead).
+                var slideEdge = hint switch
+                {
+                    ScaffoldPresentationHint.Push or ScaffoldPresentationHint.SlideEnd => (int)GravityFlags.End,
+                    ScaffoldPresentationHint.SlideStart => (int)GravityFlags.Start,
+                    _ => 0
+                };
+
+                if (slideEdge != 0)
+                {
+                    var slide = new AndroidX.Transitions.Slide(slideEdge);
+                    slide.SetDuration(_overlayDurationMs);
+                    fragment.EnterTransition = slide;
+                }
+
                 foreach (var name in sharedNames)
                 {
                     var sharedPlatformView = outgoingTagged[name].ToPlatform(mauiContext);
@@ -149,9 +166,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 }
             }
 
+            // The CURRENT navigation decides how the outgoing page leaves (a pop slides it out
+            // to the end edge; a push leaves it static beneath the incoming slide).
+            previousFragment?.PrepareRemoval(hint);
+
             transaction
                 .Replace(container.Id, fragment)
                 .CommitAllowingStateLoss();
+
 
             // Deterministic completion: presentation of the new page plus dismissal animation of
             // the previous one, with a settle timeout as a safety net.
