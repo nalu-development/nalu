@@ -37,6 +37,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private View? _currentBarView;
     private ScaffoldTabBar? _currentTabBarArea;
     private int _lastStripHeight;
+    private bool _barPresented;
+    private Android.Animation.ObjectAnimator? _stripAnimator;
 
     private AView? _overlayScrim;
     private AView? _overlayPanel;
@@ -136,6 +138,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _tabBarStrip = null;
         _currentBarView = null;
         _currentTabBarArea = null;
+        _barPresented = false;
+        _stripAnimator = null;
 
         var context = platformView.Context!;
 
@@ -154,16 +158,34 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     }
 
     /// <summary>
-    /// Brings the chrome to the desired state: mounts the strip and bar view, slides the strip
-    /// in/out (concurrently with the page transition), and unmounts the bar view on hide so the
-    /// element tree reflects presented chrome.
+    /// Brings the chrome to the desired state. Visibility changes RETARGET any in-flight
+    /// slide from its current position (the previous animator is canceled — no queue, no
+    /// teardown): the strip stays mounted while its area is a tab bar — hidden just means
+    /// translated offscreen — so rapid toggles reverse smoothly and re-showing is instant.
+    /// The bar view's logical attachment still tracks presented state (the element tree
+    /// reflects presented chrome).
     /// </summary>
-    private async Task UpdateTabBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, ScaffoldTabBar? tabBarArea, bool barVisible, bool animated)
+    private Task UpdateTabBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, ScaffoldTabBar? tabBarArea, bool barVisible, bool animated)
     {
-        if (tabBarArea is not null && barVisible)
+        if (tabBarArea is null)
+        {
+            // Area without a tab bar: tear the strip down entirely (animated slide-out first).
+            if (_currentBarView is null || _tabBarStrip is not { } strip)
+            {
+                return Task.CompletedTask;
+            }
+
+            var previousArea = _currentTabBarArea;
+            _currentBarView = null;
+            _currentTabBarArea = null;
+            _barPresented = false;
+
+            return UnmountAsync(strip, previousArea);
+        }
+
+        if (barVisible)
         {
             var barView = tabBarArea.GetOrCreateBarView();
-            var wasHidden = _currentBarView is null;
 
             if (_tabBarStrip is null)
             {
@@ -179,12 +201,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 );
             }
 
+            var freshMount = false;
+
             if (!ReferenceEquals(barView, _currentBarView))
             {
                 var previousArea = _currentTabBarArea;
                 _currentBarView = barView;
                 _currentTabBarArea = tabBarArea;
                 _tabBarStrip.SetBar(barView.ToPlatform(mauiContext));
+                freshMount = true;
 
                 if (previousArea is not null && !ReferenceEquals(previousArea, tabBarArea))
                 {
@@ -194,57 +219,77 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
             _tabBarStrip.Visibility = ViewStates.Visible;
 
-            if (wasHidden && animated && _lastStripHeight > 0)
+            if (freshMount && !_barPresented && animated && _lastStripHeight > 0)
             {
                 // A freshly appearing bar starts below the edge and slides in with the pop.
                 _tabBarStrip.TranslationY = _lastStripHeight;
-                await AnimateTranslationYAsync(_tabBarStrip, 0).ConfigureAwait(true);
             }
-            else
-            {
-                _tabBarStrip.TranslationY = 0;
-            }
+
+            _barPresented = true;
 
             if (_tabBarStrip.Height > 0)
             {
                 _lastStripHeight = _tabBarStrip.Height;
             }
 
-            return;
+            return AnimateStripToAsync(_tabBarStrip, 0, animated);
         }
 
-        if (_currentBarView is not null && _tabBarStrip is { } strip)
+        // Hidden: keep the strip alive offscreen; only the logical attachment reflects it.
+        _currentTabBarArea?.OnBarViewUnmounted();
+        _barPresented = false;
+
+        if (_tabBarStrip is not { } hiddenStrip)
         {
-            var previousArea = _currentTabBarArea;
-            _currentBarView = null;
-            _currentTabBarArea = null;
+            return Task.CompletedTask;
+        }
 
-            if (strip.Height > 0)
+        if (hiddenStrip.Height > 0)
+        {
+            _lastStripHeight = hiddenStrip.Height;
+        }
+
+        return _lastStripHeight > 0
+            ? AnimateStripToAsync(hiddenStrip, _lastStripHeight, animated)
+            : Task.CompletedTask;
+
+        async Task UnmountAsync(ScaffoldTabBarStripLayout stripToRemove, ScaffoldTabBar? previousArea)
+        {
+            if (stripToRemove.Height > 0)
             {
-                _lastStripHeight = strip.Height;
+                _lastStripHeight = stripToRemove.Height;
+                await AnimateStripToAsync(stripToRemove, stripToRemove.Height, animated).ConfigureAwait(true);
             }
 
-            if (animated && strip.Height > 0)
-            {
-                await AnimateTranslationYAsync(strip, strip.Height).ConfigureAwait(true);
-            }
-
-            strip.Visibility = ViewStates.Gone;
-            strip.TranslationY = 0;
-            strip.SetBar(null);
-
-            // The element tree reflects presented chrome: detach the bar view on unmount.
+            stripToRemove.Visibility = ViewStates.Gone;
+            stripToRemove.TranslationY = 0;
+            stripToRemove.SetBar(null);
             previousArea?.OnBarViewUnmounted();
         }
     }
 
-    private static Task AnimateTranslationYAsync(AView view, float target)
+    /// <summary>
+    /// Retargets the strip's slide: the previous animator is canceled and the new one starts
+    /// from the CURRENT translation — rapid toggles reverse smoothly mid-flight.
+    /// </summary>
+    private Task AnimateStripToAsync(AView strip, float target, bool animated)
     {
+        _stripAnimator?.Cancel();
+        _stripAnimator = null;
+
+        if (!animated)
+        {
+            strip.TranslationY = target;
+
+            return Task.CompletedTask;
+        }
+
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var animator = Android.Animation.ObjectAnimator.OfFloat(view, "translationY", view.TranslationY, target)!;
+        var animator = Android.Animation.ObjectAnimator.OfFloat(strip, "translationY", strip.TranslationY, target)!;
         animator.SetDuration(_overlayDurationMs);
         animator.AnimationEnd += (_, _) => completion.TrySetResult();
+        _stripAnimator = animator;
         animator.Start();
 
         return completion.Task;

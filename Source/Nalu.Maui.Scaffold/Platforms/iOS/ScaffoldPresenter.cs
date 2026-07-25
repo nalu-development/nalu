@@ -178,13 +178,30 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     }
 
     /// <summary>
-    /// Brings the chrome to the desired state: mounts the bar (measured synchronously so the
-    /// footprint is valid before the page mounts), slides it in/out, and unmounts on hide so
-    /// the element tree reflects presented chrome.
+    /// Brings the chrome to the desired state. Visibility changes RETARGET any in-flight
+    /// slide from its current position (no queue, no teardown): the strip stays mounted while
+    /// its area is a tab bar — hidden just means translated offscreen — so rapid toggles
+    /// reverse smoothly and re-showing is instant. The bar view's logical attachment still
+    /// tracks presented state (the element tree reflects presented chrome).
     /// </summary>
     private Task UpdateTabBarChromeAsync(ScaffoldViewController controller, IMauiContext mauiContext, ScaffoldTabBar? tabBarArea, bool barVisible, bool animated)
     {
-        if (tabBarArea is not null && barVisible)
+        if (tabBarArea is null)
+        {
+            // Area without a tab bar: tear the strip down entirely (animated slide-out first).
+            if (_currentBarView is null)
+            {
+                return Task.CompletedTask;
+            }
+
+            var previousArea = _currentTabBarArea;
+            _currentBarView = null;
+            _currentTabBarArea = null;
+
+            return UnmountAsync(previousArea);
+        }
+
+        if (barVisible)
         {
             var barView = tabBarArea.GetOrCreateBarView();
 
@@ -203,23 +220,18 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 }
             }
 
-            return controller.ShowTabBarAsync(animated);
+            return controller.SetTabBarPresentedAsync(true, animated);
         }
 
-        if (_currentBarView is not null)
+        // Hidden: keep the strip alive offscreen; only the logical attachment reflects it.
+        _currentTabBarArea?.OnBarViewUnmounted();
+
+        return controller.SetTabBarPresentedAsync(false, animated);
+
+        async Task UnmountAsync(ScaffoldTabBar? previousArea)
         {
-            var previousArea = _currentTabBarArea;
-            _currentBarView = null;
-            _currentTabBarArea = null;
-
-            return HideAsync(previousArea);
-        }
-
-        return Task.CompletedTask;
-
-        async Task HideAsync(ScaffoldTabBar? previousArea)
-        {
-            await controller.HideAndUnmountTabBarAsync(animated);
+            await controller.SetTabBarPresentedAsync(false, animated);
+            controller.UnmountTabBar();
             previousArea?.OnBarViewUnmounted();
         }
     }

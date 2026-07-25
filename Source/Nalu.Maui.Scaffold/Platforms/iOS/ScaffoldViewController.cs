@@ -19,6 +19,8 @@ internal sealed class ScaffoldViewController : UIViewController
     private ScaffoldTabBarStrip? _tabBarStrip;
     private CGRect _lastBounds;
     private nfloat _lastSafeBottom = -1;
+    private bool _barPresented;
+    private int _barAnimating;
 
     /// <summary>The controller page view controllers are added to (UIKit containment).</summary>
     public UIViewController ContentHost => _contentHost;
@@ -70,7 +72,9 @@ internal sealed class ScaffoldViewController : UIViewController
     /// <summary>
     /// Mounts the tab bar strip (hidden below the screen edge when <paramref name="startHidden"/>)
     /// and measures it synchronously so <see cref="BarHeight"/> is valid immediately —
-    /// the presenter needs the footprint BEFORE mounting the target page.
+    /// the presenter needs the footprint BEFORE mounting the target page. The strip then STAYS
+    /// mounted across visibility changes (hidden = translated offscreen): nothing is torn down
+    /// mid-animation and re-showing is instant.
     /// </summary>
     public void MountTabBar(UIView barPlatformView, bool startHidden)
     {
@@ -90,63 +94,80 @@ internal sealed class ScaffoldViewController : UIViewController
         strip.Measure(bounds.Width);
 
         var stripHeight = strip.BarHeight + safeBottom;
-        strip.Frame = new CGRect(0, bounds.Height - stripHeight, bounds.Width, stripHeight);
+        PositionStrip(strip, bounds, stripHeight);
         strip.Transform = startHidden ? CGAffineTransform.MakeTranslation(0, stripHeight) : CGAffineTransform.MakeIdentity();
+        _barPresented = !startHidden;
         ChromeBottomFootprint = startHidden ? 0 : stripHeight;
     }
 
-    /// <summary>Slides the mounted strip into place (no-op when none is mounted or it is already shown).</summary>
-    public async Task ShowTabBarAsync(bool animated)
+    /// <summary>Removes the strip entirely (area change / bar view replacement / teardown).</summary>
+    public void UnmountTabBar()
     {
-        if (_tabBarStrip is not { } strip)
-        {
-            return;
-        }
-
-        ChromeBottomFootprint = strip.Frame.Height;
-
-        if (animated && !strip.Transform.IsIdentity)
-        {
-            await UIView.AnimateAsync(_barAnimationDurationSeconds, () =>
-            {
-                strip.Transform = CGAffineTransform.MakeIdentity();
-                ApplyCurrentPageInsets();
-                View!.LayoutIfNeeded();
-            });
-        }
-        else
-        {
-            strip.Transform = CGAffineTransform.MakeIdentity();
-            ApplyCurrentPageInsets();
-        }
+        _tabBarStrip?.RemoveFromSuperview();
+        _tabBarStrip = null;
+        _barPresented = false;
+        ChromeBottomFootprint = 0;
+        View!.SetNeedsLayout();
     }
 
     /// <summary>
-    /// Slides the mounted strip below the screen edge and unmounts it (the element tree
-    /// reflects presented chrome).
+    /// Positions the strip via Bounds/Center — transform-safe: setting Frame under an active
+    /// slide transform corrupts the geometry and snaps the hide/show animation
+    /// (layout passes run INSIDE the animation block via LayoutIfNeeded).
     /// </summary>
-    public async Task HideAndUnmountTabBarAsync(bool animated)
+    private static void PositionStrip(ScaffoldTabBarStrip strip, CGRect containerBounds, nfloat stripHeight)
+    {
+        strip.Bounds = new CGRect(0, 0, containerBounds.Width, stripHeight);
+        strip.Center = new CGPoint(containerBounds.Width / 2, containerBounds.Height - (stripHeight / 2));
+    }
+
+    /// <summary>
+    /// Slides the mounted strip in or out. INTERRUPTIBLE: a call while the opposite animation
+    /// is in flight retargets it from the current position (additive UIKit animations +
+    /// BeginFromCurrentState) — rapid visibility toggles reverse smoothly instead of queueing.
+    /// </summary>
+    public async Task SetTabBarPresentedAsync(bool presented, bool animated)
     {
         if (_tabBarStrip is not { } strip)
         {
             return;
         }
 
-        ChromeBottomFootprint = 0;
+        _barPresented = presented;
+        ChromeBottomFootprint = presented ? strip.Bounds.Height : 0;
 
-        if (animated)
+        var targetTransform = presented
+            ? CGAffineTransform.MakeIdentity()
+            : CGAffineTransform.MakeTranslation(0, strip.Bounds.Height);
+
+        if (!animated)
         {
-            await UIView.AnimateAsync(_barAnimationDurationSeconds, () =>
-            {
-                strip.Transform = CGAffineTransform.MakeTranslation(0, strip.Frame.Height);
-                ApplyCurrentPageInsets();
-                View!.LayoutIfNeeded();
-            });
+            strip.Transform = targetTransform;
+            ApplyCurrentPageInsets();
+
+            return;
         }
 
-        strip.RemoveFromSuperview();
-        _tabBarStrip = null;
-        View!.SetNeedsLayout();
+        _barAnimating++;
+
+        try
+        {
+            await UIView.AnimateNotifyAsync(
+                _barAnimationDurationSeconds,
+                0,
+                UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
+                () =>
+                {
+                    strip.Transform = targetTransform;
+                    ApplyCurrentPageInsets();
+                    View!.LayoutIfNeeded();
+                }
+            );
+        }
+        finally
+        {
+            _barAnimating--;
+        }
     }
 
     /// <summary>Applies the current page's bar-inset contribution to its own controller.</summary>
@@ -154,7 +175,7 @@ internal sealed class ScaffoldViewController : UIViewController
     {
         if (CurrentPageController is { } pageController)
         {
-            pageController.AdditionalSafeAreaInsets = CurrentPageWantsBarInset && _tabBarStrip is not null
+            pageController.AdditionalSafeAreaInsets = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null
                 ? new UIEdgeInsets(0, 0, BarHeight, 0)
                 : UIEdgeInsets.Zero;
         }
@@ -178,9 +199,15 @@ internal sealed class ScaffoldViewController : UIViewController
             }
 
             var stripHeight = strip.BarHeight + safeBottom;
-            var presented = strip.Transform.IsIdentity;
-            strip.Frame = new CGRect(0, bounds.Height - stripHeight, bounds.Width, stripHeight);
-            ChromeBottomFootprint = presented ? stripHeight : 0;
+            PositionStrip(strip, bounds, stripHeight);
+            ChromeBottomFootprint = _barPresented ? stripHeight : 0;
+
+            // Keep a hidden strip fully offscreen after size changes (rotation) — but never
+            // touch the transform while a presentation animation is retargeting it.
+            if (_barAnimating == 0 && !_barPresented)
+            {
+                strip.Transform = CGAffineTransform.MakeTranslation(0, stripHeight);
+            }
         }
 
         ApplyCurrentPageInsets();
