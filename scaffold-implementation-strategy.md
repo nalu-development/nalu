@@ -543,6 +543,26 @@ Key facts anchoring the decision:
 - On iOS there is no such shortcut ⇒ custom snapshot engine is the candidate
   (with iOS 18 `UIViewController.Transition.zoom` as a possible opportunistic extra, post-v1).
 
+> **Shared elements IMPLEMENTED (July 2026), verified on both platforms.**
+> `Scaffold.TransitionName` attached property (the `transitionName` analogue): matching names on
+> the outgoing/incoming pages animate between their geometries during push/pop, riding the
+> standard slides.
+> - iOS: PoC spike A engine ported into the library
+>   (`Platforms/iOS/ScaffoldSharedElementTransitions.cs`) — flight overlay in a single
+>   `UIViewPropertyAnimator` (seekable by construction), image aspect morph with corner radii
+>   read from the LIVE views (PoC's hardcode removed), transform-match cross-fade for any other
+>   pair, incoming-layout gate with plain-slide fallback.
+> - Android: PoC spike B pattern in the fragment path — `transitionName` stamped on tagged
+>   views, `AddSharedElement` + native androidx `TransitionSet`
+>   (ChangeBounds/Transform/ImageTransform/ClipBounds) built fresh per transaction (managed
+>   Transition subclasses break on clone), `postponeEnterTransition` + pre-draw as the
+>   readiness gate. Both push AND pop wire pairs as enter transitions (Replace-based, no back
+>   stack).
+> - Verified: mid-flight frames captured on both platforms; `ScaffoldTransitionChromeTests`
+>   (end-geometry + flight cleanup restoration + repeated round trips) green on both.
+> - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option, interactive
+>   pop (iOS scrub handle exists in the engine's construction), predictive-back SET seeking.
+
 ### 8.2 Cross-platform API (independent of engine choice)
 
 - `Scaffold.TransitionTag="photo-{id}"` attached property on any `View` (the `transitionName` analogue).

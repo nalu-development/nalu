@@ -96,7 +96,12 @@
       "Bash(grep -iE \"^\\(None|SoftInput|Container|All|Default\\)$\")",
       "Bash(grep -E \"^get_SafeAreaEdges$|^set_SafeAreaEdges$\")",
       "Bash(awk '{print $6,$7,$8}')",
-      "Bash(emulator -list-avds)"
+      "Bash(emulator -list-avds)",
+      "Bash(grep -rn \"ui/tap\\\\|/tap\\\\|HttpClient\\\\|PostAsync\" ~/.nuget/packages/microsoft.maui.devflow* 2>/dev/null | head -3; grep -n \"tap\" /Users/alberto/github/nalu/.claude/skills/maui-devflow-uitests/references/agentclient-api.md | head -8)",
+      "Bash(curl -s -m 3 \"http://localhost:9223/api/v1/agent/capabilities\")",
+      "Bash(curl -s -m 3 \"http://localhost:9223/api/v1/ui/elements?automationId=PushTransitionDetail\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\('capabilities',{}\\).keys\\(\\)\\)\\)\")",
+      "Bash(ffmpeg -y -loglevel error -i /private/tmp/claude-501/-Users-alberto-github-nalu/a47b8f04-396c-48f0-a55d-5a6a9914ec96/scratchpad/flight.mp4 -vf fps=12,crop=720:800:0:100,scale=180:200 /private/tmp/claude-501/-Users-alberto-github-nalu/a47b8f04-396c-48f0-a55d-5a6a9914ec96/scratchpad/aframe_%02d.png)"
     ]
   }
 }

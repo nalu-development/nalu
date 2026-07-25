@@ -120,6 +120,15 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("FlyoutEndButtonVisibility", typeof(ScaffoldFlyoutButtonVisibility), typeof(Scaffold), ScaffoldFlyoutButtonVisibility.Auto);
 
     /// <summary>
+    /// Attached property marking a view as a SHARED ELEMENT (the <c>android:transitionName</c>
+    /// analogue): when the outgoing and incoming pages of a push/pop both contain a view with
+    /// the same name, the element animates between its two geometries during the transition
+    /// (images morph their aspect crop natively; other views transform-match with a cross-fade).
+    /// </summary>
+    public static readonly BindableProperty TransitionNameProperty =
+        BindableProperty.CreateAttached("TransitionName", typeof(string), typeof(Scaffold), null);
+
+    /// <summary>
     /// Attached property controlling tab bar visibility for a <see cref="Page"/>:
     /// <see cref="ScaffoldTabBarVisibility.Visible"/> (default),
     /// <see cref="ScaffoldTabBarVisibility.Hidden"/>, or
@@ -329,6 +338,12 @@ public partial class Scaffold : ContentPage, IDisposable
 
     /// <summary>Sets the end-drawer button policy attached to an element.</summary>
     public static void SetFlyoutEndButtonVisibility(BindableObject bindable, ScaffoldFlyoutButtonVisibility value) => bindable.SetValue(FlyoutEndButtonVisibilityProperty, value);
+
+    /// <summary>Gets the shared-element transition name attached to a view.</summary>
+    public static string? GetTransitionName(BindableObject bindable) => (string?)bindable.GetValue(TransitionNameProperty);
+
+    /// <summary>Sets the shared-element transition name attached to a view.</summary>
+    public static void SetTransitionName(BindableObject bindable, string? value) => bindable.SetValue(TransitionNameProperty, value);
 
     /// <summary>
     /// Gets the observable state the mounted nav bar view binds to (title, back/drawer button

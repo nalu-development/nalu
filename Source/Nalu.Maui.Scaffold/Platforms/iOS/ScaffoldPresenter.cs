@@ -94,6 +94,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             _currentPage.PropertyChanged -= OnCurrentPagePropertyChanged;
         }
 
+        var previousPage = _currentPage;
         var previousController = _currentController;
         var newController = targetPage.ToUIViewController(mauiContext);
         _currentPage = targetPage;
@@ -122,19 +123,40 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         switch (hint)
         {
             case ScaffoldPresentationHint.Push:
+            {
                 container.AddSubview(newView);
                 newController.DidMoveToParentViewController(parentController);
-                newView.Transform = CGAffineTransform.MakeTranslation(width, 0);
-                await UIView.AnimateAsync(_transitionDurationSeconds, () => newView.Transform = CGAffineTransform.MakeIdentity());
+
+                // Shared elements (§8): matching Scaffold.TransitionName pairs fly between the
+                // pages while the same slide plays; falls back to the plain slide when no pair
+                // matches or the incoming views miss the layout gate.
+                var handled = previousPage is not null && previousController?.View is { } prevPushView
+                    && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, _transitionDurationSeconds);
+
+                if (!handled)
+                {
+                    newView.Transform = CGAffineTransform.MakeTranslation(width, 0);
+                    await UIView.AnimateAsync(_transitionDurationSeconds, () => newView.Transform = CGAffineTransform.MakeIdentity());
+                }
 
                 break;
+            }
 
             case ScaffoldPresentationHint.Pop when previousController?.View is { } previousView:
+            {
                 container.InsertSubviewBelow(newView, previousView);
                 newController.DidMoveToParentViewController(parentController);
-                await UIView.AnimateAsync(_transitionDurationSeconds, () => previousView.Transform = CGAffineTransform.MakeTranslation(width, 0));
+
+                var handled = previousPage is not null
+                    && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, _transitionDurationSeconds);
+
+                if (!handled)
+                {
+                    await UIView.AnimateAsync(_transitionDurationSeconds, () => previousView.Transform = CGAffineTransform.MakeTranslation(width, 0));
+                }
 
                 break;
+            }
 
             case ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd:
             {

@@ -109,24 +109,49 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         if (!ReferenceEquals(targetPage, _currentPage))
         {
-            if (_currentPage is not null)
+            var previousPage = _currentPage;
+
+            if (previousPage is not null)
             {
-                _currentPage.PropertyChanged -= OnCurrentPagePropertyChanged;
+                previousPage.PropertyChanged -= OnCurrentPagePropertyChanged;
             }
 
+            // Shared elements (§8, PoC spike B): matching Scaffold.TransitionName pairs between
+            // the two pages ride the native androidx transition framework. Both push AND pop are
+            // Replace-based here (no fragment back stack), so both directions wire the pairs as
+            // an ENTER transition on the incoming fragment.
+            var sharedNames = previousPage is not null && animated
+                ? ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage))
+                : [];
+
             var previousFragment = _currentFragment;
-            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container);
+            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, postponeForSharedElements: sharedNames.Count > 0);
             _currentFragment = fragment;
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
 
             // Async commit only: a synchronous commit can run while MAUI's own ScopedFragment
             // transaction is still executing on the same FragmentManager ("already executing").
-            activity.SupportFragmentManager
-                    .BeginTransaction()
-                    .SetReorderingAllowed(true)
-                    .Replace(container.Id, fragment)
-                    .CommitAllowingStateLoss();
+            var transaction = activity.SupportFragmentManager
+                                      .BeginTransaction()
+                                      .SetReorderingAllowed(true);
+
+            if (sharedNames.Count > 0)
+            {
+                var outgoingTagged = ScaffoldTransitions.Collect(previousPage!);
+                fragment.SharedElementEnterTransition = CreateSharedElementTransition();
+
+                foreach (var name in sharedNames)
+                {
+                    var sharedPlatformView = outgoingTagged[name].ToPlatform(mauiContext);
+                    ViewCompat.SetTransitionName(sharedPlatformView, name);
+                    transaction.AddSharedElement(sharedPlatformView, name);
+                }
+            }
+
+            transaction
+                .Replace(container.Id, fragment)
+                .CommitAllowingStateLoss();
 
             // Deterministic completion: presentation of the new page plus dismissal animation of
             // the previous one, with a settle timeout as a safety net.
@@ -136,6 +161,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
         scaffold.UpdateBackCallbackEnabled();
+    }
+
+    /// <summary>
+    /// The native shared-element choreography (PoC spike B): bounds, transform, image aspect
+    /// and clip morph natively at display cadence. Built fresh per transaction — the fragment
+    /// framework clones transitions, and a MANAGED Transition subclass loses its peer on clone.
+    /// </summary>
+    private static AndroidX.Transitions.Transition CreateSharedElementTransition()
+    {
+        var set = new AndroidX.Transitions.TransitionSet();
+        set.AddTransition(new AndroidX.Transitions.ChangeBounds());
+        set.AddTransition(new AndroidX.Transitions.ChangeTransform());
+        set.AddTransition(new AndroidX.Transitions.ChangeImageTransform());
+        set.AddTransition(new AndroidX.Transitions.ChangeClipBounds());
+        set.SetDuration(_overlayDurationMs);
+
+        return set;
     }
 
     private FragmentContainerView EnsureContainer(ScaffoldLayout platformView)

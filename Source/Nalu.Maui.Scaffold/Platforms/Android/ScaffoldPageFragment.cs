@@ -11,10 +11,14 @@ namespace Nalu;
 /// <summary>
 /// Hosts a MAUI page's platform view as fragment content (the architecture MAUI Shell itself
 /// uses on Android, and the base for predictive-back integration later).
-/// Transitions are animator-based (<see cref="OnCreateAnimator"/>): the supported seekable path,
-/// and immune to the managed-peer loss that breaks managed Transition subclasses.
+/// Page transitions are animator-based (<see cref="OnCreateAnimator"/>): the supported seekable
+/// path, and immune to the managed-peer loss that breaks managed Transition subclasses.
+/// Shared elements (§8, PoC spike B) ride on the native androidx transition framework:
+/// <c>transitionName</c>s are stamped on tagged views, and when the presenter wires
+/// <c>AddSharedElement</c> + <c>SharedElementEnterTransition</c> the enter transition is
+/// POSTPONED until the first pre-draw so the end geometry exists (gate #1).
 /// </summary>
-internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, ScaffoldPresentationHint hint, AView container) : Fragment
+internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, ScaffoldPresentationHint hint, AView container, bool postponeForSharedElements = false) : Fragment
 {
     private const long _transitionDurationMs = 250;
 
@@ -51,9 +55,27 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
     {
         base.OnViewCreated(view, savedInstanceState);
 
+        // Stamp android:transitionName on every tagged view — the native SET matches by name.
+        foreach (var (name, taggedView) in ScaffoldTransitions.Collect(page))
+        {
+            ViewCompat.SetTransitionName(taggedView.ToPlatform(mauiContext), name);
+        }
+
+        if (postponeForSharedElements)
+        {
+            // Incoming-readiness gate: hold the shared-element transition until the first
+            // layout/draw pass so the end geometry exists.
+            PostponeEnterTransition();
+        }
+
         // Presented = first draw when no enter animation runs; the animator end wins otherwise.
         OneShotPreDrawListener.Add(view, new Java.Lang.Runnable(() =>
         {
+            if (postponeForSharedElements)
+            {
+                StartPostponedEnterTransition();
+            }
+
             if (!HasAnimatedEnter)
             {
                 _presented.TrySetResult();
