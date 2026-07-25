@@ -45,10 +45,17 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     {
         ArgumentNullException.ThrowIfNull(insets);
 
-        if ((view?.Parent as ScaffoldLayout)?.PageBottomInsetPx is > 0 and var chromeBottom)
+        if (view?.Parent is ScaffoldLayout { } scaffoldLayout
+            && (scaffoldLayout.PageBottomInsetPx > 0 || scaffoldLayout.PageTopInsetPx > 0))
         {
             var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
-            var modifiedSystemBarInsets = Insets.Of(systemBarInsets.Left, systemBarInsets.Top, systemBarInsets.Right, chromeBottom)!;
+
+            var modifiedSystemBarInsets = Insets.Of(
+                systemBarInsets.Left,
+                scaffoldLayout.PageTopInsetPx > 0 ? scaffoldLayout.PageTopInsetPx : systemBarInsets.Top,
+                systemBarInsets.Right,
+                scaffoldLayout.PageBottomInsetPx > 0 ? scaffoldLayout.PageBottomInsetPx : systemBarInsets.Bottom
+            )!;
 
             using var builder = new WindowInsetsCompat.Builder(insets);
 
@@ -145,5 +152,84 @@ internal sealed class ScaffoldTabBarStripLayout : FrameLayout
     public override bool OnTouchEvent(MotionEvent? e)
         // Touch-transparent glass: only the bar's own children consume touches — taps on the
         // pill's side margins must reach the page below.
+        => false;
+}
+
+/// <summary>
+/// Top chrome strip hosting the MAUI nav bar platform view. Unlike the tab bar strip, the bar
+/// view FILLS the strip (its background extends under the status bar) and consumes the
+/// safe-area padding itself (SafeAreaEdges via the MauiWindowInsetListener registration) —
+/// the measured height therefore already includes the status inset.
+/// </summary>
+internal sealed class ScaffoldNavBarStripLayout : FrameLayout
+{
+    private AView? _bar;
+    private int _barMeasuredHeight;
+
+    public AView? Bar => _bar;
+
+    public ScaffoldNavBarStripLayout(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+    }
+
+    [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicMethods, "Microsoft.Maui.Platform.MauiWindowInsetListener", "Microsoft.Maui")]
+    public ScaffoldNavBarStripLayout(Context context)
+        : base(context)
+    {
+        SetClipChildren(false);
+
+        var type = Type.GetType("Microsoft.Maui.Platform.MauiWindowInsetListener, Microsoft.Maui")
+                   ?? throw new NotSupportedException("The MAUI version you are using is not supported because MauiWindowInsetListener is missing.");
+
+        type
+            .GetMethod("RegisterParentForChildViews", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .Invoke(null, [this, null]);
+    }
+
+    public void SetBar(AView? bar)
+    {
+        if (_bar?.Parent?.Handle == Handle)
+        {
+            RemoveView(_bar);
+        }
+
+        _bar = bar;
+
+        if (bar is not null)
+        {
+            (bar.Parent as ViewGroup)?.RemoveView(bar);
+            AddView(bar);
+        }
+    }
+
+    protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        if (_bar is null)
+        {
+            SetMeasuredDimension(0, 0);
+
+            return;
+        }
+
+        MeasureChild(_bar, widthMeasureSpec, heightMeasureSpec);
+        _barMeasuredHeight = _bar.MeasuredHeight;
+        SetMeasuredDimension(_bar.MeasuredWidth, _barMeasuredHeight);
+    }
+
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        if (_bar is LayoutViewGroup layoutViewGroup)
+        {
+            layoutViewGroup.Layout(0, 0, right - left, _barMeasuredHeight);
+        }
+        else
+        {
+            _bar?.Layout(0, 0, right - left, _barMeasuredHeight);
+        }
+    }
+
+    public override bool OnTouchEvent(MotionEvent? e)
+        // Touch-transparent glass outside the bar content.
         => false;
 }

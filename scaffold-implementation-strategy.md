@@ -30,12 +30,17 @@
   + full navigation suites green on iOS and Android; the shared tab-switch chrome test now runs on
   the Scaffold host too.
 
+- **Nav bar (§5.2) IMPLEMENTED and verified on both platforms (July 2026)**: `Scaffold.NavBarView`
+  attached with scaffold-level default factory, `ScaffoldNavBarContext` binding contract,
+  default template (drawer/back/title/drawer slots, drawer-button policies), public primitives
+  for custom bars, §5.4 top-inset augmentation. Suites: `ScaffoldNavBarChromeTests` (6 green per
+  platform); full regression green (iOS 53, Android 37).
+
 **Next steps, in recommended order:**
 
 1. **Flyout completion** (§5.5): default template over `Areas`, width/styling API, RTL mapping;
    edge-swipe open lands with the transition engine (P2).
-2. **Nav bar** (§5.2, hard-minimal) + §5.4 top-inset distribution.
-3. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
+2. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
 4. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
    interactive pop, predictive-back seeking — androidx seeking-version check still pending).
 5. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
@@ -215,11 +220,29 @@ Layering, bottom-up — each layer testable without the one below:
 
 ### 5.2 Nav bar
 
-- Drawn by the Scaffold above the page content area. Per-page configuration via attached properties
-  (proposal): `Scaffold.Title`, `Scaffold.TitleView`, `Scaffold.NavBarVisible`, `Scaffold.ToolbarItems`,
-  `Scaffold.BackButtonBehavior` (visibility/icon/text).
-- **Deliberately minimal API in P1** (title, back button, toolbar items, title view). Search boxes
-  etc. are explicitly post-v1 — this is where Shell replacements die.
+> **IMPLEMENTED (July 2026), verified on iOS simulator + Android emulator.** API as reviewed:
+> - `Scaffold.NavBarView` attached (Page → Area → Scaffold resolution; the scaffold level
+>   defaults to a `ScaffoldNavBarView` via the property's default value factory) +
+>   `Scaffold.IsNavBarVisible` attached bool (default true, animated hide/show, retargeting).
+> - **`ScaffoldNavBarContext`** is the binding context of ANY mounted bar (default or custom):
+>   `Title`, `TitleView`, `CanNavigateBack`, `IsFlyoutStart/EndButtonVisible`, `BackCommand`,
+>   `OpenFlyoutStart/EndCommand` — one observable instance per scaffold.
+> - Default template slots, in order: **[start-drawer] [back] [title/TitleView] [end-drawer]**;
+>   drawer-button policy via attached `Scaffold.FlyoutStart/EndButtonVisibility`
+>   (`Auto` default = shown at stack roots; `Visible` = always, side by side with back;
+>   `Hidden`), resolved Page → Area → Scaffold and derived into the context bools.
+> - Public primitives for custom bars: `ScaffoldBackButton`, `ScaffoldFlyoutButton` (Side),
+>   `ScaffoldNavBarTitle` — drop-in, self-binding to the context.
+> - §5.4 top insets: the bar fills the top strip (background under the status bar, safe area
+>   consumed via .NET 10 `SafeAreaEdges`); measurement normalized to content height
+>   (measured − consumed inset, the NaluShellItemRenderer net10 pattern); iOS per-page
+>   `AdditionalSafeAreaInsets.Top`, Android top system-bars rewrite in the page layer.
+>   Same keep-alive-offscreen + interruptible animation model as the tab bar; the nav strip
+>   sits BELOW the tab strip in z-order (behind-chrome overlay scrims dim it).
+
+- **Deliberately minimal API in P1** (title, back button, drawer buttons, title view).
+  ToolbarItems, search boxes etc. are explicitly post-v1 — this is where Shell replacements die.
+  Custom bars (full replacement + primitives) are the v1 escape hatch.
 - **Scroll-linked chrome** (the AppBarLayout / iOS large-title replacement): a `ScrollChrome`-style
   primitive observing the content's NATIVE scroll offset (iOS: KVO on `contentOffset`; Android:
   `NestedScrollView.ScrollChange` / RecyclerView listener) and publishing `(progress, offsetDp)`
@@ -705,6 +728,8 @@ The Scaffold must own, with exact ordering:
 >   open/close, scrim, auto-close on navigation) — templates/styling pending.
 > ✅ Tab bar (§5.3) + §5.6 overlay primitive (flyout refactored onto it) + §5.4 bottom-inset
 >   distribution — implemented and verified on both platforms (July 2026).
+> ✅ Nav bar (§5.2) + §5.4 top-inset distribution — implemented and verified on both platforms
+>   (July 2026).
 > ⬜ Flyout default template, width/styling API, RTL.
 > ⬜ Minimal nav bar + §5.4 inset distribution.
 > ⬜ Modal pages (§7.1).

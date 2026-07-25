@@ -39,6 +39,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private int _lastStripHeight;
     private bool _barPresented;
     private Android.Animation.ObjectAnimator? _stripAnimator;
+    private ScaffoldNavBarStripLayout? _navBarStrip;
+    private View? _currentNavBarView;
+    private int _lastNavStripHeight;
+    private bool _navBarPresented;
+    private Android.Animation.ObjectAnimator? _navStripAnimator;
 
     private AView? _overlayScrim;
     private AView? _overlayPanel;
@@ -81,15 +86,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         var tabBarArea = root.Parent as ScaffoldTabBar;
         var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
+        var navBarView = scaffold.ResolveNavBarView(targetPage);
+        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(targetPage);
         var animated = hint != ScaffoldPresentationHint.None;
+
+        // The context must carry the target page's state before the bar (or its bindings) mount.
+        scaffold.NavBarContext.Update(root, targetPage);
 
         // Inset intent BEFORE the fragment commit: the incoming page attaches with its final
         // insets while the outgoing page keeps its stale layout — no jumps during transitions.
         platformView.ChromeBottomDesired = barVisible;
         platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
+        platformView.ChromeTopDesired = navBarVisible;
+        platformView.PageTopInsetPx = navBarVisible ? _lastNavStripHeight : 0;
 
         // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
         // page slides in (and back in sync on pop).
+        // Nav bar first: its strip must sit BELOW the tab bar strip in z-order (behind-chrome
+        // overlay scrims dim the nav bar while keeping the tab bar interactive).
+        var navChromeTask = UpdateNavBarChromeAsync(platformView, mauiContext, navBarView, navBarVisible, animated);
         var chromeTask = UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated);
 
         if (!ReferenceEquals(targetPage, _currentPage))
@@ -119,7 +134,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             await Task.WhenAny(settled, Task.Delay(_settleTimeoutMs)).ConfigureAwait(true);
         }
 
-        await chromeTask.ConfigureAwait(true);
+        await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
         scaffold.UpdateBackCallbackEnabled();
     }
 
@@ -140,6 +155,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _currentTabBarArea = null;
         _barPresented = false;
         _stripAnimator = null;
+        _navBarStrip = null;
+        _currentNavBarView = null;
+        _navBarPresented = false;
+        _navStripAnimator = null;
 
         var context = platformView.Context!;
 
@@ -275,13 +294,27 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private Task AnimateStripToAsync(AView strip, float target, bool animated)
     {
         _stripAnimator?.Cancel();
-        _stripAnimator = null;
+        _stripAnimator = AnimateTranslationCore(strip, target, animated, out var task);
 
+        return task;
+    }
+
+    private Task AnimateNavStripToAsync(AView strip, float target, bool animated)
+    {
+        _navStripAnimator?.Cancel();
+        _navStripAnimator = AnimateTranslationCore(strip, target, animated, out var task);
+
+        return task;
+    }
+
+    private static Android.Animation.ObjectAnimator? AnimateTranslationCore(AView strip, float target, bool animated, out Task task)
+    {
         if (!animated)
         {
             strip.TranslationY = target;
+            task = Task.CompletedTask;
 
-            return Task.CompletedTask;
+            return null;
         }
 
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -289,34 +322,169 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         var animator = Android.Animation.ObjectAnimator.OfFloat(strip, "translationY", strip.TranslationY, target)!;
         animator.SetDuration(_overlayDurationMs);
         animator.AnimationEnd += (_, _) => completion.TrySetResult();
-        _stripAnimator = animator;
         animator.Start();
+        task = completion.Task;
 
-        return completion.Task;
+        return animator;
+    }
+
+    /// <summary>
+    /// Brings the nav bar chrome to the desired state — same model as the tab bar strip:
+    /// mounted while a bar view resolves (hidden = translated above the screen edge),
+    /// retargeting slides, view swap only when the resolution changes.
+    /// </summary>
+    private Task UpdateNavBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, View? navBarView, bool navBarVisible, bool animated)
+    {
+        if (navBarView is null)
+        {
+            if (_currentNavBarView is { } detachedView)
+            {
+                _currentNavBarView = null;
+                _navBarPresented = false;
+                _navBarStrip?.SetBar(null);
+
+                if (_navBarStrip is not null)
+                {
+                    _navBarStrip.Visibility = ViewStates.Gone;
+                }
+
+                DetachNavBarView(detachedView);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        if (_navBarStrip is null)
+        {
+            _navBarStrip = new ScaffoldNavBarStripLayout(platformView.Context!);
+            platformView.NavBarLayer = _navBarStrip;
+
+            var layoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.WrapContent)
+            {
+                Gravity = GravityFlags.Top
+            };
+
+            // Below the tab bar strip in z-order: behind-chrome overlay scrims dim the nav bar
+            // while keeping the tab bar interactive.
+            if (_tabBarStrip is { } tabBarStrip && platformView.IndexOfChild(tabBarStrip) is >= 0 and var tabIndex)
+            {
+                platformView.AddView(_navBarStrip, tabIndex, layoutParams);
+            }
+            else
+            {
+                platformView.AddView(_navBarStrip, layoutParams);
+            }
+        }
+
+        if (!ReferenceEquals(navBarView, _currentNavBarView))
+        {
+            if (_currentNavBarView is { } previousView)
+            {
+                DetachNavBarView(previousView);
+            }
+
+            _currentNavBarView = navBarView;
+            navBarView.BindingContext = scaffold.NavBarContext;
+            _navBarStrip.SetBar(navBarView.ToPlatform(mauiContext));
+
+            if (animated && _lastNavStripHeight > 0)
+            {
+                // A freshly appearing bar starts above the edge and slides in.
+                _navBarStrip.TranslationY = -_lastNavStripHeight;
+            }
+        }
+
+        // The element tree reflects presented chrome: attached while visible, detached while
+        // hidden (the strip and platform view stay alive offscreen either way).
+        if (navBarVisible)
+        {
+            if (navBarView.Parent is null)
+            {
+                scaffold.AddLogicalChild(navBarView);
+            }
+        }
+        else
+        {
+            DetachNavBarView(navBarView);
+        }
+
+        _navBarStrip.Visibility = ViewStates.Visible;
+        _navBarPresented = navBarVisible;
+
+        if (_navBarStrip.Height > 0)
+        {
+            _lastNavStripHeight = _navBarStrip.Height;
+        }
+
+        if (navBarVisible)
+        {
+            return AnimateNavStripToAsync(_navBarStrip, 0, animated);
+        }
+
+        return _lastNavStripHeight > 0
+            ? AnimateNavStripToAsync(_navBarStrip, -_lastNavStripHeight, animated)
+            : Task.CompletedTask;
+    }
+
+    private void DetachNavBarView(View navBarView)
+    {
+        if (ReferenceEquals(navBarView.Parent, scaffold))
+        {
+            scaffold.RemoveLogicalChild(navBarView);
+        }
     }
 
     private void OnCurrentPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Bar visibility is an animated inset change, not a page relayout (§5.4).
-        if (e.PropertyName == "TabBarVisibility"
-            && sender is Page page
-            && ReferenceEquals(page, _currentPage)
-            && scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
-            && scaffold.Handler is IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
+        if (sender is not Page page
+            || !ReferenceEquals(page, _currentPage)
+            || scaffold.Proxy?.CurrentItem.CurrentSection is not ScaffoldRootProxy rootProxy
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
         {
-            var tabBarArea = rootProxy.Root.Parent as ScaffoldTabBar;
-            var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(rootProxy.Root, page);
+            return;
+        }
 
-            // Same-page toggle: the page itself must relayout to the new insets.
-            platformView.ChromeBottomDesired = barVisible;
-            platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
-
-            if (_pageLayer is { } pageLayer)
+        switch (e.PropertyName)
+        {
+            // Bar visibility is an animated inset change, not a page relayout (§5.4).
+            case "TabBarVisibility":
             {
-                ViewCompat.RequestApplyInsets(pageLayer);
+                var tabBarArea = rootProxy.Root.Parent as ScaffoldTabBar;
+                var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(rootProxy.Root, page);
+
+                // Same-page toggle: the page itself must relayout to the new insets.
+                platformView.ChromeBottomDesired = barVisible;
+                platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
+                RequestPageInsets();
+
+                UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated: true).FireAndForget(scaffold.Handler);
+
+                break;
             }
 
-            UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated: true).FireAndForget(scaffold.Handler);
+            case "IsNavBarVisible":
+            case "NavBarView":
+            {
+                var navBarView = scaffold.ResolveNavBarView(page);
+                var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
+
+                // Same-page toggle: the page itself must relayout to the new insets.
+                platformView.ChromeTopDesired = navBarVisible;
+                platformView.PageTopInsetPx = navBarVisible ? _lastNavStripHeight : 0;
+                RequestPageInsets();
+
+                UpdateNavBarChromeAsync(platformView, mauiContext, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+
+                break;
+            }
+        }
+    }
+
+    private void RequestPageInsets()
+    {
+        if (_pageLayer is { } pageLayer)
+        {
+            ViewCompat.RequestApplyInsets(pageLayer);
         }
     }
 

@@ -20,6 +20,9 @@ public sealed class ScaffoldLayout : FrameLayout
     /// <summary>The bottom chrome strip (tab bar), when mounted.</summary>
     internal AView? TabBarLayer { get; set; }
 
+    /// <summary>The top chrome strip (nav bar), when mounted.</summary>
+    internal AView? NavBarLayer { get; set; }
+
     /// <summary>
     /// The bottom inset (px) the page layer rewrites into the system-bars insets. Deliberately
     /// DECOUPLED from the strip's visual state: bar hide/show animations never relayout the
@@ -28,8 +31,14 @@ public sealed class ScaffoldLayout : FrameLayout
     /// </summary>
     internal int PageBottomInsetPx { get; set; }
 
-    /// <summary>Whether the presenter wants the chrome footprint applied once the strip is measured.</summary>
+    /// <summary>The top inset (px) the page layer rewrites into the system-bars insets (see <see cref="PageBottomInsetPx"/>).</summary>
+    internal int PageTopInsetPx { get; set; }
+
+    /// <summary>Whether the presenter wants the bottom chrome footprint applied once the strip is measured.</summary>
     internal bool ChromeBottomDesired { get; set; }
+
+    /// <summary>Whether the presenter wants the top chrome footprint applied once the strip is measured.</summary>
+    internal bool ChromeTopDesired { get; set; }
 
     /// <summary>
     /// Full height (px) of the bottom chrome strip: bar footprint + system bottom inset.
@@ -56,17 +65,28 @@ public sealed class ScaffoldLayout : FrameLayout
     {
         base.OnLayout(changed, left, top, right, bottom);
 
-        // The strip's height is only known after layout: on the first (or a re-)measure while
-        // the chrome is desired, publish the footprint and re-dispatch insets to the page layer
+        // The strips' heights are only known after layout: on the first (or a re-)measure while
+        // the chrome is desired, publish the footprints and re-dispatch insets to the page layer
         // (mirrors NaluShellItemRendererOuterLayout).
+        var insetsChanged = false;
+
         if (ChromeBottomDesired && ChromeBottomFootprint is > 0 and var footprint && PageBottomInsetPx != footprint)
         {
             PageBottomInsetPx = footprint;
+            insetsChanged = true;
+        }
 
-            if (PageLayer is { } pageLayer)
-            {
-                ViewCompat.RequestApplyInsets(pageLayer);
-            }
+        if (ChromeTopDesired
+            && NavBarLayer is { Visibility: Android.Views.ViewStates.Visible, Height: > 0 } navBar
+            && PageTopInsetPx != navBar.Height)
+        {
+            PageTopInsetPx = navBar.Height;
+            insetsChanged = true;
+        }
+
+        if (insetsChanged && PageLayer is { } pageLayer)
+        {
+            ViewCompat.RequestApplyInsets(pageLayer);
         }
     }
 }

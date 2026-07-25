@@ -17,10 +17,14 @@ internal sealed class ScaffoldViewController : UIViewController
 
     private readonly UIViewController _contentHost = new();
     private ScaffoldTabBarStrip? _tabBarStrip;
+    private ScaffoldNavBarStrip? _navBarStrip;
     private CGRect _lastBounds;
     private nfloat _lastSafeBottom = -1;
+    private nfloat _lastSafeTop = -1;
     private bool _barPresented;
     private int _barAnimating;
+    private bool _navBarPresented;
+    private int _navBarAnimating;
 
     /// <summary>The controller page view controllers are added to (UIKit containment).</summary>
     public UIViewController ContentHost => _contentHost;
@@ -37,6 +41,9 @@ internal sealed class ScaffoldViewController : UIViewController
 
     /// <summary>Whether the current page sees the bar footprint as extra bottom inset.</summary>
     public bool CurrentPageWantsBarInset { get; set; }
+
+    /// <summary>Whether the current page sees the nav bar footprint as extra top inset.</summary>
+    public bool CurrentPageWantsNavBarInset { get; set; }
 
     /// <summary>
     /// Bar footprint (points) above the system inset — the page-facing inset contribution.
@@ -111,6 +118,107 @@ internal sealed class ScaffoldViewController : UIViewController
     }
 
     /// <summary>
+    /// Mounts the nav bar strip at the top edge (measured synchronously — the presenter needs
+    /// the footprint BEFORE mounting the target page). Mounted BELOW the tab bar strip in
+    /// z-order so behind-chrome overlay scrims dim the nav bar while keeping the tab bar
+    /// interactive. The strip stays mounted across visibility changes (hidden = translated
+    /// above the screen edge).
+    /// </summary>
+    public void MountNavBar(UIView barPlatformView, bool startHidden)
+    {
+        if (ReferenceEquals(_navBarStrip?.Bar, barPlatformView))
+        {
+            return;
+        }
+
+        _navBarStrip?.RemoveFromSuperview();
+
+        var strip = new ScaffoldNavBarStrip(barPlatformView);
+        _navBarStrip = strip;
+
+        if (_tabBarStrip is { } tabBarStrip)
+        {
+            View!.InsertSubviewBelow(strip, tabBarStrip);
+        }
+        else
+        {
+            View!.AddSubview(strip);
+        }
+
+        var bounds = View.Bounds;
+        strip.Measure(bounds.Width);
+        PositionNavStrip(strip, bounds);
+        strip.Transform = startHidden ? CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip)) : CGAffineTransform.MakeIdentity();
+        _navBarPresented = !startHidden;
+    }
+
+    /// <summary>Removes the nav bar strip entirely (nav bar view swap / teardown).</summary>
+    public void UnmountNavBar()
+    {
+        _navBarStrip?.RemoveFromSuperview();
+        _navBarStrip = null;
+        _navBarPresented = false;
+        View!.SetNeedsLayout();
+    }
+
+    /// <summary>Full strip height: bar content + the system top inset the bar extends under.</summary>
+    private nfloat NavStripHeight(ScaffoldNavBarStrip strip) => strip.ContentHeight + View!.SafeAreaInsets.Top;
+
+    private void PositionNavStrip(ScaffoldNavBarStrip strip, CGRect containerBounds)
+    {
+        var stripHeight = NavStripHeight(strip);
+        strip.Bounds = new CGRect(0, 0, containerBounds.Width, stripHeight);
+        strip.Center = new CGPoint(containerBounds.Width / 2, stripHeight / 2);
+    }
+
+    /// <summary>
+    /// Slides the nav bar strip in or out — interruptible, same retargeting model as the
+    /// tab bar strip.
+    /// </summary>
+    public async Task SetNavBarPresentedAsync(bool presented, bool animated)
+    {
+        if (_navBarStrip is not { } strip)
+        {
+            return;
+        }
+
+        _navBarPresented = presented;
+
+        var targetTransform = presented
+            ? CGAffineTransform.MakeIdentity()
+            : CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
+
+        if (!animated)
+        {
+            strip.Transform = targetTransform;
+            ApplyCurrentPageInsets();
+
+            return;
+        }
+
+        _navBarAnimating++;
+
+        try
+        {
+            await UIView.AnimateNotifyAsync(
+                _barAnimationDurationSeconds,
+                0,
+                UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
+                () =>
+                {
+                    strip.Transform = targetTransform;
+                    ApplyCurrentPageInsets();
+                    View!.LayoutIfNeeded();
+                }
+            );
+        }
+        finally
+        {
+            _navBarAnimating--;
+        }
+    }
+
+    /// <summary>
     /// Positions the strip via Bounds/Center — transform-safe: setting Frame under an active
     /// slide transform corrupts the geometry and snaps the hide/show animation
     /// (layout passes run INSIDE the animation block via LayoutIfNeeded).
@@ -170,14 +278,18 @@ internal sealed class ScaffoldViewController : UIViewController
         }
     }
 
-    /// <summary>Applies the current page's bar-inset contribution to its own controller.</summary>
+    /// <summary>The nav bar's top inset contribution above the system inset: the bar's content height.</summary>
+    private nfloat NavBarInsetContribution
+        => _navBarStrip is { } strip && _navBarPresented ? strip.ContentHeight : 0;
+
+    /// <summary>Applies the current page's chrome inset contributions to its own controller.</summary>
     public void ApplyCurrentPageInsets()
     {
         if (CurrentPageController is { } pageController)
         {
-            pageController.AdditionalSafeAreaInsets = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null
-                ? new UIEdgeInsets(0, 0, BarHeight, 0)
-                : UIEdgeInsets.Zero;
+            var bottom = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null ? BarHeight : 0;
+            var top = CurrentPageWantsNavBarInset ? NavBarInsetContribution : 0;
+            pageController.AdditionalSafeAreaInsets = new UIEdgeInsets(top, 0, bottom, 0);
         }
     }
 
@@ -189,12 +301,12 @@ internal sealed class ScaffoldViewController : UIViewController
         var bounds = container.Bounds;
         var safeBottom = container.SafeAreaInsets.Bottom;
 
+        var boundsOrInsetsChanged = bounds != _lastBounds || safeBottom != _lastSafeBottom || container.SafeAreaInsets.Top != _lastSafeTop;
+
         if (_tabBarStrip is { } strip)
         {
-            if (strip.NeedsMeasure || bounds != _lastBounds || safeBottom != _lastSafeBottom)
+            if (strip.NeedsMeasure || boundsOrInsetsChanged)
             {
-                _lastBounds = bounds;
-                _lastSafeBottom = safeBottom;
                 strip.Measure(bounds.Width);
             }
 
@@ -209,6 +321,25 @@ internal sealed class ScaffoldViewController : UIViewController
                 strip.Transform = CGAffineTransform.MakeTranslation(0, stripHeight);
             }
         }
+
+        if (_navBarStrip is { } navStrip)
+        {
+            if (navStrip.NeedsMeasure || boundsOrInsetsChanged)
+            {
+                navStrip.Measure(bounds.Width);
+            }
+
+            PositionNavStrip(navStrip, bounds);
+
+            if (_navBarAnimating == 0 && !_navBarPresented)
+            {
+                navStrip.Transform = CGAffineTransform.MakeTranslation(0, -NavStripHeight(navStrip));
+            }
+        }
+
+        _lastBounds = bounds;
+        _lastSafeBottom = safeBottom;
+        _lastSafeTop = container.SafeAreaInsets.Top;
 
         ApplyCurrentPageInsets();
     }
@@ -260,6 +391,67 @@ internal sealed class ScaffoldTabBarStrip : UIView
     {
         base.LayoutSubviews();
         Bar.Frame = new CGRect(0, 0, Bounds.Width, BarHeight);
+    }
+
+    public override UIView? HitTest(CGPoint point, UIEvent? uievent)
+    {
+        var view = base.HitTest(point, uievent);
+
+        // Only the bar's actual content consumes touches; the strip itself is transparent glass.
+        return ReferenceEquals(view, this) ? null : view;
+    }
+}
+
+/// <summary>
+/// Top chrome strip hosting the MAUI nav bar platform view. Unlike the tab bar strip, the bar
+/// view FILLS the strip (its background extends under the status bar) and consumes the
+/// safe-area padding itself (SafeAreaEdges). Measurement is NORMALIZED to the content height:
+/// once positioned at the top the bar's measure includes the status padding it consumed, so it
+/// is subtracted back (the NaluShellItemRenderer net10 pattern) — the controller adds the
+/// system inset deterministically.
+/// </summary>
+internal sealed class ScaffoldNavBarStrip : UIView
+{
+    public UIView Bar { get; }
+
+    internal bool NeedsMeasure { get; private set; } = true;
+
+    /// <summary>The bar's content height, EXCLUDING any safe-area padding it consumed.</summary>
+    internal nfloat ContentHeight { get; private set; }
+
+    public ScaffoldNavBarStrip(UIView bar)
+    {
+        Bar = bar;
+        BackgroundColor = UIColor.Clear;
+        (bar.Superview as UIView)?.WillRemoveSubview(bar);
+        bar.RemoveFromSuperview();
+        AddSubview(bar);
+    }
+
+    internal void Measure(nfloat width)
+    {
+        var measured = Bar.SizeThatFits(new CGSize(width, nfloat.MaxValue)).Height;
+        ContentHeight = measured - Bar.SafeAreaInsets.Top;
+        NeedsMeasure = false;
+    }
+
+    public override void SetNeedsLayout()
+    {
+        base.SetNeedsLayout();
+        NeedsMeasure = true;
+        Superview?.SetNeedsLayout();
+    }
+
+    public override void SafeAreaInsetsDidChange()
+    {
+        base.SafeAreaInsetsDidChange();
+        NeedsMeasure = true;
+    }
+
+    public override void LayoutSubviews()
+    {
+        base.LayoutSubviews();
+        Bar.Frame = Bounds;
     }
 
     public override UIView? HitTest(CGPoint point, UIEvent? uievent)

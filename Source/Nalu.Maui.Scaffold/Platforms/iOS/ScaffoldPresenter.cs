@@ -27,6 +27,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private UIViewController? _currentController;
     private ScaffoldTabBar? _currentTabBarArea;
     private View? _currentBarView;
+    private View? _currentNavBarView;
 
     private UIView? _overlayScrim;
     private UIView? _overlayPanel;
@@ -63,20 +64,27 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         var tabBarArea = root.Parent as ScaffoldTabBar;
         var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
+        var navBarView = scaffold.ResolveNavBarView(targetPage);
+        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(targetPage);
         var animated = hint != ScaffoldPresentationHint.None;
+
+        // The context must carry the target page's state before the bar (or its bindings) mount.
+        scaffold.NavBarContext.Update(root, targetPage);
 
         // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
         // page slides in (and back in sync on pop) — no sequential two-phase motion.
+        // Nav bar first: its strip must sit BELOW the tab bar strip in z-order.
+        var navChromeTask = UpdateNavBarChromeAsync(controller, mauiContext, navBarView, navBarVisible, animated);
         var chromeTask = UpdateTabBarChromeAsync(controller, mauiContext, tabBarArea, barVisible, animated);
 
         var pageTask = ReferenceEquals(targetPage, _currentPage)
             ? Task.CompletedTask
-            : TransitionToPageAsync(controller, mauiContext, targetPage, hint, barVisible);
+            : TransitionToPageAsync(controller, mauiContext, targetPage, hint, barVisible, navBarVisible);
 
-        await Task.WhenAll(chromeTask, pageTask);
+        await Task.WhenAll(navChromeTask, chromeTask, pageTask);
     }
 
-    private async Task TransitionToPageAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, ScaffoldPresentationHint hint, bool barVisible)
+    private async Task TransitionToPageAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, ScaffoldPresentationHint hint, bool barVisible, bool navBarVisible)
     {
         var parentController = controller.ContentHost;
         var container = controller.ContentContainer;
@@ -93,12 +101,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
 
         // §5.4 per-page inset application: each page is laid out with the insets matching its
-        // own bar visibility from birth — the outgoing page keeps its insets while leaving.
+        // own chrome visibility from birth — the outgoing page keeps its insets while leaving.
         controller.CurrentPageController = newController;
         controller.CurrentPageWantsBarInset = barVisible;
-        newController.AdditionalSafeAreaInsets = barVisible
-            ? new UIEdgeInsets(0, 0, controller.BarHeight, 0)
-            : UIEdgeInsets.Zero;
+        controller.CurrentPageWantsNavBarInset = navBarVisible;
+        controller.ApplyCurrentPageInsets();
 
         parentController.AddChildViewController(newController);
         var newView = newController.View!;
@@ -238,17 +245,97 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
     private void OnCurrentPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Bar visibility is an animated inset change, not a page relayout (§5.4).
-        if (e.PropertyName == "TabBarVisibility"
-            && sender is Page page
-            && ReferenceEquals(page, _currentPage)
-            && scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
-            && scaffold.Handler is IPlatformViewHandler { ViewController: ScaffoldViewController controller, MauiContext: { } mauiContext })
+        if (sender is not Page page
+            || !ReferenceEquals(page, _currentPage)
+            || scaffold.Proxy?.CurrentItem.CurrentSection is not ScaffoldRootProxy rootProxy
+            || scaffold.Handler is not IPlatformViewHandler { ViewController: ScaffoldViewController controller, MauiContext: { } mauiContext })
         {
-            var tabBarArea = rootProxy.Root.Parent as ScaffoldTabBar;
-            var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(rootProxy.Root, page);
-            controller.CurrentPageWantsBarInset = barVisible;
-            UpdateTabBarChromeAsync(controller, mauiContext, tabBarArea, barVisible, animated: true).FireAndForget(scaffold.Handler);
+            return;
+        }
+
+        switch (e.PropertyName)
+        {
+            // Bar visibility is an animated inset change, not a page relayout (§5.4).
+            case "TabBarVisibility":
+            {
+                var tabBarArea = rootProxy.Root.Parent as ScaffoldTabBar;
+                var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(rootProxy.Root, page);
+                controller.CurrentPageWantsBarInset = barVisible;
+                UpdateTabBarChromeAsync(controller, mauiContext, tabBarArea, barVisible, animated: true).FireAndForget(scaffold.Handler);
+
+                break;
+            }
+
+            case "IsNavBarVisible":
+            case "NavBarView":
+            {
+                var navBarView = scaffold.ResolveNavBarView(page);
+                var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
+                controller.CurrentPageWantsNavBarInset = navBarVisible;
+                UpdateNavBarChromeAsync(controller, mauiContext, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Brings the nav bar chrome to the desired state — same model as the tab bar: the strip
+    /// stays mounted while a bar view is resolved (hidden = translated above the screen edge),
+    /// visibility changes retarget in-flight slides, and the bar view swaps only when the
+    /// resolution changes (page-level custom bars).
+    /// </summary>
+    private Task UpdateNavBarChromeAsync(ScaffoldViewController controller, IMauiContext mauiContext, View? navBarView, bool navBarVisible, bool animated)
+    {
+        if (navBarView is null)
+        {
+            if (_currentNavBarView is { } detachedView)
+            {
+                _currentNavBarView = null;
+                controller.UnmountNavBar();
+                DetachNavBarView(detachedView);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        if (!ReferenceEquals(navBarView, _currentNavBarView))
+        {
+            if (_currentNavBarView is { } previousView)
+            {
+                controller.UnmountNavBar();
+                DetachNavBarView(previousView);
+            }
+
+            _currentNavBarView = navBarView;
+            navBarView.BindingContext = scaffold.NavBarContext;
+
+            // A freshly appearing bar starts above the edge and slides in.
+            controller.MountNavBar(navBarView.ToPlatform(mauiContext), startHidden: animated);
+        }
+
+        // The element tree reflects presented chrome: attached while visible, detached while
+        // hidden (the strip and platform view stay alive offscreen either way).
+        if (navBarVisible)
+        {
+            if (navBarView.Parent is null)
+            {
+                scaffold.AddLogicalChild(navBarView);
+            }
+        }
+        else
+        {
+            DetachNavBarView(navBarView);
+        }
+
+        return controller.SetNavBarPresentedAsync(navBarVisible, animated);
+    }
+
+    private void DetachNavBarView(View navBarView)
+    {
+        if (ReferenceEquals(navBarView.Parent, scaffold))
+        {
+            scaffold.RemoveLogicalChild(navBarView);
         }
     }
 

@@ -80,11 +80,44 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("TitleView", typeof(View), typeof(Scaffold), null);
 
     /// <summary>
-    /// Attached property controlling navigation bar visibility for a <see cref="Page"/>.
-    /// Toggling visibility is a safe-area inset change, not a page relayout.
+    /// Attached property holding the navigation bar view. Resolution, most specific wins:
+    /// current <see cref="Page"/> → current <see cref="ScaffoldArea"/> → the
+    /// <see cref="Scaffold"/> itself, whose value defaults to a <see cref="ScaffoldNavBarView"/>
+    /// (the default template carrying the whole styling surface) via the default value factory.
+    /// The mounted view's binding context is the scaffold's <see cref="NavBarContext"/>.
     /// </summary>
-    public static readonly BindableProperty NavBarVisibleProperty =
-        BindableProperty.CreateAttached("NavBarVisible", typeof(bool), typeof(Scaffold), true);
+    public static readonly BindableProperty NavBarViewProperty =
+        BindableProperty.CreateAttached(
+            "NavBarView",
+            typeof(View),
+            typeof(Scaffold),
+            null,
+            defaultValueCreator: bindable => bindable is Scaffold ? new ScaffoldNavBarView() : null
+        );
+
+    /// <summary>
+    /// Attached property controlling navigation bar visibility for a <see cref="Page"/>.
+    /// Defaults to true. Visibility changes animate and reach the page as a safe-area inset
+    /// change, not a page relayout.
+    /// </summary>
+    public static readonly BindableProperty IsNavBarVisibleProperty =
+        BindableProperty.CreateAttached("IsNavBarVisible", typeof(bool), typeof(Scaffold), true);
+
+    /// <summary>
+    /// Attached property controlling the nav bar's start-drawer button
+    /// (<see cref="ScaffoldFlyoutButtonVisibility.Auto"/> default: shown at stack roots only).
+    /// Resolution, most specific set value wins: current <see cref="Page"/> →
+    /// current <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/>.
+    /// </summary>
+    public static readonly BindableProperty FlyoutStartButtonVisibilityProperty =
+        BindableProperty.CreateAttached("FlyoutStartButtonVisibility", typeof(ScaffoldFlyoutButtonVisibility), typeof(Scaffold), ScaffoldFlyoutButtonVisibility.Auto);
+
+    /// <summary>
+    /// Attached property controlling the nav bar's end-drawer button.
+    /// Same semantics as <see cref="FlyoutStartButtonVisibilityProperty"/>.
+    /// </summary>
+    public static readonly BindableProperty FlyoutEndButtonVisibilityProperty =
+        BindableProperty.CreateAttached("FlyoutEndButtonVisibility", typeof(ScaffoldFlyoutButtonVisibility), typeof(Scaffold), ScaffoldFlyoutButtonVisibility.Auto);
 
     /// <summary>
     /// Attached property controlling tab bar visibility for a <see cref="Page"/>:
@@ -273,11 +306,46 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets the navigation bar title view attached to a page.</summary>
     public static void SetTitleView(BindableObject bindable, View? value) => bindable.SetValue(TitleViewProperty, value);
 
+    /// <summary>Gets the navigation bar view attached to an element.</summary>
+    public static View? GetNavBarView(BindableObject bindable) => (View?)bindable.GetValue(NavBarViewProperty);
+
+    /// <summary>Sets the navigation bar view attached to an element.</summary>
+    public static void SetNavBarView(BindableObject bindable, View? value) => bindable.SetValue(NavBarViewProperty, value);
+
     /// <summary>Gets whether the navigation bar is visible for a page.</summary>
-    public static bool GetNavBarVisible(BindableObject bindable) => (bool)bindable.GetValue(NavBarVisibleProperty);
+    public static bool GetIsNavBarVisible(BindableObject bindable) => (bool)bindable.GetValue(IsNavBarVisibleProperty);
 
     /// <summary>Sets whether the navigation bar is visible for a page.</summary>
-    public static void SetNavBarVisible(BindableObject bindable, bool value) => bindable.SetValue(NavBarVisibleProperty, value);
+    public static void SetIsNavBarVisible(BindableObject bindable, bool value) => bindable.SetValue(IsNavBarVisibleProperty, value);
+
+    /// <summary>Gets the start-drawer button policy attached to an element.</summary>
+    public static ScaffoldFlyoutButtonVisibility GetFlyoutStartButtonVisibility(BindableObject bindable) => (ScaffoldFlyoutButtonVisibility)bindable.GetValue(FlyoutStartButtonVisibilityProperty);
+
+    /// <summary>Sets the start-drawer button policy attached to an element.</summary>
+    public static void SetFlyoutStartButtonVisibility(BindableObject bindable, ScaffoldFlyoutButtonVisibility value) => bindable.SetValue(FlyoutStartButtonVisibilityProperty, value);
+
+    /// <summary>Gets the end-drawer button policy attached to an element.</summary>
+    public static ScaffoldFlyoutButtonVisibility GetFlyoutEndButtonVisibility(BindableObject bindable) => (ScaffoldFlyoutButtonVisibility)bindable.GetValue(FlyoutEndButtonVisibilityProperty);
+
+    /// <summary>Sets the end-drawer button policy attached to an element.</summary>
+    public static void SetFlyoutEndButtonVisibility(BindableObject bindable, ScaffoldFlyoutButtonVisibility value) => bindable.SetValue(FlyoutEndButtonVisibilityProperty, value);
+
+    /// <summary>
+    /// Gets the observable state the mounted nav bar view binds to (title, back/drawer button
+    /// availability, commands) — the binding context of the default template and of custom
+    /// nav bar views alike.
+    /// </summary>
+    public ScaffoldNavBarContext NavBarContext => field ??= new ScaffoldNavBarContext(this);
+
+    /// <summary>
+    /// Resolves the nav bar view for the given page: page attachment → current area attachment
+    /// → the scaffold's own value (defaulting to the built-in <see cref="ScaffoldNavBarView"/>).
+    /// The resolved view is attached to this scaffold's element tree on mount.
+    /// </summary>
+    internal View? ResolveNavBarView(Page currentPage)
+        => GetNavBarView(currentPage)
+           ?? (CurrentArea is { } area ? GetNavBarView(area) : null)
+           ?? GetNavBarView(this);
 
     /// <summary>Gets the tab bar visibility policy attached to a page.</summary>
     public static ScaffoldTabBarVisibility GetTabBarVisibility(BindableObject bindable) => (ScaffoldTabBarVisibility)bindable.GetValue(TabBarVisibilityProperty);
