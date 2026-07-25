@@ -21,20 +21,24 @@
 - Test net: 7 proxy unit tests (538 total green); DevFlow `NavigationTests` parameterized over
   BOTH hosts (`NavShell` + `NavScaffold`) — 35/35 per platform; state preservation
   (scroll offset + entry text across push/pop) verified on both platforms.
+- **Tab bar (§5.3) IMPLEMENTED and verified on both platforms (July 2026)**: default Telegram-style
+  template with `ItemWidth`-driven overflow ("More" + wrap-grid panel reusing the item template),
+  engine-routed selection with preserved-stack restore, active-tab-pops-to-root, §5.4 bottom-inset
+  contribution (iOS `AdditionalSafeAreaInsets` on the content host, Android system-bars rewrite in
+  the page layer), §5.6 overlay primitive (flyout refactored onto it), `SlideStart`/`SlideEnd`
+  presentation hints for root switches. Suites: `ScaffoldTabBarChromeTests` (9 green per platform)
+  + full navigation suites green on iOS and Android; the shared tab-switch chrome test now runs on
+  the Scaffold host too.
 
 **Next steps, in recommended order:**
 
-1. **Tab bar** (§5.3): default template consuming the metadata quintet, selection through the
-   engine, active-tab-pops-to-root, bottom-inset contribution per §5.4 — opening with the
-   styling-API design review (owner: Alberto).
-2. **Flyout completion** (§5.5): default template over `Areas`, width/styling API, RTL mapping;
+1. **Flyout completion** (§5.5): default template over `Areas`, width/styling API, RTL mapping;
    edge-swipe open lands with the transition engine (P2).
-3. **Nav bar** (§5.2, hard-minimal) + §5.4 inset distribution in `ScaffoldViewController` /
-   `ScaffoldLayout` (incl. Android fragment-container insets participation).
-4. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
-5. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
+2. **Nav bar** (§5.2, hard-minimal) + §5.4 top-inset distribution.
+3. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
+4. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
    interactive pop, predictive-back seeking — androidx seeking-version check still pending).
-6. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
+5. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
 
 **Known open issue (Shell host, not Scaffold):** NaluTabBar renders full-height tab items on the
 Android API 37 emulator (visually broken, taps may fail; files untouched since commit `66c626f`) —
@@ -66,7 +70,8 @@ Build a complete replacement for MAUI `Shell` on mobile platforms that:
 
 ## 2. Packaging & positioning
 
-- New package **`Nalu.Maui.Scaffold`**, depends on `Nalu.Maui.Navigation` (and `Nalu.Maui.Core`).
+- New package **`Nalu.Maui.Scaffold`**, depends on `Nalu.Maui.Navigation`, `Nalu.Maui.Core` and
+  `Nalu.Maui.Layouts` (the default tab bar overflow panel builds on `HorizontalWrapLayout`).
   IMPLEMENTED: net10.0 / net10.0-android / net10.0-ios26.0 (net11 later); iOS floor 12.2, Android 21
   (repo low-floor policy — native sheets would be runtime-guarded, §7.2); `InternalsVisibleTo`
   grants from Core and Navigation; **not** in `Nalu.Pack.slnf` / `Nalu.Maui` meta package until
@@ -176,9 +181,11 @@ Layering, bottom-up — each layer testable without the one below:
    ghost entries), while **pushes stay pending until commit** so a multi-push batch presents as
    ONE transition. Selection state (`CurrentArea`/`CurrentRoot`/`IsSelected`) is written only here.
 3. **`IScaffoldPresenter`** (platform seam): synchronize-to-model with a direction hint
-   (`None`/`Push`/`Pop` — direction is not derivable from a stack diff on replace/cross-area
-   batches, so the proxy passes intent). One awaited synchronization per commit; deterministic
-   completion (no `Task.Delay` hacks). Also owns the flyout layer (§5.5).
+   (`None`/`Push`/`Pop`/`SlideStart`/`SlideEnd` — direction is not derivable from a stack diff on
+   replace/cross-area batches, so the proxy passes intent; the slide hints carry the direction of
+   travel for root/area switches, computed from the structure ordinal). One awaited
+   synchronization per commit; deterministic completion (no `Task.Delay` hacks). Also owns the
+   chrome (tab bar strip) and the §5.6 overlay layer.
 4. **Platform presenters**: iOS = child-`UIViewController` containment (single visible page,
    covered pages detached NEVER destroyed — scroll/entry state verified preserved);
    Android = fragment-per-visible-page (`Replace`, no back stack yet — predictive-back
@@ -229,14 +236,83 @@ Layering, bottom-up — each layer testable without the one below:
 
 ### 5.3 Tab bar
 
+> **IMPLEMENTED (July 2026), verified on iOS simulator + Android emulator** — default template
+> (`ScaffoldTabBarView` + `ScaffoldTabBarItemsLayout` + `ScaffoldTabBarItemView`), overflow panel
+> (`ScaffoldTabBarOverflowView`), full styling surface on `ScaffoldTabBar`. Implementation
+> refinements over the original review, all user-confirmed:
+> - The overflow panel is a **`HorizontalWrapLayout` grid reusing the tab item template**
+>   (icon-over-label, badge, selection pill, same `ItemWidth` slots, wraps to rows) — not list
+>   rows; it **hugs its content and centers**, mirroring the bar pill (adds a
+>   `Nalu.Maui.Layouts` dependency to the Scaffold package).
+> - The overflow scrim is **fullscreen, inserted BELOW the tab bar strip in z-order** (see §5.6)
+>   instead of exclusion geometry.
+> - Root/area switches animate with new **`SlideStart`/`SlideEnd` presentation hints** computed
+>   from the structure ordinal (direction of travel), LTR-mapped for now.
+> - Chrome mount state is reflected in the element tree (bar view and panel are logical children
+>   only while presented — tooling/UI tests see the truth).
+> - **`Scaffold.TabBarVisibility` attached property** (enum `Visible` default / `Hidden` /
+>   `Auto` = hidden while the current stack has pushed pages) replaces the earlier bool.
+>   Hide/show is ANIMATED in sync with the push/pop transition; the §5.4 inset contribution is
+>   applied PER PAGE (iOS: `AdditionalSafeAreaInsets` on each page's own controller; Android:
+>   the page-layer rewrite state is set before the fragment commit) so the outgoing page never
+>   relayouts — no jumps.
+> - Item views are Grids with an inner selection-pill layer (a Border clips its content, cutting
+>   the badge) and carry **explicit dp heights** (icon host, label, badge) — the bar measures
+>   identically on iOS and Android (verified ~70.5dp pill on both).
+
 - `ScaffoldTabBar` ships with a **default Nalu template** that auto-renders its `ScaffoldRoot`s from
   the metadata quintet (`Title`/`Icon`/`SelectedIcon`/`CurrentIcon`/`IsSelected`, honoring
-  `IsVisible`) — NaluTabBar's visual featureset is the starting point (shapes, blur, shadow,
-  scroll padding…).
+  `IsVisible`).
+- **Visual language (decided): Telegram-style floating pill bar** — translucent dark/light rounded
+  container floating above the content with margins (not edge-to-edge), icon + label per item,
+  the selected item highlighted by a rounded pill tint with the accent color on the label; badge
+  support on any icon. Default accent = **Nalu logo wave blues**: `#68A3F1` on dark theme,
+  `#2C479D`/`#3C64BC` on light — shipped as a built-in themed ResourceDictionary style.
+- **Icons render untinted (decided — no `IconColor`)**: the template draws the quintet's
+  `ImageSource`s as-is; avatars-as-tabs work out of the box (Telegram "Profilo" case). Monochrome
+  tinting is the *root's* concern (`FontImageSource` color, `AppThemeBinding` inside the Icon);
+  the selected appearance comes from providing `SelectedIcon`/`CurrentIcon`, never from template
+  recoloring.
+- **Layout & overflow policy (decided): `ItemWidth`-driven, no fixed item cap.**
+  - `ItemWidth` (bindable, default ≈76dp) is the single input.
+    `fittingSlots = floor(availableBarWidth / ItemWidth)` (available = container width minus bar
+    margins/padding and landscape notch insets per §5.4).
+  - All visible roots fit ⇒ show them all, no More button. Otherwise show `fittingSlots − 1`
+    roots + a trailing **"More" (•••)** item; the remainder (declaration order) goes to the
+    overflow panel.
+  - The bar **hugs its content**: width = `shownCount × ItemWidth + padding`, centered — grows
+    gradually with item count on tablets, lands at the Telegram look (~4 items) on phones.
+    Rotation/resize re-runs the computation (items migrate between bar and overflow; an open
+    panel whose item count drops to zero closes).
+  - Fixed slot width ⇒ long titles truncate (a `LineBreakMode`-style knob, not slot widening).
+- **Overflow "More" panel**: rounded panel anchored above the bar, rendered in the shared overlay
+  layer (§5.6). The scrim darkens the page content but **excludes the bottom chrome footprint —
+  the tab bar stays undimmed and fully interactive**: tapping an in-bar item while the panel is
+  open dismisses the panel AND performs that selection in one gesture. Overflow roots render as
+  full-width rows (icon + label + badge); when the current root lives in overflow, the More
+  button itself shows the "current" pill tint and the row is highlighted in the panel. Scrim tap
+  and Android system back dismiss the panel before the navigation engine is consulted (§7.2
+  overlay-dismiss policy). Active-tab-pops-to-root applies to overflow rows too.
+- **Styling surface (decided)**: everything customizable via `BindableProperty` on
+  `ScaffoldTabBar` so plain `Style` + `AppThemeBinding` covers theming; defaults live in the
+  built-in themed style. Proposed set —
+  - *Bar container*: `BarBackground` (Brush), `BarCornerRadius`, `BarMargin`, `BarPadding`,
+    `BarShadow` (Shadow), `BarHeightRequest`.
+  - *Items*: `ItemWidth`, `TextColor`, `SelectedTextColor`, `FontFamily`, `FontSize`,
+    `SelectedFontAttributes`, `SelectionPillBackground`, `SelectionPillCornerRadius`, `IconSize`.
+  - *Badges*: `BadgeBackground`, `BadgeTextColor`, `BadgeFontSize`; the badge value is a
+    per-root bindable (`BadgeText` attached/bindable property) so it's data-bindable per tab.
+  - *Overflow*: `OverflowIcon`, `OverflowTitle` (localizable "More"), `ScrimColor`,
+    `OverflowPanelBackground`, `OverflowPanelCornerRadius`, `OverflowPanelShadow`,
+    `OverflowItemTemplate` (optional; default row otherwise).
 - **Full replacement supported**: user provides their own virtual view (DataTemplate or direct view);
   the Scaffold supplies a binding context exposing the roots, selection state, and a select command.
   Tab selection routes through `NavigationService` (guards respected) — never a direct view swap.
 - Tapping the active tab pops that root's stack to its root page (existing NaluTabBar behavior, preserved).
+- **Insets (implementation directive)**: mirror NaluTabBar's windowinsets/safe-area renderer code
+  (§5.4 reference implementations) with high attention — the hosted page must receive the proper
+  augmented insets (bottom = bar footprint incl. the floating margins policy) exactly as it does
+  under NaluTabBar today.
 - Current `NaluTabBar` + its Shell renderers stay in `Nalu.Maui.Navigation` for Shell users;
   the Scaffold version is a fresh implementation without renderer gymnastics (it's just a view in the
   Scaffold's own layout).
@@ -319,6 +395,32 @@ Consequences and requirements:
 - Open question to settle in design review: can a flyout item target a specific *stack* inside an item
   (Shell allows it, complicates selection semantics) — **proposal: item-level targets only for v1**.
 
+### 5.6 Overlay layer — one shared primitive (decided July 2026)
+
+All scrim-plus-panel chrome goes through a single internal Scaffold overlay primitive instead of
+per-feature scrim implementations — shape (illustrative):
+`ShowOverlayAsync(content, OverlayOptions { ScrimColor, ScrimInsets, ExcludeBottomChrome, DismissOnScrimTap, Anchor })`.
+
+Consumers:
+
+| Consumer | Scrim | Notes |
+|---|---|---|
+| Flyout (§5.5) | fullscreen, above everything | IMPLEMENTED — refactored onto the primitive |
+| Tab-bar overflow panel (§5.3) | fullscreen, **inserted BELOW the tab bar strip in z-order** | IMPLEMENTED — reserved for the More button |
+| Popups & sheets (§7.2, v2) | fullscreen, above everything | the v1 "don't preclude" obligation is satisfied structurally |
+
+Key rules (as implemented):
+
+- **Behind-chrome placement is z-order, not geometry** (decided during implementation, replacing
+  the earlier exclusion-zone idea): the fullscreen scrim and the panel are inserted below the
+  bottom chrome strip, so the tab bar renders above the scrim — undimmed and interactive — with
+  zero exclusion arithmetic to maintain across devices/orientation/bar styling. Hit-testing
+  follows z-order natively (bar above scrim ⇒ bar taps win; a bar tap both dismisses the panel
+  and performs the selection). This placement mode is reserved for the tab bar's More button.
+- Back policy: hardware/system back and scrim tap dismiss the topmost overlay before the
+  navigation engine is consulted (same rule §7.2 states for popups); the Android back callback's
+  `Enabled` state accounts for open overlays.
+
 ---
 
 ## 6. Back handling, gestures & guards
@@ -371,9 +473,10 @@ separate mechanism the navigation engine never sees.
   show/await-result (the pattern Nalu popups already use in `Nalu.Maui.Layouts` —
   `PopupPageBase`/`PopupContainer`): **no route, no stack entry, no navigation lifecycle,
   no guards, excluded from snapshot/restore.**
-- The Scaffold provides the **overlay layer** they render into (above page + chrome, below nothing),
-  with scrim and safe-area handling per §5.4; back handling policy: hardware/system back and
-  back gestures dismiss the topmost overlay before the navigation engine is ever consulted.
+- The Scaffold provides the **overlay layer** they render into (the shared primitive of §5.6 —
+  above page + chrome, below nothing), with scrim and safe-area handling per §5.4; back handling
+  policy: hardware/system back and back gestures dismiss the topmost overlay before the
+  navigation engine is ever consulted.
 - A sheet is a popup with detent/drag behavior — implementation choice (native
   `UISheetPresentationController` / Material bottom sheet vs Nalu-drawn for cross-platform
   consistency) is part of THIS feature's design review, not the navigation engine's. The library's
@@ -588,7 +691,8 @@ The Scaffold must own, with exact ordering:
 > ✅ Full hierarchy incl. cross-area/root navigation with stack preservation (exercised by the
 >   shared UI suite). ✅ Back policy per §6. ✅ Flyout STRUCTURE (attached props, resolution,
 >   open/close, scrim, auto-close on navigation) — templates/styling pending.
-> ⬜ Tab bar (next up — starts with the styling-API design review).
+> ✅ Tab bar (§5.3) + §5.6 overlay primitive (flyout refactored onto it) + §5.4 bottom-inset
+>   distribution — implemented and verified on both platforms (July 2026).
 > ⬜ Flyout default template, width/styling API, RTL.
 > ⬜ Minimal nav bar + §5.4 inset distribution.
 > ⬜ Modal pages (§7.1).
@@ -705,3 +809,14 @@ will bite again if forgotten:
   brokers (kill the other app; `adb forward` vs iOS-simulator binds conflict on the HOST port —
   remove forwards when switching platforms). Identical-byte screenshots are the tell for a stale
   agent connection.
+- **.NET 10 safe-area opt-in (§5.4 corollary, verified on the tab bar)**: content is
+  edge-to-edge by default; a page's scrollable only gains the augmented bottom inset (system +
+  chrome footprint) when it opts in — `scrollView.SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container)`.
+  Without it the content end hides behind the bar. The augmentation channel itself
+  (iOS `AdditionalSafeAreaInsets` on the content-host controller, Android system-bars rewrite in
+  `ScaffoldPageLayerLayout`) is verified working on both platforms.
+- **MAUI `AutomationId` can only be set once** — reusing a templated view with a different id
+  needs the id decided at construction time (a later set throws, surfacing as a DevFlow
+  "tap failed" when it happens inside a tap handler).
+- **iOS simulator deploys over a RUNNING app keep the stale bundle** (trimmer `linked/` cache +
+  install skip, no error): always kill → build → `-t:Run` (see the maui-devflow-uitests skill).

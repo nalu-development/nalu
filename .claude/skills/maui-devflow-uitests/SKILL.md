@@ -38,6 +38,24 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
 
 1. **Launch the TestApp** (DEBUG) on the target platform — see commands in
    `references/devflow-overview.md`. Android needs `adb forward tcp:9223 tcp:9223`.
+
+   **iOS simulator rebuild/relaunch loop (the ONLY reliable sequence):**
+
+   1. `xcrun simctl terminate booted com.nalu.maui.testapp` — ALWAYS kill the app first.
+      Deploying over a *running* app silently keeps the STALE bundle (the trimmer's
+      `obj/.../linked/` cache + install skip): your code changes never reach the device and
+      nothing errors. When in doubt, verify the deployed dll timestamp:
+      `ls -la "$(xcrun simctl get_app_container booted com.nalu.maui.testapp app)"/<Library>.dll`.
+   2. `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios` — plain build first. Running
+      `-t:Run` in the same invocation right after wiping `bin/` fails with
+      "The app must be built before the arguments to launch the app using mlaunch can be computed".
+   3. `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios -t:Run` — **run in background**
+      (it can block while the app runs). The agent then comes up on 9223 — or **10223** if the
+      previous instance's port lingers in TIME_WAIT; probe with a no-op MCP call, never curl.
+
+   Also: a leftover `adb forward` on 9223 makes the iOS agent HALF-START (it logs
+   "Agent started on port 9223" but listens on nothing) — `adb forward --remove-all` first,
+   then relaunch the iOS app.
 2. **Explore the running app** via MCP tools or `maui devflow` CLI: take a screenshot, dump the
    visual tree, tap around. Confirm the scenario works manually before encoding it in a test.
 3. **Add/extend a test page** in `Samples/Nalu.Maui.TestApp/Tests/` (`[TestPage("Name")]`),

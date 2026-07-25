@@ -190,6 +190,8 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
             model.Push(entry);
         }
 
+        var previousRoot = _currentArea.CurrentRoot;
+
         if (rootChanged)
         {
             ApplySelection(targetRoot);
@@ -197,7 +199,7 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
 
         _location = model.PushedPages.Count > 0 ? model.PushedPages[^1].Route : targetRoot.BaseRoute;
 
-        var hint = rootChanged ? ScaffoldPresentationHint.None
+        var hint = rootChanged ? ComputeSlideHint(previousRoot, targetRoot)
             : pendingPushes.Count > 0 ? ScaffoldPresentationHint.Push
             : popCount > 0 ? ScaffoldPresentationHint.Pop
             : ScaffoldPresentationHint.None;
@@ -211,6 +213,60 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
     }
 
     public IShellContentProxy GetContent(string segmentName) => GetRoot(segmentName);
+
+    /// <summary>
+    /// Builds the absolute navigation realizing a tab/flyout selection of the given root:
+    /// the root segment plus the root's preserved pushed-page segments (so the engine's
+    /// stack matching keeps them — a bare root navigation would pop them), or the root segment
+    /// alone when the root is already current (pop-to-root through guards).
+    /// Returns null when the root is unknown or already current with an empty stack.
+    /// </summary>
+    public INavigationInfo? BuildRootSelectionNavigation(ScaffoldRoot root)
+    {
+        var rootProxy = _areas.SelectMany(a => a.Roots).FirstOrDefault(r => ReferenceEquals(r.Root, root));
+
+        if (rootProxy is null)
+        {
+            return null;
+        }
+
+        var isCurrent = ReferenceEquals(_currentArea.CurrentRoot, rootProxy);
+        var pushedPages = root.NavigationStack.PushedPages;
+
+        if (isCurrent && pushedPages.Count == 0)
+        {
+            return null;
+        }
+
+        var navigation = new AbsoluteNavigation();
+        IList<INavigationSegment> segments = navigation;
+
+        segments.Add(
+            new NavigationSegment
+            {
+                SegmentName = rootProxy.SegmentName,
+                Type = rootProxy.PageType
+            }
+        );
+
+        if (!isCurrent)
+        {
+            // Re-state the preserved stack so ToRelativeNavigation matches it segment by
+            // segment: the switch restores the stack instead of unwinding it.
+            foreach (var entry in pushedPages)
+            {
+                segments.Add(
+                    new NavigationSegment
+                    {
+                        SegmentName = entry.SegmentName,
+                        Type = entry.Page.GetType()
+                    }
+                );
+            }
+        }
+
+        return navigation;
+    }
 
     public void InitializeWithContent(string segmentName)
     {
@@ -253,6 +309,45 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
         => _rootsBySegment.TryGetValue(segmentName, out var rootProxy)
             ? rootProxy
             : throw new KeyNotFoundException($"No ScaffoldRoot found for segment '{segmentName}'.");
+
+    /// <summary>
+    /// Direction of a root/area switch: toward a higher structure ordinal ⇒ the new content
+    /// slides in from the end edge, toward a lower one ⇒ from the start edge.
+    /// </summary>
+    private ScaffoldPresentationHint ComputeSlideHint(ScaffoldRootProxy previousRoot, ScaffoldRootProxy targetRoot)
+    {
+        if (ReferenceEquals(previousRoot, targetRoot))
+        {
+            return ScaffoldPresentationHint.None;
+        }
+
+        var previousOrdinal = GetStructureOrdinal(previousRoot);
+        var targetOrdinal = GetStructureOrdinal(targetRoot);
+
+        return targetOrdinal.CompareTo(previousOrdinal) switch
+        {
+            > 0 => ScaffoldPresentationHint.SlideEnd,
+            < 0 => ScaffoldPresentationHint.SlideStart,
+            _ => ScaffoldPresentationHint.None
+        };
+    }
+
+    private int GetStructureOrdinal(ScaffoldRootProxy rootProxy)
+    {
+        var ordinal = 0;
+
+        foreach (var candidate in _areas.SelectMany(area => area.Roots))
+        {
+            if (ReferenceEquals(candidate, rootProxy))
+            {
+                return ordinal;
+            }
+
+            ordinal++;
+        }
+
+        return -1;
+    }
 
     private void ApplySelection(ScaffoldRootProxy targetRoot)
     {

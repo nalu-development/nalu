@@ -209,7 +209,11 @@ public sealed class NaluApp : IAsyncLifetime
         while (true)
         {
             var matches = await _client.QueryAsync(text: text).ConfigureAwait(false);
-            var element = matches.FirstOrDefault(m => m.IsVisible);
+
+            // Only on-screen matches: text queries also hit abstract structure elements
+            // (Shell's Tab, the Scaffold's ScaffoldRoot Title) that report IsVisible but have
+            // no window bounds — tapping those spins until timeout.
+            var element = matches.FirstOrDefault(m => m.IsVisible && m.WindowBounds is { Width: > 0, Height: > 0 });
 
             if (element is not null)
             {
@@ -234,7 +238,14 @@ public sealed class NaluApp : IAsyncLifetime
                     ).ConfigureAwait(false);
                     using var hitTest = JsonDocument.Parse(hitTestJson);
 
-                    foreach (var ancestor in hitTest.RootElement.GetProperty("elements").EnumerateArray().Take(5))
+                    // The hit-test stack is innermost-first but may interleave SIBLING branches
+                    // (page content under floating chrome comes before the chrome's own stack):
+                    // the matched element's ancestors are the entries AFTER it — start there,
+                    // not at the top of the list.
+                    var stack = hitTest.RootElement.GetProperty("elements").EnumerateArray().ToList();
+                    var selfIndex = stack.FindIndex(e => e.GetProperty("id").GetString() == element.Id);
+
+                    foreach (var ancestor in stack.Skip(selfIndex + 1).Take(5))
                     {
                         var ancestorId = ancestor.GetProperty("id").GetString();
 

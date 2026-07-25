@@ -27,10 +27,19 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
     /// <summary>Completes when the fragment's exit animation finished (or immediately when it has none).</summary>
     public Task DismissedTask => _dismissed.Task;
 
+    /// <summary>Whether this fragment's entry is animated (its presented signal comes from the animator end).</summary>
+    private bool HasAnimatedEnter => hint is ScaffoldPresentationHint.Push or ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd;
+
     public override AView OnCreateView(LayoutInflater inflater, ViewGroup? parent, Bundle? savedInstanceState)
     {
         var platformView = page.ToPlatform(mauiContext);
         (platformView.Parent as ViewGroup)?.RemoveView(platformView);
+
+        // A remounted page keeps whatever translation its last exit animation left behind
+        // (covered pages are detached, never destroyed) — reset before hosting it again.
+        platformView.TranslationX = 0f;
+        platformView.TranslationZ = 0f;
+
         platformView.LayoutParameters = new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent,
             ViewGroup.LayoutParams.MatchParent);
@@ -45,7 +54,7 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
         // Presented = first draw when no enter animation runs; the animator end wins otherwise.
         OneShotPreDrawListener.Add(view, new Java.Lang.Runnable(() =>
         {
-            if (hint != ScaffoldPresentationHint.Push)
+            if (!HasAnimatedEnter)
             {
                 _presented.TrySetResult();
             }
@@ -76,6 +85,15 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
             return BuildAnimator(view, fromX: width, toX: 0, elevate: true, _presented);
         }
 
+        if (enter && hint is ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd)
+        {
+            // Tab/root switch: the new page slides in over the old one in the direction of
+            // travel. Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
+            var fromX = hint == ScaffoldPresentationHint.SlideEnd ? width : -width;
+
+            return BuildAnimator(view, fromX: fromX, toX: 0, elevate: true, _presented);
+        }
+
         if (!enter && IsRemoving && hint == ScaffoldPresentationHint.Pop)
         {
             return BuildAnimator(view, fromX: 0, toX: width, elevate: true, _dismissed);
@@ -90,8 +108,9 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
     {
         if (enter)
         {
-            // No enter animation: presentation completes at first draw (OnViewCreated hook).
-            if (hint == ScaffoldPresentationHint.Push)
+            // No enter animation possible: complete what the animator end would have signaled
+            // (the no-animation case completes at first draw via the OnViewCreated hook).
+            if (HasAnimatedEnter)
             {
                 _presented.TrySetResult();
             }

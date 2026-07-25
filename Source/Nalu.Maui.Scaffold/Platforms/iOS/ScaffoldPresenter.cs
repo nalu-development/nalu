@@ -1,56 +1,112 @@
+using System.ComponentModel;
 using CoreGraphics;
 using Microsoft.Maui.Platform;
+using Nalu.Internals;
 using UIKit;
 
 namespace Nalu;
 
 /// <summary>
-/// iOS presenter (P0): hosts the visible page as a child UIViewController of the scaffold
-/// page's own controller (UIKit containment — safe area and appearance callbacks propagate),
-/// synchronizing to the stack model with a minimal slide transition.
-/// Single-visible-page policy: covered pages are unmounted and remounted on reveal.
-/// The full transition engine (shared elements, interactive pop) arrives with P2.
+/// iOS presenter: hosts the visible page as a child UIViewController of the scaffold's content
+/// host (UIKit containment — safe area and appearance callbacks propagate), synchronizing to the
+/// stack model with a minimal slide transition, and owns the chrome (tab bar strip + §5.6
+/// overlay layer). Single-visible-page policy: covered pages are unmounted and remounted on
+/// reveal. The full transition engine (shared elements, interactive pop) arrives with P2.
 /// </summary>
 internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 {
     private const double _transitionDurationSeconds = 0.25;
+    private const double _overflowGap = 8;
 
-    // Provisional chrome metrics (final styling surface arrives with the P1 API review).
+    // Provisional flyout metrics (flyout width/styling API is a pending design review).
     private const double _flyoutWidthRatio = 0.85;
     private const double _flyoutMaxWidth = 360;
-    private const float _flyoutScrimAlpha = 0.4f;
+    private static readonly Color _flyoutScrimColor = Colors.Black.WithAlpha(0.4f);
 
     private Page? _currentPage;
     private UIViewController? _currentController;
-    private UIView? _flyoutScrim;
-    private UIView? _flyoutPanel;
-    private ScaffoldFlyoutSide _flyoutSide;
+    private ScaffoldTabBar? _currentTabBarArea;
+    private View? _currentBarView;
+
+    private UIView? _overlayScrim;
+    private UIView? _overlayPanel;
+    private View? _overlayContent;
+    private ScaffoldOverlayPlacement _overlayPlacement;
+    private Action? _overlayCleanup;
+
+    public bool HasOverlay => _overlayPanel is not null;
+
+    private enum ScaffoldOverlayPlacement
+    {
+        FlyoutStart,
+        FlyoutEnd,
+        AboveBottomChrome
+    }
 
     public async Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint)
     {
-        if (scaffold.Handler is not IPlatformViewHandler { ViewController: { } parentController, PlatformView: { } container, MauiContext: { } mauiContext })
+        if (scaffold.Handler is not IPlatformViewHandler { ViewController: ScaffoldViewController controller, MauiContext: { } mauiContext })
         {
             return;
         }
 
-        // Navigation dismisses any open flyout.
-        await CloseFlyoutAsync();
+        // Navigation dismisses any open overlay (flyout, overflow panel).
+        await CloseOverlayAsync();
 
         var stack = root.NavigationStack;
         var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
 
-        if (targetPage is null || ReferenceEquals(targetPage, _currentPage))
+        if (targetPage is null)
         {
             return;
+        }
+
+        var tabBarArea = root.Parent as ScaffoldTabBar;
+        var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
+        var animated = hint != ScaffoldPresentationHint.None;
+
+        // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
+        // page slides in (and back in sync on pop) — no sequential two-phase motion.
+        var chromeTask = UpdateTabBarChromeAsync(controller, mauiContext, tabBarArea, barVisible, animated);
+
+        var pageTask = ReferenceEquals(targetPage, _currentPage)
+            ? Task.CompletedTask
+            : TransitionToPageAsync(controller, mauiContext, targetPage, hint, barVisible);
+
+        await Task.WhenAll(chromeTask, pageTask);
+    }
+
+    private async Task TransitionToPageAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, ScaffoldPresentationHint hint, bool barVisible)
+    {
+        var parentController = controller.ContentHost;
+        var container = controller.ContentContainer;
+
+        if (_currentPage is not null)
+        {
+            _currentPage.PropertyChanged -= OnCurrentPagePropertyChanged;
         }
 
         var previousController = _currentController;
         var newController = targetPage.ToUIViewController(mauiContext);
         _currentPage = targetPage;
         _currentController = newController;
+        targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
+
+        // §5.4 per-page inset application: each page is laid out with the insets matching its
+        // own bar visibility from birth — the outgoing page keeps its insets while leaving.
+        controller.CurrentPageController = newController;
+        controller.CurrentPageWantsBarInset = barVisible;
+        newController.AdditionalSafeAreaInsets = barVisible
+            ? new UIEdgeInsets(0, 0, controller.BarHeight, 0)
+            : UIEdgeInsets.Zero;
 
         parentController.AddChildViewController(newController);
         var newView = newController.View!;
+
+        // A remounted page keeps the transform its unmount animation left behind (covered pages
+        // are detached, never destroyed) — setting Frame under an active transform corrupts the
+        // geometry (the page lands offscreen). Always clear before framing.
+        newView.Transform = CGAffineTransform.MakeIdentity();
         newView.Frame = container.Bounds;
         newView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
 
@@ -73,6 +129,31 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
                 break;
 
+            case ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd:
+            {
+                // Tab/root switch: both pages slide together in the direction of travel.
+                // Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
+                var fromX = hint == ScaffoldPresentationHint.SlideEnd ? width : -width;
+
+                container.AddSubview(newView);
+                newController.DidMoveToParentViewController(parentController);
+                newView.Transform = CGAffineTransform.MakeTranslation(fromX, 0);
+
+                var previousView = previousController?.View;
+
+                await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+                {
+                    newView.Transform = CGAffineTransform.MakeIdentity();
+
+                    if (previousView is not null)
+                    {
+                        previousView.Transform = CGAffineTransform.MakeTranslation(-fromX, 0);
+                    }
+                });
+
+                break;
+            }
+
             default:
                 container.AddSubview(newView);
                 newController.DidMoveToParentViewController(parentController);
@@ -83,69 +164,279 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         if (previousController is not null)
         {
             previousController.WillMoveToParentViewController(null);
-            previousController.View?.RemoveFromSuperview();
+
+            if (previousController.View is { } previousView)
+            {
+                previousView.RemoveFromSuperview();
+
+                // Leave the detached view transform-clean for its next mount.
+                previousView.Transform = CGAffineTransform.MakeIdentity();
+            }
+
             previousController.RemoveFromParentViewController();
         }
     }
 
-    public async Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content)
+    /// <summary>
+    /// Brings the chrome to the desired state: mounts the bar (measured synchronously so the
+    /// footprint is valid before the page mounts), slides it in/out, and unmounts on hide so
+    /// the element tree reflects presented chrome.
+    /// </summary>
+    private Task UpdateTabBarChromeAsync(ScaffoldViewController controller, IMauiContext mauiContext, ScaffoldTabBar? tabBarArea, bool barVisible, bool animated)
     {
-        if (_flyoutPanel is not null
-            || scaffold.Handler is not IPlatformViewHandler { PlatformView: { } container, MauiContext: { } mauiContext })
+        if (tabBarArea is not null && barVisible)
+        {
+            var barView = tabBarArea.GetOrCreateBarView();
+
+            if (!ReferenceEquals(barView, _currentBarView))
+            {
+                var previousArea = _currentTabBarArea;
+                _currentBarView = barView;
+                _currentTabBarArea = tabBarArea;
+
+                // A freshly appearing bar starts below the edge and slides in with the pop.
+                controller.MountTabBar(barView.ToPlatform(mauiContext), startHidden: animated);
+
+                if (previousArea is not null && !ReferenceEquals(previousArea, tabBarArea))
+                {
+                    previousArea.OnBarViewUnmounted();
+                }
+            }
+
+            return controller.ShowTabBarAsync(animated);
+        }
+
+        if (_currentBarView is not null)
+        {
+            var previousArea = _currentTabBarArea;
+            _currentBarView = null;
+            _currentTabBarArea = null;
+
+            return HideAsync(previousArea);
+        }
+
+        return Task.CompletedTask;
+
+        async Task HideAsync(ScaffoldTabBar? previousArea)
+        {
+            await controller.HideAndUnmountTabBarAsync(animated);
+            previousArea?.OnBarViewUnmounted();
+        }
+    }
+
+    private void OnCurrentPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Bar visibility is an animated inset change, not a page relayout (§5.4).
+        if (e.PropertyName == "TabBarVisibility"
+            && sender is Page page
+            && ReferenceEquals(page, _currentPage)
+            && scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
+            && scaffold.Handler is IPlatformViewHandler { ViewController: ScaffoldViewController controller, MauiContext: { } mauiContext })
+        {
+            var tabBarArea = rootProxy.Root.Parent as ScaffoldTabBar;
+            var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(rootProxy.Root, page);
+            controller.CurrentPageWantsBarInset = barVisible;
+            UpdateTabBarChromeAsync(controller, mauiContext, tabBarArea, barVisible, animated: true).FireAndForget(scaffold.Handler);
+        }
+    }
+
+    public Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content)
+        => ShowOverlayAsync(
+            content,
+            side == ScaffoldFlyoutSide.Start ? ScaffoldOverlayPlacement.FlyoutStart : ScaffoldOverlayPlacement.FlyoutEnd,
+            _flyoutScrimColor,
+            behindBottomChrome: false,
+            disconnectOnClose: false
+        );
+
+    public Task OpenTabBarOverflowAsync(ScaffoldTabBar tabBar, ScaffoldTabBarView barView)
+    {
+        if (HasOverlay)
+        {
+            return Task.CompletedTask;
+        }
+
+        var panel = new ScaffoldTabBarOverflowView(barView, CloseOverlayAsync);
+        panel.Margin = new Thickness(tabBar.BarMargin.Left, 0, tabBar.BarMargin.Right, 0);
+
+        // Logical parenting: the panel participates in the element tree while presented
+        // (BindingContext/resource flow, visual-tree visibility for tooling and UI tests).
+        tabBar.AddLogicalChild(panel);
+
+        // The overflow set is recomputed per layout pass: rotation/resize migrating items
+        // between bar and panel invalidates an open panel.
+        barView.OverflowRootsChanged += OnOverflowRootsChanged;
+
+        _overlayCleanup = () =>
+        {
+            barView.OverflowRootsChanged -= OnOverflowRootsChanged;
+            tabBar.RemoveLogicalChild(panel);
+            panel.Cleanup();
+        };
+
+        return ShowOverlayAsync(
+            panel,
+            ScaffoldOverlayPlacement.AboveBottomChrome,
+            barView.EffectiveStyle.ScrimColor,
+            behindBottomChrome: true,
+            disconnectOnClose: true
+        );
+    }
+
+    private void OnOverflowRootsChanged() => _ = CloseOverlayAsync();
+
+    /// <summary>
+    /// §5.6 overlay primitive: scrim + panel. With <paramref name="behindBottomChrome"/>
+    /// (reserved for the tab bar overflow panel) the FULLSCREEN scrim and the panel are
+    /// inserted BELOW the bottom chrome strip in z-order — the tab bar renders above the scrim,
+    /// undimmed and interactive, with no exclusion geometry to maintain.
+    /// </summary>
+    private async Task ShowOverlayAsync(View content, ScaffoldOverlayPlacement placement, Color scrimColor, bool behindBottomChrome, bool disconnectOnClose)
+    {
+        if (_overlayPanel is not null
+            || scaffold.Handler is not IPlatformViewHandler { ViewController: ScaffoldViewController controller, PlatformView: { } container, MauiContext: { } mauiContext })
         {
             return;
         }
 
-        var containerWidth = container.Bounds.Width;
-        var containerHeight = container.Bounds.Height;
-        var width = Math.Min(containerWidth * _flyoutWidthRatio, _flyoutMaxWidth);
+        var bounds = container.Bounds;
+        var chromeLayer = behindBottomChrome ? controller.ChromeBottomLayer : null;
+        var excludedBottom = behindBottomChrome ? controller.ChromeBottomFootprint : 0;
 
-        var scrim = new UIView(container.Bounds)
+        var scrim = new UIView(bounds)
         {
-            BackgroundColor = UIColor.Black,
+            BackgroundColor = scrimColor.ToPlatform(),
             Alpha = 0,
             AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight
         };
-        scrim.AddGestureRecognizer(new UITapGestureRecognizer(() => _ = CloseFlyoutAsync()));
-        container.AddSubview(scrim);
+        scrim.AddGestureRecognizer(new UITapGestureRecognizer(() => _ = CloseOverlayAsync()));
+
+        if (chromeLayer is not null)
+        {
+            container.InsertSubviewBelow(scrim, chromeLayer);
+        }
+        else
+        {
+            container.AddSubview(scrim);
+        }
 
         var panel = content.ToPlatform(mauiContext);
-        var offscreenX = side == ScaffoldFlyoutSide.Start ? -width : containerWidth;
-        var openX = side == ScaffoldFlyoutSide.Start ? 0 : containerWidth - width;
-        panel.Frame = new CGRect(offscreenX, 0, width, containerHeight);
-        container.AddSubview(panel);
 
-        _flyoutScrim = scrim;
-        _flyoutPanel = panel;
-        _flyoutSide = side;
-
-        await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+        switch (placement)
         {
-            scrim.Alpha = _flyoutScrimAlpha;
-            panel.Frame = new CGRect(openX, 0, width, containerHeight);
-        });
+            case ScaffoldOverlayPlacement.FlyoutStart:
+            case ScaffoldOverlayPlacement.FlyoutEnd:
+            {
+                var width = Math.Min(bounds.Width * _flyoutWidthRatio, _flyoutMaxWidth);
+                var offscreenX = placement == ScaffoldOverlayPlacement.FlyoutStart ? -width : bounds.Width;
+                var openX = placement == ScaffoldOverlayPlacement.FlyoutStart ? 0 : bounds.Width - width;
+                panel.Frame = new CGRect(offscreenX, 0, width, bounds.Height);
+                container.AddSubview(panel);
+
+                _overlayScrim = scrim;
+                _overlayPanel = panel;
+                _overlayContent = disconnectOnClose ? content : null;
+                _overlayPlacement = placement;
+
+                await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+                {
+                    scrim.Alpha = 1;
+                    panel.Frame = new CGRect(openX, 0, width, bounds.Height);
+                });
+
+                break;
+            }
+
+            case ScaffoldOverlayPlacement.AboveBottomChrome:
+            {
+                var margin = content.Margin;
+                var maxWidth = bounds.Width - margin.Left - margin.Right;
+                var maxHeight = bounds.Height - excludedBottom - _overflowGap - controller.View!.SafeAreaInsets.Top;
+
+                // The panel hugs its content and centers, mirroring the bar pill's own sizing.
+                var fitted = panel.SizeThatFits(new CGSize(maxWidth, maxHeight));
+                var width = Math.Min((double)fitted.Width, maxWidth);
+                var height = Math.Min((double)fitted.Height, maxHeight);
+
+                var y = bounds.Height - excludedBottom - _overflowGap - height;
+                panel.Frame = new CGRect((bounds.Width - width) / 2, y, width, height);
+                panel.Alpha = 0;
+                panel.Transform = CGAffineTransform.MakeTranslation(0, 24);
+
+                if (chromeLayer is not null)
+                {
+                    container.InsertSubviewBelow(panel, chromeLayer);
+                }
+                else
+                {
+                    container.AddSubview(panel);
+                }
+
+                _overlayScrim = scrim;
+                _overlayPanel = panel;
+                _overlayContent = disconnectOnClose ? content : null;
+                _overlayPlacement = placement;
+
+                await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+                {
+                    scrim.Alpha = 1;
+                    panel.Alpha = 1;
+                    panel.Transform = CGAffineTransform.MakeIdentity();
+                });
+
+                break;
+            }
+        }
     }
 
-    public async Task CloseFlyoutAsync()
+    public async Task CloseOverlayAsync()
     {
-        if (_flyoutPanel is not { } panel || _flyoutScrim is not { } scrim)
+        if (_overlayPanel is not { } panel || _overlayScrim is not { } scrim)
         {
             return;
         }
 
-        _flyoutPanel = null;
-        _flyoutScrim = null;
+        var content = _overlayContent;
+        var placement = _overlayPlacement;
+        var cleanup = _overlayCleanup;
+        _overlayPanel = null;
+        _overlayScrim = null;
+        _overlayContent = null;
+        _overlayCleanup = null;
+        cleanup?.Invoke();
 
         var containerWidth = panel.Superview?.Bounds.Width ?? panel.Frame.Width;
-        var offscreenX = _flyoutSide == ScaffoldFlyoutSide.Start ? -panel.Frame.Width : containerWidth;
 
         await UIView.AnimateAsync(_transitionDurationSeconds, () =>
         {
             scrim.Alpha = 0;
-            panel.Frame = new CGRect(offscreenX, panel.Frame.Y, panel.Frame.Width, panel.Frame.Height);
+
+            switch (placement)
+            {
+                case ScaffoldOverlayPlacement.FlyoutStart:
+                    panel.Frame = panel.Frame with { X = -panel.Frame.Width };
+
+                    break;
+
+                case ScaffoldOverlayPlacement.FlyoutEnd:
+                    panel.Frame = panel.Frame with { X = containerWidth };
+
+                    break;
+
+                case ScaffoldOverlayPlacement.AboveBottomChrome:
+                    panel.Alpha = 0;
+                    panel.Transform = CGAffineTransform.MakeTranslation(0, 24);
+
+                    break;
+            }
         });
 
         panel.RemoveFromSuperview();
         scrim.RemoveFromSuperview();
+
+        if (content is not null)
+        {
+            content.DisconnectHandlers();
+        }
     }
 }

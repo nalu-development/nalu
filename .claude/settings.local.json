@@ -80,7 +80,23 @@
       "Bash(git worktree *)",
       "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-class Nalu.Maui.UITests.Tests.NavigationTests --filter-class Nalu.Maui.UITests.Tests.ScaffoldNavigationTests)",
       "Bash(adb uninstall *)",
-      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-method \"*.NavigationTests.NativeTabSwitchPreservesPushedPages\")"
+      "Bash(DEVFLOW_PORT=9223 dotnet test UITests/UITests.DevFlow -- --filter-method \"*.NavigationTests.NativeTabSwitchPreservesPushedPages\")",
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(lsof -nP -iTCP:9223 -iTCP:10223 -sTCP:LISTEN)",
+      "Bash(nc -z -w 2 localhost 9223)",
+      "Bash(nc -z -w 2 127.0.0.1 9223)",
+      "Bash(nc -z -w 2 ::1 9223)",
+      "Bash(nc -z -w 1 localhost 9223)",
+      "Bash(nc -z -w 1 localhost 10223)",
+      "Bash(nc -z localhost 9223)",
+      "Bash(awk '{print $2}')",
+      "Bash(awk '{print $5, $6, $7, $8}')",
+      "Bash(awk '{print $6, $7, $8}')",
+      "Bash(grep -iE \"^\\(None|SoftInput|Container|All|Default\\)$\")",
+      "Bash(grep -E \"^get_SafeAreaEdges$|^set_SafeAreaEdges$\")",
+      "Bash(awk '{print $6,$7,$8}')",
+      "Bash(emulator -list-avds)"
     ]
   }
 }

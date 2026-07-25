@@ -483,8 +483,7 @@ public class ScaffoldNavigationTests(NaluApp app) : NavigationTestsBase(app)
 {
     protected override string PageName => "Scaffold Navigation Tests";
 
-    // P0: no tab bar chrome yet (arrives with P1).
-    protected override bool HasTabBarChrome => false;
+    // P1: the default ScaffoldTabBar template renders tappable items (labels "HomeTab"/"SearchTab").
 
     // Android system back pops via the OnBackPressedDispatcher callback; iOS has no system
     // back and the Scaffold has no nav-bar back button until P1.

@@ -36,7 +36,7 @@ public partial class Scaffold
     {
         if (_backCallback is not null)
         {
-            _backCallback.Enabled = HasPushedPages();
+            _backCallback.Enabled = HasPushedPages() || Presenter is { HasOverlay: true };
         }
     }
 
@@ -45,6 +45,15 @@ public partial class Scaffold
 
     private void HandleSystemBack()
     {
+        // Overlays (flyout, tab bar overflow panel) dismiss before the navigation engine
+        // is ever consulted — the same policy §7.2 defines for popups.
+        if (Presenter is { HasOverlay: true } presenter)
+        {
+            Dispatcher.Dispatch(() => presenter.CloseOverlayAsync().FireAndForget(Handler));
+
+            return;
+        }
+
         if (NavigationService is { } navigationService && HasPushedPages())
         {
             Dispatcher.Dispatch(() => navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).FireAndForget(Handler));

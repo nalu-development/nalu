@@ -87,11 +87,14 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("NavBarVisible", typeof(bool), typeof(Scaffold), true);
 
     /// <summary>
-    /// Attached property controlling tab bar visibility for a <see cref="Page"/>.
-    /// Toggling visibility is a safe-area inset change, not a page relayout.
+    /// Attached property controlling tab bar visibility for a <see cref="Page"/>:
+    /// <see cref="ScaffoldTabBarVisibility.Visible"/> (default),
+    /// <see cref="ScaffoldTabBarVisibility.Hidden"/>, or
+    /// <see cref="ScaffoldTabBarVisibility.Auto"/> (hidden while the current stack has pushed
+    /// pages). Visibility changes animate and reach the page as a safe-area inset change.
     /// </summary>
-    public static readonly BindableProperty TabBarVisibleProperty =
-        BindableProperty.CreateAttached("TabBarVisible", typeof(bool), typeof(Scaffold), true);
+    public static readonly BindableProperty TabBarVisibilityProperty =
+        BindableProperty.CreateAttached("TabBarVisibility", typeof(ScaffoldTabBarVisibility), typeof(Scaffold), ScaffoldTabBarVisibility.Visible);
 
 
     /// <summary>
@@ -181,9 +184,26 @@ public partial class Scaffold : ContentPage, IDisposable
             ? presenter.OpenFlyoutAsync(side, content)
             : Task.CompletedTask;
 
-    /// <summary>Closes the open flyout, if any.</summary>
+    /// <summary>Closes the open flyout (or any other presented overlay), if any.</summary>
     public Task CloseFlyoutAsync()
-        => Presenter is { } presenter ? presenter.CloseFlyoutAsync() : Task.CompletedTask;
+        => Presenter is { } presenter ? presenter.CloseOverlayAsync() : Task.CompletedTask;
+
+    /// <summary>
+    /// Selects the given root through the navigation engine: switching to another root restores
+    /// its preserved navigation stack; re-selecting the current root pops its stack back to the
+    /// root page. Guards and lifecycle events always run. No-op when the root is already current
+    /// with an empty stack.
+    /// </summary>
+    internal async Task<bool> SelectRootAsync(ScaffoldRoot root)
+    {
+        if (NavigationService is not { } navigationService
+            || Proxy?.BuildRootSelectionNavigation(root) is not { } navigation)
+        {
+            return false;
+        }
+
+        return await navigationService.GoToAsync(navigation).ConfigureAwait(true);
+    }
 
     internal View? ResolveFlyoutContent(ScaffoldFlyoutSide side)
     {
@@ -211,11 +231,24 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets whether the navigation bar is visible for a page.</summary>
     public static void SetNavBarVisible(BindableObject bindable, bool value) => bindable.SetValue(NavBarVisibleProperty, value);
 
-    /// <summary>Gets whether the tab bar is visible for a page.</summary>
-    public static bool GetTabBarVisible(BindableObject bindable) => (bool)bindable.GetValue(TabBarVisibleProperty);
+    /// <summary>Gets the tab bar visibility policy attached to a page.</summary>
+    public static ScaffoldTabBarVisibility GetTabBarVisibility(BindableObject bindable) => (ScaffoldTabBarVisibility)bindable.GetValue(TabBarVisibilityProperty);
 
-    /// <summary>Sets whether the tab bar is visible for a page.</summary>
-    public static void SetTabBarVisible(BindableObject bindable, bool value) => bindable.SetValue(TabBarVisibleProperty, value);
+    /// <summary>Sets the tab bar visibility policy attached to a page.</summary>
+    public static void SetTabBarVisibility(BindableObject bindable, ScaffoldTabBarVisibility value) => bindable.SetValue(TabBarVisibilityProperty, value);
+
+    /// <summary>
+    /// Resolves the effective tab bar visibility for the given page hosted by the given root:
+    /// the page's <see cref="TabBarVisibilityProperty"/> policy, with
+    /// <see cref="ScaffoldTabBarVisibility.Auto"/> meaning "visible only at the stack root".
+    /// </summary>
+    internal static bool ComputeTabBarVisible(ScaffoldRoot root, Page page)
+        => GetTabBarVisibility(page) switch
+        {
+            ScaffoldTabBarVisibility.Hidden => false,
+            ScaffoldTabBarVisibility.Auto => root.NavigationStack.PushedPages.Count == 0,
+            _ => true
+        };
 
 
     // System back (Android hardware/gesture back) is handled by the OnBackPressedDispatcher
@@ -234,6 +267,15 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <returns>True when a pop was dispatched.</returns>
     protected override bool OnBackButtonPressed()
     {
+        // Overlays (flyout, tab bar overflow panel) dismiss before the navigation engine
+        // is ever consulted — the same policy §7.2 defines for popups.
+        if (Presenter is { HasOverlay: true } presenter)
+        {
+            Dispatcher.Dispatch(() => presenter.CloseOverlayAsync().FireAndForget(Handler));
+
+            return true;
+        }
+
         if (NavigationService is { } navigationService
             && Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
             && rootProxy.Root.NavigationStack.PushedPages.Count > 0)

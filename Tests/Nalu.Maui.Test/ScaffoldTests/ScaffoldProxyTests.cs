@@ -72,7 +72,11 @@ public class ScaffoldProxyTests
 
         public Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content) => Task.CompletedTask;
 
-        public Task CloseFlyoutAsync() => Task.CompletedTask;
+        public Task OpenTabBarOverflowAsync(ScaffoldTabBar tabBar, ScaffoldTabBarView barView) => Task.CompletedTask;
+
+        public bool HasOverlay => false;
+
+        public Task CloseOverlayAsync() => Task.CompletedTask;
     }
 
     private readonly ServiceProvider _serviceProvider;
@@ -227,7 +231,10 @@ public class ScaffoldProxyTests
 
         _presenter.Syncs.Should().NotBeEmpty();
         _presenter.Syncs[^1].Root.Should().Be(settingsArea.CurrentRoot);
-        _presenter.Syncs[^1].Hint.Should().Be(ScaffoldPresentationHint.None);
+
+        // Root switches slide in the direction of travel: Settings sits AFTER the tab bar's
+        // roots in the structure, so the new content enters from the end edge.
+        _presenter.Syncs[^1].Hint.Should().Be(ScaffoldPresentationHint.SlideEnd);
         _scaffold.Proxy!.Location.Should().Be("//area1/SettingsPage");
     }
 

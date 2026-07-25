@@ -25,16 +25,27 @@ internal interface IScaffoldPresenter
 {
     /// <summary>
     /// Brings the platform view hierarchy in sync with the given root's
-    /// <see cref="ScaffoldRoot.NavigationStack"/> model, animating per <paramref name="hint"/>.
-    /// Closes any open flyout first (navigation dismisses drawers).
+    /// <see cref="ScaffoldRoot.NavigationStack"/> model, animating per <paramref name="hint"/>,
+    /// and updates the chrome (tab bar visibility and its safe-area footprint contribution).
+    /// Closes any open overlay first (navigation dismisses drawers and panels).
     /// </summary>
     Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint);
 
-    /// <summary>Presents the given content as a flyout sliding in from the given side (scrim behind).</summary>
+    /// <summary>Presents the given content as a flyout sliding in from the given side (full scrim behind).</summary>
     Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content);
 
-    /// <summary>Dismisses the open flyout, if any.</summary>
-    Task CloseFlyoutAsync();
+    /// <summary>
+    /// Opens the tab bar overflow panel above the bar. The scrim covers the page content only —
+    /// the tab bar is excluded and stays interactive (tapping an in-bar item both dismisses the
+    /// panel and performs that selection).
+    /// </summary>
+    Task OpenTabBarOverflowAsync(ScaffoldTabBar tabBar, ScaffoldTabBarView barView);
+
+    /// <summary>Gets whether an overlay (flyout or overflow panel) is currently presented.</summary>
+    bool HasOverlay { get; }
+
+    /// <summary>Dismisses the current overlay, if any. Back gestures dismiss overlays before the navigation engine is consulted.</summary>
+    Task CloseOverlayAsync();
 }
 
 /// <summary>How a <see cref="IScaffoldPresenter.SynchronizeAsync"/> pass should be animated.</summary>
@@ -47,5 +58,18 @@ internal enum ScaffoldPresentationHint
     Push,
 
     /// <summary>Backward transition revealing the new top page.</summary>
-    Pop
+    Pop,
+
+    /// <summary>
+    /// Root/area switch toward a LOWER ordinal (an earlier tab): the new content enters from
+    /// the start edge. Logical direction — presenters map it to the physical edge (RTL-aware
+    /// mapping arrives with the transition engine).
+    /// </summary>
+    SlideStart,
+
+    /// <summary>
+    /// Root/area switch toward a HIGHER ordinal (a later tab): the new content enters from
+    /// the end edge.
+    /// </summary>
+    SlideEnd
 }

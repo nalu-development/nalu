@@ -50,10 +50,4 @@ public partial class ScaffoldHandler : ViewHandler<Scaffold, UIView>, IPlatformV
         _viewController = null;
         base.DisconnectHandler(platformView);
     }
-
-    /// <summary>
-    /// Root view controller of a scaffold-hosted app. Owned by the handler; the future home of
-    /// appearance forwarding, status-bar styling and safe-area distribution (strategy §5.4).
-    /// </summary>
-    private sealed class ScaffoldViewController : UIViewController;
 }
