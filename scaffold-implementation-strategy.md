@@ -293,9 +293,13 @@ Layering, bottom-up — each layer testable without the one below:
   button itself shows the "current" pill tint and the row is highlighted in the panel. Scrim tap
   and Android system back dismiss the panel before the navigation engine is consulted (§7.2
   overlay-dismiss policy). Active-tab-pops-to-root applies to overflow rows too.
-- **Styling surface (decided)**: everything customizable via `BindableProperty` on
-  `ScaffoldTabBar` so plain `Style` + `AppThemeBinding` covers theming; defaults live in the
-  built-in themed style. Proposed set —
+- **Styling surface (decided; REVISED July 2026)**: the whole styling surface lives on the
+  default template COMPONENT — public `ScaffoldTabBarView` — not on `ScaffoldTabBar`
+  (an app installing a custom bar carries none of the default template's properties).
+  `ScaffoldTabBar.TabBarView` defaults to a fresh `ScaffoldTabBarView` via the bindable
+  property's default value factory; the component resolves its owning tab bar from the logical
+  parent when presented. Plain `Style TargetType="ScaffoldTabBarView"` + `AppThemeBinding`
+  covers theming. Property set —
   - *Bar container*: `BarBackground` (Brush), `BarCornerRadius`, `BarMargin`, `BarPadding`,
     `BarShadow` (Shadow), `BarHeightRequest`.
   - *Items*: `ItemWidth`, `TextColor`, `SelectedTextColor`, `FontFamily`, `FontSize`,
@@ -408,6 +412,14 @@ Consumers:
 | Flyout (§5.5) | fullscreen, above everything | IMPLEMENTED — refactored onto the primitive |
 | Tab-bar overflow panel (§5.3) | fullscreen, **inserted BELOW the tab bar strip in z-order** | IMPLEMENTED — reserved for the More button |
 | Popups & sheets (§7.2, v2) | fullscreen, above everything | the v1 "don't preclude" obligation is satisfied structurally |
+
+**Public surface (July 2026)**: the behind-chrome panel placement is exposed as
+`Scaffold.OpenTabBarPanelAsync(View, Color? scrimColor)` (+ `ScaffoldTabBar.OpenPanelAsync`
+convenience, and `Scaffold.CloseOverlayAsync`), so CUSTOM tab bars can present their own panels
+with the exact More-button semantics (toggle on re-invoke, scrim below the bar, dismiss on
+scrim tap/back/navigation). The default template's overflow runs on this same path
+(panel construction moved to shared code in `ScaffoldTabBar.OpenOverflowAsync`); the fullscreen
+overlay placement (popups, §7.2) deliberately stays internal until the v2 design review.
 
 Key rules (as implemented):
 

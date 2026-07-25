@@ -35,11 +35,16 @@ internal interface IScaffoldPresenter
     Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content);
 
     /// <summary>
-    /// Opens the tab bar overflow panel above the bar. The scrim covers the page content only —
-    /// the tab bar is excluded and stays interactive (tapping an in-bar item both dismisses the
-    /// panel and performs that selection).
+    /// Opens a panel anchored above the bottom chrome, with a fullscreen scrim inserted BELOW
+    /// the tab bar strip in z-order — the bar stays undimmed and interactive (tapping an in-bar
+    /// item both dismisses the panel and performs that selection). Used by the default
+    /// template's "More" overflow and by <see cref="Scaffold.OpenTabBarPanelAsync"/>.
     /// </summary>
-    Task OpenTabBarOverflowAsync(ScaffoldTabBar tabBar, ScaffoldTabBarView barView);
+    /// <param name="content">The panel view (its horizontal margin positions it).</param>
+    /// <param name="scrimColor">The scrim color.</param>
+    /// <param name="disconnectOnClose">Whether to disconnect the content's handlers on close (single-use panels).</param>
+    /// <param name="cleanup">Invoked when the overlay closes (or when presenting fails).</param>
+    Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup);
 
     /// <summary>Gets whether an overlay (flyout or overflow panel) is currently presented.</summary>
     bool HasOverlay { get; }

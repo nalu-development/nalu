@@ -72,7 +72,7 @@ public class ScaffoldProxyTests
 
         public Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content) => Task.CompletedTask;
 
-        public Task OpenTabBarOverflowAsync(ScaffoldTabBar tabBar, ScaffoldTabBarView barView) => Task.CompletedTask;
+        public Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup) => Task.CompletedTask;
 
         public bool HasOverlay => false;
 

@@ -284,43 +284,26 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             disconnectOnClose: false
         );
 
-    public Task OpenTabBarOverflowAsync(ScaffoldTabBar tabBar, ScaffoldTabBarView barView)
+    public async Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup)
     {
         if (HasOverlay)
         {
-            return Task.CompletedTask;
+            cleanup?.Invoke();
+
+            return;
         }
 
-        var panel = new ScaffoldTabBarOverflowView(barView, CloseOverlayAsync)
+        _overlayCleanup = cleanup;
+
+        await ShowOverlayAsync(content, ScaffoldOverlayPlacement.AboveBottomChrome, scrimColor, behindBottomChrome: true, disconnectOnClose);
+
+        if (!HasOverlay)
         {
-            Margin = new Thickness(tabBar.BarMargin.Left, 0, tabBar.BarMargin.Right, 0)
-        };
-
-        // Logical parenting: the panel participates in the element tree while presented
-        // (BindingContext/resource flow, visual-tree visibility for tooling and UI tests).
-        tabBar.AddLogicalChild(panel);
-
-        // The overflow set is recomputed per layout pass: rotation/resize migrating items
-        // between bar and panel invalidates an open panel.
-        barView.OverflowRootsChanged += OnOverflowRootsChanged;
-
-        _overlayCleanup = () =>
-        {
-            barView.OverflowRootsChanged -= OnOverflowRootsChanged;
-            tabBar.RemoveLogicalChild(panel);
-            panel.Cleanup();
-        };
-
-        return ShowOverlayAsync(
-            panel,
-            ScaffoldOverlayPlacement.AboveBottomChrome,
-            barView.EffectiveStyle.ScrimColor,
-            behindBottomChrome: true,
-            disconnectOnClose: true
-        );
+            // Presenting failed (no handler/platform view): release the caller's resources.
+            _overlayCleanup = null;
+            cleanup?.Invoke();
+        }
     }
-
-    private void OnOverflowRootsChanged() => _ = CloseOverlayAsync();
 
     /// <summary>
     /// §5.6 overlay primitive: scrim + panel. With <paramref name="behindBottomChrome"/>

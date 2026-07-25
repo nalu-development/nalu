@@ -1,4 +1,3 @@
-using System.Collections.Specialized;
 using System.ComponentModel;
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Layouts;
@@ -7,7 +6,7 @@ namespace Nalu;
 
 /// <summary>
 /// Effective styling values of the default tab bar template: the user-set
-/// <see cref="ScaffoldTabBar"/> property when present, the theme-aware Nalu default otherwise.
+/// <see cref="ScaffoldTabBarView"/> property when present, the theme-aware Nalu default otherwise.
 /// </summary>
 internal sealed record ScaffoldTabBarStyleValues(
     Brush BarBackground,
@@ -32,28 +31,28 @@ internal static class ScaffoldTabBarPalette
     internal static readonly Color AccentLight = Color.FromArgb("#2C479D");
     internal static readonly Color AccentDark = Color.FromArgb("#68A3F1");
 
-    public static ScaffoldTabBarStyleValues Resolve(ScaffoldTabBar tabBar)
+    public static ScaffoldTabBarStyleValues Resolve(ScaffoldTabBarView barView)
     {
         var dark = (Application.Current?.RequestedTheme ?? AppTheme.Light) == AppTheme.Dark;
         var accent = dark ? AccentDark : AccentLight;
 
         return new ScaffoldTabBarStyleValues(
-            BarBackground: tabBar.BarBackground ?? new SolidColorBrush(dark ? Color.FromArgb("#EB2E2E2E") : Color.FromArgb("#F2FFFFFF")),
-            BarShadow: tabBar.BarShadow ?? new Shadow
+            BarBackground: barView.BarBackground ?? new SolidColorBrush(dark ? Color.FromArgb("#EB2E2E2E") : Color.FromArgb("#F2FFFFFF")),
+            BarShadow: barView.BarShadow ?? new Shadow
             {
                 Brush = Brush.Black,
                 Opacity = dark ? 0.35f : 0.18f,
                 Radius = 14,
                 Offset = new Point(0, 3)
             },
-            TextColor: tabBar.TextColor ?? (dark ? Colors.White : Color.FromArgb("#3A3A40")),
-            SelectedTextColor: tabBar.SelectedTextColor ?? accent,
-            SelectionPillBackground: tabBar.SelectionPillBackground ?? new SolidColorBrush(accent.WithAlpha(dark ? 0.18f : 0.12f)),
-            BadgeBackground: tabBar.BadgeBackground ?? new SolidColorBrush(accent),
-            BadgeTextColor: tabBar.BadgeTextColor ?? (dark ? Color.FromArgb("#042C53") : Colors.White),
-            ScrimColor: tabBar.ScrimColor ?? Colors.Black.WithAlpha(dark ? 0.55f : 0.45f),
-            OverflowPanelBackground: tabBar.OverflowPanelBackground ?? new SolidColorBrush(dark ? Color.FromArgb("#F7333333") : Color.FromArgb("#FAFFFFFF")),
-            OverflowPanelShadow: tabBar.OverflowPanelShadow ?? new Shadow
+            TextColor: barView.TextColor ?? (dark ? Colors.White : Color.FromArgb("#3A3A40")),
+            SelectedTextColor: barView.SelectedTextColor ?? accent,
+            SelectionPillBackground: barView.SelectionPillBackground ?? new SolidColorBrush(accent.WithAlpha(dark ? 0.18f : 0.12f)),
+            BadgeBackground: barView.BadgeBackground ?? new SolidColorBrush(accent),
+            BadgeTextColor: barView.BadgeTextColor ?? (dark ? Color.FromArgb("#042C53") : Colors.White),
+            ScrimColor: barView.ScrimColor ?? Colors.Black.WithAlpha(dark ? 0.55f : 0.45f),
+            OverflowPanelBackground: barView.OverflowPanelBackground ?? new SolidColorBrush(dark ? Color.FromArgb("#F7333333") : Color.FromArgb("#FAFFFFFF")),
+            OverflowPanelShadow: barView.OverflowPanelShadow ?? new Shadow
             {
                 Brush = Brush.Black,
                 Opacity = dark ? 0.4f : 0.22f,
@@ -62,127 +61,6 @@ internal static class ScaffoldTabBarPalette
             }
         );
     }
-}
-
-/// <summary>
-/// The default Nalu tab bar template: a floating pill bar hugging its content, one item per
-/// visible <see cref="ScaffoldRoot"/> rendered from the metadata quintet, fixed
-/// <see cref="ScaffoldTabBar.ItemWidth"/> slots, and a trailing "More" item collecting the roots
-/// that don't fit the container width (recomputed on every layout pass, so rotation/resize
-/// migrates items between the bar and the overflow panel automatically).
-/// </summary>
-internal sealed class ScaffoldTabBarView : Grid
-{
-    private readonly ScaffoldTabBar _tabBar;
-    private readonly Border _pill;
-    private readonly ScaffoldTabBarItemsLayout _items;
-
-    /// <summary>Current effective styling; refreshed on theme and styling-property changes.</summary>
-    internal ScaffoldTabBarStyleValues EffectiveStyle { get; private set; }
-
-    /// <summary>Roots currently living in the overflow panel (recomputed by the items layout on measure).</summary>
-    internal IReadOnlyList<ScaffoldRoot> OverflowRoots => _items.OverflowRoots;
-
-    /// <summary>Raised when the overflow set changes (an open panel must close or refresh).</summary>
-    internal event Action? OverflowRootsChanged;
-
-    public ScaffoldTabBarView(ScaffoldTabBar tabBar)
-    {
-        _tabBar = tabBar;
-        EffectiveStyle = ScaffoldTabBarPalette.Resolve(tabBar);
-
-        BackgroundColor = Colors.Transparent;
-
-        // A star-row root Grid FILLS bounded measure constraints (the bar would measure
-        // full-screen inside the platform strip) — the single row must be Auto.
-        RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-
-        _items = new ScaffoldTabBarItemsLayout(this);
-
-        _pill = new Border
-        {
-            StrokeThickness = 0,
-            HorizontalOptions = LayoutOptions.Center,
-            VerticalOptions = LayoutOptions.End,
-            Content = _items
-        };
-
-        Add(_pill);
-
-        SetBinding(PaddingProperty, new Binding(nameof(ScaffoldTabBar.BarMargin), source: tabBar));
-        _pill.SetBinding(Border.PaddingProperty, new Binding(nameof(ScaffoldTabBar.BarPadding), source: tabBar));
-
-        ApplyStyling();
-        BuildItems();
-
-        tabBar.PropertyChanged += OnTabBarPropertyChanged;
-
-        if (tabBar.Roots is INotifyCollectionChanged observableRoots)
-        {
-            observableRoots.CollectionChanged += (_, _) => BuildItems();
-        }
-
-        if (Application.Current is { } application)
-        {
-            // The default bar lives as long as its ScaffoldTabBar (static structure): no unsubscription needed.
-            application.RequestedThemeChanged += (_, _) => ApplyStyling();
-        }
-    }
-
-    internal ScaffoldTabBar TabBar => _tabBar;
-
-    internal Task OnItemTappedAsync(ScaffoldRoot? root)
-        => root is null
-            ? _tabBar.OpenOverflowAsync()
-            : _tabBar.SelectRootAsync(root);
-
-    internal void NotifyOverflowRootsChanged() => OverflowRootsChanged?.Invoke();
-
-    private void OnTabBarPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        switch (e.PropertyName)
-        {
-            case nameof(ScaffoldTabBar.BarBackground):
-            case nameof(ScaffoldTabBar.BarShadow):
-            case nameof(ScaffoldTabBar.BarCornerRadius):
-            case nameof(ScaffoldTabBar.TextColor):
-            case nameof(ScaffoldTabBar.SelectedTextColor):
-            case nameof(ScaffoldTabBar.SelectionPillBackground):
-            case nameof(ScaffoldTabBar.SelectionPillCornerRadius):
-            case nameof(ScaffoldTabBar.BadgeBackground):
-            case nameof(ScaffoldTabBar.BadgeTextColor):
-            case nameof(ScaffoldTabBar.BadgeFontSize):
-            case nameof(ScaffoldTabBar.FontFamily):
-            case nameof(ScaffoldTabBar.FontSize):
-            case nameof(ScaffoldTabBar.IconSize):
-            case nameof(ScaffoldTabBar.OverflowIcon):
-            case nameof(ScaffoldTabBar.OverflowTitle):
-                ApplyStyling();
-
-                break;
-
-            case nameof(ScaffoldTabBar.ItemWidth):
-                _items.InvalidateMeasure();
-
-                break;
-        }
-    }
-
-    private void ApplyStyling()
-    {
-        EffectiveStyle = ScaffoldTabBarPalette.Resolve(_tabBar);
-
-        _pill.Background = EffectiveStyle.BarBackground;
-        _pill.Shadow = EffectiveStyle.BarShadow;
-        _pill.StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(_tabBar.BarCornerRadius) };
-
-        foreach (var item in _items.ItemViews)
-        {
-            item.ApplyStyling();
-        }
-    }
-
-    private void BuildItems() => _items.Rebuild();
 }
 
 /// <summary>
@@ -230,11 +108,14 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
             Remove(_moreItem);
         }
 
-        foreach (var root in _owner.TabBar.Roots)
+        if (_owner.TabBar is { } tabBar)
         {
-            var item = new ScaffoldTabBarItemView(_owner, root);
-            _rootItems.Add(item);
-            Add(item);
+            foreach (var root in tabBar.Roots)
+            {
+                var item = new ScaffoldTabBarItemView(_owner, root);
+                _rootItems.Add(item);
+                Add(item);
+            }
         }
 
         Add(_moreItem);
@@ -254,7 +135,7 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
 
         public Size Measure(double widthConstraint, double heightConstraint)
         {
-            var itemWidth = Math.Max(1, layout._owner.TabBar.ItemWidth);
+            var itemWidth = Math.Max(1, layout._owner.ItemWidth);
             var visibleItems = layout._rootItems.Where(item => item.Root!.IsVisible).ToList();
 
             int shownRootCount;
@@ -300,7 +181,7 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
 
         public Size ArrangeChildren(Rect bounds)
         {
-            var itemWidth = Math.Max(1, layout._owner.TabBar.ItemWidth);
+            var itemWidth = Math.Max(1, layout._owner.ItemWidth);
             var x = bounds.X;
 
             foreach (var child in layout.Cast<IView>())
@@ -326,7 +207,7 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
 /// <summary>
 /// One tab item: untinted icon (or the built-in ••• glyph for the "More" item), optional badge,
 /// truncating label, and the rounded selection highlight. Selection visuals react to the root's
-/// <see cref="ScaffoldRoot.IsSelected"/>; the badge to the <see cref="ScaffoldTabBar.BadgeTextProperty"/>
+/// <see cref="ScaffoldRoot.IsSelected"/>; the badge to the <see cref="ScaffoldTabBarView.BadgeTextProperty"/>
 /// attached value.
 /// </summary>
 /// <remarks>
@@ -365,8 +246,6 @@ internal sealed class ScaffoldTabBarItemView : Grid
         _owner = owner;
         Root = root;
 
-        var tabBar = owner.TabBar;
-
         // The selection highlight: an inner background layer, so the item itself never clips.
         _pill = new Border
         {
@@ -394,7 +273,7 @@ internal sealed class ScaffoldTabBarItemView : Grid
             _icon.SetBinding(Image.SourceProperty, new Binding(nameof(ScaffoldRoot.CurrentIcon), source: root));
             iconHost.Add(_icon);
         }
-        else if (tabBar.OverflowIcon is { } overflowIcon)
+        else if (owner.OverflowIcon is { } overflowIcon)
         {
             _icon = new Image
             {
@@ -459,7 +338,7 @@ internal sealed class ScaffoldTabBarItemView : Grid
         }
         else
         {
-            _label.SetBinding(Label.TextProperty, new Binding(nameof(ScaffoldTabBar.OverflowTitle), source: tabBar));
+            _label.SetBinding(Label.TextProperty, new Binding(nameof(ScaffoldTabBarView.OverflowTitle), source: owner));
         }
 
         Add(new VerticalStackLayout
@@ -510,20 +389,20 @@ internal sealed class ScaffoldTabBarItemView : Grid
 
     internal void ApplyStyling()
     {
-        var tabBar = _owner.TabBar;
-        var style = _owner.EffectiveStyle;
+        var owner = _owner;
+        var style = owner.EffectiveStyle;
 
-        _pill.StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(tabBar.SelectionPillCornerRadius) };
+        _pill.StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(owner.SelectionPillCornerRadius) };
         _pill.Background = _selected ? style.SelectionPillBackground : null;
 
         // Explicit dp heights everywhere text metrics would otherwise leak platform differences:
         // the bar must measure identically on iOS and Android.
-        _iconHost.HeightRequest = tabBar.IconSize;
+        _iconHost.HeightRequest = owner.IconSize;
 
         if (_icon is not null)
         {
-            _icon.WidthRequest = tabBar.IconSize;
-            _icon.HeightRequest = tabBar.IconSize;
+            _icon.WidthRequest = owner.IconSize;
+            _icon.HeightRequest = owner.IconSize;
         }
 
         if (_dots is not null)
@@ -536,30 +415,30 @@ internal sealed class ScaffoldTabBarItemView : Grid
             }
 
             // The dots row mimics the icon slot height so More aligns with icon items.
-            _dots.HeightRequest = tabBar.IconSize;
+            _dots.HeightRequest = owner.IconSize;
         }
 
         _label.TextColor = _selected ? style.SelectedTextColor : style.TextColor;
-        _label.FontFamily = tabBar.FontFamily;
-        _label.FontSize = tabBar.FontSize;
+        _label.FontFamily = owner.FontFamily;
+        _label.FontSize = owner.FontSize;
         _label.FontAttributes = _selected ? FontAttributes.Bold : FontAttributes.None;
-        _label.HeightRequest = Math.Ceiling(tabBar.FontSize * 1.45);
+        _label.HeightRequest = Math.Ceiling(owner.FontSize * 1.45);
 
         _badge.Background = style.BadgeBackground;
-        _badge.HeightRequest = Math.Ceiling(tabBar.BadgeFontSize * 1.6);
+        _badge.HeightRequest = Math.Ceiling(owner.BadgeFontSize * 1.6);
         _badgeLabel.TextColor = style.BadgeTextColor;
-        _badgeLabel.FontSize = tabBar.BadgeFontSize;
-        _badgeLabel.FontFamily = tabBar.FontFamily;
+        _badgeLabel.FontSize = owner.BadgeFontSize;
+        _badgeLabel.FontFamily = owner.FontFamily;
 
         // Overlap the icon's top-right corner (translation only — no layout impact; the item
         // never clips, and the fixed protrusion stays inside the bar pill's padding headroom).
-        _badge.TranslationX = tabBar.IconSize * 0.5 + 6;
+        _badge.TranslationX = owner.IconSize * 0.5 + 6;
         _badge.TranslationY = -5;
     }
 
     private void UpdateBadge()
     {
-        var text = Root is null ? null : ScaffoldTabBar.GetBadgeText(Root);
+        var text = Root is null ? null : ScaffoldTabBarView.GetBadgeText(Root);
         _badge.IsVisible = !string.IsNullOrEmpty(text);
         _badgeLabel.Text = text;
     }

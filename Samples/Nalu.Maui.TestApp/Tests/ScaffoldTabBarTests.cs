@@ -85,7 +85,7 @@ public abstract class TabPageBase : ContentPage
 
             if (element is Scaffold scaffold && scaffold.Areas.OfType<ScaffoldTabBar>().FirstOrDefault() is { Roots.Count: > 0 } tabBar)
             {
-                ScaffoldTabBar.SetBadgeText(tabBar.Roots[0], "9");
+                ScaffoldTabBarView.SetBadgeText(tabBar.Roots[0], "9");
             }
         };
         stack.Add(badgeButton);
@@ -200,8 +200,8 @@ public class TabBarScaffold : Scaffold
         var echo = MakeRoot<TabEchoPage>("Echo", "\ue88e"); // info
         var foxtrot = MakeRoot<TabFoxtrotPage>("Foxtrot", "\ue8b8"); // settings
 
-        ScaffoldTabBar.SetBadgeText(alpha, "11");
-        ScaffoldTabBar.SetBadgeText(foxtrot, "2");
+        ScaffoldTabBarView.SetBadgeText(alpha, "11");
+        ScaffoldTabBarView.SetBadgeText(foxtrot, "2");
 
         Areas.Add(
             new ScaffoldTabBar

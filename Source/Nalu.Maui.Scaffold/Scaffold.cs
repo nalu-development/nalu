@@ -188,6 +188,54 @@ public partial class Scaffold : ContentPage, IDisposable
     public Task CloseFlyoutAsync()
         => Presenter is { } presenter ? presenter.CloseOverlayAsync() : Task.CompletedTask;
 
+    /// <summary>Dismisses the currently presented overlay (flyout or bottom panel), if any.</summary>
+    public Task CloseOverlayAsync()
+        => Presenter is { } presenter ? presenter.CloseOverlayAsync() : Task.CompletedTask;
+
+    /// <summary>
+    /// Presents a panel anchored above the bottom chrome — the primitive behind the default
+    /// tab bar template's "More" overflow, available to custom tab bars too. A fullscreen scrim
+    /// renders BELOW the tab bar in z-order: the bar stays undimmed and interactive (a bar tap
+    /// dismisses the panel and performs its own action). Scrim tap, system back and any
+    /// navigation dismiss the panel. Toggle semantics: when an overlay is already presented,
+    /// the call dismisses it instead.
+    /// </summary>
+    /// <param name="content">
+    /// The panel view; its horizontal <see cref="View.Margin"/> insets it from the container
+    /// edges. The view is attached to this scaffold's element tree while presented (unless it
+    /// already has a parent) and is reusable across presentations — handlers are not
+    /// disconnected on close.
+    /// </param>
+    /// <param name="scrimColor">The scrim color; a theme-aware translucent black when omitted.</param>
+    public Task OpenTabBarPanelAsync(View content, Color? scrimColor = null)
+    {
+        if (Presenter is not { } presenter)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (presenter.HasOverlay)
+        {
+            return presenter.CloseOverlayAsync();
+        }
+
+        var attach = content.Parent is null;
+
+        if (attach)
+        {
+            AddLogicalChild(content);
+        }
+
+        var dark = (Application.Current?.RequestedTheme ?? AppTheme.Light) == AppTheme.Dark;
+
+        return presenter.OpenTabBarPanelAsync(
+            content,
+            scrimColor ?? Colors.Black.WithAlpha(dark ? 0.55f : 0.45f),
+            disconnectOnClose: false,
+            cleanup: attach ? () => RemoveLogicalChild(content) : null
+        );
+    }
+
     /// <summary>
     /// Selects the given root through the navigation engine: switching to another root restores
     /// its preserved navigation stack; re-selecting the current root pops its stack back to the

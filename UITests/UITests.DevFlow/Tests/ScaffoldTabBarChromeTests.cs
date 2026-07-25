@@ -155,6 +155,20 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     }
 
     [Fact]
+    public async Task OverflowPanelTogglesOnMoreTap()
+    {
+        await WaitDisplayedAsync("TabPageAlpha");
+
+        await App.TapAsync("TabMore");
+        await App.WaitForElementAsync("TabBarOverflowPanel");
+
+        // A second More tap dismisses the panel without navigating.
+        await App.TapAsync("TabMore");
+        await App.WaitForElementGoneAsync("TabBarOverflowPanel");
+        await WaitDisplayedAsync("TabPageAlpha");
+    }
+
+    [Fact]
     public async Task OverflowPanelDismissesOnBarSelection()
     {
         await App.WaitForElementAsync("TabPageAlpha");
