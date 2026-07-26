@@ -479,6 +479,7 @@ public partial class VirtualScrollHandler
             {
                 recyclerView.HorizontalFadingEdgeEnabled = false;
                 recyclerView.VerticalFadingEdgeEnabled = false;
+                recyclerView.Invalidate();
                 return;
             }
 
@@ -498,6 +499,11 @@ public partial class VirtualScrollHandler
 
             var fadingEdgePx = (int)recyclerView.Context!.ToPixels(virtualScroll.FadingEdgeLength);
             recyclerView.SetFadingEdgeLength(fadingEdgePx);
+
+            // setXxxFadingEdgeEnabled / setFadingEdgeLength only flip view flags — they do NOT
+            // invalidate, so under hardware rendering the cached display list keeps drawing
+            // without the fade until the next unrelated redraw (e.g. a 1px scroll). Force it.
+            recyclerView.Invalidate();
         }
     }
 
