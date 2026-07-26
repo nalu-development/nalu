@@ -42,37 +42,18 @@ public class ScaffoldTabBar : ScaffoldArea
         set => SetValue(TabBarViewProperty, value);
     }
 
-    private volatile int _navigating;
-
     /// <summary>
     /// Selects the given root through the Nalu navigation engine: switching to another root
     /// restores its preserved navigation stack; selecting the current root pops its stack back
     /// to the root page. Guards and lifecycle events always run — a guarded page can cancel the
-    /// switch. Re-entrant calls while a selection is in flight are ignored.
+    /// switch. Calls while ANY selection on the owning scaffold is in flight are ignored (the
+    /// same scaffold-wide gate <see cref="ScaffoldRoot.SelectCommand"/> reports via
+    /// <c>CanExecute</c>).
     /// </summary>
     /// <param name="root">The root to select; must belong to this tab bar's <see cref="ScaffoldArea.Roots"/>.</param>
     /// <returns>True when the navigation was executed (even if a guard canceled it midway).</returns>
-    public async Task<bool> SelectRootAsync(ScaffoldRoot root)
-    {
-        if (FindScaffold() is not { } scaffold)
-        {
-            return false;
-        }
-
-        if (Interlocked.CompareExchange(ref _navigating, 1, 0) != 0)
-        {
-            return false;
-        }
-
-        try
-        {
-            return await scaffold.SelectRootAsync(root).ConfigureAwait(true);
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _navigating, 0);
-        }
-    }
+    public Task<bool> SelectRootAsync(ScaffoldRoot root)
+        => this.FindScaffold() is { } scaffold ? scaffold.SelectRootGatedAsync(root) : Task.FromResult(false);
 
     /// <summary>
     /// Gets the view the presenter mounts as the bar (the default template or a user
@@ -126,7 +107,7 @@ public class ScaffoldTabBar : ScaffoldArea
     /// <param name="content">The panel view (reusable; horizontal margin insets it).</param>
     /// <param name="scrimColor">The scrim color; a theme-aware translucent black when omitted.</param>
     public Task OpenPanelAsync(View content, Color? scrimColor = null)
-        => FindScaffold() is { } scaffold ? scaffold.OpenTabBarPanelAsync(content, scrimColor) : Task.CompletedTask;
+        => this.FindScaffold() is { } scaffold ? scaffold.OpenTabBarPanelAsync(content, scrimColor) : Task.CompletedTask;
 
     /// <summary>
     /// Opens the overflow panel listing the roots that don't fit the bar (toggling when already
@@ -135,7 +116,7 @@ public class ScaffoldTabBar : ScaffoldArea
     /// </summary>
     internal Task OpenOverflowAsync()
     {
-        if (FindScaffold() is not { Presenter: { } presenter }
+        if (this.FindScaffold() is not { Presenter: { } presenter }
             || TabBarView is not ScaffoldTabBarView { OverflowRoots.Count: > 0 } barView)
         {
             return Task.CompletedTask;
@@ -174,17 +155,5 @@ public class ScaffoldTabBar : ScaffoldArea
         );
 
         void OnOverflowRootsChanged() => _ = presenter.CloseOverlayAsync();
-    }
-
-    private Scaffold? FindScaffold()
-    {
-        Element? element = this;
-
-        while (element is not null and not Scaffold)
-        {
-            element = element.Parent;
-        }
-
-        return element as Scaffold;
     }
 }

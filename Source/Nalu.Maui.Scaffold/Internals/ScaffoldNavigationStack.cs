@@ -34,6 +34,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
             if (_rootPage is not null)
             {
                 FindHostPage()?.RemoveLogicalChild(_rootPage);
+                Scaffold.CleanupPageFlyoutContent(_rootPage);
             }
 
             _rootPage = value;
@@ -61,6 +62,10 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
         var entry = _pushedPages[^1];
         _pushedPages.RemoveAt(_pushedPages.Count - 1);
         FindHostPage()?.RemoveLogicalChild(entry.Page);
+
+        // The page's drawer overrides leave the resolution stack with it; release the
+        // attached content so the page model is not retained through it.
+        Scaffold.CleanupPageFlyoutContent(entry.Page);
 
         return entry;
     }

@@ -38,10 +38,13 @@
 
 **Next steps, in recommended order:**
 
-1. **Flyout completion** (§5.5): API DECIDED (design review July 2026) — implement
-   `ScaffoldFlyoutMode` (Auto/Disabled/Flyout), `ScaffoldFlyoutMenuView`,
-   `ScaffoldFlyoutOptions`, RTL mapping, open-state observability, `IScaffoldFlyoutController`,
-   area-icon removal; edge-swipe open lands with the transition engine (P2).
+1. **Flyout completion (§5.5): IMPLEMENTED and verified on both platforms (July 2026)** —
+   `ScaffoldFlyoutMode` (Auto/Disabled/Flyout, both sides default Disabled),
+   `ScaffoldFlyoutMenuView`, `ScaffoldRoot.SelectCommand` (scaffold-wide busy gate, shared
+   with tab-bar selection), `ScaffoldFlyoutOptions`, RTL mapping, per-side open state +
+   events, `IScaffoldFlyoutController` (page scope), area-icon removal, stack-of-overrides
+   resolution with page-content lifecycle cleanup. Edge-swipe open lands with the
+   transition engine (P2).
 2. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
 4. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
    interactive pop, predictive-back seeking — androidx seeking-version check still pending).
@@ -404,14 +407,21 @@ Consequences and requirements:
 > parented at their attachment point (per-page flyouts inherit the page's BindingContext);
 > `Scaffold.OpenFlyoutAsync(side)`/`CloseFlyoutAsync()`; presenters render scrim + slide-in
 > panel, tap-scrim closes, any navigation auto-closes.
-> **Completion API DECIDED (design review, July 2026) — implementation pending; see below.**
-> Edge-swipe open remains transition-engine territory (P2).
+> **Completion IMPLEMENTED (July 2026), verified on both platforms** — suites:
+> `ScaffoldFlyoutChromeTests` (5 green per platform) + full regression green
+> (Android 183, iOS 180). Edge-swipe open remains transition-engine territory (P2).
 
 - **Two drawers: `Start` and `End`** (logical directions, RTL-aware), independently configurable.
-- **Resolution order for drawer content** (most specific wins):
-  1. `Scaffold.FlyoutStart` / `Scaffold.FlyoutEnd` attached property on the **current Page**
-  2. same attached property on the current **`ScaffoldArea`**
-  3. **global** `Scaffold.FlyoutStart` / `FlyoutEnd` property on the Scaffold itself
+- **Resolution = a STACK of overrides** (content AND mode, decided July 2026): the topmost
+  stack page that explicitly SET the property wins (`IsSet` semantics — an explicit
+  null/Disabled overrides downward), then older pushed pages, the root page, the current
+  `ScaffoldArea`, and finally the `Scaffold` — a page's drawer survives pushes that don't
+  override it, and a pop restores the previous page's drawer.
+- **Page-level content lifecycle**: attached content is a logical child of its page
+  (inheriting the page's BindingContext live); when the page leaves the navigation stack the
+  content is detached (clearing the inherited context) and its handlers disconnected —
+  the page model is never retained through the drawer view
+  (`Scaffold.CleanupPageFlyoutContent`, hooked in `ScaffoldNavigationStack.Pop`/root swap).
 - Open question settled: flyout items target roots only for v1 (no per-stack targets).
 
 **Decided completion design (July 2026):**

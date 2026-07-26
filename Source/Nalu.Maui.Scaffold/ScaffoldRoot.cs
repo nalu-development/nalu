@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Windows.Input;
 using Nalu.Internals;
 
 namespace Nalu;
@@ -111,6 +112,17 @@ public class ScaffoldRoot : Element
     /// bind tab templates directly to it.
     /// </summary>
     public ImageSource? CurrentIcon => (ImageSource?)GetValue(CurrentIconProperty);
+
+    /// <summary>
+    /// Gets the parameterless command selecting this root through the navigation engine
+    /// (preserved-stack restore, active-root-pops-to-root, guards always run) — the selection
+    /// hook for custom tab bar and flyout templates alike: with the root as binding context,
+    /// <c>Command="{Binding SelectCommand}"</c> is all a template needs.
+    /// <c>CanExecute</c> is false while ANY selection on the owning scaffold is navigating
+    /// (all roots' commands disable together, so a second tap can't race the first) and the
+    /// command no-ops while the root is not part of a presented <see cref="Scaffold"/>.
+    /// </summary>
+    public ICommand SelectCommand => field ??= new ScaffoldRootSelectCommand(this);
 
     private void OnIconSourceChanged(ImageSource? oldValue, ImageSource? newValue) => UpdateCurrentIcon();
 

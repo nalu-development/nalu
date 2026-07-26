@@ -39,6 +39,9 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
 
     public string State => "//" + string.Join('/', _currentArea.CurrentRoot.GetNavigationStack().Select(p => p.SegmentName));
 
+    /// <summary>The scaffold this proxy drives (host-specific services resolve it through here).</summary>
+    internal Scaffold Scaffold => _scaffold;
+
     public ScaffoldProxy(Scaffold scaffold, NavigationService navigationService)
     {
         _scaffold = scaffold;

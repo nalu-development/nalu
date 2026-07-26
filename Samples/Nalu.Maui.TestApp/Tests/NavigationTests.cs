@@ -478,6 +478,8 @@ public class NavScaffold : Scaffold
         Areas.Add(new ScaffoldRoot { Title = "SettingsItem", PageType = typeof(NavSettingsPage) });
 
         // Global start flyout (scaffold level — the fallback of the Page → Area → Scaffold chain).
+        // Mode Flyout: available on every page (the drawer requires content + an enabling mode).
+        Scaffold.SetFlyoutStartMode(this, ScaffoldFlyoutMode.Flyout);
         FlyoutStart = new VerticalStackLayout
         {
             AutomationId = "GlobalFlyout",

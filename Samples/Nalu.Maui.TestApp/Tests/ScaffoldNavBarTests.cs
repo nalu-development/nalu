@@ -188,6 +188,9 @@ public class NavBarScaffold : Scaffold
             }
         );
 
+        // Mode Flyout: available on every page (the drawer requires content + an enabling mode).
+        Scaffold.SetFlyoutStartMode(this, ScaffoldFlyoutMode.Flyout);
+
         FlyoutStart = new VerticalStackLayout
         {
             AutomationId = "GlobalNavFlyout",

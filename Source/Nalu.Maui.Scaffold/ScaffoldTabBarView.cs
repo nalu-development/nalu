@@ -343,6 +343,8 @@ public sealed class ScaffoldTabBarView : Grid
             Content = _items
         };
 
+        // SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container, SafeAreaRegions.None);
+
         Add(_pill);
 
         Padding = BarMargin;

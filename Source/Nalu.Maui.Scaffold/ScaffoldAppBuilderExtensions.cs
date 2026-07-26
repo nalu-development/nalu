@@ -18,6 +18,10 @@ public static class ScaffoldAppBuilderExtensions
         ScaffoldScrollToFix.Apply();
 #endif
 
+        // Page-scope drawer control: page models open/close the ambient scaffold's flyouts
+        // without a scaffold reference.
+        builder.Services.AddScoped<IScaffoldFlyoutController, ScaffoldFlyoutController>();
+
         return builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Scaffold, ScaffoldHandler>());
     }
 }

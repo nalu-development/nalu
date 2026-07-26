@@ -23,11 +23,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private const int _overlayDurationMs = 250;
     private const double _overflowGapDp = 8;
 
-    // Provisional flyout metrics (flyout width/styling API is a pending design review).
-    private const double _flyoutWidthRatio = 0.85;
-    private const double _flyoutMaxWidthDp = 360;
-    private static readonly Color _flyoutScrimColor = Colors.Black.WithAlpha(0.4f);
-
     private ScaffoldLayout? _hostPlatformView;
     private ScaffoldPageLayerLayout? _pageLayer;
     private FragmentContainerView? _container;
@@ -779,10 +774,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         => ShowOverlayAsync(
             content,
             side == ScaffoldFlyoutSide.Start ? ScaffoldOverlayPlacement.FlyoutStart : ScaffoldOverlayPlacement.FlyoutEnd,
-            _flyoutScrimColor,
+            scaffold.GetEffectiveFlyoutOptions(side).ComputeScrimColor(),
             behindBottomChrome: false,
             disconnectOnClose: false
         );
+
+    /// <summary>
+    /// Maps a logical drawer placement to the physical LEFT edge (false = right): Start is left
+    /// in LTR — the single spot the RTL mapping lives in (placement and slide direction).
+    /// </summary>
+    private bool IsFlyoutOnLeft(ScaffoldOverlayPlacement placement)
+        => placement == ScaffoldOverlayPlacement.FlyoutStart != scaffold.IsRightToLeft;
 
     public async Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup)
     {
@@ -853,16 +855,21 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             case ScaffoldOverlayPlacement.FlyoutStart:
             case ScaffoldOverlayPlacement.FlyoutEnd:
             {
-                var widthPx = (int)Math.Min(platformView.Width * _flyoutWidthRatio, context.ToPixels(_flyoutMaxWidthDp));
+                var side = placement == ScaffoldOverlayPlacement.FlyoutStart ? ScaffoldFlyoutSide.Start : ScaffoldFlyoutSide.End;
+                var options = scaffold.GetEffectiveFlyoutOptions(side);
+                var containerWidthDp = context.FromPixels(platformView.Width);
+                var widthPx = (int)context.ToPixels(options.ComputeWidth(containerWidthDp));
+                var onLeft = IsFlyoutOnLeft(placement);
 
                 panel.LayoutParameters = new Android.Widget.FrameLayout.LayoutParams(widthPx, AViewGroup.LayoutParams.MatchParent)
                 {
-                    Gravity = placement == ScaffoldOverlayPlacement.FlyoutStart ? GravityFlags.Start : GravityFlags.End
+                    Gravity = onLeft ? GravityFlags.Left : GravityFlags.Right
                 };
-                panel.TranslationX = placement == ScaffoldOverlayPlacement.FlyoutStart ? -widthPx : widthPx;
+                panel.TranslationX = onLeft ? -widthPx : widthPx;
                 platformView.AddView(panel);
 
                 await AnimateOverlayAsync(scrim, scrimAlpha: 1, panel, panelProperty: "translationX", panelTarget: 0);
+                scaffold.OnFlyoutPresented(side);
 
                 break;
             }
@@ -918,12 +925,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         switch (placement)
         {
             case ScaffoldOverlayPlacement.FlyoutStart:
-                await AnimateOverlayAsync(scrim, scrimAlpha: 0, panel, panelProperty: "translationX", panelTarget: -panel.Width);
-
-                break;
-
             case ScaffoldOverlayPlacement.FlyoutEnd:
-                await AnimateOverlayAsync(scrim, scrimAlpha: 0, panel, panelProperty: "translationX", panelTarget: panel.Width);
+                await AnimateOverlayAsync(
+                    scrim,
+                    scrimAlpha: 0,
+                    panel,
+                    panelProperty: "translationX",
+                    panelTarget: IsFlyoutOnLeft(placement) ? -panel.Width : panel.Width
+                );
 
                 break;
 
@@ -939,6 +948,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         if (content is not null)
         {
             content.DisconnectHandlers();
+        }
+
+        if (placement is ScaffoldOverlayPlacement.FlyoutStart or ScaffoldOverlayPlacement.FlyoutEnd)
+        {
+            scaffold.OnFlyoutDismissed(placement == ScaffoldOverlayPlacement.FlyoutStart ? ScaffoldFlyoutSide.Start : ScaffoldFlyoutSide.End);
         }
 
         scaffold.UpdateBackCallbackEnabled();

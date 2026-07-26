@@ -18,6 +18,9 @@ internal class NavigationService : INavigationService, IDisposable
     private IShellProxy? _shellProxy;
 
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
+
+    /// <summary>The current shell proxy, or null before initialization (non-throwing peek for host-specific services).</summary>
+    internal IShellProxy? ShellProxyOrDefault => _shellProxy;
     public INavigationConfiguration Configuration { get; }
 
     internal IServiceProvider ServiceProvider { get; }

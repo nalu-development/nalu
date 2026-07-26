@@ -18,11 +18,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private const double _transitionDurationSeconds = 0.25;
     private const double _overflowGap = 8;
 
-    // Provisional flyout metrics (flyout width/styling API is a pending design review).
-    private const double _flyoutWidthRatio = 0.85;
-    private const double _flyoutMaxWidth = 360;
-    private static readonly Color _flyoutScrimColor = Colors.Black.WithAlpha(0.4f);
-
     private Page? _currentPage;
     private ScaffoldRoot? _currentRoot;
     private UIViewController? _currentController;
@@ -681,10 +676,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         => ShowOverlayAsync(
             content,
             side == ScaffoldFlyoutSide.Start ? ScaffoldOverlayPlacement.FlyoutStart : ScaffoldOverlayPlacement.FlyoutEnd,
-            _flyoutScrimColor,
+            scaffold.GetEffectiveFlyoutOptions(side).ComputeScrimColor(),
             behindBottomChrome: false,
             disconnectOnClose: false
         );
+
+    /// <summary>
+    /// Maps a logical drawer placement to the physical LEFT edge (false = right): Start is left
+    /// in LTR — the single spot the RTL mapping lives in (placement and slide direction).
+    /// </summary>
+    private bool IsFlyoutOnLeft(ScaffoldOverlayPlacement placement)
+        => placement == ScaffoldOverlayPlacement.FlyoutStart != scaffold.IsRightToLeft;
 
     public async Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup)
     {
@@ -749,9 +751,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             case ScaffoldOverlayPlacement.FlyoutStart:
             case ScaffoldOverlayPlacement.FlyoutEnd:
             {
-                var width = Math.Min(bounds.Width * _flyoutWidthRatio, _flyoutMaxWidth);
-                var offscreenX = placement == ScaffoldOverlayPlacement.FlyoutStart ? -width : bounds.Width;
-                var openX = placement == ScaffoldOverlayPlacement.FlyoutStart ? 0 : bounds.Width - width;
+                var side = placement == ScaffoldOverlayPlacement.FlyoutStart ? ScaffoldFlyoutSide.Start : ScaffoldFlyoutSide.End;
+                var options = scaffold.GetEffectiveFlyoutOptions(side);
+                var width = options.ComputeWidth(bounds.Width);
+                var onLeft = IsFlyoutOnLeft(placement);
+                var offscreenX = onLeft ? -width : bounds.Width;
+                var openX = onLeft ? 0 : bounds.Width - width;
                 panel.Frame = new CGRect(offscreenX, 0, width, bounds.Height);
                 container.AddSubview(panel);
 
@@ -765,6 +770,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                     scrim.Alpha = 1;
                     panel.Frame = new CGRect(openX, 0, width, bounds.Height);
                 });
+
+                scaffold.OnFlyoutPresented(side);
 
                 break;
             }
@@ -836,12 +843,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             switch (placement)
             {
                 case ScaffoldOverlayPlacement.FlyoutStart:
-                    panel.Frame = panel.Frame with { X = -panel.Frame.Width };
-
-                    break;
-
                 case ScaffoldOverlayPlacement.FlyoutEnd:
-                    panel.Frame = panel.Frame with { X = containerWidth };
+                    panel.Frame = panel.Frame with { X = IsFlyoutOnLeft(placement) ? -panel.Frame.Width : containerWidth };
 
                     break;
 
@@ -859,6 +862,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         if (content is not null)
         {
             content.DisconnectHandlers();
+        }
+
+        if (placement is ScaffoldOverlayPlacement.FlyoutStart or ScaffoldOverlayPlacement.FlyoutEnd)
+        {
+            scaffold.OnFlyoutDismissed(placement == ScaffoldOverlayPlacement.FlyoutStart ? ScaffoldFlyoutSide.Start : ScaffoldFlyoutSide.End);
         }
     }
 }

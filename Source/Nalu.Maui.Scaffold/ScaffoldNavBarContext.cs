@@ -136,13 +136,13 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         CanNavigateBack = !stackEmpty && !isModal;
 
         IsFlyoutStartButtonVisible = !isModal && ComputeFlyoutButtonVisible(
-            _scaffold.ResolveFlyoutContent(ScaffoldFlyoutSide.Start) is not null,
+            _scaffold.ComputeFlyoutAvailable(ScaffoldFlyoutSide.Start),
             ResolveFlyoutButtonVisibility(currentPage, Scaffold.FlyoutStartButtonVisibilityProperty),
             stackEmpty
         );
 
         IsFlyoutEndButtonVisible = !isModal && ComputeFlyoutButtonVisible(
-            _scaffold.ResolveFlyoutContent(ScaffoldFlyoutSide.End) is not null,
+            _scaffold.ComputeFlyoutAvailable(ScaffoldFlyoutSide.End),
             ResolveFlyoutButtonVisibility(currentPage, Scaffold.FlyoutEndButtonVisibilityProperty),
             stackEmpty
         );
@@ -193,6 +193,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 
             case "FlyoutStartButtonVisibility":
             case "FlyoutEndButtonVisibility":
+            case "FlyoutStartMode":
+            case "FlyoutEndMode":
                 if (_scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy)
                 {
                     Update(rootProxy.Root, page);

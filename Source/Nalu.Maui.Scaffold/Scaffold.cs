@@ -73,6 +73,43 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached(nameof(FlyoutEnd), typeof(View), typeof(Scaffold), null, propertyChanged: OnFlyoutContentChanged);
 
     /// <summary>
+    /// Attached property controlling the start-edge drawer's behavior
+    /// (<see cref="ScaffoldFlyoutMode"/>). Resolution, most specific SET value wins:
+    /// current <see cref="Page"/> → current <see cref="ScaffoldArea"/> → the
+    /// <see cref="Scaffold"/>. Defaults to <see cref="ScaffoldFlyoutMode.Disabled"/> —
+    /// a drawer requires content AND an explicitly enabling mode.
+    /// </summary>
+    public static readonly BindableProperty FlyoutStartModeProperty =
+        BindableProperty.CreateAttached("FlyoutStartMode", typeof(ScaffoldFlyoutMode), typeof(Scaffold), ScaffoldFlyoutMode.Disabled);
+
+    /// <summary>
+    /// Attached property controlling the end-edge drawer's behavior.
+    /// Same semantics as <see cref="FlyoutStartModeProperty"/>.
+    /// </summary>
+    public static readonly BindableProperty FlyoutEndModeProperty =
+        BindableProperty.CreateAttached("FlyoutEndMode", typeof(ScaffoldFlyoutMode), typeof(Scaffold), ScaffoldFlyoutMode.Disabled);
+
+    /// <summary>Bindable property for <see cref="FlyoutStartOptions"/>.</summary>
+    public static readonly BindableProperty FlyoutStartOptionsProperty =
+        BindableProperty.Create(nameof(FlyoutStartOptions), typeof(ScaffoldFlyoutOptions), typeof(Scaffold), null);
+
+    /// <summary>Bindable property for <see cref="FlyoutEndOptions"/>.</summary>
+    public static readonly BindableProperty FlyoutEndOptionsProperty =
+        BindableProperty.Create(nameof(FlyoutEndOptions), typeof(ScaffoldFlyoutOptions), typeof(Scaffold), null);
+
+    private static readonly BindablePropertyKey _isFlyoutStartOpenPropertyKey =
+        BindableProperty.CreateReadOnly(nameof(IsFlyoutStartOpen), typeof(bool), typeof(Scaffold), false);
+
+    /// <summary>Bindable property for <see cref="IsFlyoutStartOpen"/> (read-only).</summary>
+    public static readonly BindableProperty IsFlyoutStartOpenProperty = _isFlyoutStartOpenPropertyKey.BindableProperty;
+
+    private static readonly BindablePropertyKey _isFlyoutEndOpenPropertyKey =
+        BindableProperty.CreateReadOnly(nameof(IsFlyoutEndOpen), typeof(bool), typeof(Scaffold), false);
+
+    /// <summary>Bindable property for <see cref="IsFlyoutEndOpen"/> (read-only).</summary>
+    public static readonly BindableProperty IsFlyoutEndOpenProperty = _isFlyoutEndOpenPropertyKey.BindableProperty;
+
+    /// <summary>
     /// Attached property replacing the navigation bar title view for a <see cref="Page"/>.
     /// The page's <see cref="Page.Title"/> is used when no title view is set.
     /// </summary>
@@ -196,6 +233,38 @@ public partial class Scaffold : ContentPage, IDisposable
         set => SetValue(FlyoutEndProperty, value);
     }
 
+    /// <summary>Gets or sets the start-edge drawer styling; null uses the built-in defaults.</summary>
+    public ScaffoldFlyoutOptions? FlyoutStartOptions
+    {
+        get => (ScaffoldFlyoutOptions?)GetValue(FlyoutStartOptionsProperty);
+        set => SetValue(FlyoutStartOptionsProperty, value);
+    }
+
+    /// <summary>Gets or sets the end-edge drawer styling; null uses the built-in defaults.</summary>
+    public ScaffoldFlyoutOptions? FlyoutEndOptions
+    {
+        get => (ScaffoldFlyoutOptions?)GetValue(FlyoutEndOptionsProperty);
+        set => SetValue(FlyoutEndOptionsProperty, value);
+    }
+
+    /// <summary>Gets whether the start-edge drawer is currently presented.</summary>
+    public bool IsFlyoutStartOpen => (bool)GetValue(IsFlyoutStartOpenProperty);
+
+    /// <summary>Gets whether the end-edge drawer is currently presented.</summary>
+    public bool IsFlyoutEndOpen => (bool)GetValue(IsFlyoutEndOpenProperty);
+
+    /// <summary>Occurs when the start-edge drawer finished opening.</summary>
+    public event EventHandler? FlyoutStartOpened;
+
+    /// <summary>Occurs when the start-edge drawer finished closing.</summary>
+    public event EventHandler? FlyoutStartClosed;
+
+    /// <summary>Occurs when the end-edge drawer finished opening.</summary>
+    public event EventHandler? FlyoutEndOpened;
+
+    /// <summary>Occurs when the end-edge drawer finished closing.</summary>
+    public event EventHandler? FlyoutEndClosed;
+
     /// <summary>Initializes a new <see cref="Scaffold"/>.</summary>
     public Scaffold()
     {
@@ -218,6 +287,18 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets the end-edge flyout content attached to an element.</summary>
     public static void SetFlyoutEnd(BindableObject bindable, View? value) => bindable.SetValue(FlyoutEndProperty, value);
 
+    /// <summary>Gets the start-edge drawer mode attached to an element.</summary>
+    public static ScaffoldFlyoutMode GetFlyoutStartMode(BindableObject bindable) => (ScaffoldFlyoutMode)bindable.GetValue(FlyoutStartModeProperty);
+
+    /// <summary>Sets the start-edge drawer mode attached to an element.</summary>
+    public static void SetFlyoutStartMode(BindableObject bindable, ScaffoldFlyoutMode value) => bindable.SetValue(FlyoutStartModeProperty, value);
+
+    /// <summary>Gets the end-edge drawer mode attached to an element.</summary>
+    public static ScaffoldFlyoutMode GetFlyoutEndMode(BindableObject bindable) => (ScaffoldFlyoutMode)bindable.GetValue(FlyoutEndModeProperty);
+
+    /// <summary>Sets the end-edge drawer mode attached to an element.</summary>
+    public static void SetFlyoutEndMode(BindableObject bindable, ScaffoldFlyoutMode value) => bindable.SetValue(FlyoutEndModeProperty, value);
+
     private static void OnFlyoutContentChanged(BindableObject bindable, object oldValue, object newValue)
     {
         // Flyout content participates in the element tree at its attachment point:
@@ -238,12 +319,14 @@ public partial class Scaffold : ContentPage, IDisposable
 
     /// <summary>
     /// Opens the flyout for the given side, resolving its content from the current page,
-    /// then the current area, then the scaffold's own value. No-op when no content is
-    /// configured at any level or the scaffold is not presented yet.
+    /// then the current area, then the scaffold's own value. No-op when the drawer does not
+    /// exist — no content configured at any level, its mode resolves to
+    /// <see cref="ScaffoldFlyoutMode.Disabled"/> (or <see cref="ScaffoldFlyoutMode.Auto"/>
+    /// while pages are pushed) — or the scaffold is not presented yet.
     /// </summary>
     /// <param name="side">The edge the flyout slides in from.</param>
     public Task OpenFlyoutAsync(ScaffoldFlyoutSide side)
-        => Presenter is { } presenter && ResolveFlyoutContent(side) is { } content
+        => Presenter is { } presenter && ComputeFlyoutAvailable(side) && ResolveFlyoutContent(side) is { } content
             ? presenter.OpenFlyoutAsync(side, content)
             : Task.CompletedTask;
 
@@ -316,18 +399,179 @@ public partial class Scaffold : ContentPage, IDisposable
         return await navigationService.GoToAsync(navigation).ConfigureAwait(true);
     }
 
-    internal View? ResolveFlyoutContent(ScaffoldFlyoutSide side)
-    {
-        var property = side == ScaffoldFlyoutSide.Start ? FlyoutStartProperty : FlyoutEndProperty;
-        var currentRoot = (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root;
-        var stack = currentRoot?.NavigationStack;
-        var currentPage = stack is null ? null
-            : stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page
-            : stack.RootPage;
+    private int _rootSelectionInFlight;
 
-        return (currentPage?.GetValue(property) as View)
-               ?? (CurrentArea?.GetValue(property) as View)
-               ?? GetValue(property) as View;
+    /// <summary>
+    /// Raised when <see cref="IsRootSelectionInFlight"/> flips — every root's
+    /// <see cref="ScaffoldRoot.SelectCommand"/> re-evaluates <c>CanExecute</c> on it.
+    /// </summary>
+    internal event EventHandler? RootSelectionInFlightChanged;
+
+    /// <summary>Gets whether a chrome-initiated root selection is currently navigating.</summary>
+    internal bool IsRootSelectionInFlight => _rootSelectionInFlight != 0;
+
+    /// <summary>
+    /// <see cref="SelectRootAsync"/> behind the scaffold-wide selection gate: while one
+    /// selection navigates, further ones are ignored and every root's
+    /// <see cref="ScaffoldRoot.SelectCommand"/> reports non-executable — a second tab can't
+    /// race the first (the engine would silently ignore it; the gate makes the UI honest).
+    /// Always re-opens on settle (success, guard-cancel or failure).
+    /// </summary>
+    internal async Task<bool> SelectRootGatedAsync(ScaffoldRoot root)
+    {
+        if (Interlocked.CompareExchange(ref _rootSelectionInFlight, 1, 0) != 0)
+        {
+            return false;
+        }
+
+        RootSelectionInFlightChanged?.Invoke(this, EventArgs.Empty);
+
+        try
+        {
+            return await SelectRootAsync(root).ConfigureAwait(true);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _rootSelectionInFlight, 0);
+            RootSelectionInFlightChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Gets the page currently on top of the presented root's stack.</summary>
+    internal Page? CurrentDisplayedPage
+    {
+        get
+        {
+            var stack = (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack;
+
+            return stack is null ? null
+                : stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page
+                : stack.RootPage;
+        }
+    }
+
+    /// <summary>
+    /// Resolves a per-side flyout attached property as a STACK of overrides: the topmost
+    /// stack page that explicitly SET the property wins (an explicit null/Disabled overrides
+    /// downward), then older pushed pages, the root page, the current area and finally the
+    /// scaffold — so a page's drawer survives pushes that don't override it, and a pop
+    /// restores the previous page's drawer.
+    /// </summary>
+    private object? ResolveFlyoutValue(BindableProperty property)
+    {
+        if ((Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack is { } stack)
+        {
+            for (var i = stack.PushedPages.Count - 1; i >= 0; i--)
+            {
+                if (stack.PushedPages[i].Page is { } page && page.IsSet(property))
+                {
+                    return page.GetValue(property);
+                }
+            }
+
+            if (stack.RootPage is { } rootPage && rootPage.IsSet(property))
+            {
+                return rootPage.GetValue(property);
+            }
+        }
+
+        if (CurrentArea is { } area && area.IsSet(property))
+        {
+            return area.GetValue(property);
+        }
+
+        return GetValue(property);
+    }
+
+    internal View? ResolveFlyoutContent(ScaffoldFlyoutSide side)
+        => ResolveFlyoutValue(side == ScaffoldFlyoutSide.Start ? FlyoutStartProperty : FlyoutEndProperty) as View;
+
+    internal ScaffoldFlyoutMode ResolveFlyoutMode(ScaffoldFlyoutSide side)
+        => (ScaffoldFlyoutMode)ResolveFlyoutValue(side == ScaffoldFlyoutSide.Start ? FlyoutStartModeProperty : FlyoutEndModeProperty)!;
+
+    /// <summary>
+    /// Releases the flyout content a page carried when the page leaves the navigation stack:
+    /// detaching the logical child clears the inherited BindingContext (the page model must not
+    /// be retained through the drawer view) and the handlers of a previously presented drawer
+    /// are disconnected. Navigation closes any open overlay before the stack mutates, so the
+    /// view is never presented when this runs.
+    /// </summary>
+    internal static void CleanupPageFlyoutContent(Page page)
+    {
+        Cleanup(page, FlyoutStartProperty);
+        Cleanup(page, FlyoutEndProperty);
+
+        static void Cleanup(Page page, BindableProperty property)
+        {
+            if (page.IsSet(property) && page.GetValue(property) is View view)
+            {
+                page.RemoveLogicalChild(view);
+                view.DisconnectHandlers();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the drawer on the given side exists right now: content resolves non-null AND its
+    /// mode allows it (<see cref="ScaffoldFlyoutMode.Auto"/> = stack roots only). The nav bar's
+    /// drawer button and <see cref="OpenFlyoutAsync"/> key off the same check.
+    /// </summary>
+    internal bool ComputeFlyoutAvailable(ScaffoldFlyoutSide side)
+    {
+        if (ResolveFlyoutContent(side) is null)
+        {
+            return false;
+        }
+
+        return ResolveFlyoutMode(side) switch
+        {
+            ScaffoldFlyoutMode.Flyout => true,
+            ScaffoldFlyoutMode.Auto =>
+                (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack.PushedPages.Count == 0,
+            _ => false
+        };
+    }
+
+    /// <summary>Gets the effective styling for the given drawer side (never null).</summary>
+    internal ScaffoldFlyoutOptions GetEffectiveFlyoutOptions(ScaffoldFlyoutSide side)
+        => (side == ScaffoldFlyoutSide.Start ? FlyoutStartOptions : FlyoutEndOptions) ?? ScaffoldFlyoutOptions.Default;
+
+    /// <summary>
+    /// Whether the scaffold renders right-to-left — the presenters map the logical Start/End
+    /// drawer sides to physical edges through this single flag (placement, slide direction and,
+    /// later, the gesture edge).
+    /// </summary>
+    internal bool IsRightToLeft
+        => ((IVisualElementController)this).EffectiveFlowDirection.HasFlag(EffectiveFlowDirection.RightToLeft);
+
+    /// <summary>Called by the presenter when a drawer finished opening.</summary>
+    internal void OnFlyoutPresented(ScaffoldFlyoutSide side)
+    {
+        if (side == ScaffoldFlyoutSide.Start)
+        {
+            SetValue(_isFlyoutStartOpenPropertyKey, true);
+            FlyoutStartOpened?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            SetValue(_isFlyoutEndOpenPropertyKey, true);
+            FlyoutEndOpened?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Called by the presenter when a drawer finished closing.</summary>
+    internal void OnFlyoutDismissed(ScaffoldFlyoutSide side)
+    {
+        if (side == ScaffoldFlyoutSide.Start)
+        {
+            SetValue(_isFlyoutStartOpenPropertyKey, false);
+            FlyoutStartClosed?.Invoke(this, EventArgs.Empty);
+        }
+        else
+        {
+            SetValue(_isFlyoutEndOpenPropertyKey, false);
+            FlyoutEndClosed?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     /// <summary>Gets the navigation bar title view attached to a page.</summary>
