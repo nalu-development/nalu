@@ -634,8 +634,36 @@ Key facts anchoring the decision:
 >   `ScaffoldTransitionChromeTests.PredictiveBackRestoresSharedElementRendering` — pixel-samples
 >   the hero after a stepped adb motion-event scrub (`NaluApp.PredictiveBackScrubAsync`; a plain
 >   `input swipe` commits as a canned fling and can even dispatch a second back).
-> - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option,
->   predictive-back SET seeking (Android follow-up).
+> - Still P2: predictive-back SET seeking (Android follow-up). Per-navigation
+>   `WithTransition(...)` was DROPPED (decided July 2026): page/scaffold-level
+>   `Scaffold.PageTransition` covers the use cases without threading the spec through
+>   `INavigationInfo`.
+> - **Predictive-back SET seeking — investigated (July 2026), design parked:**
+>   - Availability: the Scaffold already resolves Xamarin.AndroidX.Transition **1.6.0.1**
+>     (seeking exists since androidx transition 1.5.0) at the low MAUI floor — binding surface
+>     confirmed (`TransitionManager.ControlDelayedTransition` → `ITransitionSeekController`:
+>     `CurrentFraction`, `AnimateToEnd/Start`, `IsReady`). Fragment 1.8.8.1, Activity 1.10.1.3.
+>     No version bumps needed.
+>   - The BUILT-IN fragment predictive-back seeking only works for back-STACK pops
+>     (`FragmentManager` drives the seek controller when popping an `addToBackStack`
+>     transaction). Our architecture is deliberately Replace-based with an engine-owned stack
+>     (guards, awaitable intents) — adopting the fragment back stack to get free seeking would
+>     hand system back to the FragmentManager and bypass the engine. Ruled out.
+>   - The viable route is a MANUAL scrub: on HandleOnBackStarted peek-mount the below page
+>     (as today, incl. `ScaffoldPageRestore.Repair` — see next point), stage the below page's
+>     pair views at the top page's geometry, call `ControlDelayedTransition(pageLayer, set)`
+>     (ChangeBounds/Transform/ImageTransform/ClipBounds + Slide for page motion), restore the
+>     natural layout as the end state, then drive `CurrentFraction` from back progress;
+>     commit → `AnimateToEnd` + engine pop handoff; cancel → `AnimateToStart` + unmount. This
+>     re-implements the fragment machinery's shared-element staging (`setSharedElementState`)
+>     by hand — bounded but substantial.
+>   - **It does NOT replace the transitionAlpha repair**: the `setTransitionAlpha(0)` hide and
+>     its restore live in the FRAGMENT transition machinery (DefaultSpecialEffectsController
+>     pairs first-out/last-in shared views); a manual `TransitionManager` scrub runs outside
+>     that machinery, so nothing would restore the hidden sources — the repair must in fact run
+>     BEFORE the start-state capture so the below page's pair views are drawable at all.
+>     Seeking is a pure UX upgrade (hero morphs under the finger, parity with the iOS
+>     interactive pop), not a correctness fix.
 
 ### 8.2 Cross-platform API (independent of engine choice)
 
@@ -654,9 +682,10 @@ Key facts anchoring the decision:
   their dedicated both-pages slide and NEVER consult the spec; shared-element navigations keep
   the standard slide (the flight math assumes it). Harness: "Scaffold Page Transition Tests" +
   ScaffoldPageTransitionChromeTests (both platforms).
-- Still P2: per-navigation `WithTransition(...)` on the fluent builder (needs the spec carried
-  through `INavigationInfo` and the engine seam); restore (§9) and programmatic bulk
-  navigations run with transitions suppressed.
+- Per-navigation `WithTransition(...)` on the fluent builder: **DROPPED (decided July 2026)** —
+  the attached-property resolution (page → scaffold → Default) covers the use cases; no spec
+  threading through `INavigationInfo`. Restore (§9) and programmatic bulk navigations run with
+  transitions suppressed.
 
 ### 8.3 Known-hard problems (what the PoC must exercise)
 
@@ -842,7 +871,8 @@ The Scaffold must own, with exact ordering:
 - **Exit**: a real-world sample app shape (tabs + drawer + modals) fully navigable with guards.
 
 ### P2 — transitions & gestures
-- PoC spikes A + B → engine decision → implement engine + `TransitionTag` API + `WithTransition(...)`.
+- PoC spikes A + B → engine decision → implement engine + `TransitionTag` API
+  (`WithTransition(...)` dropped July 2026 — attached-property resolution covers it).
 - Platform-parity push/pop animations, then shared elements, then interactive pop (iOS) and
   predictive back (Android), honoring the guard policy.
 - (Popups/sheets are §7.2 — v2, out of the initial release entirely.)
