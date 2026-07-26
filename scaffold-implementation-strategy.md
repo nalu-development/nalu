@@ -38,8 +38,10 @@
 
 **Next steps, in recommended order:**
 
-1. **Flyout completion** (§5.5): default template over `Areas`, width/styling API, RTL mapping;
-   edge-swipe open lands with the transition engine (P2).
+1. **Flyout completion** (§5.5): API DECIDED (design review July 2026) — implement
+   `ScaffoldFlyoutMode` (Auto/Disabled/Flyout), `ScaffoldFlyoutMenuView`,
+   `ScaffoldFlyoutOptions`, RTL mapping, open-state observability, `IScaffoldFlyoutController`,
+   area-icon removal; edge-swipe open lands with the transition engine (P2).
 2. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
 4. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
    interactive pop, predictive-back seeking — androidx seeking-version check still pending).
@@ -401,26 +403,67 @@ Consequences and requirements:
 > (disabled by default — null at every level); contents are plain MAUI views, logically
 > parented at their attachment point (per-page flyouts inherit the page's BindingContext);
 > `Scaffold.OpenFlyoutAsync(side)`/`CloseFlyoutAsync()`; presenters render scrim + slide-in
-> panel, tap-scrim closes, any navigation auto-closes. Still pending (P1): default template
-> over Areas, edge-swipe open (transition-engine territory), width/styling API (design review),
-> RTL mapping of Start/End.
+> panel, tap-scrim closes, any navigation auto-closes.
+> **Completion API DECIDED (design review, July 2026) — implementation pending; see below.**
+> Edge-swipe open remains transition-engine territory (P2).
 
 - **Two drawers: `Start` and `End`** (logical directions, RTL-aware), independently configurable.
-- Content model:
-  - **Default template**: auto-renders the Scaffold's `ScaffoldArea`s (title/icon) as navigation entries;
-    selection routes through `NavigationService`.
-  - **Custom content**: any virtual view.
 - **Resolution order for drawer content** (most specific wins):
   1. `Scaffold.FlyoutStart` / `Scaffold.FlyoutEnd` attached property on the **current Page**
   2. same attached property on the current **`ScaffoldArea`**
   3. **global** `Scaffold.FlyoutStart` / `FlyoutEnd` property on the Scaffold itself
-  - `null` at all levels ⇒ that drawer doesn't exist; an explicit "none" sentinel lets a page suppress
-    a globally-configured drawer.
-- Behavior properties per drawer: mode (overlay for v1; locked/side-by-side is a tablet concern, post-v1),
-  width, scrim, edge-swipe enable. Programmatic open/close via a small `IScaffoldDrawerController`
-  (resolvable from page DI scope).
-- Open question to settle in design review: can a flyout item target a specific *stack* inside an item
-  (Shell allows it, complicates selection semantics) — **proposal: item-level targets only for v1**.
+- Open question settled: flyout items target roots only for v1 (no per-stack targets).
+
+**Decided completion design (July 2026):**
+
+- **Existence = content AND mode.** A drawer exists when its content resolves non-null AND its
+  mode resolves ≠ `Disabled`. No implicit content, no "none" sentinel — suppression goes
+  through the mode.
+- **`ScaffoldFlyoutMode { Auto, Disabled, Flyout }`** via `Scaffold.FlyoutStartMode` /
+  `FlyoutEndMode` attached properties, Page → Area → Scaffold resolution using `IsSet`
+  fall-through (`Auto` is a real policy, not an "unset" marker). `Auto` = `Flyout` at stack
+  roots, `Disabled` once pages are pushed (mirrors `ScaffoldFlyoutButtonVisibility.Auto`).
+  Defaults: **both sides `Disabled`** — a drawer always requires content + an explicit mode
+  (`Auto` or `Flyout`); nothing materializes by merely setting content.
+  Future member: `Sticky` (always visible, splits the screen with the page — tablets); `Auto`
+  may later adapt to form factor. `OpenFlyoutAsync` no-ops when existence fails; the nav-bar
+  drawer button keys off the same check.
+- **`ScaffoldFlyoutMenuView`** (public view, the opt-in menu content — no implicit default):
+  renders the scaffold's VISIBLE roots. Rules: area with one visible root → flat entry (root
+  metadata quintet); area with 2+ visible roots → area `Title` as text-only group header with
+  its roots below; `ScaffoldTabBar` areas excluded unless `IsTabBarDisplayed="True"` (default
+  false). Selection routes through the engine like a tab tap (preserved-stack restore, guards;
+  navigation auto-closes the drawer). Customization: `HeaderView`, `FooterView`, `ItemTemplate`
+  (BindingContext = the `ScaffoldRoot`; each item is wrapped in a tappable container so
+  templates are purely visual). Internals: `ScrollView` + `BindableLayout` over a vertical
+  stack — deliberately NOT virtualized.
+- **`ScaffoldRoot.SelectCommand`** (read-only `ICommand`, parameterless): engine-routed
+  selection of that root via the parent `Scaffold` (guards, preserved-stack restore); no-op
+  when detached. Usable from ANY custom flyout content — `ScaffoldFlyoutMenuView`'s default
+  items ride the same command. Also becomes the public selection hook for custom TAB BAR
+  templates and full `TabBarView` replacements (today taps are wired internally by
+  `ScaffoldTabBarView`; its items migrate to the same command).
+  **Async-smart**: `CanExecute` is false while a selection navigation is in flight — the gate
+  is scaffold-wide (ALL roots' commands raise `CanExecuteChanged` together, so a second tab
+  can't race the first; the engine would silently ignore it anyway — this makes the UI honest),
+  always re-enabled on settle (success, guard-cancel or failure). Follow-up (not v1): reflect
+  ANY engine navigation by surfacing the engine's busy state through the proxy.
+- **Metadata cleanup (breaking)**: `ScaffoldArea` loses `Icon`/`SelectedIcon`/`CurrentIcon` and
+  keeps `Title` only — the icon quintet lives on `ScaffoldRoot` (verify no tab-bar template
+  binds area-level icons when implementing).
+- **Styling**: per-side `ScaffoldFlyoutOptions : BindableObject` (`Width` = explicit dp, wins
+  when >= 0; else `WidthRatio` default 0.85 capped by `MaximumWidth` default 360; `ScrimColor`
+  null = black 40%) via `Scaffold.FlyoutStartOptions` / `FlyoutEndOptions` — scaffold-level
+  only (styling is chrome, not page content). Defaults reproduce the current hardcoded
+  presenter metrics. `EdgeSwipeEnabled` reserved for this object (added with the P2 gesture).
+- **RTL**: presenters map `Start`/`End` to left/right from the scaffold's effective
+  `FlowDirection` — one mapping helper drives placement gravity, slide direction and (later)
+  the gesture edge.
+- **Open-state observability**: read-only bindable `IsFlyoutStartOpen` / `IsFlyoutEndOpen` +
+  events `FlyoutStartOpened`/`FlyoutStartClosed`/`FlyoutEndOpened`/`FlyoutEndClosed`.
+- **Programmatic control**: `OpenFlyoutAsync(side)` / `CloseFlyoutAsync()` stay; add
+  `IScaffoldFlyoutController` registered in the page DI scope forwarding to the ambient
+  scaffold.
 
 ### 5.6 Overlay layer — one shared primitive (decided July 2026)
 
