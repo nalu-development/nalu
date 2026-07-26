@@ -138,7 +138,7 @@ internal static class ScaffoldSharedElementTransitions
         Page revealedPage,
         UIView poppedView,
         UIView revealedView,
-        double durationSeconds)
+        ScaffoldPageTransition transition)
     {
         var pairs = MatchPairs(mauiContext, poppedPage, revealedPage);
 
@@ -152,10 +152,33 @@ internal static class ScaffoldSharedElementTransitions
             pairs = [];
         }
 
+        // The flight geometry assumes the standard slide: shared-element pops always play it.
+        if (pairs.Count > 0)
+        {
+            transition = ScaffoldPageTransition.Default;
+        }
+
         var overlay = new UIView(container.Bounds) { UserInteractionEnabled = false };
         var width = (double)container.Bounds.Width;
-        var elements = new List<IScrubElement> { new PageSlideElement(poppedView, width) };
-        var cleanup = new List<Action> { () => overlay.RemoveFromSuperview() };
+        var identity = new ScaffoldTransitionMotion();
+
+        var elements = new List<IScrubElement>
+        {
+            // The popped page replays its enter motion in reverse; the revealed page returns
+            // from the behind state (§8.2 — the same spec the programmatic pop interprets).
+            new MotionScrubElement(poppedView, identity, transition.Enter, container.Bounds),
+            new MotionScrubElement(revealedView, transition.Behind, identity, container.Bounds)
+        };
+
+        var cleanup = new List<Action>
+        {
+            () => overlay.RemoveFromSuperview(),
+            () =>
+            {
+                revealedView.Alpha = 1;
+                revealedView.Transform = CGAffineTransform.MakeIdentity();
+            }
+        };
 
         foreach (var pair in pairs)
         {
@@ -221,7 +244,7 @@ internal static class ScaffoldSharedElementTransitions
 
         container.AddSubview(overlay);
 
-        return new ScaffoldPopAnimationSession(elements, cleanup, durationSeconds);
+        return new ScaffoldPopAnimationSession(elements, cleanup, transition.DurationSeconds > 0 ? transition.DurationSeconds : 0.25);
     }
 
     /// <summary>The per-fraction scrub surface of one animated element of the pop choreography.</summary>
@@ -231,9 +254,17 @@ internal static class ScaffoldSharedElementTransitions
         void Apply(double progress);
     }
 
-    private sealed class PageSlideElement(UIView movingView, double width) : IScrubElement
+    private sealed class MotionScrubElement(UIView view, ScaffoldTransitionMotion start, ScaffoldTransitionMotion end, CGRect bounds) : IScrubElement
     {
-        public void Apply(double progress) => movingView.Transform = CGAffineTransform.MakeTranslation((nfloat)(width * progress), 0);
+        public void Apply(double progress)
+        {
+            var scale = Lerp(start.Scale, end.Scale, progress);
+            var transform = CGAffineTransform.MakeScale((nfloat)scale, (nfloat)scale);
+            transform.Tx = (nfloat)(Lerp(start.FractionX, end.FractionX, progress) * bounds.Width);
+            transform.Ty = (nfloat)(Lerp(start.FractionY, end.FractionY, progress) * bounds.Height);
+            view.Transform = transform;
+            view.Alpha = (nfloat)Lerp(start.Opacity, end.Opacity, progress);
+        }
     }
 
     private sealed class ImageMorphElement(

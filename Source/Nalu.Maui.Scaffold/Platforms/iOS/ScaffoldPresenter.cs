@@ -266,7 +266,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             belowPage,
             topView,
             belowView,
-            _transitionDurationSeconds
+            scaffold.ResolvePageTransition(topPage)
         );
 
         _interactivePop = new InteractivePopState(topPage, belowPage, belowView, topView, container.Bounds.Width, session);
@@ -377,7 +377,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         // A remounted page keeps the transform its unmount animation left behind (covered pages
         // are detached, never destroyed) — setting Frame under an active transform corrupts the
         // geometry (the page lands offscreen). Always clear before framing.
-        newView.Transform = CGAffineTransform.MakeIdentity();
+        ResetMotion(newView);
         newView.Frame = container.Bounds;
         newView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
 
@@ -400,15 +400,30 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 newController.DidMoveToParentViewController(parentController);
 
                 // Shared elements (§8): matching Scaffold.TransitionName pairs fly between the
-                // pages while the same slide plays; falls back to the plain slide when no pair
-                // matches or the incoming views miss the layout gate.
+                // pages while the standard slide plays (the flight math assumes it); pages
+                // without pairs play their resolved ScaffoldPageTransition spec (§8.2).
                 var handled = previousPage is not null && previousController?.View is { } prevPushView
                     && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, _transitionDurationSeconds);
 
                 if (!handled)
                 {
-                    newView.Transform = CGAffineTransform.MakeTranslation(width, 0);
-                    await UIView.AnimateAsync(_transitionDurationSeconds, () => newView.Transform = CGAffineTransform.MakeIdentity());
+                    var spec = scaffold.ResolvePageTransition(targetPage);
+
+                    if (spec.IsAnimated)
+                    {
+                        var previousView = previousController?.View;
+                        ApplyMotion(newView, spec.Enter, container.Bounds);
+
+                        await UIView.AnimateAsync(spec.DurationSeconds, () =>
+                        {
+                            ResetMotion(newView);
+
+                            if (previousView is not null)
+                            {
+                                ApplyMotion(previousView, spec.Behind, container.Bounds);
+                            }
+                        });
+                    }
                 }
 
                 break;
@@ -424,7 +439,19 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
                 if (!handled)
                 {
-                    await UIView.AnimateAsync(_transitionDurationSeconds, () => previousView.Transform = CGAffineTransform.MakeTranslation(width, 0));
+                    // The POPPED page's own spec, reversed: it leaves the way it entered.
+                    var spec = previousPage is not null ? scaffold.ResolvePageTransition(previousPage) : ScaffoldPageTransition.Default;
+
+                    if (spec.IsAnimated)
+                    {
+                        ApplyMotion(newView, spec.Behind, container.Bounds);
+
+                        await UIView.AnimateAsync(spec.DurationSeconds, () =>
+                        {
+                            ResetMotion(newView);
+                            ApplyMotion(previousView, spec.Enter, container.Bounds);
+                        });
+                    }
                 }
 
                 break;
@@ -470,12 +497,28 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             {
                 previousView.RemoveFromSuperview();
 
-                // Leave the detached view transform-clean for its next mount.
-                previousView.Transform = CGAffineTransform.MakeIdentity();
+                // Leave the detached view motion-clean for its next mount.
+                ResetMotion(previousView);
             }
 
             previousController.RemoveFromParentViewController();
         }
+    }
+
+    /// <summary>Applies a §8.2 motion state: scale about center + fractional translation + opacity.</summary>
+    private static void ApplyMotion(UIView view, ScaffoldTransitionMotion motion, CGRect bounds)
+    {
+        var transform = CGAffineTransform.MakeScale((nfloat)motion.Scale, (nfloat)motion.Scale);
+        transform.Tx = (nfloat)(motion.FractionX * bounds.Width);
+        transform.Ty = (nfloat)(motion.FractionY * bounds.Height);
+        view.Transform = transform;
+        view.Alpha = (nfloat)motion.Opacity;
+    }
+
+    private static void ResetMotion(UIView view)
+    {
+        view.Transform = CGAffineTransform.MakeIdentity();
+        view.Alpha = 1;
     }
 
     /// <summary>

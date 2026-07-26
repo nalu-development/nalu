@@ -129,6 +129,17 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("TransitionName", typeof(string), typeof(Scaffold), null);
 
     /// <summary>
+    /// Attached property declaring the push/pop transition of a <see cref="Page"/> (§8.2).
+    /// Set on a page it overrides the scaffold-level value; set on the <see cref="Scaffold"/>
+    /// itself it is the default for every page. Resolution:
+    /// page → scaffold → <see cref="ScaffoldPageTransition.Default"/>.
+    /// The spec belongs to the PUSHED page: it enters with it and leaves with it reversed
+    /// (pop and the iOS interactive edge swipe replay it backwards).
+    /// </summary>
+    public static readonly BindableProperty PageTransitionProperty =
+        BindableProperty.CreateAttached("PageTransition", typeof(ScaffoldPageTransition), typeof(Scaffold), null);
+
+    /// <summary>
     /// Attached property controlling tab bar visibility for a <see cref="Page"/>:
     /// <see cref="ScaffoldTabBarVisibility.Visible"/> (default),
     /// <see cref="ScaffoldTabBarVisibility.Hidden"/>, or
@@ -338,6 +349,19 @@ public partial class Scaffold : ContentPage, IDisposable
 
     /// <summary>Sets the end-drawer button policy attached to an element.</summary>
     public static void SetFlyoutEndButtonVisibility(BindableObject bindable, ScaffoldFlyoutButtonVisibility value) => bindable.SetValue(FlyoutEndButtonVisibilityProperty, value);
+
+    /// <summary>Gets the page transition attached to <paramref name="bindable"/>.</summary>
+    public static ScaffoldPageTransition? GetPageTransition(BindableObject bindable) => (ScaffoldPageTransition?)bindable.GetValue(PageTransitionProperty);
+
+    /// <summary>Sets the page transition attached to <paramref name="bindable"/>.</summary>
+    public static void SetPageTransition(BindableObject bindable, ScaffoldPageTransition? value) => bindable.SetValue(PageTransitionProperty, value);
+
+    /// <summary>
+    /// Resolves the transition spec for <paramref name="pushedPage"/>:
+    /// page-attached value → scaffold-level value → <see cref="ScaffoldPageTransition.Default"/>.
+    /// </summary>
+    internal ScaffoldPageTransition ResolvePageTransition(Page pushedPage)
+        => GetPageTransition(pushedPage) ?? GetPageTransition(this) ?? ScaffoldPageTransition.Default;
 
     /// <summary>Gets the shared-element transition name attached to a view.</summary>
     public static string? GetTransitionName(BindableObject bindable) => (string?)bindable.GetValue(TransitionNameProperty);

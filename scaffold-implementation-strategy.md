@@ -607,16 +607,22 @@ Key facts anchoring the decision:
 
 - `Scaffold.TransitionTag="photo-{id}"` attached property on any `View` (the `transitionName` analogue).
   Matching tags on outgoing/incoming pages animate automatically.
-- **Customizable push/pop page transitions are a first-class deliverable** (PoC'd, spike C):
-  a declarative `PageTransition` spec — `Enter` motion for the incoming page, `Behind` motion for
-  the covered page (fractional translate / scale / opacity), duration — with built-ins
-  (SlideUpFade, SlideFromRight, ZoomFade, None). Declarative on purpose: both engines interpret it
-  (iOS animator block; Android `Fragment.OnCreateAnimator` — NOT a managed Transition subclass,
-  which the fragment framework's `Transition.clone()` breaks), keeping every transition
-  seekable/reversible. Pop plays the push spec reversed.
-- Resolution order: Scaffold default → per-page → per-navigation via the fluent builder
-  (`Navigation.Relative().Push<DetailPageModel>().WithTransition(...)`, carried in `INavigationInfo`).
-- Restore (§9) and programmatic bulk navigations run with transitions suppressed.
+- **Customizable push/pop page transitions — IMPLEMENTED (July 2026)**: public
+  `ScaffoldPageTransition(Enter, Behind, DurationSeconds)` + `ScaffoldTransitionMotion`
+  (fractional translate / scale / opacity) with built-ins (Default = stock slide,
+  SlideFromRight w/ parallax, SlideUpFade, ZoomFade, None). Both engines interpret the spec
+  natively (iOS animation blocks + the manual-scrub interactive session; Android
+  `Fragment.OnCreateAnimator` PropertyValuesHolder animator — NOT a managed Transition
+  subclass). Pop replays the PUSHED page's spec reversed (the spec is resolved from the page
+  that entered with it); the iOS edge swipe scrubs the same spec. Attachment:
+  `Scaffold.PageTransition` attached property — page-level overrides scaffold-level; resolution
+  page → scaffold → Default. Boundaries (by design): SlideStart/SlideEnd root/tab switches keep
+  their dedicated both-pages slide and NEVER consult the spec; shared-element navigations keep
+  the standard slide (the flight math assumes it). Harness: "Scaffold Page Transition Tests" +
+  ScaffoldPageTransitionChromeTests (both platforms).
+- Still P2: per-navigation `WithTransition(...)` on the fluent builder (needs the spec carried
+  through `INavigationInfo` and the engine seam); restore (§9) and programmatic bulk
+  navigations run with transitions suppressed.
 
 ### 8.3 Known-hard problems (what the PoC must exercise)
 

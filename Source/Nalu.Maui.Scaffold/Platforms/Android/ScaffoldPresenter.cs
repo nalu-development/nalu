@@ -153,8 +153,21 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 ? ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage))
                 : [];
 
+            // §8.2 spec resolution: the spec belongs to the PUSHED page — it enters with it
+            // (push) and leaves with it reversed (pop reveals with its Behind reversed).
+            // Shared-element navigations keep the standard slide (the SET choreography
+            // assumes it), so they run with the Default spec.
+            var pageTransition = sharedNames.Count > 0
+                ? ScaffoldPageTransition.Default
+                : hint switch
+                {
+                    ScaffoldPresentationHint.Push => scaffold.ResolvePageTransition(targetPage),
+                    ScaffoldPresentationHint.Pop when previousPage is not null => scaffold.ResolvePageTransition(previousPage),
+                    _ => ScaffoldPageTransition.Default
+                };
+
             var previousFragment = _currentFragment;
-            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, postponeForSharedElements: sharedNames.Count > 0);
+            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, pageTransition, postponeForSharedElements: sharedNames.Count > 0);
             _currentFragment = fragment;
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
@@ -195,10 +208,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 }
             }
 
-            // The CURRENT navigation decides how the outgoing page leaves (a pop slides it out
-            // to the end edge; a push leaves it static beneath the incoming slide). A settled
-            // predictive-back preview already moved it offscreen — no exit animation.
-            previousFragment?.PrepareRemoval(predictivelySettled ? ScaffoldPresentationHint.None : hint);
+            // The CURRENT navigation decides how the outgoing page leaves (a pop replays the
+            // spec's Enter motion reversed; a push plays the incoming spec's Behind motion). A
+            // settled predictive-back preview already moved it offscreen — no exit animation.
+            previousFragment?.PrepareRemoval(predictivelySettled ? ScaffoldPresentationHint.None : hint, pageTransition);
 
             transaction
                 .Replace(container.Id, fragment)

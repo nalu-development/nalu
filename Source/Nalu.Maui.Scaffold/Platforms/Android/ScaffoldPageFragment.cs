@@ -18,13 +18,20 @@ namespace Nalu;
 /// <c>AddSharedElement</c> + <c>SharedElementEnterTransition</c> the enter transition is
 /// POSTPONED until the first pre-draw so the end geometry exists (gate #1).
 /// </summary>
-internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, ScaffoldPresentationHint hint, AView container, bool postponeForSharedElements = false) : Fragment
+internal sealed class ScaffoldPageFragment(
+    IMauiContext mauiContext,
+    Page page,
+    ScaffoldPresentationHint hint,
+    AView container,
+    ScaffoldPageTransition transition,
+    bool postponeForSharedElements = false) : Fragment
 {
     private const long _transitionDurationMs = 250;
 
     private readonly TaskCompletionSource _presented = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _dismissed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScaffoldPresentationHint _removalHint = ScaffoldPresentationHint.None;
+    private ScaffoldPageTransition _removalTransition = ScaffoldPageTransition.Default;
 
     /// <summary>Completes when the fragment's view is laid out and its enter animation (if any) finished.</summary>
     public Task PresentedTask => _presented.Task;
@@ -37,26 +44,43 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
     /// the animator end). A shared-element entry never is: the fragment framework IGNORES
     /// animators on fragments involved in a transition, so the postponed path signals presented
     /// at first pre-draw and rides the transition framework for any page motion.
+    /// A pop entry (the revealed page) animates only when the spec declares a Behind motion.
     /// </summary>
     private bool HasAnimatedEnter => !postponeForSharedElements
-        && hint is ScaffoldPresentationHint.Push or ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd;
+        && transition.IsAnimated
+        && hint switch
+        {
+            ScaffoldPresentationHint.Push => !transition.Enter.IsIdentity,
+            ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd => true,
+            ScaffoldPresentationHint.Pop => !transition.Behind.IsIdentity,
+            _ => false
+        };
 
     /// <summary>
     /// Called by the presenter right before this fragment is replaced: the CURRENT navigation's
-    /// hint decides the exit choreography (a pop slides the removed page out; a push leaves it
-    /// static beneath the incoming slide) — the creation hint says nothing about how we leave.
+    /// hint decides the exit choreography (a pop replays the spec's Enter motion in reverse; a
+    /// push plays the incoming page's Behind motion) — the creation hint says nothing about how
+    /// we leave.
     /// </summary>
-    public void PrepareRemoval(ScaffoldPresentationHint removalHint) => _removalHint = removalHint;
+    public void PrepareRemoval(ScaffoldPresentationHint removalHint, ScaffoldPageTransition removalTransition)
+    {
+        _removalHint = removalHint;
+        _removalTransition = removalTransition;
+    }
 
     public override AView OnCreateView(LayoutInflater inflater, ViewGroup? parent, Bundle? savedInstanceState)
     {
         var platformView = page.ToPlatform(mauiContext);
         (platformView.Parent as ViewGroup)?.RemoveView(platformView);
 
-        // A remounted page keeps whatever translation its last exit animation left behind
+        // A remounted page keeps whatever motion state its last exit animation left behind
         // (covered pages are detached, never destroyed) — reset before hosting it again.
         platformView.TranslationX = 0f;
+        platformView.TranslationY = 0f;
         platformView.TranslationZ = 0f;
+        platformView.ScaleX = 1f;
+        platformView.ScaleY = 1f;
+        platformView.Alpha = 1f;
 
         platformView.LayoutParameters = new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent,
@@ -123,28 +147,84 @@ internal sealed class ScaffoldPageFragment(IMauiContext mauiContext, Page page, 
             return null;
         }
 
-        if (enter && hint == ScaffoldPresentationHint.Push)
+        var identity = new ScaffoldTransitionMotion();
+
+        if (enter && hint == ScaffoldPresentationHint.Push && HasAnimatedEnter)
         {
-            return BuildAnimator(view, fromX: width, toX: 0, elevate: true, _presented);
+            // The pushed page enters from the spec's Enter state.
+            return BuildMotionAnimator(view, transition.Enter, identity, transition, elevate: true, _presented);
         }
 
         if (enter && hint is ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd)
         {
             // Tab/root switch: the new page slides in over the old one in the direction of
-            // travel. Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
+            // travel (spec-independent). Logical Start/End mapped LTR for now.
             var fromX = hint == ScaffoldPresentationHint.SlideEnd ? width : -width;
 
             return BuildAnimator(view, fromX: fromX, toX: 0, elevate: true, _presented);
         }
 
-        if (!enter && IsRemoving && _removalHint == ScaffoldPresentationHint.Pop)
+        if (enter && hint == ScaffoldPresentationHint.Pop && HasAnimatedEnter)
         {
-            return BuildAnimator(view, fromX: 0, toX: width, elevate: true, _dismissed);
+            // The revealed page returns from the popped page's Behind state.
+            return BuildMotionAnimator(view, transition.Behind, identity, transition, elevate: false, _presented);
+        }
+
+        if (!enter && IsRemoving && _removalHint == ScaffoldPresentationHint.Pop && _removalTransition.IsAnimated)
+        {
+            // Popped: replay this page's Enter motion in reverse, above the revealed page.
+            return BuildMotionAnimator(view, identity, _removalTransition.Enter, _removalTransition, elevate: true, _dismissed);
+        }
+
+        if (!enter && IsRemoving && _removalHint == ScaffoldPresentationHint.Push && _removalTransition.IsAnimated && !_removalTransition.Behind.IsIdentity)
+        {
+            // Covered: play the INCOMING page's Behind motion beneath its entry.
+            return BuildMotionAnimator(view, identity, _removalTransition.Behind, _removalTransition, elevate: false, _dismissed);
         }
 
         CompleteFor(enter);
 
         return null;
+    }
+
+    /// <summary>
+    /// Property animator between two §8.2 motion states (fractional translation, scale about
+    /// center, opacity). A single ObjectAnimator with PropertyValuesHolders — the supported,
+    /// seekable fragment-animation path.
+    /// </summary>
+    private Animator BuildMotionAnimator(
+        AView view,
+        ScaffoldTransitionMotion from,
+        ScaffoldTransitionMotion to,
+        ScaffoldPageTransition spec,
+        bool elevate,
+        TaskCompletionSource completion)
+    {
+        var width = container.Width;
+        var height = container.Height;
+
+        if (elevate)
+        {
+            view.TranslationZ = 1f;
+        }
+
+        var animator = ObjectAnimator.OfPropertyValuesHolder(
+            view,
+            PropertyValuesHolder.OfFloat("translationX", (float)(from.FractionX * width), (float)(to.FractionX * width))!,
+            PropertyValuesHolder.OfFloat("translationY", (float)(from.FractionY * height), (float)(to.FractionY * height))!,
+            PropertyValuesHolder.OfFloat("scaleX", (float)from.Scale, (float)to.Scale)!,
+            PropertyValuesHolder.OfFloat("scaleY", (float)from.Scale, (float)to.Scale)!,
+            PropertyValuesHolder.OfFloat("alpha", (float)from.Opacity, (float)to.Opacity)!
+        )!;
+
+        animator.SetDuration((long)(spec.DurationSeconds * 1000));
+        animator.AnimationEnd += (_, _) =>
+        {
+            view.TranslationZ = 0f;
+            completion.TrySetResult();
+        };
+
+        return animator;
     }
 
     private void CompleteFor(bool enter)
