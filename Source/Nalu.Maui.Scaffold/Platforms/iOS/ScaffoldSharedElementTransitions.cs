@@ -225,20 +225,32 @@ internal static class ScaffoldSharedElementTransitions
             }
             else
             {
+                // SNAPSHOT flight (interactive-only): transforms set directly on MAUI-managed
+                // views never render during the scrub — every per-frame page-transform change
+                // invalidates the container layout and MAUI's arrange pass re-sets the pair
+                // views' frames, visually cancelling the transform (measured on iOS 26).
+                // Overlay-hosted snapshots are ours and immune; the live views hide via alpha
+                // (which DOES survive layout).
                 var fromView = pair.From;
                 var toView = pair.To;
+                var fromSnapshot = fromView.SnapshotView(false) ?? new UIView();
+                var toSnapshot = toView.SnapshotView(true) ?? new UIView();
+                fromSnapshot.Frame = fromFrame;
+                toSnapshot.Frame = fromFrame;
+                toSnapshot.Alpha = 0;
+                overlay.AddSubview(toSnapshot);
+                overlay.AddSubview(fromSnapshot);
+
+                fromView.Alpha = 0;
                 toView.Alpha = 0;
-                toView.Transform = MatchTransform(toFrame, fromFrame);
 
                 cleanup.Add(() =>
                 {
                     fromView.Alpha = 1;
-                    fromView.Transform = CGAffineTransform.MakeIdentity();
                     toView.Alpha = 1;
-                    toView.Transform = CGAffineTransform.MakeIdentity();
                 });
 
-                elements.Add(new TransformMatchElement(fromView, toView, fromFrame, toFrame, width));
+                elements.Add(new SnapshotMatchElement(fromSnapshot, toSnapshot, fromFrame, toFrame));
             }
         }
 
@@ -285,21 +297,16 @@ internal static class ScaffoldSharedElementTransitions
         }
     }
 
-    private sealed class TransformMatchElement(UIView fromView, UIView toView, CGRect fromFrame, CGRect toFrame, double width) : IScrubElement
+    private sealed class SnapshotMatchElement(UIView fromSnapshot, UIView toSnapshot, CGRect fromFrame, CGRect toFrame) : IScrubElement
     {
         public void Apply(double progress)
         {
-            // The live destination flies in from the source geometry while the source flies out,
-            // cross-fading — the same choreography BuildTransformMatch encodes as end states.
-            // The FROM view lives on the popped page, which the page-slide element translates by
-            // width * progress: compensate so the pair follows its own path, not the page slide.
-            toView.Alpha = (nfloat)progress;
-            toView.Transform = LerpTransform(MatchTransform(toFrame, fromFrame), CGAffineTransform.MakeIdentity(), progress);
-
-            var exit = LerpTransform(CGAffineTransform.MakeIdentity(), MatchTransform(fromFrame, toFrame), progress);
-            exit.Tx -= (nfloat)(width * progress);
-            fromView.Alpha = (nfloat)(1 - progress);
-            fromView.Transform = exit;
+            // Cross-dissolve morph between the two snapshots along the shared geometry path.
+            var rect = Lerp(fromFrame, toFrame, progress);
+            fromSnapshot.Frame = rect;
+            fromSnapshot.Alpha = (nfloat)(1 - progress);
+            toSnapshot.Frame = rect;
+            toSnapshot.Alpha = (nfloat)progress;
         }
     }
 

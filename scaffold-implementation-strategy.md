@@ -602,6 +602,12 @@ Key facts anchoring the decision:
 >   (5) Transform-match pairs live INSIDE the sliding page: the view on the MOVING page must
 >   compensate the page translation or the pair rides the slide (the "Bot hero flies in from
 >   the right" bug).
+>   (6) During the INTERACTIVE scrub, transforms set directly on MAUI-managed views never
+>   render: each per-frame page-transform change invalidates the container layout and MAUI's
+>   arrange pass re-sets the pair views' frames, visually cancelling the transform (alpha and
+>   background survive; proven with a rotation probe). The interactive session therefore flies
+>   label/generic pairs as OVERLAY SNAPSHOTS (cross-dissolve along the lerped geometry, live
+>   views hidden via alpha) — the same overlay strategy that makes the image flight immune.
 > - Android predictive back IMPLEMENTED (July 2026): `OnBackPressedCallback`
 >   HandleOnBackStarted/Progressed/Cancelled/Pressed. Started peek-mounts the page below
 >   (presentation-only) beneath the fragment container and sniffs `ILeavingGuard` (guarded
