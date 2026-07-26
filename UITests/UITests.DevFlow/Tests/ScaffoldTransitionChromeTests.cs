@@ -50,6 +50,35 @@ public class ScaffoldTransitionChromeTests(NaluApp app) : BaseUiTest(app), IAsyn
     }
 
     [Fact]
+    public async Task PredictiveBackRestoresSharedElementRendering()
+    {
+        // Android-only: the predictive-back pop skips the shared-element transition, so the
+        // push's setTransitionAlpha(0) on the outgoing hero would never be undone without the
+        // presenter's remount repair. A blank ImageView still reports visible bounds — only
+        // pixels prove it renders (the regression this covers).
+        Assert.SkipUnless(await App.IsAndroidGestureNavigationAsync(), "Predictive back needs Android gesture navigation.");
+
+        await WaitDisplayedAsync("TransitionGridPage");
+        var gridImage = await App.WaitForStableBoundsAsync("GridHeroImage");
+
+        // Reference pixel at the hero's center while it is known-good.
+        var reference = await App.GetPixelColorAsync("GridHeroImage", gridImage.Width / 2, gridImage.Height / 2);
+
+        await App.TapAsync("PushTransitionDetail");
+        await WaitDisplayedAsync("TransitionDetailPage");
+
+        await App.PredictiveBackScrubAsync();
+        await WaitDisplayedAsync("TransitionGridPage");
+
+        await App.WaitForPixelColorAsync(
+            "GridHeroImage",
+            gridImage.Width / 2,
+            gridImage.Height / 2,
+            c => Math.Abs(c.R - reference.R) <= 3 && Math.Abs(c.G - reference.G) <= 3 && Math.Abs(c.B - reference.B) <= 3
+        );
+    }
+
+    [Fact]
     public async Task RepeatedRoundTripsStayStable()
     {
         await WaitDisplayedAsync("TransitionGridPage");

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Maui.DevFlow.Driver;
 using SkiaSharp;
@@ -654,6 +655,68 @@ public sealed class NaluApp : IAsyncLifetime
         }
 
         await _client.BackAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether the Android device navigates by gestures (navigation_mode 2) — the predictive
+    /// back gesture only exists there. False on other platforms.
+    /// </summary>
+    public async Task<bool> IsAndroidGestureNavigationAsync()
+    {
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        if (!platform.Contains("android", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var mode = await RunAdbAsync("shell", "settings", "get", "secure", "navigation_mode").ConfigureAwait(false);
+
+        return mode.Trim() == "2";
+    }
+
+    /// <summary>
+    /// Performs a SLOW committed predictive-back edge scrub (Android, gesture navigation) via
+    /// discrete adb motion events. A plain 'input swipe' commits as a canned fling (and can even
+    /// dispatch a second back); the stepped scrub is what exercises the peek-mount path.
+    /// </summary>
+    public async Task PredictiveBackScrubAsync()
+    {
+        var size = await RunAdbAsync("shell", "wm", "size").ConfigureAwait(false);
+        var dimensions = size[(size.IndexOf(':') + 1)..].Trim().Split('x');
+        var width = int.Parse(dimensions[0], CultureInfo.InvariantCulture);
+        var height = int.Parse(dimensions[1], CultureInfo.InvariantCulture);
+
+        var y = height / 2;
+        var stops = new[] { 0.04, 0.1, 0.18, 0.28, 0.38, 0.48, 0.58 };
+
+        var script = $"input motionevent DOWN 5 {y}; "
+                     + string.Join("; ", stops.Select(s => $"input motionevent MOVE {(int) (width * s)} {y}"))
+                     + $"; input motionevent UP {(int) (width * 0.58)} {y}";
+
+        await RunAdbAsync("shell", script).ConfigureAwait(false);
+    }
+
+    private static async Task<string> RunAdbAsync(params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("adb")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo)
+                            ?? throw new InvalidOperationException("Could not start 'adb'.");
+
+        var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+        await process.WaitForExitAsync().ConfigureAwait(false);
+
+        return output;
     }
 
     /// <summary>

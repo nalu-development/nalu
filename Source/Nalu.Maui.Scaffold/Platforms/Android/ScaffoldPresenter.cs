@@ -200,12 +200,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                     fragment.EnterTransition = slide;
                 }
 
+                var sharedSourceViews = new List<View>(sharedNames.Count);
+
                 foreach (var name in sharedNames)
                 {
-                    var sharedPlatformView = outgoingTagged[name].ToPlatform(mauiContext);
+                    var sharedView = outgoingTagged[name];
+                    var sharedPlatformView = sharedView.ToPlatform(mauiContext);
                     ViewCompat.SetTransitionName(sharedPlatformView, name);
                     transaction.AddSharedElement(sharedPlatformView, name);
+                    sharedSourceViews.Add(sharedView);
                 }
+
+                // The SET hides these sources via setTransitionAlpha(0) and only the return SET
+                // restores them — record them so paths that skip it (predictive back) can repair.
+                ScaffoldPageRestore.CaptureSharedElementSources(previousPage!, sharedSourceViews);
             }
 
             // The CURRENT navigation decides how the outgoing page leaves (a pop replays the
@@ -264,6 +272,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         belowView.TranslationX = 0f;
         belowView.TranslationZ = 0f;
         pageLayer.AddView(belowView, 0, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+
+        // If the peeked page's shared elements took off in the push SET, they are still hidden
+        // via transitionAlpha — repair before the page becomes visible under the scrubbed one.
+        ScaffoldPageRestore.Repair(belowPage);
 
         _ = container;
         _backPeekView = belowView;

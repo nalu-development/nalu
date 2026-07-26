@@ -82,6 +82,10 @@ internal sealed class ScaffoldPageFragment(
         platformView.ScaleY = 1f;
         platformView.Alpha = 1f;
 
+        // A page whose shared elements took off in a previous SET may still carry their hidden
+        // render state (see ScaffoldPageRestore) — no-op unless a capture is pending.
+        ScaffoldPageRestore.Repair(page);
+
         platformView.LayoutParameters = new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent,
             ViewGroup.LayoutParams.MatchParent);

@@ -618,6 +618,22 @@ Key facts anchoring the decision:
 >   SET) and the new fragment re-parents the very platform view the peek was showing.
 >   Root pages keep the callback disabled → native back-to-home preview. Requires
 >   `android:enableOnBackInvokedCallback="true"` (TestApp manifest) + gesture navigation.
+> - Android predictive-back + shared elements gotcha (FIXED July 2026): the push's SET machinery
+>   hides the OUTGOING source view via `setTransitionAlpha(0)` — invisible to `getAlpha()`,
+>   drawable/visibility/matrix/clip all read healthy — and relies on the paired return SET to
+>   restore it. The predictive-back pop skips the SET (handoff adopts settled visuals), so the
+>   hero stayed permanently undrawn ("hero image missing after slow predictive back"; the slow
+>   scrub is just when it's noticeable — any committed predictive back reproduced it). Ruled
+>   out by instrumentation: Glide drawable clears (drawable present at every checkpoint) and
+>   visibility/alpha/matrix/clip residue. Fix: the presenter records the outgoing source views
+>   at AddSharedElement time (`ScaffoldPageRestore.CaptureSharedElementSources`, a
+>   ConditionalWeakTable keyed by page — no tree walk); `Repair` then resets `TransitionAlpha=1`
+>   + re-runs visibility/opacity/translation/scale/rotation mappers on exactly those views,
+>   one-shot, from fragment remount (OnCreateView) and predictive-back peek (StartBackPreview).
+>   Regression test:
+>   `ScaffoldTransitionChromeTests.PredictiveBackRestoresSharedElementRendering` — pixel-samples
+>   the hero after a stepped adb motion-event scrub (`NaluApp.PredictiveBackScrubAsync`; a plain
+>   `input swipe` commits as a canned fling and can even dispatch a second back).
 > - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option,
 >   predictive-back SET seeking (Android follow-up).
 
