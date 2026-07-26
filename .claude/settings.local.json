@@ -101,7 +101,21 @@
       "Bash(curl -s -m 3 \"http://localhost:9223/api/v1/agent/capabilities\")",
       "Bash(curl -s -m 3 \"http://localhost:9223/api/v1/ui/elements?automationId=PushTransitionDetail\")",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\('capabilities',{}\\).keys\\(\\)\\)\\)\")",
-      "Bash(ffmpeg -y -loglevel error -i /private/tmp/claude-501/-Users-alberto-github-nalu/a47b8f04-396c-48f0-a55d-5a6a9914ec96/scratchpad/flight.mp4 -vf fps=12,crop=720:800:0:100,scale=180:200 /private/tmp/claude-501/-Users-alberto-github-nalu/a47b8f04-396c-48f0-a55d-5a6a9914ec96/scratchpad/aframe_%02d.png)"
+      "Bash(ffmpeg -y -loglevel error -i /private/tmp/claude-501/-Users-alberto-github-nalu/a47b8f04-396c-48f0-a55d-5a6a9914ec96/scratchpad/flight.mp4 -vf fps=12,crop=720:800:0:100,scale=180:200 /private/tmp/claude-501/-Users-alberto-github-nalu/a47b8f04-396c-48f0-a55d-5a6a9914ec96/scratchpad/aframe_%02d.png)",
+      "Bash(curl -s -m 5 -X POST \"http://localhost:9223/api/v1/ui/actions/fill\" -H \"Content-Type: application/json\" -d '{\"elementId\":\"TestName\",\"text\":\"Scaffold Transition Tests\"}')",
+      "Bash(curl -s -m 5 -X POST \"http://localhost:9223/api/v1/ui/actions/tap\" -H \"Content-Type: application/json\" -d '{\"elementId\":\"RunTestButton\"}')",
+      "Bash(curl -s -m 5 -X POST \"http://localhost:9223/api/v1/ui/actions/tap\" -H \"Content-Type: application/json\" -d '{\"elementId\":\"PushTransitionDetail\"}')",
+      "Bash(curl -s -m 5 -X POST \"http://localhost:9223/api/v1/ui/actions/tap\" -H \"Content-Type: application/json\" -d '{\"elementId\":\"PopTransitionDetail\"}')",
+      "Bash(git -C /Users/alberto/github/nalu diff --stat)",
+      "Bash(curl -s -m 5 \"http://localhost:9223/api/v1/app\")",
+      "Bash(curl -s -m 5 \"http://localhost:9223/api/v1/ui/elements?automationId=TransitionDetailPage\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('detail displayed:', d and d[0]['windowBounds']\\)\")",
+      "Bash(curl -s -m 5 \"http://localhost:9223/api/v1/ui/elements?automationId=TransitionGridPage\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('grid displayed:', d and d[0]['windowBounds']\\)\")",
+      "Bash(curl -s -m 5 \"http://localhost:9223/api/v1/ui/elements?automationId=GridHeroImage\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('hero:', d and \\(d[0]['windowBounds'], d[0].get\\('isVisible'\\)\\)\\)\")",
+      "Bash(curl -s -m 5 \"http://localhost:9223/api/v1/ui/elements?automationId=DetailHeroImage\")",
+      "Bash(curl -s -m 5 \"http://localhost:9223/api/v1/ui/elements?automationId=TabPageAlpha\")"
     ]
   }
 }

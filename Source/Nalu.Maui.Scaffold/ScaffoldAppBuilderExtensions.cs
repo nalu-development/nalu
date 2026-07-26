@@ -10,5 +10,14 @@ public static class ScaffoldAppBuilderExtensions
     /// <param name="builder">The MAUI application builder.</param>
     /// <returns>The same builder, for chaining.</returns>
     public static MauiAppBuilder UseNaluScaffold(this MauiAppBuilder builder)
-        => builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Scaffold, ScaffoldHandler>());
+    {
+#if IOS
+        // Upstream MAUI iOS bug: programmatic scrolls clamp without AdjustedContentInset and
+        // under-shoot on inset-consuming scroll views (every scaffold-hosted page). See
+        // ScaffoldScrollToFix; remove once fixed in MAUI.
+        ScaffoldScrollToFix.Apply();
+#endif
+
+        return builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Scaffold, ScaffoldHandler>());
+    }
 }

@@ -101,13 +101,12 @@ public abstract class TabPageBase : ContentPage
 
         stack.Add(new Label { Text = $"{name} bottom probe", AutomationId = $"BottomProbe{name}", FontSize = 14, FontAttributes = FontAttributes.Bold });
 
-        // .NET 10 edge-to-edge model: the scrollable opts into the safe area (§5.4) — content
-        // scrolls behind the floating tab bar and gains the augmented end padding natively.
+        // .NET 10 edge-to-edge model: default SafeAreaEdges — iOS applies the (chrome-augmented)
+        // safe area natively via UIScrollViewContentInsetAdjustmentBehavior.Automatic.
         Content = new ScrollView
         {
             AutomationId = $"{name}Scroll",
-            Content = stack,
-            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container)
+            Content = stack
         };
     }
 }

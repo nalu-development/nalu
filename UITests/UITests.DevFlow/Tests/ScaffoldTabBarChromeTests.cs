@@ -221,7 +221,9 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         var barBounds = await App.WaitForStableBoundsAsync("TabAlpha");
 
         // Scroll to the very end: the §5.4 inset contribution must leave the bottom probe
-        // fully visible ABOVE the floating bar, not underneath it.
+        // fully visible ABOVE the floating bar, not underneath it. (The library's
+        // ScaffoldScrollToFix makes the programmatic scroll inset-aware on iOS — without it
+        // MAUI's ScrollToAsync clamp under-scrolls by the safe-area amount.)
         await App.ScrollAsync("AlphaScroll", deltaY: 5000);
 
         var finalProbe = await App.WaitForStableBoundsAsync("BottomProbeAlpha");

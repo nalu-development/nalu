@@ -120,10 +120,54 @@ internal static class ScaffoldSharedElementTransitions
     }
 
     /// <summary>
+    /// Begins a SCRUBBABLE pop session for the interactive edge swipe: the same single-animator
+    /// choreography as a programmatic pop (page slide + shared-element flights when pairs match
+    /// and the revealed views are already laid out), created PAUSED at fraction 0.
+    /// The caller drives it with <see cref="ScaffoldPopAnimationSession.SetProgress"/> and settles
+    /// it with Finish/Cancel. Never returns null: with no usable pairs the session is just the
+    /// page slide — the caller gets one uniform scrub surface.
+    /// </summary>
+    public static ScaffoldPopAnimationSession BeginInteractivePopSession(
+        UIView container,
+        IMauiContext mauiContext,
+        Page poppedPage,
+        Page revealedPage,
+        UIView poppedView,
+        UIView revealedView,
+        double durationSeconds)
+    {
+        var pairs = MatchPairs(mauiContext, poppedPage, revealedPage);
+
+        // Synchronous readiness gate only: the revealed page was just peek-mounted, one layout
+        // pass makes its geometry real. Anything still unlaid drops the flights (page motion
+        // still scrubs) — a gesture cannot await a polling gate.
+        revealedView.LayoutIfNeeded();
+
+        if (pairs.Any(p => !IsLaidOut(p.To)))
+        {
+            pairs = [];
+        }
+
+        var (animator, completion) = BuildSession(container, pairs, movingView: poppedView, movingFromOffscreen: false, durationSeconds);
+        animator.PauseAnimation();
+
+        return new ScaffoldPopAnimationSession(animator, completion);
+    }
+
+    /// <summary>
     /// One transition session: an overlay carrying the flights + the page slide, all inside a
     /// single UIViewPropertyAnimator (seekable by construction — the interactive-pop hook).
     /// </summary>
     private static async Task RunSessionAsync(UIView container, List<TagPair> pairs, UIView movingView, bool movingFromOffscreen, UIView counterpartView, double durationSeconds)
+    {
+        _ = counterpartView; // stays put — matches the plain slide choreography
+
+        var (animator, completion) = BuildSession(container, pairs, movingView, movingFromOffscreen, durationSeconds);
+        animator.StartAnimation();
+        await completion;
+    }
+
+    private static (UIViewPropertyAnimator Animator, Task Completion) BuildSession(UIView container, List<TagPair> pairs, UIView movingView, bool movingFromOffscreen, double durationSeconds)
     {
         var overlay = new UIView(container.Bounds) { UserInteractionEnabled = false };
         var width = container.Bounds.Width;
@@ -165,8 +209,6 @@ internal static class ScaffoldSharedElementTransitions
             animations.Add(() => movingView.Transform = CGAffineTransform.MakeTranslation(width, 0));
         }
 
-        _ = counterpartView; // stays put — matches the plain slide choreography
-
         container.AddSubview(overlay);
 
         foreach (var action in prep)
@@ -184,6 +226,8 @@ internal static class ScaffoldSharedElementTransitions
             }
         });
 
+        // Cleanup runs at EITHER end position: the prep/animations pairs are symmetric, so a
+        // reversed (cancelled) session restores the exact pre-session state.
         animator.AddCompletion(_ =>
         {
             foreach (var action in cleanup)
@@ -194,8 +238,7 @@ internal static class ScaffoldSharedElementTransitions
             completion.TrySetResult();
         });
 
-        animator.StartAnimation();
-        await completion.Task;
+        return (animator, completion.Task);
     }
 
     /// <summary>
@@ -324,3 +367,52 @@ internal static class ScaffoldSharedElementTransitions
         return new CGRect((container.Width - width) / 2, (container.Height - height) / 2, width, height);
     }
 }
+
+/// <summary>
+/// A paused, scrubbable pop animation (page slide + shared-element flights): the finger drives
+/// <see cref="SetProgress"/>; release settles with <see cref="FinishAsync"/> (visuals end in the
+/// popped state) or <see cref="CancelAsync"/> (the animator REVERSES and the completion cleanup
+/// restores the exact pre-session state).
+/// </summary>
+// VSTHRD003: the completion task is a main-thread TaskCompletionSource resolved by the
+// animator's completion callback — awaiting it from the main thread cannot deadlock.
+#pragma warning disable VSTHRD003
+internal sealed class ScaffoldPopAnimationSession(UIViewPropertyAnimator animator, Task completion)
+{
+    private bool _settled;
+
+    /// <summary>Scrubs the session; safe to call only before Finish/Cancel.</summary>
+    public void SetProgress(double progress)
+    {
+        if (!_settled)
+        {
+            animator.FractionComplete = (nfloat)Math.Clamp(progress, 0d, 1d);
+        }
+    }
+
+    /// <summary>Runs the animation forward to the popped end state.</summary>
+    public Task FinishAsync()
+    {
+        if (!_settled)
+        {
+            _settled = true;
+            animator.ContinueAnimation(null, 1);
+        }
+
+        return completion;
+    }
+
+    /// <summary>Reverses the animation back to the resting state.</summary>
+    public Task CancelAsync()
+    {
+        if (!_settled)
+        {
+            _settled = true;
+            animator.Reversed = true;
+            animator.ContinueAnimation(null, 1);
+        }
+
+        return completion;
+    }
+}
+#pragma warning restore VSTHRD003

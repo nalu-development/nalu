@@ -50,8 +50,7 @@ file static class NavBarPageFactory
 
         return new ScrollView
         {
-            Content = stack,
-            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container)
+            Content = stack
         };
     }
 }

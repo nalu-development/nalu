@@ -29,6 +29,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private View? _currentBarView;
     private View? _currentNavBarView;
 
+    private UIScreenEdgePanGestureRecognizer? _edgeGesture;
+    private InteractivePopState? _interactivePop;
+    private InteractivePopState? _popHandoff;
+    private bool _syncInFlight;
+
+    /// <summary>A live edge-swipe pop: the scrub session plus everything needed to settle it.</summary>
+    private sealed record InteractivePopState(
+        Page TopPage,
+        Page BelowPage,
+        UIView BelowView,
+        UIView TopView,
+        double Width,
+        ScaffoldPopAnimationSession Session);
+
     private UIView? _overlayScrim;
     private UIView? _overlayPanel;
     private View? _overlayContent;
@@ -51,6 +65,29 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             return;
         }
 
+        // A navigation arriving while a finger is still scrubbing (programmatic push, tab
+        // selection) invalidates the preview: cancel the recognizer — its Cancelled callback
+        // reverses the session and unmounts the peek before we proceed.
+        if (_interactivePop is not null && _popHandoff is null && _edgeGesture is { } gesture)
+        {
+            gesture.Enabled = false;
+            gesture.Enabled = true;
+        }
+
+        _syncInFlight = true;
+
+        try
+        {
+            await SynchronizeCoreAsync(root, hint, controller, mauiContext);
+        }
+        finally
+        {
+            _syncInFlight = false;
+        }
+    }
+
+    private async Task SynchronizeCoreAsync(ScaffoldRoot root, ScaffoldPresentationHint hint, ScaffoldViewController controller, IMauiContext mauiContext)
+    {
         // Navigation dismisses any open overlay (flyout, overflow panel).
         await CloseOverlayAsync();
 
@@ -84,10 +121,183 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         await Task.WhenAll(navChromeTask, chromeTask, pageTask);
     }
 
+    /// <summary>
+    /// Interactive pop (left-edge swipe): scrubs the SAME single-animator pop choreography a
+    /// programmatic pop plays (page slide + shared-element flights), with the page below
+    /// peek-mounted presentation-only. Release either reverses everything, or settles the
+    /// visuals forward and THEN dispatches the pop through the engine (guards and lifecycle run
+    /// normally) — the resulting sync adopts the settled state without re-animating.
+    /// Guarded pages (ILeavingGuard) get no preview: the gesture never begins on them.
+    /// </summary>
+    private void AttachEdgeGestureTo(UIView pageView)
+    {
+        var recognizer = _edgeGesture ??= new UIScreenEdgePanGestureRecognizer(OnEdgePan)
+        {
+            Edges = UIRectEdge.Left,
+            ShouldBegin = _ => CanBeginInteractivePop()
+        };
+
+        // The recognizer lives on the PRESENTED page's view — set up when the page is shown,
+        // torn down when it leaves (a single recognizer moves between page views).
+        recognizer.View?.RemoveGestureRecognizer(recognizer);
+        pageView.AddGestureRecognizer(recognizer);
+    }
+
+    private bool CanBeginInteractivePop()
+        => !_syncInFlight
+            && !HasOverlay
+            && _interactivePop is null
+            && _popHandoff is null
+            && scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
+            && rootProxy.Root.NavigationStack.PushedPages.Count > 0
+            && rootProxy.Root.NavigationStack.PushedPages[^1].Page is { BindingContext: not ILeavingGuard } topPage
+            && ReferenceEquals(topPage, _currentPage)
+            && _currentController?.View is not null;
+
+    private void OnEdgePan(UIScreenEdgePanGestureRecognizer recognizer)
+    {
+        switch (recognizer.State)
+        {
+            case UIGestureRecognizerState.Began:
+                BeginInteractivePop();
+
+                break;
+
+            case UIGestureRecognizerState.Changed when _interactivePop is { } state:
+                state.Session.SetProgress((double)recognizer.TranslationInView(recognizer.View).X / state.Width);
+
+                break;
+
+            case UIGestureRecognizerState.Ended:
+                SettleInteractivePop(recognizer, allowCommit: true);
+
+                break;
+
+            case UIGestureRecognizerState.Cancelled:
+            case UIGestureRecognizerState.Failed:
+                SettleInteractivePop(recognizer, allowCommit: false);
+
+                break;
+        }
+    }
+
+    private void BeginInteractivePop()
+    {
+        if (scaffold.Handler is not IPlatformViewHandler { ViewController: ScaffoldViewController controller, MauiContext: { } mauiContext }
+            || scaffold.Proxy?.CurrentItem.CurrentSection is not ScaffoldRootProxy rootProxy
+            || _currentPage is not { } topPage
+            || _currentController?.View is not { } topView)
+        {
+            return;
+        }
+
+        var stack = rootProxy.Root.NavigationStack;
+
+        if (stack.PushedPages.Count == 0)
+        {
+            return;
+        }
+
+        var belowPage = stack.PushedPages.Count > 1 ? stack.PushedPages[^2].Page : stack.RootPage;
+
+        if (belowPage is null)
+        {
+            return;
+        }
+
+        var container = controller.ContentContainer;
+        var belowView = belowPage.ToUIViewController(mauiContext).View!;
+
+        // Peek mount: presentation-only — no controller containment, no page lifecycle. The
+        // engine still owns the stack; only the pixels preview the pop.
+        belowView.Transform = CGAffineTransform.MakeIdentity();
+        belowView.Frame = container.Bounds;
+        belowView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
+        container.InsertSubviewBelow(belowView, topView);
+
+        var session = ScaffoldSharedElementTransitions.BeginInteractivePopSession(
+            container,
+            mauiContext,
+            topPage,
+            belowPage,
+            topView,
+            belowView,
+            _transitionDurationSeconds
+        );
+
+        _interactivePop = new InteractivePopState(topPage, belowPage, belowView, topView, container.Bounds.Width, session);
+    }
+
+    private void SettleInteractivePop(UIScreenEdgePanGestureRecognizer recognizer, bool allowCommit)
+    {
+        if (_interactivePop is not { } state)
+        {
+            return;
+        }
+
+        _interactivePop = null;
+
+        var progress = Math.Clamp((double)recognizer.TranslationInView(recognizer.View).X / state.Width, 0d, 1d);
+        var velocity = (double)recognizer.VelocityInView(recognizer.View).X;
+
+        // Guard re-check at release: a guard that appeared mid-gesture cancels the commit.
+        var commit = allowCommit
+            && (progress > 0.35 || velocity > 500)
+            && state.TopPage.BindingContext is not ILeavingGuard;
+
+        SettleAsync().FireAndForget(scaffold.Handler);
+
+        async Task SettleAsync()
+        {
+            if (!commit)
+            {
+                await state.Session.CancelAsync();
+                UnmountPeek();
+
+                return;
+            }
+
+            // Visuals settle forward FIRST (the finger's motion completes uninterrupted), then
+            // the pop goes through the engine; the sync it triggers finalizes containment
+            // through the handoff below without re-animating.
+            await state.Session.FinishAsync();
+            _popHandoff = state;
+
+            var popped = scaffold.NavigationService is { } navigationService
+                && await navigationService.GoToAsync(Nalu.Navigation.Relative().Pop());
+
+            if (!popped && ReferenceEquals(_popHandoff, state))
+            {
+                // Engine refused (busy, or a guard surfaced inside the engine): restore the
+                // pre-gesture presentation — slide the top page back over the peek, then unmount.
+                _popHandoff = null;
+                await UIView.AnimateAsync(_transitionDurationSeconds, () => state.TopView.Transform = CGAffineTransform.MakeIdentity());
+                UnmountPeek();
+            }
+        }
+
+        void UnmountPeek()
+        {
+            // A sync may have adopted this very view as the current page meanwhile (programmatic
+            // pop racing the gesture) — never unmount the presented page.
+            if (!ReferenceEquals(state.BelowView, _currentController?.View))
+            {
+                state.BelowView.RemoveFromSuperview();
+            }
+        }
+    }
+
     private async Task TransitionToPageAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, ScaffoldPresentationHint hint, bool barVisible, bool navBarVisible)
     {
         var parentController = controller.ContentHost;
         var container = controller.ContentContainer;
+
+        // An interactive pop already settled these exact visuals: adopt instead of animating.
+        var handoff = _popHandoff;
+        _popHandoff = null;
+        var interactivelySettled = handoff is not null
+            && hint == ScaffoldPresentationHint.Pop
+            && ReferenceEquals(targetPage, handoff.BelowPage);
 
         if (_currentPage is not null)
         {
@@ -118,10 +328,21 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         newView.Frame = container.Bounds;
         newView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
 
+        AttachEdgeGestureTo(newView);
+
         var width = container.Bounds.Width;
 
         switch (hint)
         {
+            case ScaffoldPresentationHint.Pop when interactivelySettled:
+            {
+                // Peek view already mounted at its final geometry; popped view already offscreen
+                // (the gesture session finished the exact pop choreography). Containment only.
+                newController.DidMoveToParentViewController(parentController);
+
+                break;
+            }
+
             case ScaffoldPresentationHint.Push:
             {
                 container.AddSubview(newView);

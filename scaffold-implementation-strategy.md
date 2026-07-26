@@ -876,12 +876,19 @@ will bite again if forgotten:
   brokers (kill the other app; `adb forward` vs iOS-simulator binds conflict on the HOST port —
   remove forwards when switching platforms). Identical-byte screenshots are the tell for a stale
   agent connection.
-- **.NET 10 safe-area opt-in (§5.4 corollary, verified on the tab bar)**: content is
-  edge-to-edge by default; a page's scrollable only gains the augmented bottom inset (system +
-  chrome footprint) when it opts in — `scrollView.SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container)`.
-  Without it the content end hides behind the bar. The augmentation channel itself
-  (iOS `AdditionalSafeAreaInsets` on the content-host controller, Android system-bars rewrite in
-  `ScaffoldPageLayerLayout`) is verified working on both platforms.
+- **.NET 10 safe-area rule (§5.4 corollary — REVISED July 2026 after native-state measurement)**:
+  page scrollables must use the DEFAULT `SafeAreaEdges` — iOS maps it to
+  `UIScrollViewContentInsetAdjustmentBehavior.Automatic`, which natively applies the augmented
+  safe area (system + chrome contribution) in plain child-VC containment: no
+  `UINavigationController` ancestor needed, `AdditionalSafeAreaInsets` propagates from any
+  `UIViewController`. Do NOT set `SafeAreaEdges(Container)` on scroll views: MAUI net10 maps it
+  to behavior `Always` AND pads the native contentSize by the same safe-area thickness
+  (`MauiScrollView.CrossPlatformArrange`: `height += _safeArea.VerticalThickness`) — the space
+  is reserved twice, leaving a phantom scroll range of exactly the inset sum (user-visible as a
+  half-empty page that scrolls). Related upstream defect: `ScrollViewHandler.iOS.MapRequestScrollTo`
+  clamps to `ContentSize - Frame` WITHOUT `AdjustedContentInset`, so programmatic scrolls (and
+  DevFlow synthetic swipes built on them) under-scroll by the safe-area amount — the bottom-probe
+  test scrolls via the harness's native inset-aware `ScrollToEnd{name}` button instead.
 - **MAUI `AutomationId` can only be set once** — reusing a templated view with a different id
   needs the id decided at construction time (a later set throws, surfacing as a DevFlow
   "tap failed" when it happens inside a tap handler).

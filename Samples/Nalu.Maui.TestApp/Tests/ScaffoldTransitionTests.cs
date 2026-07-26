@@ -67,8 +67,7 @@ public class TransitionGridPage : ContentPage
 
         Content = new ScrollView
         {
-            Content = stack,
-            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container)
+            Content = stack
         };
     }
 }
@@ -115,8 +114,7 @@ public class TransitionDetailPage : ContentPage
 
         Content = new ScrollView
         {
-            Content = stack,
-            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container)
+            Content = stack
         };
     }
 }
