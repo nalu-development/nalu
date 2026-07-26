@@ -184,6 +184,12 @@ internal sealed class ScaffoldViewController : UIViewController
 
         _navBarPresented = presented;
 
+        // Bar-INTERNAL layout changes (e.g. the back button appearing via the context binding)
+        // settle instantly: flushing them inside the animation block below would make UIKit
+        // interpolate the button from its never-arranged zero frame — a nonsense fly-in.
+        // Only the strip transform and the page inset relayout are meant to animate.
+        UIView.PerformWithoutAnimation(strip.LayoutIfNeeded);
+
         var targetTransform = presented
             ? CGAffineTransform.MakeIdentity()
             : CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
@@ -243,6 +249,9 @@ internal sealed class ScaffoldViewController : UIViewController
 
         _barPresented = presented;
         ChromeBottomFootprint = presented ? strip.Bounds.Height : 0;
+
+        // Same rationale as the nav bar strip: bar-internal layout settles without animation.
+        UIView.PerformWithoutAnimation(strip.LayoutIfNeeded);
 
         var targetTransform = presented
             ? CGAffineTransform.MakeIdentity()

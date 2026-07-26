@@ -112,6 +112,7 @@ public class TransitionDetailPage : ContentPage
         exitButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
         stack.Add(exitButton);
 
+
         Content = new ScrollView
         {
             Content = stack

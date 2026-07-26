@@ -18,7 +18,6 @@ namespace Nalu;
 public sealed class ScaffoldNavBarView : Grid
 {
     private readonly Grid _row;
-    private readonly HorizontalStackLayout _leadingButtons;
     private readonly ScaffoldFlyoutButton _flyoutStartButton;
     private readonly ScaffoldBackButton _backButton;
     private readonly ScaffoldNavBarTitle _title;
@@ -179,12 +178,12 @@ public sealed class ScaffoldNavBarView : Grid
         // around the 24dp glyphs provides equal optical gaps — edge→glyph and glyph→glyph.
         // Hidden buttons are skipped entirely by the stack, so the rhythm survives every
         // visibility combination.
-        _leadingButtons = new HorizontalStackLayout
-        {
-            Spacing = 0,
-            VerticalOptions = LayoutOptions.Center,
-            Children = { _flyoutStartButton, _backButton }
-        };
+        var leadingButtons = new HorizontalStackLayout
+                             {
+                                 Spacing = 0,
+                                 VerticalOptions = LayoutOptions.Center,
+                                 Children = { _flyoutStartButton, _backButton }
+                             };
 
         _row = new Grid
         {
@@ -196,7 +195,7 @@ public sealed class ScaffoldNavBarView : Grid
             }
         };
 
-        _row.Add(_leadingButtons, 0);
+        _row.Add(leadingButtons, 0);
         _row.Add(_title, 1);
         _row.Add(_flyoutEndButton, 2);
 

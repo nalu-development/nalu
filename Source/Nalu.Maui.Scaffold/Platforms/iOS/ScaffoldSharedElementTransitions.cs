@@ -120,12 +120,16 @@ internal static class ScaffoldSharedElementTransitions
     }
 
     /// <summary>
-    /// Begins a SCRUBBABLE pop session for the interactive edge swipe: the same single-animator
-    /// choreography as a programmatic pop (page slide + shared-element flights when pairs match
-    /// and the revealed views are already laid out), created PAUSED at fraction 0.
-    /// The caller drives it with <see cref="ScaffoldPopAnimationSession.SetProgress"/> and settles
-    /// it with Finish/Cancel. Never returns null: with no usable pairs the session is just the
-    /// page slide — the caller gets one uniform scrub surface.
+    /// Begins a SCRUBBABLE pop session for the interactive edge swipe: the same choreography a
+    /// programmatic pop plays (page slide + shared-element flights when pairs match and the
+    /// revealed views are already laid out), interpolated MANUALLY per fraction.
+    /// A paused <see cref="UIViewPropertyAnimator"/> is deliberately NOT used: measured on
+    /// iOS 26 (simulator and device), a paused animator accepts <c>FractionComplete</c> (state
+    /// Active, read-back correct) but never renders the interpolation — started animators work,
+    /// paused-scrub mode does not. Manual value application has no such dependency.
+    /// The caller drives it with <see cref="ScaffoldPopAnimationSession.SetProgress"/> and
+    /// settles it with Finish/Cancel (plain UIView animations to the end/start values).
+    /// Never returns null: with no usable pairs the session is just the page slide.
     /// </summary>
     public static ScaffoldPopAnimationSession BeginInteractivePopSession(
         UIView container,
@@ -148,11 +152,144 @@ internal static class ScaffoldSharedElementTransitions
             pairs = [];
         }
 
-        var (animator, completion) = BuildSession(container, pairs, movingView: poppedView, movingFromOffscreen: false, durationSeconds);
-        animator.PauseAnimation();
+        var overlay = new UIView(container.Bounds) { UserInteractionEnabled = false };
+        var width = (double)container.Bounds.Width;
+        var elements = new List<IScrubElement> { new PageSlideElement(poppedView, width) };
+        var cleanup = new List<Action> { () => overlay.RemoveFromSuperview() };
 
-        return new ScaffoldPopAnimationSession(animator, completion);
+        foreach (var pair in pairs)
+        {
+            var fromFrame = pair.From.ConvertRectToView(pair.From.Bounds, container);
+            var toFrame = pair.To.ConvertRectToView(pair.To.Bounds, container);
+
+            if (pair.From is UIImageView { Image: not null } fromImage && pair.To is UIImageView)
+            {
+                var image = fromImage.Image!;
+                var fromFill = fromImage.ContentMode is UIViewContentMode.ScaleAspectFill;
+                var toFill = pair.To is UIImageView { ContentMode: UIViewContentMode.ScaleAspectFill };
+
+                var flight = new UIView(fromFrame) { ClipsToBounds = true, BackgroundColor = UIColor.Clear };
+                flight.Layer.CornerRadius = EffectiveCornerRadius(fromImage);
+
+                var flyingImage = new UIImageView(image)
+                {
+                    ContentMode = UIViewContentMode.ScaleToFill,
+                    Frame = AspectRect(fromFrame.Size, image.Size, fill: fromFill)
+                };
+                flight.AddSubview(flyingImage);
+                overlay.AddSubview(flight);
+
+                var fromView = fromImage;
+                var toView = pair.To;
+                fromView.Alpha = 0;
+                toView.Alpha = 0;
+                cleanup.Add(() =>
+                {
+                    fromView.Alpha = 1;
+                    toView.Alpha = 1;
+                });
+
+                elements.Add(new ImageMorphElement(
+                    flight,
+                    flyingImage,
+                    fromFrame,
+                    toFrame,
+                    EffectiveCornerRadius(fromImage),
+                    EffectiveCornerRadius(pair.To),
+                    AspectRect(fromFrame.Size, image.Size, fill: fromFill),
+                    AspectRect(toFrame.Size, image.Size, fill: toFill)
+                ));
+            }
+            else
+            {
+                var fromView = pair.From;
+                var toView = pair.To;
+                toView.Alpha = 0;
+                toView.Transform = MatchTransform(toFrame, fromFrame);
+
+                cleanup.Add(() =>
+                {
+                    fromView.Alpha = 1;
+                    fromView.Transform = CGAffineTransform.MakeIdentity();
+                    toView.Alpha = 1;
+                    toView.Transform = CGAffineTransform.MakeIdentity();
+                });
+
+                elements.Add(new TransformMatchElement(fromView, toView, fromFrame, toFrame, width));
+            }
+        }
+
+        container.AddSubview(overlay);
+
+        return new ScaffoldPopAnimationSession(elements, cleanup, durationSeconds);
     }
+
+    /// <summary>The per-fraction scrub surface of one animated element of the pop choreography.</summary>
+    internal interface IScrubElement
+    {
+        /// <summary>Applies the visual state for <paramref name="progress"/> in [0, 1].</summary>
+        void Apply(double progress);
+    }
+
+    private sealed class PageSlideElement(UIView movingView, double width) : IScrubElement
+    {
+        public void Apply(double progress) => movingView.Transform = CGAffineTransform.MakeTranslation((nfloat)(width * progress), 0);
+    }
+
+    private sealed class ImageMorphElement(
+        UIView flight,
+        UIImageView flyingImage,
+        CGRect fromFrame,
+        CGRect toFrame,
+        nfloat fromRadius,
+        nfloat toRadius,
+        CGRect fromAspect,
+        CGRect toAspect) : IScrubElement
+    {
+        public void Apply(double progress)
+        {
+            flight.Frame = Lerp(fromFrame, toFrame, progress);
+            flight.Layer.CornerRadius = (nfloat)Lerp((double)fromRadius, (double)toRadius, progress);
+            flyingImage.Frame = Lerp(fromAspect, toAspect, progress);
+        }
+    }
+
+    private sealed class TransformMatchElement(UIView fromView, UIView toView, CGRect fromFrame, CGRect toFrame, double width) : IScrubElement
+    {
+        public void Apply(double progress)
+        {
+            // The live destination flies in from the source geometry while the source flies out,
+            // cross-fading — the same choreography BuildTransformMatch encodes as end states.
+            // The FROM view lives on the popped page, which the page-slide element translates by
+            // width * progress: compensate so the pair follows its own path, not the page slide.
+            toView.Alpha = (nfloat)progress;
+            toView.Transform = LerpTransform(MatchTransform(toFrame, fromFrame), CGAffineTransform.MakeIdentity(), progress);
+
+            var exit = LerpTransform(CGAffineTransform.MakeIdentity(), MatchTransform(fromFrame, toFrame), progress);
+            exit.Tx -= (nfloat)(width * progress);
+            fromView.Alpha = (nfloat)(1 - progress);
+            fromView.Transform = exit;
+        }
+    }
+
+    private static double Lerp(double from, double to, double progress) => from + ((to - from) * progress);
+
+    private static CGRect Lerp(CGRect from, CGRect to, double progress)
+        => new(
+            (nfloat)Lerp((double)from.X, (double)to.X, progress),
+            (nfloat)Lerp((double)from.Y, (double)to.Y, progress),
+            (nfloat)Lerp((double)from.Width, (double)to.Width, progress),
+            (nfloat)Lerp((double)from.Height, (double)to.Height, progress));
+
+    /// <summary>Component-wise interpolation — exact for the scale+translate matrices used here.</summary>
+    private static CGAffineTransform LerpTransform(CGAffineTransform from, CGAffineTransform to, double progress)
+        => new(
+            (nfloat)Lerp((double)from.A, (double)to.A, progress),
+            (nfloat)Lerp((double)from.B, (double)to.B, progress),
+            (nfloat)Lerp((double)from.C, (double)to.C, progress),
+            (nfloat)Lerp((double)from.D, (double)to.D, progress),
+            (nfloat)Lerp((double)from.Tx, (double)to.Tx, progress),
+            (nfloat)Lerp((double)from.Ty, (double)to.Ty, progress));
 
     /// <summary>
     /// One transition session: an overlay carrying the flights + the page slide, all inside a
@@ -192,7 +329,7 @@ internal static class ScaffoldSharedElementTransitions
             }
             else
             {
-                BuildTransformMatch(pair.From, pair.To, fromFrame, toFrame, prep, animations, cleanup);
+                BuildTransformMatch(pair.From, pair.To, fromFrame, toFrame, movingFromOffscreen, width, prep, animations, cleanup);
             }
         }
 
@@ -317,21 +454,44 @@ internal static class ScaffoldSharedElementTransitions
         UIView toView,
         CGRect fromFrame,
         CGRect toFrame,
+        bool movingFromOffscreen,
+        double width,
         List<Action> prep,
         List<Action> animations,
         List<Action> cleanup)
     {
+        // The pair views animate via transforms ON THE LIVE VIEWS, but one of them lives INSIDE
+        // the sliding page: its effective position is pageTranslation + ownTransform. The match
+        // frames are measured in un-translated space, so the view on the MOVING page must
+        // compensate the page offset wherever the page is not at identity — otherwise the pair
+        // rides the page slide (flies in from / out to the side even when its X barely changes).
+        // Push (movingFromOffscreen): the TO view's page STARTS at +width — compensate the prep.
+        // Pop: the FROM view's page ENDS at +width — compensate the end transform.
         prep.Add(() =>
         {
+            var enter = MatchTransform(toFrame, fromFrame);
+
+            if (movingFromOffscreen)
+            {
+                enter.Tx -= (nfloat)width;
+            }
+
             toView.Alpha = 0;
-            toView.Transform = MatchTransform(toFrame, fromFrame);
+            toView.Transform = enter;
         });
         animations.Add(() =>
         {
+            var exit = MatchTransform(fromFrame, toFrame);
+
+            if (!movingFromOffscreen)
+            {
+                exit.Tx -= (nfloat)width;
+            }
+
             toView.Alpha = 1;
             toView.Transform = CGAffineTransform.MakeIdentity();
             fromView.Alpha = 0;
-            fromView.Transform = MatchTransform(fromFrame, toFrame);
+            fromView.Transform = exit;
         });
         cleanup.Add(() =>
         {
@@ -369,50 +529,67 @@ internal static class ScaffoldSharedElementTransitions
 }
 
 /// <summary>
-/// A paused, scrubbable pop animation (page slide + shared-element flights): the finger drives
-/// <see cref="SetProgress"/>; release settles with <see cref="FinishAsync"/> (visuals end in the
-/// popped state) or <see cref="CancelAsync"/> (the animator REVERSES and the completion cleanup
-/// restores the exact pre-session state).
+/// A scrubbable pop session (page slide + shared-element flights) driven by MANUAL per-fraction
+/// interpolation: the finger drives <see cref="SetProgress"/>; release settles with
+/// <see cref="FinishAsync"/> (a UIView animation to the popped end state) or
+/// <see cref="CancelAsync"/> (back to the resting state, then cleanup restores the exact
+/// pre-session view state).
 /// </summary>
-// VSTHRD003: the completion task is a main-thread TaskCompletionSource resolved by the
-// animator's completion callback — awaiting it from the main thread cannot deadlock.
-#pragma warning disable VSTHRD003
-internal sealed class ScaffoldPopAnimationSession(UIViewPropertyAnimator animator, Task completion)
+internal sealed class ScaffoldPopAnimationSession(
+    IReadOnlyList<ScaffoldSharedElementTransitions.IScrubElement> elements,
+    IReadOnlyList<Action> cleanup,
+    double durationSeconds)
 {
+    private double _progress;
     private bool _settled;
 
     /// <summary>Scrubs the session; safe to call only before Finish/Cancel.</summary>
     public void SetProgress(double progress)
     {
-        if (!_settled)
+        if (_settled)
         {
-            animator.FractionComplete = (nfloat)Math.Clamp(progress, 0d, 1d);
+            return;
+        }
+
+        _progress = Math.Clamp(progress, 0d, 1d);
+
+        foreach (var element in elements)
+        {
+            element.Apply(_progress);
         }
     }
 
-    /// <summary>Runs the animation forward to the popped end state.</summary>
-    public Task FinishAsync()
+    /// <summary>Animates forward to the popped end state.</summary>
+    public Task FinishAsync() => SettleAsync(1);
+
+    /// <summary>Animates back to the resting state and restores the pre-session view state.</summary>
+    public Task CancelAsync() => SettleAsync(0);
+
+    private async Task SettleAsync(double target)
     {
-        if (!_settled)
+        if (_settled)
         {
-            _settled = true;
-            animator.ContinueAnimation(null, 1);
+            return;
         }
 
-        return completion;
-    }
+        _settled = true;
 
-    /// <summary>Reverses the animation back to the resting state.</summary>
-    public Task CancelAsync()
-    {
-        if (!_settled)
+        var remaining = Math.Abs(target - _progress);
+
+        if (remaining > 0.001)
         {
-            _settled = true;
-            animator.Reversed = true;
-            animator.ContinueAnimation(null, 1);
+            await UIView.AnimateAsync(durationSeconds * remaining, () =>
+            {
+                foreach (var element in elements)
+                {
+                    element.Apply(target);
+                }
+            });
         }
 
-        return completion;
+        foreach (var action in cleanup)
+        {
+            action();
+        }
     }
 }
-#pragma warning restore VSTHRD003

@@ -570,8 +570,28 @@ Key facts anchoring the decision:
 >   left real pops with no exit slide.
 > - Verified: mid-flight frames captured on both platforms; `ScaffoldTransitionChromeTests`
 >   (end-geometry + flight cleanup restoration + repeated round trips) green on both.
-> - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option, interactive
->   pop (iOS scrub handle exists in the engine's construction), predictive-back SET seeking.
+> - iOS interactive pop (left-edge swipe) IMPLEMENTED (July 2026): plain-pan recognizer with
+>   manual edge/direction gating on the content container; peek-mounts the page below
+>   (presentation-only); scrubs the pop choreography via MANUAL per-fraction interpolation
+>   (`ScaffoldPopAnimationSession` + `IScrubElement`s); release either reverses or settles
+>   forward and dispatches the pop through the engine — the sync adopts the settled visuals via
+>   a handoff without re-animating. Guard gating: `BindingContext is ILeavingGuard` blocks the
+>   gesture (sniff at begin + re-check at release).
+> - iOS 26 gesture/animator gotchas that shaped the implementation (all measured, sim + device):
+>   (1) `UIScreenEdgePanGestureRecognizer` misfires erratically — its begin-time edge test
+>   consumes STALE recognizer state; unusable. (2) Inside `TouchesBegan`, a recognizer's
+>   `LocationInView` still returns the PREVIOUS gesture's end position — read the `UITouch`
+>   from the `touches` set instead (this was the every-other-swipe-fails bug). (3) A PAUSED
+>   `UIViewPropertyAnimator` accepts `FractionComplete` (state Active, read-back correct) but
+>   never renders the interpolation — started animators work, paused-scrub does not; hence the
+>   manual interpolation. (4) `ShouldBeRequiredToFailBy` against scroll pans deadlocks with the
+>   scroll view's `delaysTouchesBegan` gate (touches flushed compressed at release); no failure
+>   requirements are needed — vertical-only scroll views don't engage on horizontal edge drags.
+>   (5) Transform-match pairs live INSIDE the sliding page: the view on the MOVING page must
+>   compensate the page translation or the pair rides the slide (the "Bot hero flies in from
+>   the right" bug).
+> - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option,
+>   predictive-back SET seeking (Android), Android predictive-back preview.
 
 ### 8.2 Cross-platform API (independent of engine choice)
 

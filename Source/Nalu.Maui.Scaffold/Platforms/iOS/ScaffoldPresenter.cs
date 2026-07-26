@@ -24,12 +24,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private static readonly Color _flyoutScrimColor = Colors.Black.WithAlpha(0.4f);
 
     private Page? _currentPage;
+    private ScaffoldRoot? _currentRoot;
     private UIViewController? _currentController;
     private ScaffoldTabBar? _currentTabBarArea;
     private View? _currentBarView;
     private View? _currentNavBarView;
 
-    private UIScreenEdgePanGestureRecognizer? _edgeGesture;
+    private ScaffoldEdgePanRecognizer? _edgeGesture;
     private InteractivePopState? _interactivePop;
     private InteractivePopState? _popHandoff;
     private bool _syncInFlight;
@@ -65,6 +66,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             return;
         }
 
+        EnsureEdgeGesture(controller);
+
         // A navigation arriving while a finger is still scrubbing (programmatic push, tab
         // selection) invalidates the preview: cancel the recognizer — its Cancelled callback
         // reverses the session and unmounts the peek before we proceed.
@@ -88,6 +91,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
     private async Task SynchronizeCoreAsync(ScaffoldRoot root, ScaffoldPresentationHint hint, ScaffoldViewController controller, IMauiContext mauiContext)
     {
+        // The presented root is the gesture's source of truth for the stack (self-contained
+        // presenter state — the engine proxy is not reliably readable at touch time).
+        _currentRoot = root;
+
         // Navigation dismisses any open overlay (flyout, overflow panel).
         await CloseOverlayAsync();
 
@@ -129,32 +136,71 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     /// normally) — the resulting sync adopts the settled state without re-animating.
     /// Guarded pages (ILeavingGuard) get no preview: the gesture never begins on them.
     /// </summary>
-    private void AttachEdgeGestureTo(UIView pageView)
+    private void EnsureEdgeGesture(ScaffoldViewController controller)
     {
-        var recognizer = _edgeGesture ??= new UIScreenEdgePanGestureRecognizer(OnEdgePan)
+        if (_edgeGesture is not null)
         {
-            Edges = UIRectEdge.Left,
-            ShouldBegin = _ => CanBeginInteractivePop()
+            return;
+        }
+
+        var recognizer = new ScaffoldEdgePanRecognizer(OnEdgePan);
+
+        recognizer.ShouldBegin = r =>
+        {
+            // Edge + direction gate (a plain pan sees every touch — WE decide what qualifies):
+            // must start in the leading-edge zone and move forward. The direction cone is
+            // deliberately WIDE (~63° per side): ShouldBegin fires after ~10pt of movement,
+            // where finger wobble dominates — a strict 45° cone makes the gesture feel like it
+            // only accepts perfectly horizontal swipes. Genuinely vertical drags still fail
+            // here and fall through to the scroll view.
+            var pan = (ScaffoldEdgePanRecognizer)r;
+            var translation = pan.TranslationInView(pan.View);
+
+            return pan.StartedAtLeadingEdge
+                && translation.X > 0
+                && Math.Abs((double)translation.Y) <= (double)translation.X * 2
+                && CanBeginInteractivePop();
         };
 
-        // The recognizer lives on the PRESENTED page's view — set up when the page is shown,
-        // torn down when it leaves (a single recognizer moves between page views).
-        recognizer.View?.RemoveGestureRecognizer(recognizer);
-        pageView.AddGestureRecognizer(recognizer);
+        // NO failure requirements — measured deadlock (iOS 26, simulator AND device): making
+        // scroll pans wait for this recognizer chains with the scroll view's own
+        // delaysTouchesBegan gate, which then withholds OUR touches until the gesture ends
+        // (TouchesBegan flushed at the release position → edge/direction gates see garbage).
+        // The plain race is safe: a vertical-only scroll view does not engage on horizontal
+        // edge drags, and vertical drags fail our direction gate and scroll normally.
+
+        // The recognizer lives on the ROOT content container (stable across page transitions):
+        // touches on any descendant page reach it through the normal ancestor gesture chain,
+        // and CanBeginInteractivePop gates when it may engage.
+        _edgeGesture = recognizer;
+        controller.ContentContainer.AddGestureRecognizer(recognizer);
     }
 
     private bool CanBeginInteractivePop()
-        => !_syncInFlight
-            && !HasOverlay
-            && _interactivePop is null
-            && _popHandoff is null
-            && scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
-            && rootProxy.Root.NavigationStack.PushedPages.Count > 0
-            && rootProxy.Root.NavigationStack.PushedPages[^1].Page is { BindingContext: not ILeavingGuard } topPage
-            && ReferenceEquals(topPage, _currentPage)
-            && _currentController?.View is not null;
+    {
+        var canBegin = !_syncInFlight
+                       && !HasOverlay
+                       && _interactivePop is null
+                       && _popHandoff is null
+                       && _currentController?.View is not null;
 
-    private void OnEdgePan(UIScreenEdgePanGestureRecognizer recognizer)
+        if (!canBegin)
+        {
+            return false;
+        }
+        
+        if (_currentRoot?.NavigationStack is { PushedPages.Count: > 0 } stack &&
+            stack.PushedPages[^1].Page is { BindingContext: not ILeavingGuard } topPage)
+        {
+            var topPageMatches = ReferenceEquals(topPage, _currentPage);
+
+            return topPageMatches;
+        }
+
+        return false;
+    }
+
+    private void OnEdgePan(UIPanGestureRecognizer recognizer)
     {
         switch (recognizer.State)
         {
@@ -184,14 +230,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private void BeginInteractivePop()
     {
         if (scaffold.Handler is not IPlatformViewHandler { ViewController: ScaffoldViewController controller, MauiContext: { } mauiContext }
-            || scaffold.Proxy?.CurrentItem.CurrentSection is not ScaffoldRootProxy rootProxy
+            || _currentRoot?.NavigationStack is not { } stack
             || _currentPage is not { } topPage
             || _currentController?.View is not { } topView)
         {
             return;
         }
-
-        var stack = rootProxy.Root.NavigationStack;
 
         if (stack.PushedPages.Count == 0)
         {
@@ -228,7 +272,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _interactivePop = new InteractivePopState(topPage, belowPage, belowView, topView, container.Bounds.Width, session);
     }
 
-    private void SettleInteractivePop(UIScreenEdgePanGestureRecognizer recognizer, bool allowCommit)
+    private void SettleInteractivePop(UIPanGestureRecognizer recognizer, bool allowCommit)
     {
         if (_interactivePop is not { } state)
         {
@@ -273,7 +317,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 _popHandoff = null;
                 await UIView.AnimateAsync(_transitionDurationSeconds, () => state.TopView.Transform = CGAffineTransform.MakeIdentity());
                 UnmountPeek();
+
+                return;
             }
+
+            // Committed: same phantom-touch guard as the cancel path (see UnmountPeek).
+            _edgeGesture?.ResetTracking();
         }
 
         void UnmountPeek()
@@ -284,6 +333,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             {
                 state.BelowView.RemoveFromSuperview();
             }
+
+            // Phantom-touch guard: drop any stale touch bookkeeping so the NEXT edge swipe
+            // starts from a clean recognizer (observed on device without this).
+            _edgeGesture?.ResetTracking();
         }
     }
 
@@ -327,8 +380,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         newView.Transform = CGAffineTransform.MakeIdentity();
         newView.Frame = container.Bounds;
         newView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
-
-        AttachEdgeGestureTo(newView);
 
         var width = container.Bounds.Width;
 
