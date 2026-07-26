@@ -128,6 +128,22 @@ public sealed class ScaffoldBackButton : ScaffoldNavBarButtonBase
 }
 
 /// <summary>
+/// A nav bar close (X) button for modal pages: pops through the navigation engine (guards and
+/// lifecycle run); visible on <see cref="ScaffoldPageMode.DismissableModal"/> pages. Drop it
+/// anywhere inside a custom nav bar — it binds to the inherited <see cref="ScaffoldNavBarContext"/>.
+/// </summary>
+public sealed class ScaffoldCloseButton : ScaffoldNavBarButtonBase
+{
+    /// <summary>Initializes the close button (built-in X glyph).</summary>
+    public ScaffoldCloseButton()
+        : base("M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5")
+    {
+        BindVisibility(nameof(ScaffoldNavBarContext.IsCloseButtonVisible));
+        BindCommand(nameof(ScaffoldNavBarContext.BackCommand));
+    }
+}
+
+/// <summary>
 /// A nav bar drawer button: opens the corresponding flyout; visible when its content resolves
 /// and its <see cref="ScaffoldFlyoutButtonVisibility"/> policy allows it. Drop it anywhere
 /// inside a custom nav bar — it binds to the inherited <see cref="ScaffoldNavBarContext"/>.

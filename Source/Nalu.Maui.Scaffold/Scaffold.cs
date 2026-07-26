@@ -140,6 +140,16 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("PageTransition", typeof(ScaffoldPageTransition), typeof(Scaffold), null);
 
     /// <summary>
+    /// Attached property declaring a page's presentation mode (§7.1):
+    /// <see cref="ScaffoldPageMode.Default"/>, <see cref="ScaffoldPageMode.Modal"/> or
+    /// <see cref="ScaffoldPageMode.DismissableModal"/>. Modal pages enter from the bottom,
+    /// cover the tab bar, get no interactive back preview and show a title-only nav bar
+    /// (plus a close button for <see cref="ScaffoldPageMode.DismissableModal"/>).
+    /// </summary>
+    public static readonly BindableProperty PageModeProperty =
+        BindableProperty.CreateAttached("PageMode", typeof(ScaffoldPageMode), typeof(Scaffold), ScaffoldPageMode.Default);
+
+    /// <summary>
     /// Attached property controlling tab bar visibility for a <see cref="Page"/>:
     /// <see cref="ScaffoldTabBarVisibility.Visible"/> (default),
     /// <see cref="ScaffoldTabBarVisibility.Hidden"/>, or
@@ -350,6 +360,12 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets the end-drawer button policy attached to an element.</summary>
     public static void SetFlyoutEndButtonVisibility(BindableObject bindable, ScaffoldFlyoutButtonVisibility value) => bindable.SetValue(FlyoutEndButtonVisibilityProperty, value);
 
+    /// <summary>Gets the presentation mode attached to <paramref name="bindable"/>.</summary>
+    public static ScaffoldPageMode GetPageMode(BindableObject bindable) => (ScaffoldPageMode)bindable.GetValue(PageModeProperty);
+
+    /// <summary>Sets the presentation mode attached to <paramref name="bindable"/>.</summary>
+    public static void SetPageMode(BindableObject bindable, ScaffoldPageMode value) => bindable.SetValue(PageModeProperty, value);
+
     /// <summary>Gets the page transition attached to <paramref name="bindable"/>.</summary>
     public static ScaffoldPageTransition? GetPageTransition(BindableObject bindable) => (ScaffoldPageTransition?)bindable.GetValue(PageTransitionProperty);
 
@@ -357,11 +373,15 @@ public partial class Scaffold : ContentPage, IDisposable
     public static void SetPageTransition(BindableObject bindable, ScaffoldPageTransition? value) => bindable.SetValue(PageTransitionProperty, value);
 
     /// <summary>
-    /// Resolves the transition spec for <paramref name="pushedPage"/>:
-    /// page-attached value → scaffold-level value → <see cref="ScaffoldPageTransition.Default"/>.
+    /// Resolves the transition spec for <paramref name="pushedPage"/>: page-attached value →
+    /// modal default (modal-mode pages enter from the bottom) →
+    /// scaffold-level value → <see cref="ScaffoldPageTransition.Default"/>.
     /// </summary>
     internal ScaffoldPageTransition ResolvePageTransition(Page pushedPage)
-        => GetPageTransition(pushedPage) ?? GetPageTransition(this) ?? ScaffoldPageTransition.Default;
+        => GetPageTransition(pushedPage)
+            ?? (GetPageMode(pushedPage) != ScaffoldPageMode.Default ? ScaffoldPageTransition.SlideFromBottom : null)
+            ?? GetPageTransition(this)
+            ?? ScaffoldPageTransition.Default;
 
     /// <summary>Gets the shared-element transition name attached to a view.</summary>
     public static string? GetTransitionName(BindableObject bindable) => (string?)bindable.GetValue(TransitionNameProperty);
@@ -398,12 +418,13 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <see cref="ScaffoldTabBarVisibility.Auto"/> meaning "visible only at the stack root".
     /// </summary>
     internal static bool ComputeTabBarVisible(ScaffoldRoot root, Page page)
-        => GetTabBarVisibility(page) switch
-        {
-            ScaffoldTabBarVisibility.Hidden => false,
-            ScaffoldTabBarVisibility.Auto => root.NavigationStack.PushedPages.Count == 0,
-            _ => true
-        };
+        => GetPageMode(page) == ScaffoldPageMode.Default // a modal page always covers the tab bar
+            && GetTabBarVisibility(page) switch
+            {
+                ScaffoldTabBarVisibility.Hidden => false,
+                ScaffoldTabBarVisibility.Auto => root.NavigationStack.PushedPages.Count == 0,
+                _ => true
+            };
 
 
     // System back (Android hardware/gesture back) is handled by the OnBackPressedDispatcher

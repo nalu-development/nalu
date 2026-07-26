@@ -52,6 +52,15 @@ public sealed record ScaffoldPageTransition(ScaffoldTransitionMotion Enter, Scaf
         new ScaffoldTransitionMotion(Scale: 1.05, Opacity: 0.6),
         0.3);
 
+    /// <summary>
+    /// Modal presentation: slide up from the bottom edge; the behind page recedes slightly.
+    /// The default for modal pages (<see cref="Scaffold.PageModeProperty"/>).
+    /// </summary>
+    public static ScaffoldPageTransition SlideFromBottom { get; } = new(
+        new ScaffoldTransitionMotion(FractionY: 1),
+        new ScaffoldTransitionMotion(Scale: 0.97, Opacity: 0.9),
+        0.3);
+
     /// <summary>No animation: pages swap instantly.</summary>
     public static ScaffoldPageTransition None { get; } = new(
         new ScaffoldTransitionMotion(),

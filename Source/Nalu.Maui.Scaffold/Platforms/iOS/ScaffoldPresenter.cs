@@ -190,7 +190,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         }
         
         if (_currentRoot?.NavigationStack is { PushedPages.Count: > 0 } stack &&
-            stack.PushedPages[^1].Page is { BindingContext: not ILeavingGuard } topPage)
+            stack.PushedPages[^1].Page is { BindingContext: not ILeavingGuard } topPage &&
+            Scaffold.GetPageMode(topPage) == ScaffoldPageMode.Default)
         {
             var topPageMatches = ReferenceEquals(topPage, _currentPage);
 

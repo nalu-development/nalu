@@ -22,6 +22,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     private bool _canNavigateBack;
     private bool _isFlyoutStartButtonVisible;
     private bool _isFlyoutEndButtonVisible;
+    private bool _isModal;
+    private bool _isCloseButtonVisible;
 
     /// <inheritdoc />
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -59,6 +61,23 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     {
         get => _isFlyoutEndButtonVisible;
         private set => SetField(ref _isFlyoutEndButtonVisible, value);
+    }
+
+    /// <summary>Gets whether the current page is a modal page (<see cref="Scaffold.PageModeProperty"/>).</summary>
+    public bool IsModal
+    {
+        get => _isModal;
+        private set => SetField(ref _isModal, value);
+    }
+
+    /// <summary>
+    /// Gets whether the trailing close (X) button should show:
+    /// <see cref="ScaffoldPageMode.DismissableModal"/> pages.
+    /// </summary>
+    public bool IsCloseButtonVisible
+    {
+        get => _isCloseButtonVisible;
+        private set => SetField(ref _isCloseButtonVisible, value);
     }
 
     /// <summary>Pops the current page through the navigation engine — guards and lifecycle run.</summary>
@@ -105,18 +124,24 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         }
 
         var stackEmpty = root.NavigationStack.PushedPages.Count == 0;
+        var pageMode = Scaffold.GetPageMode(currentPage);
+        var isModal = pageMode != ScaffoldPageMode.Default;
 
         Title = currentPage.Title;
         TitleView = Scaffold.GetTitleView(currentPage);
-        CanNavigateBack = !stackEmpty;
+        IsModal = isModal;
+        IsCloseButtonVisible = pageMode == ScaffoldPageMode.DismissableModal;
 
-        IsFlyoutStartButtonVisible = ComputeFlyoutButtonVisible(
+        // A modal page shows title + close only: no back chevron, no drawer buttons.
+        CanNavigateBack = !stackEmpty && !isModal;
+
+        IsFlyoutStartButtonVisible = !isModal && ComputeFlyoutButtonVisible(
             _scaffold.ResolveFlyoutContent(ScaffoldFlyoutSide.Start) is not null,
             ResolveFlyoutButtonVisibility(currentPage, Scaffold.FlyoutStartButtonVisibilityProperty),
             stackEmpty
         );
 
-        IsFlyoutEndButtonVisible = ComputeFlyoutButtonVisible(
+        IsFlyoutEndButtonVisible = !isModal && ComputeFlyoutButtonVisible(
             _scaffold.ResolveFlyoutContent(ScaffoldFlyoutSide.End) is not null,
             ResolveFlyoutButtonVisibility(currentPage, Scaffold.FlyoutEndButtonVisibilityProperty),
             stackEmpty

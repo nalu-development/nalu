@@ -22,6 +22,7 @@ public sealed class ScaffoldNavBarView : Grid
     private readonly ScaffoldBackButton _backButton;
     private readonly ScaffoldNavBarTitle _title;
     private readonly ScaffoldFlyoutButton _flyoutEndButton;
+    private readonly ScaffoldCloseButton _closeButton;
 
     /// <summary>Bindable property for <see cref="BarBackground"/>.</summary>
     public static readonly BindableProperty BarBackgroundProperty =
@@ -33,7 +34,7 @@ public sealed class ScaffoldNavBarView : Grid
 
     /// <summary>Bindable property for <see cref="BarPadding"/>.</summary>
     public static readonly BindableProperty BarPaddingProperty =
-        BindableProperty.Create(nameof(BarPadding), typeof(Thickness), typeof(ScaffoldNavBarView), Thickness.Zero, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
+        BindableProperty.Create(nameof(BarPadding), typeof(Thickness), typeof(ScaffoldNavBarView), new Thickness(8, 0), propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
 
     /// <summary>Bindable property for <see cref="Spacing"/>.</summary>
     public static readonly BindableProperty SpacingProperty =
@@ -173,6 +174,7 @@ public sealed class ScaffoldNavBarView : Grid
         _backButton = new ScaffoldBackButton { AutomationId = "NavBarBackButton" };
         _title = new ScaffoldNavBarTitle { AutomationId = "NavBarTitle" };
         _flyoutEndButton = new ScaffoldFlyoutButton { Side = ScaffoldFlyoutSide.End, AutomationId = "NavBarFlyoutEndButton" };
+        _closeButton = new ScaffoldCloseButton { AutomationId = "NavBarCloseButton" };
 
         // The leading buttons sit flush (zero spacing): the 44dp tap targets' inner whitespace
         // around the 24dp glyphs provides equal optical gaps — edge→glyph and glyph→glyph.
@@ -195,9 +197,13 @@ public sealed class ScaffoldNavBarView : Grid
             }
         };
 
+        var trailingButtons = new HorizontalStackLayout { Spacing = 0 };
+        trailingButtons.Add(_flyoutEndButton);
+        trailingButtons.Add(_closeButton);
+
         _row.Add(leadingButtons, 0);
         _row.Add(_title, 1);
-        _row.Add(_flyoutEndButton, 2);
+        _row.Add(trailingButtons, 2);
 
         Add(_row);
 
@@ -223,6 +229,7 @@ public sealed class ScaffoldNavBarView : Grid
         _backButton.Icon = BackIcon;
         _flyoutStartButton.IconColor = IconColor;
         _flyoutStartButton.Icon = FlyoutStartIcon;
+        _closeButton.IconColor = IconColor;
         _flyoutEndButton.IconColor = IconColor;
         _flyoutEndButton.Icon = FlyoutEndIcon;
 

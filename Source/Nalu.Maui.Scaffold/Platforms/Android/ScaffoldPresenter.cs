@@ -245,6 +245,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             || scaffold.Handler is not IPlatformViewHandler { MauiContext: { } mauiContext }
             || _currentRoot?.NavigationStack is not { PushedPages.Count: > 0 } stack
             || stack.PushedPages[^1].Page is not { BindingContext: not ILeavingGuard } topPage
+            || Scaffold.GetPageMode(topPage) != ScaffoldPageMode.Default
             || !ReferenceEquals(topPage, _currentPage)
             || _currentFragment?.View is not { } topView)
         {

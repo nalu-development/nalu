@@ -491,14 +491,26 @@ Notes:
 **Modal pages are navigation. Popups and sheets are NOT** — they are presented UI, offered by a
 separate mechanism the navigation engine never sees.
 
-### 7.1 Modal pages (navigation)
+### 7.1 Modal pages (navigation) — IMPLEMENTED (July 2026)
 
-- Full-screen modal pages stay in the navigation model: stack entries (`NavigationStackPage.IsModal`
-  already models this), routes, guards, lifecycle events, snapshot/restore all apply.
-- The Scaffold owns their presentation natively (today's Shell adapter piggybacks on
-  `Shell.GetPresentationMode` + `ShellSection.Navigation.ModalStack` — reimplemented directly).
+- Modal pages stay ordinary navigation stack entries (routes, guards, lifecycle, DI scoping,
+  snapshot/restore all apply). No dedicated modal presentation engine: the transition spec,
+  chrome policies and back gating built for §5/§8 compose into modal presentation.
+- **`Scaffold.PageMode` attached property** (`Default` | `Modal` | `DismissableModal`):
+  - enters with `ScaffoldPageTransition.SlideFromBottom` by default (an explicit page-attached
+    `Scaffold.PageTransition` still wins; resolution page-spec → modal default → scaffold → Default);
+  - forcefully covers the tab bar (`ComputeTabBarVisible` = false, hides animated with the push);
+  - NO interactive back preview (iOS edge swipe and Android predictive back refuse to begin);
+    Android system back still COMMITS through the engine, where `ILeavingGuard` decides;
+  - default nav bar shows title only — back chevron and drawer buttons hidden; `DismissableModal`
+    adds a trailing `ScaffoldCloseButton` (X, new primitive, binds `IsCloseButtonVisible` +
+    `BackCommand`); `ScaffoldNavBarContext` gains `IsModal`/`IsCloseButtonVisible`.
+- The engine's `NavigationStackPage.IsModal` (Shell `PresentationMode`-derived) is untouched —
+  presenters key off `Scaffold.GetPageMode(page)` directly.
 - MAUI's own `Navigation.PushModalAsync` on the page: out of scope / unsupported inside Scaffold
   (document it; all page navigation goes through Nalu).
+- Harness: "Scaffold Modal Tests" + ScaffoldModalChromeTests (tab-bar cover, X close, plain
+  modal programmatic close, Android system-back pop) — green on both platforms.
 
 ### 7.2 Popups & sheets (presentation, separate from navigation — decided; **ships in v2**)
 
