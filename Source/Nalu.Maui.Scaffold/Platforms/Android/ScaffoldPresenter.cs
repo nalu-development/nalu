@@ -51,7 +51,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private ScaffoldOverlayPlacement _overlayPlacement;
     private Action? _overlayCleanup;
 
+    private ScaffoldRoot? _currentRoot;
+    private AView? _backPeekView;
+    private AView? _backTopView;
+    private Page? _backBelowPage;
+    private bool _backPreviewActive;
+    private Page? _predictiveHandoffPage;
+
     public bool HasOverlay => _overlayPanel is not null;
+
+    /// <summary>Whether a predictive-back preview is currently scrubbing.</summary>
+    public bool HasBackPreview => _backPreviewActive;
 
     private enum ScaffoldOverlayPlacement
     {
@@ -69,6 +79,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         }
 
         scaffold.EnsureBackCallback(activity);
+
+        // The presented root is the back preview's source of truth for the stack.
+        _currentRoot = root;
+
+        // A navigation arriving while a back gesture is still scrubbing (programmatic push,
+        // tab selection) invalidates the preview; a handoff sync is the preview's OWN commit.
+        if (_backPreviewActive && _predictiveHandoffPage is null)
+        {
+            AbortBackPreview();
+        }
 
         // Navigation dismisses any open overlay (flyout, overflow panel).
         await CloseOverlayAsync();
@@ -116,11 +136,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 previousPage.PropertyChanged -= OnCurrentPagePropertyChanged;
             }
 
+            // A committed predictive-back preview already settled the visuals (top page
+            // offscreen, below page fully revealed via the peek): adopt without re-animating —
+            // no shared-element transition, no exit animator on the removed fragment.
+            var handoffPage = _predictiveHandoffPage;
+            _predictiveHandoffPage = null;
+            var predictivelySettled = handoffPage is not null
+                && hint == ScaffoldPresentationHint.Pop
+                && ReferenceEquals(handoffPage, targetPage);
+
             // Shared elements (§8, PoC spike B): matching Scaffold.TransitionName pairs between
             // the two pages ride the native androidx transition framework. Both push AND pop are
             // Replace-based here (no fragment back stack), so both directions wire the pairs as
             // an ENTER transition on the incoming fragment.
-            var sharedNames = previousPage is not null && animated
+            var sharedNames = !predictivelySettled && previousPage is not null && animated
                 ? ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage))
                 : [];
 
@@ -167,8 +196,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             }
 
             // The CURRENT navigation decides how the outgoing page leaves (a pop slides it out
-            // to the end edge; a push leaves it static beneath the incoming slide).
-            previousFragment?.PrepareRemoval(hint);
+            // to the end edge; a push leaves it static beneath the incoming slide). A settled
+            // predictive-back preview already moved it offscreen — no exit animation.
+            previousFragment?.PrepareRemoval(predictivelySettled ? ScaffoldPresentationHint.None : hint);
 
             transaction
                 .Replace(container.Id, fragment)
@@ -183,6 +213,168 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
         scaffold.UpdateBackCallbackEnabled();
+    }
+
+    private const float _backPreviewMaxShift = 0.4f;
+
+    /// <summary>
+    /// Predictive back, gesture started: peek-mounts the page below (presentation-only, no
+    /// lifecycle — the engine still owns the stack) beneath the fragment container so the
+    /// scrubbed page reveals it. Guarded pages (<see cref="ILeavingGuard"/>) get NO preview —
+    /// the committed back still routes through the engine, which runs the guard.
+    /// </summary>
+    public void StartBackPreview()
+    {
+        if (_backPreviewActive
+            || HasOverlay
+            || _pageLayer is not { } pageLayer
+            || _container is not { } container
+            || scaffold.Handler is not IPlatformViewHandler { MauiContext: { } mauiContext }
+            || _currentRoot?.NavigationStack is not { PushedPages.Count: > 0 } stack
+            || stack.PushedPages[^1].Page is not { BindingContext: not ILeavingGuard } topPage
+            || !ReferenceEquals(topPage, _currentPage)
+            || _currentFragment?.View is not { } topView)
+        {
+            return;
+        }
+
+        var belowPage = stack.PushedPages.Count > 1 ? stack.PushedPages[^2].Page : stack.RootPage;
+
+        if (belowPage is null)
+        {
+            return;
+        }
+
+        var belowView = belowPage.ToPlatform(mauiContext);
+        (belowView.Parent as AViewGroup)?.RemoveView(belowView);
+        belowView.TranslationX = 0f;
+        belowView.TranslationZ = 0f;
+        pageLayer.AddView(belowView, 0, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+
+        _ = container;
+        _backPeekView = belowView;
+        _backTopView = topView;
+        _backBelowPage = belowPage;
+        _backPreviewActive = true;
+    }
+
+    /// <summary>Predictive back, gesture progressing: page-motion-only scrub (v1).</summary>
+    public void UpdateBackPreview(float progress)
+    {
+        if (_backPreviewActive && _backTopView is { } topView)
+        {
+            topView.TranslationX = progress * _backPreviewMaxShift * (topView.Width > 0 ? topView.Width : 0);
+        }
+    }
+
+    /// <summary>Predictive back, gesture cancelled: the top page slides home, peek unmounts.</summary>
+    public void CancelBackPreview()
+    {
+        if (!_backPreviewActive)
+        {
+            return;
+        }
+
+        _backPreviewActive = false;
+        var topView = _backTopView;
+        var peekView = _backPeekView;
+        _backTopView = null;
+        _backPeekView = null;
+        _backBelowPage = null;
+
+        if (topView is null)
+        {
+            RemovePeek(peekView);
+
+            return;
+        }
+
+        var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
+        animator.SetDuration(150);
+        animator.AnimationEnd += (_, _) => RemovePeek(peekView);
+        animator.Start();
+    }
+
+    /// <summary>
+    /// Predictive back, gesture committed: the top page settles fully offscreen FIRST (the
+    /// gesture's motion completes uninterrupted), then the pop is dispatched through the
+    /// engine; the sync it triggers adopts the settled state via the handoff (no exit animator,
+    /// no shared-element transition). If the engine refuses (busy, or a guard surfaced), the
+    /// preview reverses.
+    /// </summary>
+    public async Task CommitBackPreviewAsync()
+    {
+        if (!_backPreviewActive)
+        {
+            return;
+        }
+
+        _backPreviewActive = false;
+        var topView = _backTopView;
+        var peekView = _backPeekView;
+        var belowPage = _backBelowPage;
+        _backTopView = null;
+        _backPeekView = null;
+        _backBelowPage = null;
+
+        if (topView is null || belowPage is null)
+        {
+            RemovePeek(peekView);
+
+            return;
+        }
+
+        var width = topView.Width > 0 ? topView.Width : 1;
+        var settle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, width)!;
+        animator.SetDuration((long)(_overlayDurationMs * (1 - (topView.TranslationX / width))));
+        animator.AnimationEnd += (_, _) => settle.TrySetResult();
+        animator.Start();
+        await settle.Task.ConfigureAwait(true);
+
+        _predictiveHandoffPage = belowPage;
+
+        var popped = scaffold.NavigationService is { } navigationService
+            && await navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).ConfigureAwait(true);
+
+        if (!popped && ReferenceEquals(_predictiveHandoffPage, belowPage))
+        {
+            // Engine refused: restore the pre-gesture presentation.
+            _predictiveHandoffPage = null;
+            var restore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var restoreAnimator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
+            restoreAnimator.SetDuration(_overlayDurationMs);
+            restoreAnimator.AnimationEnd += (_, _) => restore.TrySetResult();
+            restoreAnimator.Start();
+            await restore.Task.ConfigureAwait(true);
+            RemovePeek(peekView);
+        }
+    }
+
+    /// <summary>Instant teardown for a preview invalidated by an unrelated navigation.</summary>
+    private void AbortBackPreview()
+    {
+        _backPreviewActive = false;
+
+        if (_backTopView is { } topView)
+        {
+            topView.TranslationX = 0f;
+        }
+
+        RemovePeek(_backPeekView);
+        _backTopView = null;
+        _backPeekView = null;
+        _backBelowPage = null;
+    }
+
+    private void RemovePeek(AView? peekView)
+    {
+        // The commit sync re-parents this exact platform view into the new fragment — never
+        // detach it once it is no longer OUR peek (it may already be the presented page).
+        if (peekView is not null && ReferenceEquals(peekView.Parent, _pageLayer))
+        {
+            _pageLayer?.RemoveView(peekView);
+        }
     }
 
     /// <summary>
@@ -223,6 +415,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _currentNavBarView = null;
         _navBarPresented = false;
         _navStripAnimator = null;
+        _backPreviewActive = false;
+        _backPeekView = null;
+        _backTopView = null;
+        _backBelowPage = null;
+        _predictiveHandoffPage = null;
 
         var context = platformView.Context!;
 

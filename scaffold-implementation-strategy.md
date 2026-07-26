@@ -590,8 +590,18 @@ Key facts anchoring the decision:
 >   (5) Transform-match pairs live INSIDE the sliding page: the view on the MOVING page must
 >   compensate the page translation or the pair rides the slide (the "Bot hero flies in from
 >   the right" bug).
+> - Android predictive back IMPLEMENTED (July 2026): `OnBackPressedCallback`
+>   HandleOnBackStarted/Progressed/Cancelled/Pressed. Started peek-mounts the page below
+>   (presentation-only) beneath the fragment container and sniffs `ILeavingGuard` (guarded
+>   pages: no preview, committed back still routes through the engine → guard runs);
+>   Progressed scrubs page motion only (v1, translationX up to 40% width); Cancelled slides
+>   home and unmounts the peek; Pressed settles the top page fully offscreen, then dispatches
+>   the engine pop with a handoff — the sync adopts the settled state (no exit animator, no
+>   SET) and the new fragment re-parents the very platform view the peek was showing.
+>   Root pages keep the callback disabled → native back-to-home preview. Requires
+>   `android:enableOnBackInvokedCallback="true"` (TestApp manifest) + gesture navigation.
 > - Still P2: public `PageTransition` spec + `WithTransition(...)` builder option,
->   predictive-back SET seeking (Android), Android predictive-back preview.
+>   predictive-back SET seeking (Android follow-up).
 
 ### 8.2 Cross-platform API (independent of engine choice)
 

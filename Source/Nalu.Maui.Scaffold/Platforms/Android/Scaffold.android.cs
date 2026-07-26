@@ -54,15 +54,40 @@ public partial class Scaffold
             return;
         }
 
+        // A predictive-back preview settles its own visuals forward and dispatches the pop
+        // through the engine with a handoff (the sync adopts the settled state).
+        if (Presenter is ScaffoldPresenter { HasBackPreview: true } previewPresenter)
+        {
+            Dispatcher.Dispatch(() => previewPresenter.CommitBackPreviewAsync().FireAndForget(Handler));
+
+            return;
+        }
+
         if (NavigationService is { } navigationService && HasPushedPages())
         {
             Dispatcher.Dispatch(() => navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).FireAndForget(Handler));
         }
     }
 
+    /// <summary>
+    /// Predictive-back integration (§ predictive back design): the system back gesture scrubs a
+    /// page-motion preview of the pop (v1 — shared-element seeking is a follow-up). Guarded
+    /// pages (<see cref="ILeavingGuard"/>) get NO preview, but the committed back still routes
+    /// through the engine, which runs the guard. Root pages keep the callback disabled — the
+    /// native back-to-home preview applies.
+    /// </summary>
     internal sealed class ScaffoldBackCallback(Scaffold scaffold, AppCompatActivity activity) : OnBackPressedCallback(false)
     {
         public AppCompatActivity Activity => activity;
+
+        public override void HandleOnBackStarted(BackEventCompat backEvent)
+            => (scaffold.Presenter as ScaffoldPresenter)?.StartBackPreview();
+
+        public override void HandleOnBackProgressed(BackEventCompat backEvent)
+            => (scaffold.Presenter as ScaffoldPresenter)?.UpdateBackPreview(backEvent.Progress);
+
+        public override void HandleOnBackCancelled()
+            => (scaffold.Presenter as ScaffoldPresenter)?.CancelBackPreview();
 
         public override void HandleOnBackPressed() => scaffold.HandleSystemBack();
     }
