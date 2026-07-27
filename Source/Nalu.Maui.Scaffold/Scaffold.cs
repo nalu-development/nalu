@@ -409,6 +409,72 @@ public partial class Scaffold : ContentPage, IDisposable
     public Task ShowTabBarPanelAsync(View content, Brush? scrim = null, bool closeIfOpened = true)
         => ShowTabBarPanelCoreAsync(content, scrim, closeIfOpened, disconnectContentOnClose: false, cleanup: null);
 
+    /// <summary>
+    /// Presents a popup in the top overlay layer — above all chrome and previously presented
+    /// overlays (popups stack in open order, each above its own scrim). Placement, scrim and
+    /// dismissal policy come from <paramref name="options"/>; the tab bar's safe-area footprint
+    /// never affects the presentation area (only system insets do).
+    /// </summary>
+    /// <param name="content">
+    /// The popup view, measured within the safe presentation area. Attached to this scaffold's
+    /// element tree while presented (styles and BindingContext flow); treated as single-use —
+    /// its handlers are disconnected when the popup closes.
+    /// </param>
+    /// <param name="options">The presentation options; sensible popup defaults when omitted.</param>
+    /// <returns>
+    /// The lifetime handle: close it, await <see cref="IScaffoldPopup.Closed"/>, or scope it
+    /// with <c>await using</c>. When the scaffold is not presented yet, the returned handle is
+    /// already closed (<see cref="IScaffoldPopup.IsOpen"/> is false).
+    /// </returns>
+    public async Task<IScaffoldPopup> ShowPopupAsync(View content, ScaffoldPopupOptions? options = null)
+    {
+        options ??= new ScaffoldPopupOptions();
+        var handle = new ScaffoldPopupHandle();
+
+        if (Presenter is not { } presenter)
+        {
+            handle.MarkClosed();
+
+            return handle;
+        }
+
+        var attach = content.Parent is null;
+
+        if (attach)
+        {
+            AddLogicalChild(content);
+        }
+
+        var request = new ScaffoldOverlayRequest
+        {
+            Kind = ScaffoldOverlayKind.Popup,
+            Content = content,
+            Scrim = options.Scrim ?? CreateDefaultScrim(),
+            CloseOnScrimTap = options.CloseOnScrimTap,
+            CloseOnBack = options.CloseOnBack,
+            DisconnectContentOnClose = true,
+            PopupOptions = options,
+            ScrimAutomationId = "PopupScrim"
+        };
+
+        request.Cleanup = () =>
+        {
+            if (attach)
+            {
+                RemoveLogicalChild(content);
+            }
+
+            handle.MarkClosed();
+        };
+
+        handle.Attach(this, request);
+
+        // On failure the presenter has already run Cleanup — the handle comes back closed.
+        await presenter.ShowOverlayAsync(request).ConfigureAwait(true);
+
+        return handle;
+    }
+
     /// <summary>Closes the presented tab bar panel, if any.</summary>
     public Task CloseTabBarPanelAsync()
         => Presenter is { } presenter && _tabBarPanelRequest is { } request

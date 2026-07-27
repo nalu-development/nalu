@@ -7,7 +7,10 @@ internal enum ScaffoldOverlayKind
     Flyout,
 
     /// <summary>The tab bar panel (below the tab bar strip in z-order, rises above the bottom chrome). Single instance.</summary>
-    TabBarPanel
+    TabBarPanel,
+
+    /// <summary>A popup (top layer, placed per <see cref="ScaffoldPopupOptions"/>, fades in). Stacks freely.</summary>
+    Popup
 }
 
 /// <summary>
@@ -41,6 +44,9 @@ internal sealed class ScaffoldOverlayRequest
 
     /// <summary>The drawer side; meaningful for <see cref="ScaffoldOverlayKind.Flyout"/> only.</summary>
     public ScaffoldFlyoutSide FlyoutSide { get; init; }
+
+    /// <summary>The placement options; meaningful for <see cref="ScaffoldOverlayKind.Popup"/> only.</summary>
+    public ScaffoldPopupOptions? PopupOptions { get; init; }
 
     /// <summary>The automation id of the scrim view (UI-test hook for scrim taps).</summary>
     public string? ScrimAutomationId { get; init; }
@@ -91,6 +97,13 @@ internal static class ScaffoldOverlayAnimations
                 content.TranslationY = 24;
 
                 break;
+
+            case ScaffoldOverlayKind.Popup:
+                // Popups FADE in (subtle scale, no slide) — the backdrop fades with them.
+                content.Opacity = 0;
+                content.Scale = 0.97;
+
+                break;
         }
     }
 
@@ -101,6 +114,10 @@ internal static class ScaffoldOverlayAnimations
             request.Kind switch
             {
                 ScaffoldOverlayKind.Flyout => request.Content.TranslateTo(0, 0, _duration, Easing.CubicOut),
+                ScaffoldOverlayKind.Popup => Task.WhenAll(
+                    request.Content.FadeTo(1, _duration),
+                    request.Content.ScaleTo(1, _duration, Easing.CubicOut)
+                ),
                 _ => Task.WhenAll(
                     request.Content.FadeTo(1, _duration),
                     request.Content.TranslateTo(0, 0, _duration, Easing.CubicOut)
@@ -115,6 +132,10 @@ internal static class ScaffoldOverlayAnimations
             request.Kind switch
             {
                 ScaffoldOverlayKind.Flyout => request.Content.TranslateTo(flyoutOffscreenTranslation, 0, _duration, Easing.CubicIn),
+                ScaffoldOverlayKind.Popup => Task.WhenAll(
+                    request.Content.FadeTo(0, _duration),
+                    request.Content.ScaleTo(0.97, _duration, Easing.CubicIn)
+                ),
                 _ => Task.WhenAll(
                     request.Content.FadeTo(0, _duration),
                     request.Content.TranslateTo(0, 24, _duration, Easing.CubicIn)
@@ -131,5 +152,6 @@ internal static class ScaffoldOverlayAnimations
         content.TranslationX = 0;
         content.TranslationY = 0;
         content.Opacity = 1;
+        content.Scale = 1;
     }
 }

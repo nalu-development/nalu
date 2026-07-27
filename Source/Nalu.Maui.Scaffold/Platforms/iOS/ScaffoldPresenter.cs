@@ -685,6 +685,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private bool IsFlyoutOnLeft(ScaffoldFlyoutSide side)
         => side == ScaffoldFlyoutSide.Start != scaffold.IsRightToLeft;
 
+    /// <summary>
+    /// The scrim tap rides a MAUI recognizer (uniform hit-testing on both platforms, visible to
+    /// automation); it always consumes the touch — closing only when the entry allows it.
+    /// </summary>
+    private void AttachScrimTap(View scrimView, ScaffoldOverlayRequest request)
+    {
+        var tap = new TapGestureRecognizer();
+
+        tap.Tapped += (_, _) =>
+        {
+            if (request.CloseOnScrimTap)
+            {
+                _ = CloseOverlayAsync(request);
+            }
+        };
+
+        scrimView.GestureRecognizers.Add(tap);
+    }
+
     public async Task<bool> ShowOverlayAsync(ScaffoldOverlayRequest request)
     {
         if (scaffold.Handler is not IPlatformViewHandler { ViewController: ScaffoldViewController controller, PlatformView: { } container, MauiContext: { } mauiContext })
@@ -701,16 +720,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         var chromeLayer = request.Kind == ScaffoldOverlayKind.TabBarPanel ? controller.ChromeBottomLayer : null;
 
         var scrimView = request.CreateScrimView();
+
+        // The element tree reflects presented chrome: the scrim participates while mounted
+        // (tooling and UI tests can see and tap it).
+        scaffold.AddLogicalChild(scrimView);
+        AttachScrimTap(scrimView, request);
         var scrim = scrimView.ToPlatform(mauiContext);
         scrim.Frame = bounds;
         scrim.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
-        scrim.AddGestureRecognizer(new UITapGestureRecognizer(() =>
-        {
-            if (request.CloseOnScrimTap)
-            {
-                _ = CloseOverlayAsync(request);
-            }
-        }));
 
         if (chromeLayer is not null)
         {
@@ -737,6 +754,37 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 panel = request.Content.ToPlatform(mauiContext);
                 panel.Frame = new CGRect(onLeft ? 0 : bounds.Width - width, 0, width, bounds.Height);
                 flyoutOffscreen = onLeft ? -width : width;
+                container.AddSubview(panel);
+
+                break;
+            }
+
+            case ScaffoldOverlayKind.Popup:
+            {
+                var insets = controller.View!.SafeAreaInsets;
+
+                var area = new Rect(
+                    bounds.X + insets.Left,
+                    bounds.Y + insets.Top,
+                    bounds.Width - insets.Left - insets.Right,
+                    bounds.Height - insets.Top - insets.Bottom
+                );
+
+                panel = request.Content.ToPlatform(mauiContext);
+
+                var fitted = panel.SizeThatFits(new CGSize(area.Width, area.Height));
+                var contentSize = new Size(Math.Min((double)fitted.Width, area.Width), Math.Min((double)fitted.Height, area.Height));
+
+                Rect? anchorBounds = null;
+
+                if (request.PopupOptions?.Anchor is { Handler.PlatformView: UIView anchorView })
+                {
+                    var frame = anchorView.ConvertRectToView(anchorView.Bounds, container);
+                    anchorBounds = new Rect(frame.X, frame.Y, frame.Width, frame.Height);
+                }
+
+                var rect = ScaffoldPopupPlacementResolver.Resolve(request.PopupOptions ?? new ScaffoldPopupOptions(), area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+                panel.Frame = new CGRect(rect.X, rect.Y, rect.Width, rect.Height);
                 container.AddSubview(panel);
 
                 break;
@@ -883,6 +931,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         ScaffoldOverlayAnimations.ResetContent(request.Content);
         entry.ScrimView.DisconnectHandlers();
+        scaffold.RemoveLogicalChild(entry.ScrimView);
 
         if (request.DisconnectContentOnClose)
         {

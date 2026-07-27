@@ -832,6 +832,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private bool IsFlyoutOnLeft(ScaffoldFlyoutSide side)
         => side == ScaffoldFlyoutSide.Start != scaffold.IsRightToLeft;
 
+    /// <summary>
+    /// The scrim tap rides a MAUI recognizer (uniform hit-testing on both platforms, visible to
+    /// automation); it always consumes the touch — closing only when the entry allows it.
+    /// </summary>
+    private void AttachScrimTap(View scrimView, ScaffoldOverlayRequest request)
+    {
+        var tap = new TapGestureRecognizer();
+
+        tap.Tapped += (_, _) =>
+        {
+            if (request.CloseOnScrimTap)
+            {
+                _ = CloseOverlayAsync(request);
+            }
+        };
+
+        scrimView.GestureRecognizers.Add(tap);
+    }
+
     public async Task<bool> ShowOverlayAsync(ScaffoldOverlayRequest request)
     {
         if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext }
@@ -848,15 +867,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         var chromeLayerIndex = chromeLayer is null ? -1 : platformView.IndexOfChild(chromeLayer);
 
         var scrimView = request.CreateScrimView();
+
+        // The element tree reflects presented chrome: the scrim participates while mounted
+        // (tooling and UI tests can see and tap it).
+        scaffold.AddLogicalChild(scrimView);
+        AttachScrimTap(scrimView, request);
         var scrim = scrimView.ToPlatform(mauiContext);
         scrim.Clickable = true;
-        scrim.Click += (_, _) =>
-        {
-            if (request.CloseOnScrimTap)
-            {
-                _ = CloseOverlayAsync(request);
-            }
-        };
 
         var scrimLayoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent);
 
@@ -893,6 +910,61 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 // Entrance offset rides the MAUI translation (dp), applied after mounting.
                 flyoutOffscreen = onLeft ? -widthDp : widthDp;
                 platformView.AddView(panel);
+
+                break;
+            }
+
+            case ScaffoldOverlayKind.Popup:
+            {
+                var systemInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+
+                var area = new Rect(
+                    context.FromPixels(systemInsets?.Left ?? 0),
+                    context.FromPixels(systemInsets?.Top ?? 0),
+                    context.FromPixels(platformView.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)),
+                    context.FromPixels(platformView.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0))
+                );
+
+                panel = request.Content.ToPlatform(mauiContext);
+                (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+                panel.Measure(
+                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Width), MeasureSpecMode.AtMost),
+                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Height), MeasureSpecMode.AtMost)
+                );
+
+                var contentSize = new Size(
+                    Math.Min(context.FromPixels(panel.MeasuredWidth), area.Width),
+                    Math.Min(context.FromPixels(panel.MeasuredHeight), area.Height)
+                );
+
+                Rect? anchorBounds = null;
+
+                if (request.PopupOptions?.Anchor is { Handler.PlatformView: AView anchorView })
+                {
+                    var anchorLocation = new int[2];
+                    var containerLocation = new int[2];
+                    anchorView.GetLocationInWindow(anchorLocation);
+                    platformView.GetLocationInWindow(containerLocation);
+
+                    anchorBounds = new Rect(
+                        context.FromPixels(anchorLocation[0] - containerLocation[0]),
+                        context.FromPixels(anchorLocation[1] - containerLocation[1]),
+                        context.FromPixels(anchorView.Width),
+                        context.FromPixels(anchorView.Height)
+                    );
+                }
+
+                var rect = ScaffoldPopupPlacementResolver.Resolve(request.PopupOptions ?? new ScaffoldPopupOptions(), area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+
+                var popupLayoutParams = new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(rect.Width), (int)context.ToPixels(rect.Height))
+                {
+                    Gravity = GravityFlags.Left | GravityFlags.Top,
+                    LeftMargin = (int)context.ToPixels(rect.X),
+                    TopMargin = (int)context.ToPixels(rect.Y)
+                };
+
+                platformView.AddView(panel, popupLayoutParams);
 
                 break;
             }
@@ -1041,6 +1113,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         ScaffoldOverlayAnimations.ResetContent(request.Content);
         entry.ScrimView.DisconnectHandlers();
+        scaffold.RemoveLogicalChild(entry.ScrimView);
 
         if (request.DisconnectContentOnClose)
         {

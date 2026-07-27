@@ -179,7 +179,9 @@
       "mcp__maui-devflow__maui_get_theme",
       "Bash(git commit -q -m 'Scaffold styling: component-per-concern styles, base-ctor callback guards, docs *)",
       "mcp__maui-devflow__maui_assert",
-      "Bash(git commit -q -m 'Scaffold overlay stack + tab bar panel API rework \\(popup system phase A\\) *)"
+      "Bash(git commit -q -m 'Scaffold overlay stack + tab bar panel API rework \\(popup system phase A\\) *)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 UITests/UITests.DevFlow/bin/Debug/net10.0/TestResults/UITests.DevFlow_net10.0_arm64.log)",
+      "Bash(git commit -q -m 'Scaffold popups: ShowPopupAsync, placement, stacking \\(§5.6 phase B\\) *)"
     ]
   }
 }
