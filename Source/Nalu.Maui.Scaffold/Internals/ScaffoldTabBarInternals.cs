@@ -266,11 +266,11 @@ internal sealed class ScaffoldTabBarItemView : Grid
         {
             _icon = new Image
             {
-                Aspect = Aspect.AspectFit,
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.Center
+                Aspect = Aspect.Fill,
+                HeightRequest = 24,
+                WidthRequest = 24,
             };
-            _icon.SetBinding(Image.SourceProperty, Binding.Create(static (ScaffoldRoot r) => r.CurrentIcon, source: root));
+            _icon.SetBinding(Image.SourceProperty, static (ScaffoldRoot r) => r.CurrentIcon, source: root);
             iconHost.Add(_icon);
         }
         else if (owner.OverflowIcon is { } overflowIcon)
@@ -278,9 +278,9 @@ internal sealed class ScaffoldTabBarItemView : Grid
             _icon = new Image
             {
                 Source = overflowIcon,
-                Aspect = Aspect.AspectFit,
-                HorizontalOptions = LayoutOptions.Center,
-                VerticalOptions = LayoutOptions.Center
+                Aspect = Aspect.Fill,
+                HeightRequest = 24,
+                WidthRequest = 24,
             };
             iconHost.Add(_icon);
         }
@@ -325,7 +325,6 @@ internal sealed class ScaffoldTabBarItemView : Grid
 
         _label = new Label
         {
-            HorizontalOptions = LayoutOptions.Center,
             HorizontalTextAlignment = TextAlignment.Center,
             VerticalTextAlignment = TextAlignment.Center,
             LineBreakMode = LineBreakMode.TailTruncation,

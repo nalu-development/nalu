@@ -126,16 +126,24 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     {
         await App.WaitForElementAsync("TabPageAlpha");
         (await App.WaitForElementAsync("TabAlpha")).IsVisible.Should().BeTrue();
+        var restingBounds = await App.WaitForStableBoundsAsync("TabAlpha");
 
         // The pushed page opts into Auto: the bar hides (animated, in sync with the push)…
         await App.TapAsync("PushAutoDetailAlpha");
         await WaitDisplayedAsync("TabAutoDetailPage");
         await App.WaitForElementGoneAsync("TabAlpha");
 
-        // …and shows again when the stack returns to its root.
+        // …and shows again when the stack returns to its root — at the SAME resting frame
+        // (regression: stale safe-area padding picked up while the strip was translated into
+        // the Android system-bars region left the re-shown bar higher than its resting spot).
         await App.TapAsync("PopTabAutoDetail");
         await WaitDisplayedAsync("TabPageAlpha");
         (await App.WaitForElementAsync("TabAlpha")).IsVisible.Should().BeTrue();
+
+        await App.WaitForBoundsAsync(
+            "TabAlpha",
+            b => Math.Abs(b.Y - restingBounds.Y) <= 1 && Math.Abs(b.Height - restingBounds.Height) <= 1
+        );
     }
 
     [Fact]

@@ -533,7 +533,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 _lastStripHeight = _tabBarStrip.Height;
             }
 
-            return AnimateStripToAsync(_tabBarStrip, 0, animated);
+            return ShowAsync(_tabBarStrip);
+
+            async Task ShowAsync(ScaffoldTabBarStripLayout strip)
+            {
+                // The slide-in starts away from rest: keep the insets frozen (see FreezeInsets)
+                // for the whole flight so the bar keeps its resting padding while it crosses
+                // the system-bars region, then recompute once settled.
+                if (strip.TranslationY != 0)
+                {
+                    strip.FreezeInsets();
+                }
+
+                await AnimateStripToAsync(strip, 0, animated).ConfigureAwait(true);
+
+                if (strip.TranslationY == 0)
+                {
+                    strip.UnfreezeInsets();
+                }
+            }
         }
 
         // Hidden: keep the strip alive offscreen; only the logical attachment reflects it.
@@ -550,21 +568,30 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             _lastStripHeight = hiddenStrip.Height;
         }
 
-        return _lastStripHeight > 0
-            ? AnimateStripToAsync(hiddenStrip, _lastStripHeight, animated)
-            : Task.CompletedTask;
+        if (_lastStripHeight <= 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Freeze the insets at their resting values BEFORE leaving rest (see FreezeInsets):
+        // the bar must not be re-padded while translated through the system-bars region.
+        hiddenStrip.FreezeInsets();
+
+        return AnimateStripToAsync(hiddenStrip, _lastStripHeight, animated);
 
         async Task UnmountAsync(ScaffoldTabBarStripLayout stripToRemove, ScaffoldTabBar? previousArea)
         {
             if (stripToRemove.Height > 0)
             {
                 _lastStripHeight = stripToRemove.Height;
+                stripToRemove.FreezeInsets();
                 await AnimateStripToAsync(stripToRemove, stripToRemove.Height, animated).ConfigureAwait(true);
             }
 
             stripToRemove.Visibility = ViewStates.Gone;
             stripToRemove.TranslationY = 0;
             stripToRemove.SetBar(null);
+            stripToRemove.UnfreezeInsets(requestApply: false);
             previousArea?.OnBarViewUnmounted();
         }
     }
@@ -700,12 +727,34 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         if (navBarVisible)
         {
-            return AnimateNavStripToAsync(_navBarStrip, 0, animated);
+            return ShowNavAsync(_navBarStrip);
         }
 
-        return _lastNavStripHeight > 0
-            ? AnimateNavStripToAsync(_navBarStrip, -_lastNavStripHeight, animated)
-            : Task.CompletedTask;
+        if (_lastNavStripHeight <= 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Same contract as the tab bar strip: freeze the insets at their resting values
+        // before leaving rest so the translated bar is never re-padded mid-flight.
+        _navBarStrip.FreezeInsets();
+
+        return AnimateNavStripToAsync(_navBarStrip, -_lastNavStripHeight, animated);
+
+        async Task ShowNavAsync(ScaffoldNavBarStripLayout strip)
+        {
+            if (strip.TranslationY != 0)
+            {
+                strip.FreezeInsets();
+            }
+
+            await AnimateNavStripToAsync(strip, 0, animated).ConfigureAwait(true);
+
+            if (strip.TranslationY == 0)
+            {
+                strip.UnfreezeInsets();
+            }
+        }
     }
 
     private void DetachNavBarView(View navBarView)

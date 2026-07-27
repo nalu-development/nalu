@@ -9,14 +9,15 @@
              x:Class="Nalu.Maui.DailyHelper.Pages.ForecastPage"
              x:DataType="pm:ForecastPageModel"
              x:Name="Self"
+             nalu:Scaffold.FlyoutEndMode="Auto"
              Title="Forecast">
 
-    <!-- Per-page END flyout: the nav bar shows the end-drawer button automatically, and the
-         panel inherits this page's BindingContext — the switches below bind straight into the
-         page model, reshaping the pipelines live while the drawer is open. -->
+    <!-- Per-page END flyout, explicitly enabled via FlyoutEndMode (§5.5): the nav bar shows
+         the end-drawer button automatically, and the panel inherits this page's BindingContext
+         — the switches below bind straight into the page model, reshaping the pipelines live
+         while the drawer is open. The presenter sizes the drawer (ScaffoldFlyoutOptions). -->
     <nalu:Scaffold.FlyoutEnd>
         <Border StrokeThickness="0"
-                WidthRequest="300"
                 BackgroundColor="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}">
             <VerticalStackLayout Padding="24,72,24,24" Spacing="20">
                 <Label Text="Forecast options" Style="{StaticResource SectionTitle}" />

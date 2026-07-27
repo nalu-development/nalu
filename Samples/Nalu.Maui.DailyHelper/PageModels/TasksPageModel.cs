@@ -5,7 +5,6 @@ using DynamicData.Binding;
 using Nalu.Maui.DailyHelper.Models;
 using Nalu.Maui.DailyHelper.Services;
 using System.Collections.ObjectModel;
-using System.Reactive.Disposables;
 
 namespace Nalu.Maui.DailyHelper.PageModels;
 

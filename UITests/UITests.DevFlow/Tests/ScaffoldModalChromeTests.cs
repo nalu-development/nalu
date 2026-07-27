@@ -42,6 +42,29 @@ public class ScaffoldModalChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLife
     }
 
     [Fact]
+    public async Task TabBarReturnsToRestingFrameAfterModalRoundTrip()
+    {
+        // Regression: on Android, the strip translated into the system-bars region picked up
+        // safe-area padding from the net10 inset listener while hidden, and the stale padding
+        // survived the slide back in — the bar re-appeared ABOVE its resting position.
+        await WaitDisplayedAsync("ModalHomePage");
+        var restingBounds = await App.WaitForStableBoundsAsync("TabMHome");
+
+        await App.TapAsync("PushDismissableModal");
+        await WaitDisplayedAsync("DismissableModalPage");
+        await App.WaitForElementGoneAsync("TabMHome");
+
+        await App.TapAsync("NavBarCloseButton");
+        await WaitDisplayedAsync("ModalHomePage");
+
+        // Retry-until-match: the slide-in is still settling when the page becomes visible.
+        await App.WaitForBoundsAsync(
+            "TabMHome",
+            b => Math.Abs(b.Y - restingBounds.Y) <= 1 && Math.Abs(b.Height - restingBounds.Height) <= 1
+        );
+    }
+
+    [Fact]
     public async Task PlainModalHasNoCloseButtonAndClosesProgrammatically()
     {
         await WaitDisplayedAsync("ModalHomePage");

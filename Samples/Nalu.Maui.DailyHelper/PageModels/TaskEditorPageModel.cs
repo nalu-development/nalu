@@ -17,7 +17,7 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
     private string _pageTitle = "New task";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
     private string _title = string.Empty;
 
     [ObservableProperty]

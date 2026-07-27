@@ -81,8 +81,38 @@ internal sealed class ScaffoldTabBarStripLayout : FrameLayout
 
     private AView? _bar;
     private int _barMeasuredHeight;
+    private bool _insetsFrozen;
 
     public AView? Bar => _bar;
+
+    /// <summary>
+    /// Freezes the insets seen by the hosted bar while the strip is translated for a
+    /// hide/show slide: the net10 MauiWindowInsetListener recomputes child safe-area padding
+    /// from ON-SCREEN bounds on every insets dispatch, so a strip sliding through the
+    /// system-bars region would inflate the bar by the overlap (and the stale padding
+    /// survived back at rest). While frozen, dispatches are swallowed and the bar keeps its
+    /// resting padding.
+    /// </summary>
+    internal void FreezeInsets() => _insetsFrozen = true;
+
+    /// <summary>Unfreezes insets; when requested, re-dispatches so children recompute at rest.</summary>
+    internal void UnfreezeInsets(bool requestApply = true)
+    {
+        if (!_insetsFrozen)
+        {
+            return;
+        }
+
+        _insetsFrozen = false;
+
+        if (requestApply)
+        {
+            ViewCompat.RequestApplyInsets(this);
+        }
+    }
+
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+        => _insetsFrozen ? insets : base.DispatchApplyWindowInsets(insets);
 
     public ScaffoldTabBarStripLayout(IntPtr javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
@@ -165,8 +195,31 @@ internal sealed class ScaffoldNavBarStripLayout : FrameLayout
 {
     private AView? _bar;
     private int _barMeasuredHeight;
+    private bool _insetsFrozen;
 
     public AView? Bar => _bar;
+
+    /// <summary>Same freeze contract as <see cref="ScaffoldTabBarStripLayout.FreezeInsets"/> for the top strip.</summary>
+    internal void FreezeInsets() => _insetsFrozen = true;
+
+    /// <summary>Unfreezes insets; when requested, re-dispatches so children recompute at rest.</summary>
+    internal void UnfreezeInsets(bool requestApply = true)
+    {
+        if (!_insetsFrozen)
+        {
+            return;
+        }
+
+        _insetsFrozen = false;
+
+        if (requestApply)
+        {
+            ViewCompat.RequestApplyInsets(this);
+        }
+    }
+
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+        => _insetsFrozen ? insets : base.DispatchApplyWindowInsets(insets);
 
     public ScaffoldNavBarStripLayout(IntPtr javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)

@@ -343,7 +343,12 @@ public sealed class ScaffoldTabBarView : Grid
             Content = _items
         };
 
-        // SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container, SafeAreaRegions.None);
+        // The strip hosting the bar reserves the bottom system inset itself (on both
+        // platforms) — the bar must never consume safe-area padding on top of that. This also
+        // guards the Android hide/show slide: a translated strip overlaps the system bars and
+        // the net10 inset listener would otherwise pad the bar by the overlap, and the stale
+        // padding survived the slide back in (bar re-appearing ABOVE its resting position).
+        SafeAreaEdges = SafeAreaEdges.None;
 
         Add(_pill);
 
