@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<nalu:Scaffold xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+               xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
+               x:Class="Nalu.Maui.DailyHelper.AppScaffold"
+               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+
+    <!-- The whole application structure: one tab bar, three roots, each hosting its own
+         navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->
+
+    <nalu:Scaffold.NavBarView>
+        <nalu:ScaffoldNavBarView FontFamily="SemiBold"
+                                 TitleFontSize="20"
+                                 IconColor="{StaticResource Accent}"
+                                 TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                                 BarBackground="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
+    </nalu:Scaffold.NavBarView>
+
+    <nalu:ScaffoldTabBar>
+        <nalu:ScaffoldRoot Title="Today" PageType="{x:Type pages:TodayPage}">
+            <nalu:ScaffoldRoot.Icon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe8df;" Color="{StaticResource TabIcon}" Size="24" />
+            </nalu:ScaffoldRoot.Icon>
+            <nalu:ScaffoldRoot.SelectedIcon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe8df;" Color="{StaticResource Accent}" Size="24" />
+            </nalu:ScaffoldRoot.SelectedIcon>
+        </nalu:ScaffoldRoot>
+
+        <nalu:ScaffoldRoot Title="Forecast" PageType="{x:Type pages:ForecastPage}">
+            <nalu:ScaffoldRoot.Icon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe81a;" Color="{StaticResource TabIcon}" Size="24" />
+            </nalu:ScaffoldRoot.Icon>
+            <nalu:ScaffoldRoot.SelectedIcon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe81a;" Color="{StaticResource Accent}" Size="24" />
+            </nalu:ScaffoldRoot.SelectedIcon>
+        </nalu:ScaffoldRoot>
+
+        <nalu:ScaffoldRoot x:Name="TasksRoot" Title="Tasks" PageType="{x:Type pages:TasksPage}">
+            <nalu:ScaffoldRoot.Icon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe6b1;" Color="{StaticResource TabIcon}" Size="24" />
+            </nalu:ScaffoldRoot.Icon>
+            <nalu:ScaffoldRoot.SelectedIcon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe6b1;" Color="{StaticResource Accent}" Size="24" />
+            </nalu:ScaffoldRoot.SelectedIcon>
+        </nalu:ScaffoldRoot>
+    </nalu:ScaffoldTabBar>
+
+</nalu:Scaffold>

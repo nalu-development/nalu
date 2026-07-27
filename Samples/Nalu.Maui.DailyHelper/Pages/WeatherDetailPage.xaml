@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
+             xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
+             x:Class="Nalu.Maui.DailyHelper.Pages.WeatherDetailPage"
+             x:DataType="pm:WeatherDetailPageModel"
+             nalu:Scaffold.TabBarVisibility="Auto"
+             Title="Weather">
+
+    <!-- The photo, temperature and icon carry the same TransitionName as the Today hero:
+         pushing this page morphs them between the two layouts (pop and the iOS edge swipe
+         play the flight backwards). -->
+    <ScrollView>
+        <VerticalStackLayout Spacing="16" Padding="0,0,0,32">
+
+            <Grid HeightRequest="260">
+                <Image nalu:Scaffold.TransitionName="weather-photo"
+                       Source="{Binding Current.Photo}"
+                       Aspect="AspectFill" />
+                <BoxView Color="Black" Opacity="0.32" />
+                <VerticalStackLayout Padding="20,0,20,18" Spacing="2" VerticalOptions="End">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Label nalu:Scaffold.TransitionName="weather-temp"
+                               Text="{Binding Current.TemperatureLabel}"
+                               TextColor="White" FontFamily="SemiBold" FontSize="68" />
+                        <Label Grid.Column="2"
+                               nalu:Scaffold.TransitionName="weather-icon"
+                               Text="{Binding Current.Glyph}"
+                               FontFamily="Material" FontSize="56" TextColor="White"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    <Label Text="{Binding Current.Description}" TextColor="White" FontSize="17" />
+                    <Label Text="{Binding Current.MinMaxLabel}" TextColor="White" Opacity="0.85" FontSize="13" />
+                </VerticalStackLayout>
+            </Grid>
+
+            <Grid Padding="16,0" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                <Border Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xf076;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.FeelsLikeLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Feels like" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xe891;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.HumidityLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Humidity" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Row="1" Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xefd8;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.WindLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Wind" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xe91c;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.PrecipitationLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Rain today" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <Label Text="Next 24 hours" Style="{StaticResource SectionTitle}" Margin="20,4,20,0" />
+
+            <!-- Same control, horizontal layout: a virtualized hourly strip. -->
+            <vs:VirtualScroll HeightRequest="120"
+                              ItemsSource="{Binding NextHoursAdapter}">
+                <vs:VirtualScroll.ItemsLayout>
+                    <vs:HorizontalVirtualScrollLayout EstimatedItemSize="64" />
+                </vs:VirtualScroll.ItemsLayout>
+                <vs:VirtualScroll.ItemTemplate>
+                    <DataTemplate x:DataType="m:HourForecast">
+                        <VerticalStackLayout WidthRequest="64" Spacing="6" Padding="0,10" HorizontalOptions="Center">
+                            <Label Text="{Binding TimeLabel}" Style="{StaticResource Muted}" FontSize="12" HorizontalOptions="Center" />
+                            <Label Text="{Binding Glyph}" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" HorizontalOptions="Center" />
+                            <Label Text="{Binding TemperatureLabel}" FontFamily="SemiBold" FontSize="15" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </vs:VirtualScroll.ItemTemplate>
+            </vs:VirtualScroll>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

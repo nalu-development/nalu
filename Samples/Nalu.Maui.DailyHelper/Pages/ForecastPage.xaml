@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
+             xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
+             xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
+             x:Class="Nalu.Maui.DailyHelper.Pages.ForecastPage"
+             x:DataType="pm:ForecastPageModel"
+             x:Name="Self"
+             Title="Forecast">
+
+    <!-- Per-page END flyout: the nav bar shows the end-drawer button automatically, and the
+         panel inherits this page's BindingContext — the switches below bind straight into the
+         page model, reshaping the pipelines live while the drawer is open. -->
+    <nalu:Scaffold.FlyoutEnd>
+        <Border StrokeThickness="0"
+                WidthRequest="300"
+                BackgroundColor="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}">
+            <VerticalStackLayout Padding="24,72,24,24" Spacing="20">
+                <Label Text="Forecast options" Style="{StaticResource SectionTitle}" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Show full week" VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding ShowFullWeek}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Fahrenheit" VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding UseFahrenheit}" />
+                </Grid>
+
+                <Label Text="Hourly details" Style="{StaticResource Muted}" Margin="0,8,0,0" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Precipitation" VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding ShowPrecipitation}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Wind" VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding ShowWind}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Humidity" VerticalOptions="Center" />
+                    <Switch Grid.Column="1" IsToggled="{Binding ShowHumidity}" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+    </nalu:Scaffold.FlyoutEnd>
+
+    <!-- Custom title view: title plus a "Now" chip scrolling the list to the current hour. -->
+    <nalu:Scaffold.TitleView>
+        <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+            <Label Text="Forecast" FontFamily="SemiBold" FontSize="20" VerticalOptions="Center" />
+            <Border Grid.Column="1"
+                    StrokeThickness="0"
+                    StrokeShape="RoundRectangle 14"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                    Padding="14,5"
+                    VerticalOptions="Center">
+                <Label Text="Now" TextColor="{StaticResource Accent}" FontFamily="SemiBold" FontSize="13" />
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnNowTapped" />
+                </Border.GestureRecognizers>
+            </Border>
+        </Grid>
+    </nalu:Scaffold.TitleView>
+
+    <vs:VirtualScroll x:Name="Scroll"
+                      ItemsSource="{Binding DaysAdapter}"
+                      IsRefreshEnabled="True"
+                      RefreshCommand="{Binding RefreshCommand}"
+                      RefreshAccentColor="{StaticResource Accent}">
+
+        <vs:VirtualScroll.SectionHeaderTemplate>
+            <DataTemplate x:DataType="pm:DaySection">
+                <Label Text="{Binding Title}"
+                       FontFamily="SemiBold"
+                       FontSize="15"
+                       Padding="20,14,20,6"
+                       BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
+            </DataTemplate>
+        </vs:VirtualScroll.SectionHeaderTemplate>
+
+        <vs:VirtualScroll.ItemTemplate>
+            <DataTemplate x:DataType="m:HourForecast">
+                <Grid Padding="20,7" ColumnDefinitions="48,32,*,Auto" ColumnSpacing="10">
+                    <Label Text="{Binding TimeLabel}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                    <Label Grid.Column="1" Text="{Binding Glyph}" FontFamily="Material" FontSize="20"
+                           TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                    <HorizontalStackLayout Grid.Column="2" Spacing="12" VerticalOptions="Center">
+                        <HorizontalStackLayout Spacing="3"
+                                               IsVisible="{Binding Model.ShowPrecipitation, Source={x:Reference Self}, x:DataType=pages:ForecastPage}">
+                            <Label Text="&#xe91c;" Style="{StaticResource Icon}" FontSize="13" VerticalOptions="Center" />
+                            <Label Text="{Binding PrecipitationLabel}" Style="{StaticResource Muted}" FontSize="12" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <HorizontalStackLayout Spacing="3"
+                                               IsVisible="{Binding Model.ShowWind, Source={x:Reference Self}, x:DataType=pages:ForecastPage}">
+                            <Label Text="&#xefd8;" Style="{StaticResource Icon}" FontSize="13" VerticalOptions="Center" />
+                            <Label Text="{Binding WindLabel}" Style="{StaticResource Muted}" FontSize="12" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <HorizontalStackLayout Spacing="3"
+                                               IsVisible="{Binding Model.ShowHumidity, Source={x:Reference Self}, x:DataType=pages:ForecastPage}">
+                            <Label Text="&#xe891;" Style="{StaticResource Icon}" FontSize="13" VerticalOptions="Center" />
+                            <Label Text="{Binding HumidityLabel}" Style="{StaticResource Muted}" FontSize="12" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                    </HorizontalStackLayout>
+                    <Label Grid.Column="3" Text="{Binding TemperatureLabel}" FontFamily="SemiBold" FontSize="16" VerticalOptions="Center" />
+                </Grid>
+            </DataTemplate>
+        </vs:VirtualScroll.ItemTemplate>
+
+    </vs:VirtualScroll>
+</ContentPage>

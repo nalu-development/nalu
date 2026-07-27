@@ -29,9 +29,8 @@
   <Folder Name="/Samples/">
     <File Path="Samples/.editorconfig" />
     <File Path="Samples/Directory.Build.props" />
-    <Project Path="Samples/Nalu.Maui.Sample/Nalu.Maui.Sample.csproj" />
+    <Project Path="Samples/Nalu.Maui.DailyHelper/Nalu.Maui.DailyHelper.csproj" />
     <Project Path="Samples/Nalu.Maui.TestApp/Nalu.Maui.TestApp.csproj" />
-    <Project Path="Samples/Nalu.Maui.Weather/Nalu.Maui.Weather.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

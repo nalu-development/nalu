@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
+             x:Class="Nalu.Maui.DailyHelper.Pages.TaskEditorPage"
+             x:DataType="pm:TaskEditorPageModel"
+             nalu:Scaffold.PageMode="DismissableModal"
+             Title="{Binding PageTitle}">
+
+    <!-- DismissableModal: slides up from the bottom, covers the tab bar, title-only nav bar
+         with a close button. All through one attached property. -->
+    <ScrollView>
+        <VerticalStackLayout Padding="20,16" Spacing="16">
+
+            <Border Style="{StaticResource Card}" Padding="16,6">
+                <VerticalStackLayout>
+                    <Entry Placeholder="What do you need to do?" Text="{Binding Title}" FontSize="17" />
+                    <BoxView Style="{StaticResource Divider}" />
+                    <Editor Placeholder="Notes" Text="{Binding Notes}" AutoSize="TextChanges" MinimumHeightRequest="72" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="16,10">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <Label Text="Due date" VerticalOptions="Center" />
+                    <DatePicker Grid.Column="1" Date="{Binding DueDate}" IsVisible="{Binding HasDueDate}" VerticalOptions="Center" />
+                    <Switch Grid.Column="2" IsToggled="{Binding HasDueDate}" />
+                </Grid>
+            </Border>
+
+            <Button Text="Save" Command="{Binding SaveCommand}" Margin="0,8,0,0" />
+
+            <Button Text="Delete"
+                    Command="{Binding DeleteCommand}"
+                    IsVisible="{Binding CanDelete}"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Danger}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

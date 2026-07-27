@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
+             xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
+             xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
+             x:Class="Nalu.Maui.DailyHelper.Pages.TodayPage"
+             x:DataType="pm:TodayPageModel"
+             x:Name="Self"
+             Title="Today">
+
+    <vs:VirtualScroll ItemsSource="{Binding TodosAdapter}"
+                      IsRefreshEnabled="True"
+                      RefreshCommand="{Binding RefreshCommand}"
+                      RefreshAccentColor="{StaticResource Accent}">
+
+        <!-- Global header: the weather hero. Its image, temperature and icon are shared
+             elements flying into WeatherDetailPage on tap. -->
+        <vs:VirtualScroll.HeaderTemplate>
+            <DataTemplate x:DataType="pm:TodayPageModel">
+                <VerticalStackLayout Padding="16,12,16,4" Spacing="14">
+                    <Label Text="{Binding DateLabel}" Style="{StaticResource Muted}" />
+
+                    <Border StrokeThickness="0"
+                            StrokeShape="RoundRectangle 24"
+                            HeightRequest="180"
+                            IsVisible="{Binding HasWeather}">
+                        <Grid>
+                            <Image nalu:Scaffold.TransitionName="weather-photo"
+                                   Source="{Binding Current.Photo}"
+                                   Aspect="AspectFill" />
+                            <BoxView Color="Black" Opacity="0.32" />
+                            <Grid Padding="18,14" RowDefinitions="Auto,*,Auto,Auto">
+                                <Label Text="{Binding Current.Place}" TextColor="White" FontFamily="SemiBold" FontSize="14" Opacity="0.9" />
+                                <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">
+                                    <Label nalu:Scaffold.TransitionName="weather-temp"
+                                           Text="{Binding Current.TemperatureLabel}"
+                                           TextColor="White" FontFamily="SemiBold" FontSize="52" />
+                                    <Label Grid.Column="2"
+                                           nalu:Scaffold.TransitionName="weather-icon"
+                                           Text="{Binding Current.Glyph}"
+                                           FontFamily="Material" FontSize="44" TextColor="White"
+                                           VerticalOptions="Center" />
+                                </Grid>
+                                <Label Grid.Row="2" Text="{Binding Current.Description}" TextColor="White" FontSize="15" />
+                                <Label Grid.Row="3" Text="{Binding Current.MinMaxLabel}" TextColor="White" Opacity="0.85" FontSize="13" />
+                            </Grid>
+                        </Grid>
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenWeatherCommand}" />
+                        </Border.GestureRecognizers>
+                    </Border>
+
+                    <Label Text="Tasks for today" Style="{StaticResource SectionTitle}" Margin="0,6,0,0" />
+                </VerticalStackLayout>
+            </DataTemplate>
+        </vs:VirtualScroll.HeaderTemplate>
+
+        <vs:VirtualScroll.ItemTemplate>
+            <DataTemplate x:DataType="m:TodoItem">
+                <Grid Padding="20,8" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                    <Label Text="{Binding CheckGlyph}"
+                           FontFamily="Material" FontSize="24"
+                           TextColor="{StaticResource Accent}"
+                           VerticalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Model.ToggleCommand, Source={x:Reference Self}, x:DataType=pages:TodayPage}"
+                                                  CommandParameter="{Binding .}" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                        <Label Text="{Binding Title}" FontSize="16" />
+                        <Label Text="{Binding Notes}" Style="{StaticResource Muted}" IsVisible="{Binding HasNotes}" LineBreakMode="TailTruncation" />
+                        <VerticalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Model.EditTaskCommand, Source={x:Reference Self}, x:DataType=pages:TodayPage}"
+                                                  CommandParameter="{Binding .}" />
+                        </VerticalStackLayout.GestureRecognizers>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2"
+                           Text="{Binding DueLabel}"
+                           TextColor="{StaticResource Danger}"
+                           FontSize="12"
+                           IsVisible="{Binding IsOverdue}"
+                           VerticalOptions="Center" />
+                </Grid>
+            </DataTemplate>
+        </vs:VirtualScroll.ItemTemplate>
+
+        <!-- Global footer doubling as the empty-state call to action. -->
+        <vs:VirtualScroll.FooterTemplate>
+            <DataTemplate x:DataType="pm:TodayPageModel">
+                <HorizontalStackLayout Padding="20,10,20,28" Spacing="14">
+                    <Label Text="&#xe145;" FontFamily="Material" FontSize="24" TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                    <Label Text="Add a task" TextColor="{StaticResource Accent}" FontFamily="SemiBold" FontSize="16" VerticalOptions="Center" />
+                    <HorizontalStackLayout.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding AddTaskCommand}" />
+                    </HorizontalStackLayout.GestureRecognizers>
+                </HorizontalStackLayout>
+            </DataTemplate>
+        </vs:VirtualScroll.FooterTemplate>
+
+    </vs:VirtualScroll>
+</ContentPage>
