@@ -469,7 +469,7 @@ private async void NavigateNext()
 }
 ```
 
-**Real-world example from Weather sample:**
+**Real-world example — an initialization page that loads data, then dispatches navigation:**
 
 ```csharp
 public class InitializationPageModel : ObservableObject, IAppearingAware<StartupIntent>
@@ -477,7 +477,7 @@ public class InitializationPageModel : ObservableObject, IAppearingAware<Startup
     public async ValueTask OnAppearingAsync(StartupIntent intent)
     {
         // Load data
-        await LoadWeatherDataAsync();
+        await LoadDataAsync();
         
         // Dispatch navigation to home page
         _ = _dispatcher.DispatchAsync(NavigateToHomePage);

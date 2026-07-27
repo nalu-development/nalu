@@ -176,7 +176,8 @@
       "Bash(echo \"bg pid $!\")",
       "mcp__maui-devflow__maui_set_theme",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "mcp__maui-devflow__maui_get_theme"
+      "mcp__maui-devflow__maui_get_theme",
+      "Bash(git commit -q -m 'Scaffold styling: component-per-concern styles, base-ctor callback guards, docs *)"
     ]
   }
 }

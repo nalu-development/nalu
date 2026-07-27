@@ -57,4 +57,4 @@ You can fully theme this control on every single aspect, from colors to duration
     RotationStarted="DurationWheel_OnRotationStarted" />
 ```
 
-As an example, you can see how to implement a `DurationWheel` popup [here](https://github.com/nalu-development/nalu/blob/main/Samples/Nalu.Maui.Weather/Popups/DurationEditPopup.xaml.cs).
+As an example, you can see how to implement a `DurationWheel` popup [here](https://github.com/nalu-development/nalu/blob/2efb34a81b73/Samples/Nalu.Maui.Weather/Popups/DurationEditPopup.xaml.cs) (a permalink into the former Weather sample).
