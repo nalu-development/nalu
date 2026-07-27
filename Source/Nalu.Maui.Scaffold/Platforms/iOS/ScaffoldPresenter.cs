@@ -749,10 +749,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 var width = options.ComputeWidth(bounds.Width);
                 var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
 
-                // Framed at the OPEN position; the entrance offset rides the MAUI translation
-                // (frames are set before transforms apply — never the other way around).
+                // Arranged VIRTUALLY at the OPEN position (the MAUI frame must be valid or the
+                // iOS transform mapper skips translations); the entrance offset rides the MAUI
+                // translation, applied after the arrange.
                 panel = request.Content.ToPlatform(mauiContext);
-                panel.Frame = new CGRect(onLeft ? 0 : bounds.Width - width, 0, width, bounds.Height);
+                var flyoutView = (IView)request.Content;
+                flyoutView.Measure(width, bounds.Height);
+                flyoutView.Arrange(new Rect(onLeft ? 0 : bounds.Width - width, 0, width, bounds.Height));
                 flyoutOffscreen = onLeft ? -width : width;
                 container.AddSubview(panel);
 
@@ -763,17 +766,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             {
                 var insets = controller.View!.SafeAreaInsets;
 
+                var margin = request.PopupOptions?.Margin ?? new Thickness(16);
+
                 var area = new Rect(
-                    bounds.X + insets.Left,
-                    bounds.Y + insets.Top,
-                    bounds.Width - insets.Left - insets.Right,
-                    bounds.Height - insets.Top - insets.Bottom
+                    bounds.X + insets.Left + margin.Left,
+                    bounds.Y + insets.Top + margin.Top,
+                    Math.Max(0, bounds.Width - insets.Left - insets.Right - margin.HorizontalThickness),
+                    Math.Max(0, bounds.Height - insets.Top - insets.Bottom - margin.VerticalThickness)
                 );
 
                 panel = request.Content.ToPlatform(mauiContext);
 
-                var fitted = panel.SizeThatFits(new CGSize(area.Width, area.Height));
-                var contentSize = new Size(Math.Min((double)fitted.Width, area.Width), Math.Min((double)fitted.Height, area.Height));
+                var popupView = (IView)request.Content;
+                var fitted = popupView.Measure(area.Width, area.Height);
+                var contentSize = new Size(Math.Min(fitted.Width, area.Width), Math.Min(fitted.Height, area.Height));
 
                 Rect? anchorBounds = null;
 
@@ -784,7 +790,30 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 }
 
                 var rect = ScaffoldPopupPlacementResolver.Resolve(request.PopupOptions ?? new ScaffoldPopupOptions(), area, contentSize, anchorBounds, scaffold.IsRightToLeft);
-                panel.Frame = new CGRect(rect.X, rect.Y, rect.Width, rect.Height);
+                popupView.Arrange(rect);
+                container.AddSubview(panel);
+
+                break;
+            }
+
+            case ScaffoldOverlayKind.BottomSheet:
+            {
+                var sheet = (ScaffoldBottomSheetView)request.Content;
+                var insets = controller.View!.SafeAreaInsets;
+                var availableHeight = bounds.Height - insets.Top;
+
+                // Padding first (it affects the natural height), then measure, then geometry.
+                sheet.PrepareForMeasure(insets.Bottom);
+                panel = request.Content.ToPlatform(mauiContext);
+                var sheetView = (IView)request.Content;
+                var sheetWidth = Math.Min((double)bounds.Width, sheet.MaxWidth);
+                var natural = sheetView.Measure(sheetWidth, (double)availableHeight).Height;
+                var sheetHeight = sheet.InitializeGeometry((double)availableHeight, Math.Min(natural, (double)availableHeight));
+
+                // Bottom-anchored, centered at the (possibly capped) width; the sheet's own
+                // TranslationY does the rest. Virtual arrange: a valid MAUI frame is required
+                // for translations to apply.
+                sheetView.Arrange(new Rect((bounds.Width - sheetWidth) / 2, bounds.Height - sheetHeight, sheetWidth, sheetHeight));
                 container.AddSubview(panel);
 
                 break;
@@ -829,13 +858,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
         var panel = content.ToPlatform(mauiContext);
 
-        // The panel hugs its content and centers, mirroring the bar pill's own sizing.
-        var fitted = panel.SizeThatFits(new CGSize(maxWidth, maxHeight));
-        var width = Math.Min((double)fitted.Width, maxWidth);
-        var height = Math.Min((double)fitted.Height, maxHeight);
+        // The panel hugs its content and centers, mirroring the bar pill's own sizing. Virtual
+        // measure/arrange: a valid MAUI frame is required for the transform mappers to apply.
+        var panelView = (IView)content;
+        var fitted = panelView.Measure(maxWidth, (double)maxHeight);
+        var width = Math.Min(fitted.Width, maxWidth);
+        var height = Math.Min(fitted.Height, (double)maxHeight);
 
         var y = bounds.Height - excludedBottom - _overflowGap - height;
-        panel.Frame = new CGRect((bounds.Width - width) / 2, y, width, height);
+        panelView.Arrange(new Rect((bounds.Width - width) / 2, y, width, height));
 
         if (chromeLayer is not null)
         {

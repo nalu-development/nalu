@@ -10,7 +10,10 @@ internal enum ScaffoldOverlayKind
     TabBarPanel,
 
     /// <summary>A popup (top layer, placed per <see cref="ScaffoldPopupOptions"/>, fades in). Stacks freely.</summary>
-    Popup
+    Popup,
+
+    /// <summary>A bottom sheet (top layer, slides from the bottom edge; the sheet view owns its translation). Stacks freely.</summary>
+    BottomSheet
 }
 
 /// <summary>
@@ -104,6 +107,9 @@ internal static class ScaffoldOverlayAnimations
                 content.Scale = 0.97;
 
                 break;
+
+                // BottomSheet: the sheet view owns ALL its translation (EnterAsync parks it
+                // offscreen itself) — preparing anything here would fight it.
         }
     }
 
@@ -118,6 +124,7 @@ internal static class ScaffoldOverlayAnimations
                     request.Content.FadeTo(1, _duration),
                     request.Content.ScaleTo(1, _duration, Easing.CubicOut)
                 ),
+                ScaffoldOverlayKind.BottomSheet => ((ScaffoldBottomSheetView)request.Content).EnterAsync(),
                 _ => Task.WhenAll(
                     request.Content.FadeTo(1, _duration),
                     request.Content.TranslateTo(0, 0, _duration, Easing.CubicOut)
@@ -136,6 +143,7 @@ internal static class ScaffoldOverlayAnimations
                     request.Content.FadeTo(0, _duration),
                     request.Content.ScaleTo(0.97, _duration, Easing.CubicIn)
                 ),
+                ScaffoldOverlayKind.BottomSheet => ((ScaffoldBottomSheetView)request.Content).ExitAsync(),
                 _ => Task.WhenAll(
                     request.Content.FadeTo(0, _duration),
                     request.Content.TranslateTo(0, 24, _duration, Easing.CubicIn)

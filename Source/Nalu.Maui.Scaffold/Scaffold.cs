@@ -475,6 +475,66 @@ public partial class Scaffold : ContentPage, IDisposable
         return handle;
     }
 
+    /// <summary>
+    /// Presents a bottom sheet in the top overlay layer: it slides from the bottom edge over
+    /// any chrome (only system insets shape the presentation area — the bottom inset pads the
+    /// content clear of the home indicator). The content is wrapped in a
+    /// <see cref="ScaffoldBottomSheetView"/> handling drag between detents and
+    /// pull-down-to-close entirely at the virtual view layer.
+    /// </summary>
+    /// <param name="content">
+    /// The sheet content. Attached to this scaffold's element tree while presented (styles and
+    /// BindingContext flow); treated as single-use — handlers are disconnected on close.
+    /// </param>
+    /// <param name="options">The presentation options; a content-hugging, pull-down-closable sheet when omitted.</param>
+    /// <returns>
+    /// The lifetime handle: close it, await <see cref="IScaffoldPopup.Closed"/>, or scope it
+    /// with <c>await using</c>. When the scaffold is not presented yet, the returned handle is
+    /// already closed (<see cref="IScaffoldPopup.IsOpen"/> is false).
+    /// </returns>
+    public async Task<IScaffoldPopup> ShowBottomSheetAsync(View content, ScaffoldBottomSheetOptions? options = null)
+    {
+        options ??= new ScaffoldBottomSheetOptions();
+        var handle = new ScaffoldPopupHandle();
+
+        if (Presenter is not { } presenter)
+        {
+            handle.MarkClosed();
+
+            return handle;
+        }
+
+        var sheetView = new ScaffoldBottomSheetView(content, options);
+        AddLogicalChild(sheetView);
+
+        var request = new ScaffoldOverlayRequest
+        {
+            Kind = ScaffoldOverlayKind.BottomSheet,
+            Content = sheetView,
+            Scrim = options.Scrim ?? CreateDefaultScrim(),
+            CloseOnScrimTap = options.CloseOnScrimTap,
+            CloseOnBack = options.CloseOnBack,
+            DisconnectContentOnClose = true,
+            ScrimAutomationId = "SheetScrim"
+        };
+
+        request.Cleanup = () =>
+        {
+            RemoveLogicalChild(sheetView);
+            handle.MarkClosed();
+        };
+
+        handle.Attach(this, request);
+
+        // Pull-down rides the same close path as every other dismissal (scrim fade + cleanup).
+        sheetView.SetDismissCallback(() => presenter.CloseOverlayAsync(request));
+
+        // On failure the presenter has already run Cleanup — the handle comes back closed.
+        await presenter.ShowOverlayAsync(request).ConfigureAwait(true);
+
+        return handle;
+    }
+
     /// <summary>Closes the presented tab bar panel, if any.</summary>
     public Task CloseTabBarPanelAsync()
         => Presenter is { } presenter && _tabBarPanelRequest is { } request

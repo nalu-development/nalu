@@ -918,11 +918,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             {
                 var systemInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
 
+                var margin = request.PopupOptions?.Margin ?? new Thickness(16);
+
                 var area = new Rect(
-                    context.FromPixels(systemInsets?.Left ?? 0),
-                    context.FromPixels(systemInsets?.Top ?? 0),
-                    context.FromPixels(platformView.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)),
-                    context.FromPixels(platformView.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0))
+                    context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
+                    context.FromPixels(systemInsets?.Top ?? 0) + margin.Top,
+                    Math.Max(0, context.FromPixels(platformView.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)) - margin.HorizontalThickness),
+                    Math.Max(0, context.FromPixels(platformView.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0)) - margin.VerticalThickness)
                 );
 
                 panel = request.Content.ToPlatform(mauiContext);
@@ -965,6 +967,39 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                 };
 
                 platformView.AddView(panel, popupLayoutParams);
+
+                break;
+            }
+
+            case ScaffoldOverlayKind.BottomSheet:
+            {
+                var sheet = (ScaffoldBottomSheetView)request.Content;
+                var sheetInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+                var availableHeight = context.FromPixels(platformView.Height - (sheetInsets?.Top ?? 0));
+
+                // Padding first (it affects the natural height), then measure, then geometry.
+                sheet.PrepareForMeasure(context.FromPixels(sheetInsets?.Bottom ?? 0));
+                panel = request.Content.ToPlatform(mauiContext);
+                (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+                var sheetWidthPx = (int)Math.Min(platformView.Width, context.ToPixels(sheet.MaxWidth));
+
+                panel.Measure(
+                    AView.MeasureSpec.MakeMeasureSpec(sheetWidthPx, MeasureSpecMode.Exactly),
+                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(availableHeight), MeasureSpecMode.AtMost)
+                );
+
+                var natural = Math.Min(context.FromPixels(panel.MeasuredHeight), availableHeight);
+                var sheetHeight = sheet.InitializeGeometry(availableHeight, natural);
+
+                // Bottom-anchored, centered at the (possibly capped) width; the sheet's own
+                // TranslationY does the rest.
+                var sheetLayoutParams = new Android.Widget.FrameLayout.LayoutParams(sheetWidthPx, (int)context.ToPixels(sheetHeight))
+                {
+                    Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal
+                };
+
+                platformView.AddView(panel, sheetLayoutParams);
 
                 break;
             }

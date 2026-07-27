@@ -83,6 +83,15 @@ public sealed class ScaffoldPopupOptions
     /// </summary>
     public bool CloseOnBack { get; init; } = true;
 
+    /// <summary>
+    /// Gets or sets the minimum gap kept between the popup and the safe-area edges (the
+    /// placement area shrinks by it). Defaults to 16. To cap the popup's own size, set
+    /// <see cref="VisualElement.MaximumWidthRequest"/> /
+    /// <see cref="VisualElement.MaximumHeightRequest"/> on the content — both participate in
+    /// the popup measure.
+    /// </summary>
+    public Thickness Margin { get; init; } = new(16);
+
     /// <summary>Gets or sets the placement. Anchor placements require <see cref="Anchor"/>.</summary>
     public ScaffoldPopupPlacement Placement { get; init; } = ScaffoldPopupPlacement.Center;
 
