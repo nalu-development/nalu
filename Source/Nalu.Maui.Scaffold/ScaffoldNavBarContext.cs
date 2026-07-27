@@ -32,42 +32,42 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     public string? Title
     {
         get => _title;
-        private set => SetField(ref _title, value);
+        internal set => SetField(ref _title, value);
     }
 
     /// <summary>Gets the current page's <see cref="Scaffold.TitleViewProperty"/> content, replacing the title label when set.</summary>
     public View? TitleView
     {
         get => _titleView;
-        private set => SetField(ref _titleView, value);
+        internal set => SetField(ref _titleView, value);
     }
 
     /// <summary>Gets whether the current navigation stack has at least one pushed page.</summary>
     public bool CanNavigateBack
     {
         get => _canNavigateBack;
-        private set => SetField(ref _canNavigateBack, value);
+        internal set => SetField(ref _canNavigateBack, value);
     }
 
     /// <summary>Gets whether the start-drawer button should show (content resolves + policy).</summary>
     public bool IsFlyoutStartButtonVisible
     {
         get => _isFlyoutStartButtonVisible;
-        private set => SetField(ref _isFlyoutStartButtonVisible, value);
+        internal set => SetField(ref _isFlyoutStartButtonVisible, value);
     }
 
     /// <summary>Gets whether the end-drawer button should show (content resolves + policy).</summary>
     public bool IsFlyoutEndButtonVisible
     {
         get => _isFlyoutEndButtonVisible;
-        private set => SetField(ref _isFlyoutEndButtonVisible, value);
+        internal set => SetField(ref _isFlyoutEndButtonVisible, value);
     }
 
     /// <summary>Gets whether the current page is a modal page (<see cref="Scaffold.PageModeProperty"/>).</summary>
     public bool IsModal
     {
         get => _isModal;
-        private set => SetField(ref _isModal, value);
+        internal set => SetField(ref _isModal, value);
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     public bool IsCloseButtonVisible
     {
         get => _isCloseButtonVisible;
-        private set => SetField(ref _isCloseButtonVisible, value);
+        internal set => SetField(ref _isCloseButtonVisible, value);
     }
 
     /// <summary>Pops the current page through the navigation engine — guards and lifecycle run.</summary>

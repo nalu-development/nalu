@@ -95,11 +95,11 @@ public abstract class ScaffoldNavBarButtonBase : Border
         ApplyStyling();
     }
 
-    /// <summary>Binds the tap command to the given context property path.</summary>
-    private protected void BindCommand(string commandPath) => _tap.SetBinding(TapGestureRecognizer.CommandProperty, new Binding(commandPath));
+    /// <summary>Binds the tap command with the given (trim-safe, typed) binding.</summary>
+    private protected void BindCommand(BindingBase binding) => _tap.SetBinding(TapGestureRecognizer.CommandProperty, binding);
 
-    /// <summary>Binds visibility to the given context property path.</summary>
-    private protected void BindVisibility(string visibilityPath) => this.SetBinding(IsVisibleProperty, new Binding(visibilityPath));
+    /// <summary>Binds visibility with the given (trim-safe, typed) binding.</summary>
+    private protected void BindVisibility(BindingBase binding) => this.SetBinding(IsVisibleProperty, binding);
 
     private protected void ApplyStyling()
     {
@@ -122,8 +122,9 @@ public sealed class ScaffoldBackButton : ScaffoldNavBarButtonBase
     public ScaffoldBackButton()
         : base("M14.5 5.5 L7.5 12 L14.5 18.5")
     {
-        BindVisibility(nameof(ScaffoldNavBarContext.CanNavigateBack));
-        BindCommand(nameof(ScaffoldNavBarContext.BackCommand));
+        // Typed bindings: string paths resolve via reflection and break under trimming/AOT.
+        BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.CanNavigateBack));
+        BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.BackCommand));
     }
 }
 
@@ -138,8 +139,8 @@ public sealed class ScaffoldCloseButton : ScaffoldNavBarButtonBase
     public ScaffoldCloseButton()
         : base("M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5")
     {
-        BindVisibility(nameof(ScaffoldNavBarContext.IsCloseButtonVisible));
-        BindCommand(nameof(ScaffoldNavBarContext.BackCommand));
+        BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.IsCloseButtonVisible));
+        BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.BackCommand));
     }
 }
 
@@ -172,13 +173,13 @@ public sealed class ScaffoldFlyoutButton : ScaffoldNavBarButtonBase
     {
         if (Side == ScaffoldFlyoutSide.Start)
         {
-            BindVisibility(nameof(ScaffoldNavBarContext.IsFlyoutStartButtonVisible));
-            BindCommand(nameof(ScaffoldNavBarContext.OpenFlyoutStartCommand));
+            BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.IsFlyoutStartButtonVisible));
+            BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.OpenFlyoutStartCommand));
         }
         else
         {
-            BindVisibility(nameof(ScaffoldNavBarContext.IsFlyoutEndButtonVisible));
-            BindCommand(nameof(ScaffoldNavBarContext.OpenFlyoutEndCommand));
+            BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.IsFlyoutEndButtonVisible));
+            BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.OpenFlyoutEndCommand));
         }
     }
 }
@@ -250,7 +251,7 @@ public sealed class ScaffoldNavBarTitle : Grid
             VerticalOptions = LayoutOptions.Center,
             VerticalTextAlignment = TextAlignment.Center
         };
-        _label.SetBinding(Label.TextProperty, new Binding(nameof(ScaffoldNavBarContext.Title)));
+        _label.SetBinding(Label.TextProperty, Binding.Create(static (ScaffoldNavBarContext c) => c.Title));
         Add(_label);
 
         VerticalOptions = LayoutOptions.Center;

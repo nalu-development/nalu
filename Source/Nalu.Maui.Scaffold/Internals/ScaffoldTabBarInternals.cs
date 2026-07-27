@@ -270,7 +270,7 @@ internal sealed class ScaffoldTabBarItemView : Grid
                 HorizontalOptions = LayoutOptions.Center,
                 VerticalOptions = LayoutOptions.Center
             };
-            _icon.SetBinding(Image.SourceProperty, new Binding(nameof(ScaffoldRoot.CurrentIcon), source: root));
+            _icon.SetBinding(Image.SourceProperty, Binding.Create(static (ScaffoldRoot r) => r.CurrentIcon, source: root));
             iconHost.Add(_icon);
         }
         else if (owner.OverflowIcon is { } overflowIcon)
@@ -334,11 +334,11 @@ internal sealed class ScaffoldTabBarItemView : Grid
 
         if (root is not null)
         {
-            _label.SetBinding(Label.TextProperty, new Binding(nameof(ScaffoldRoot.Title), source: root));
+            _label.SetBinding(Label.TextProperty, Binding.Create(static (ScaffoldRoot r) => r.Title, source: root));
         }
         else
         {
-            _label.SetBinding(Label.TextProperty, new Binding(nameof(ScaffoldTabBarView.OverflowTitle), source: owner));
+            _label.SetBinding(Label.TextProperty, Binding.Create(static (ScaffoldTabBarView v) => v.OverflowTitle, source: owner));
         }
 
         Add(new VerticalStackLayout
