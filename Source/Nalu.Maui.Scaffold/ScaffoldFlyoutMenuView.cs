@@ -174,7 +174,7 @@ public class ScaffoldFlyoutMenuView : ScrollView
     protected override void OnParentSet()
     {
         base.OnParentSet();
-        AttachToScaffold(this.FindScaffold());
+        AttachToScaffold(this.GetScaffoldOrDefault());
     }
 
     private void AttachToScaffold(Scaffold? scaffold)

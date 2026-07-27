@@ -31,26 +31,40 @@ internal interface IScaffoldPresenter
     /// </summary>
     Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint);
 
-    /// <summary>Presents the given content as a flyout sliding in from the given side (full scrim behind).</summary>
-    Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content);
+    /// <summary>
+    /// Presents an overlay entry per its request (kind selects z-slot, geometry and animation);
+    /// entries STACK in open order within their slot, each above its own scrim. Returns false —
+    /// after invoking the request's cleanup — when presentation is impossible (no platform
+    /// view). Single-instance policies (one flyout, one tab bar panel) are the SCAFFOLD's
+    /// responsibility; the presenter trusts its input.
+    /// </summary>
+    Task<bool> ShowOverlayAsync(ScaffoldOverlayRequest request);
 
     /// <summary>
-    /// Opens a panel anchored above the bottom chrome, with a fullscreen scrim inserted BELOW
-    /// the tab bar strip in z-order — the bar stays undimmed and interactive (tapping an in-bar
-    /// item both dismisses the panel and performs that selection). Used by the default
-    /// template's "More" overflow and by <see cref="Scaffold.OpenTabBarPanelAsync"/>.
+    /// Swaps the presented tab bar panel's content and scrim in place (content crossfade, no
+    /// scrim re-animation): the <see cref="Scaffold.ShowTabBarPanelAsync"/> replace path.
+    /// The replaced request's cleanup runs; the replacement takes over the entry identity.
     /// </summary>
-    /// <param name="content">The panel view (its horizontal margin positions it).</param>
-    /// <param name="scrimColor">The scrim color.</param>
-    /// <param name="disconnectOnClose">Whether to disconnect the content's handlers on close (single-use panels).</param>
-    /// <param name="cleanup">Invoked when the overlay closes (or when presenting fails).</param>
-    Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup);
+    Task ReplaceTabBarPanelAsync(ScaffoldOverlayRequest replacement);
 
-    /// <summary>Gets whether an overlay (flyout or overflow panel) is currently presented.</summary>
+    /// <summary>Closes the given entry (no-op when it is not presented). Idempotent and safe under concurrent calls.</summary>
+    Task CloseOverlayAsync(ScaffoldOverlayRequest request);
+
+    /// <summary>
+    /// Back-gesture policy: closes the TOPMOST entry when it allows back-dismissal, otherwise
+    /// consumes the gesture without closing. Overlays dismiss before the navigation engine is
+    /// ever consulted.
+    /// </summary>
+    Task CloseTopOverlayAsync();
+
+    /// <summary>Closes every presented entry (navigation commits dismiss all overlays).</summary>
+    Task CloseAllOverlaysAsync();
+
+    /// <summary>Gets whether any overlay entry is presented.</summary>
     bool HasOverlay { get; }
 
-    /// <summary>Dismisses the current overlay, if any. Back gestures dismiss overlays before the navigation engine is consulted.</summary>
-    Task CloseOverlayAsync();
+    /// <summary>Gets whether the given entry is currently presented.</summary>
+    bool IsOverlayPresented(ScaffoldOverlayRequest request);
 }
 
 /// <summary>How a <see cref="IScaffoldPresenter.SynchronizeAsync"/> pass should be animated.</summary>

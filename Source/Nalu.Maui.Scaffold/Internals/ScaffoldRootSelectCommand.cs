@@ -36,7 +36,7 @@ internal sealed class ScaffoldRootSelectCommand(ScaffoldRoot root) : ICommand
     /// </summary>
     private Scaffold? ObserveScaffold()
     {
-        var scaffold = root.FindScaffold();
+        var scaffold = root.GetScaffoldOrDefault();
 
         if (!ReferenceEquals(scaffold, _observedScaffold))
         {

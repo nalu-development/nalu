@@ -40,11 +40,19 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private bool _navBarPresented;
     private Android.Animation.ObjectAnimator? _navStripAnimator;
 
-    private AView? _overlayScrim;
-    private AView? _overlayPanel;
-    private View? _overlayContent;
-    private ScaffoldOverlayPlacement _overlayPlacement;
-    private Action? _overlayCleanup;
+    /// <summary>One presented §5.6 overlay entry: scrim + content, stacked in open order.</summary>
+    private sealed class OverlayEntry
+    {
+        public required ScaffoldOverlayRequest Request { get; set; }
+        public required View ScrimView { get; init; }
+        public required AView ScrimPlatform { get; init; }
+        public required AView ContentPlatform { get; set; }
+        public double FlyoutOffscreenTranslation { get; init; }
+        public bool Closing { get; set; }
+        public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private readonly List<OverlayEntry> _overlays = [];
 
     private ScaffoldRoot? _currentRoot;
     private AView? _backPeekView;
@@ -53,17 +61,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private bool _backPreviewActive;
     private Page? _predictiveHandoffPage;
 
-    public bool HasOverlay => _overlayPanel is not null;
+    public bool HasOverlay => _overlays.Count > 0;
+
+    public bool IsOverlayPresented(ScaffoldOverlayRequest request) => FindEntry(request) is not null;
+
+    private OverlayEntry? FindEntry(ScaffoldOverlayRequest request)
+        => _overlays.Find(entry => ReferenceEquals(entry.Request, request));
 
     /// <summary>Whether a predictive-back preview is currently scrubbing.</summary>
     public bool HasBackPreview => _backPreviewActive;
-
-    private enum ScaffoldOverlayPlacement
-    {
-        FlyoutStart,
-        FlyoutEnd,
-        AboveBottomChrome
-    }
 
     public async Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint)
     {
@@ -86,7 +92,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         }
 
         // Navigation dismisses any open overlay (flyout, overflow panel).
-        await CloseOverlayAsync();
+        await CloseAllOverlaysAsync();
 
         var container = EnsureContainer(platformView);
         var stack = root.NavigationStack;
@@ -819,65 +825,38 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         }
     }
 
-    public Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content)
-        => ShowOverlayAsync(
-            content,
-            side == ScaffoldFlyoutSide.Start ? ScaffoldOverlayPlacement.FlyoutStart : ScaffoldOverlayPlacement.FlyoutEnd,
-            scaffold.GetEffectiveFlyoutOptions(side).ComputeScrimColor(),
-            behindBottomChrome: false,
-            disconnectOnClose: false
-        );
-
     /// <summary>
-    /// Maps a logical drawer placement to the physical LEFT edge (false = right): Start is left
+    /// Maps a logical drawer side to the physical LEFT edge (false = right): Start is left
     /// in LTR — the single spot the RTL mapping lives in (placement and slide direction).
     /// </summary>
-    private bool IsFlyoutOnLeft(ScaffoldOverlayPlacement placement)
-        => placement == ScaffoldOverlayPlacement.FlyoutStart != scaffold.IsRightToLeft;
+    private bool IsFlyoutOnLeft(ScaffoldFlyoutSide side)
+        => side == ScaffoldFlyoutSide.Start != scaffold.IsRightToLeft;
 
-    public async Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup)
+    public async Task<bool> ShowOverlayAsync(ScaffoldOverlayRequest request)
     {
-        if (HasOverlay)
-        {
-            cleanup?.Invoke();
-
-            return;
-        }
-
-        _overlayCleanup = cleanup;
-
-        await ShowOverlayAsync(content, ScaffoldOverlayPlacement.AboveBottomChrome, scrimColor, behindBottomChrome: true, disconnectOnClose);
-
-        if (!HasOverlay)
-        {
-            // Presenting failed (no handler/platform view): release the caller's resources.
-            _overlayCleanup = null;
-            cleanup?.Invoke();
-        }
-    }
-
-    /// <summary>
-    /// §5.6 overlay primitive: scrim + panel. With <paramref name="behindBottomChrome"/>
-    /// (reserved for the tab bar overflow panel) the FULLSCREEN scrim and the panel are
-    /// inserted BELOW the bottom chrome strip in z-order — the tab bar renders above the scrim,
-    /// undimmed and interactive, with no exclusion geometry to maintain.
-    /// </summary>
-    private async Task ShowOverlayAsync(View content, ScaffoldOverlayPlacement placement, Color scrimColor, bool behindBottomChrome, bool disconnectOnClose)
-    {
-        if (_overlayPanel is not null
-            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext }
+        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext }
             || platformView.Context is not { } context)
         {
-            return;
+            request.Cleanup?.Invoke();
+
+            return false;
         }
 
-        var chromeLayer = behindBottomChrome && _tabBarStrip is { Visibility: ViewStates.Visible } strip ? strip : null;
+        // The tab bar panel slot sits BELOW the bottom chrome strip in z-order — the bar
+        // renders above the scrim, undimmed and interactive. Everything else stacks on top.
+        var chromeLayer = request.Kind == ScaffoldOverlayKind.TabBarPanel && _tabBarStrip is { Visibility: ViewStates.Visible } strip ? strip : null;
         var chromeLayerIndex = chromeLayer is null ? -1 : platformView.IndexOfChild(chromeLayer);
-        var excludedBottom = behindBottomChrome ? platformView.ChromeBottomFootprint : 0;
 
-        var scrim = new AView(context) { Clickable = true, Alpha = 0 };
-        scrim.SetBackgroundColor(scrimColor.ToPlatform());
-        scrim.Click += (_, _) => _ = CloseOverlayAsync();
+        var scrimView = request.CreateScrimView();
+        var scrim = scrimView.ToPlatform(mauiContext);
+        scrim.Clickable = true;
+        scrim.Click += (_, _) =>
+        {
+            if (request.CloseOnScrimTap)
+            {
+                _ = CloseOverlayAsync(request);
+            }
+        };
 
         var scrimLayoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent);
 
@@ -890,145 +869,185 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             platformView.AddView(scrim, scrimLayoutParams);
         }
 
-        var panel = content.ToPlatform(mauiContext);
-        (panel.Parent as AViewGroup)?.RemoveView(panel);
+        double flyoutOffscreen = 0;
+        AView panel;
 
-        _overlayScrim = scrim;
-        _overlayPanel = panel;
-        _overlayContent = disconnectOnClose ? content : null;
-        _overlayPlacement = placement;
-        scaffold.UpdateBackCallbackEnabled();
-
-        switch (placement)
+        switch (request.Kind)
         {
-            case ScaffoldOverlayPlacement.FlyoutStart:
-            case ScaffoldOverlayPlacement.FlyoutEnd:
+            case ScaffoldOverlayKind.Flyout:
             {
-                var side = placement == ScaffoldOverlayPlacement.FlyoutStart ? ScaffoldFlyoutSide.Start : ScaffoldFlyoutSide.End;
-                var options = scaffold.GetEffectiveFlyoutOptions(side);
+                var options = scaffold.GetEffectiveFlyoutOptions(request.FlyoutSide);
                 var containerWidthDp = context.FromPixels(platformView.Width);
-                var widthPx = (int)context.ToPixels(options.ComputeWidth(containerWidthDp));
-                var onLeft = IsFlyoutOnLeft(placement);
+                var widthDp = options.ComputeWidth(containerWidthDp);
+                var widthPx = (int)context.ToPixels(widthDp);
+                var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
+
+                panel = request.Content.ToPlatform(mauiContext);
+                (panel.Parent as AViewGroup)?.RemoveView(panel);
 
                 panel.LayoutParameters = new Android.Widget.FrameLayout.LayoutParams(widthPx, AViewGroup.LayoutParams.MatchParent)
                 {
                     Gravity = onLeft ? GravityFlags.Left : GravityFlags.Right
                 };
-                panel.TranslationX = onLeft ? -widthPx : widthPx;
-                platformView.AddView(panel);
 
-                await AnimateOverlayAsync(scrim, scrimAlpha: 1, panel, panelProperty: "translationX", panelTarget: 0);
-                scaffold.OnFlyoutPresented(side);
+                // Entrance offset rides the MAUI translation (dp), applied after mounting.
+                flyoutOffscreen = onLeft ? -widthDp : widthDp;
+                platformView.AddView(panel);
 
                 break;
             }
 
-            case ScaffoldOverlayPlacement.AboveBottomChrome:
+            default:
             {
-                var gapPx = (int)context.ToPixels(_overflowGapDp);
-                var margin = content.Margin;
-
-                // The panel hugs its content and centers, mirroring the bar pill's own sizing.
-                var panelLayoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.WrapContent, AViewGroup.LayoutParams.WrapContent)
-                {
-                    Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal,
-                    LeftMargin = (int)context.ToPixels(margin.Left),
-                    RightMargin = (int)context.ToPixels(margin.Right),
-                    BottomMargin = excludedBottom + gapPx
-                };
-                panel.Alpha = 0;
-                panel.TranslationY = context.ToPixels(24);
-
-                if (chromeLayerIndex >= 0)
-                {
-                    platformView.AddView(panel, chromeLayerIndex, panelLayoutParams);
-                }
-                else
-                {
-                    platformView.AddView(panel, panelLayoutParams);
-                }
-
-                await AnimateOverlayAsync(scrim, scrimAlpha: 1, panel, panelProperty: "translationY", panelTarget: 0, alsoFadePanel: true);
+                panel = MountTabBarPanelContent(request.Content, platformView, context, mauiContext, chromeLayerIndex);
 
                 break;
             }
         }
+
+        var entry = new OverlayEntry
+        {
+            Request = request,
+            ScrimView = scrimView,
+            ScrimPlatform = scrim,
+            ContentPlatform = panel,
+            FlyoutOffscreenTranslation = flyoutOffscreen
+        };
+
+        _overlays.Add(entry);
+        scaffold.UpdateBackCallbackEnabled();
+
+        ScaffoldOverlayAnimations.PrepareEnter(request, flyoutOffscreen);
+        await ScaffoldOverlayAnimations.EnterAsync(request, scrimView);
+
+        return true;
     }
 
-    public async Task CloseOverlayAsync()
+    /// <summary>
+    /// Mounts a tab bar panel at its resting position: hugging its content, centered, above the
+    /// bottom chrome footprint (inserted below the strip when present).
+    /// </summary>
+    private AView MountTabBarPanelContent(View content, ScaffoldLayout platformView, Android.Content.Context context, IMauiContext mauiContext, int chromeLayerIndex)
     {
-        if (_overlayPanel is not { } panel || _overlayScrim is not { } scrim)
+        var gapPx = (int)context.ToPixels(_overflowGapDp);
+        var excludedBottom = chromeLayerIndex >= 0 ? platformView.ChromeBottomFootprint : 0;
+        var margin = content.Margin;
+
+        var panel = content.ToPlatform(mauiContext);
+        (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+        // The panel hugs its content and centers, mirroring the bar pill's own sizing.
+        var panelLayoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.WrapContent, AViewGroup.LayoutParams.WrapContent)
         {
+            Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal,
+            LeftMargin = (int)context.ToPixels(margin.Left),
+            RightMargin = (int)context.ToPixels(margin.Right),
+            BottomMargin = excludedBottom + gapPx
+        };
+
+        if (chromeLayerIndex >= 0)
+        {
+            platformView.AddView(panel, chromeLayerIndex, panelLayoutParams);
+        }
+        else
+        {
+            platformView.AddView(panel, panelLayoutParams);
+        }
+
+        return panel;
+    }
+
+    public async Task ReplaceTabBarPanelAsync(ScaffoldOverlayRequest replacement)
+    {
+        var entry = _overlays.Find(static candidate => candidate.Request.Kind == ScaffoldOverlayKind.TabBarPanel && !candidate.Closing);
+
+        if (entry is null)
+        {
+            await ShowOverlayAsync(replacement);
+
             return;
         }
 
-        var content = _overlayContent;
-        var placement = _overlayPlacement;
-        var cleanup = _overlayCleanup;
-        _overlayPanel = null;
-        _overlayScrim = null;
-        _overlayContent = null;
-        _overlayCleanup = null;
-        cleanup?.Invoke();
-
-        switch (placement)
+        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext }
+            || platformView.Context is not { } context)
         {
-            case ScaffoldOverlayPlacement.FlyoutStart:
-            case ScaffoldOverlayPlacement.FlyoutEnd:
-                await AnimateOverlayAsync(
-                    scrim,
-                    scrimAlpha: 0,
-                    panel,
-                    panelProperty: "translationX",
-                    panelTarget: IsFlyoutOnLeft(placement) ? -panel.Width : panel.Width
-                );
+            replacement.Cleanup?.Invoke();
 
-                break;
-
-            case ScaffoldOverlayPlacement.AboveBottomChrome:
-                await AnimateOverlayAsync(scrim, scrimAlpha: 0, panel, panelProperty: "translationY", panelTarget: panel.Context is { } ctx ? ctx.ToPixels(24) : 24, alsoFadePanel: true);
-
-                break;
+            return;
         }
 
-        (panel.Parent as AViewGroup)?.RemoveView(panel);
-        (scrim.Parent as AViewGroup)?.RemoveView(scrim);
+        var previous = entry.Request;
+        entry.Request = replacement;
 
-        if (content is not null)
+        // Scrim: brush update only, no re-animation.
+        entry.ScrimView.Background = replacement.Scrim;
+
+        await previous.Content.FadeTo(0, 100);
+        (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
+        ScaffoldOverlayAnimations.ResetContent(previous.Content);
+        previous.Cleanup?.Invoke();
+
+        if (previous.DisconnectContentOnClose)
         {
-            content.DisconnectHandlers();
+            previous.Content.DisconnectHandlers();
         }
 
-        if (placement is ScaffoldOverlayPlacement.FlyoutStart or ScaffoldOverlayPlacement.FlyoutEnd)
-        {
-            scaffold.OnFlyoutDismissed(placement == ScaffoldOverlayPlacement.FlyoutStart ? ScaffoldFlyoutSide.Start : ScaffoldFlyoutSide.End);
-        }
+        var chromeLayer = _tabBarStrip is { Visibility: ViewStates.Visible } strip ? strip : null;
+        var chromeLayerIndex = chromeLayer is null ? -1 : platformView.IndexOfChild(chromeLayer);
+        var panel = MountTabBarPanelContent(replacement.Content, platformView, context, mauiContext, chromeLayerIndex);
+        entry.ContentPlatform = panel;
 
-        scaffold.UpdateBackCallbackEnabled();
+        replacement.Content.Opacity = 0;
+        await replacement.Content.FadeTo(1, 100);
     }
 
-    private static Task AnimateOverlayAsync(AView scrim, float scrimAlpha, AView panel, string panelProperty, float panelTarget, bool alsoFadePanel = false)
+    public Task CloseOverlayAsync(ScaffoldOverlayRequest request)
+        => FindEntry(request) is { } entry ? CloseEntryAsync(entry) : Task.CompletedTask;
+
+    public Task CloseTopOverlayAsync()
+        => _overlays.Count > 0 && _overlays[^1] is { Request.CloseOnBack: true } top
+            ? CloseEntryAsync(top)
+            : Task.CompletedTask;
+
+    public Task CloseAllOverlaysAsync()
+        => _overlays.Count == 0
+            ? Task.CompletedTask
+            : Task.WhenAll(_overlays.ToArray().Select(CloseEntryAsync));
+
+    private async Task CloseEntryAsync(OverlayEntry entry)
     {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var current = panelProperty == "translationX" ? panel.TranslationX : panel.TranslationY;
-        var panelAnimator = Android.Animation.ObjectAnimator.OfFloat(panel, panelProperty, current, panelTarget)!;
-        panelAnimator.SetDuration(_overlayDurationMs);
-        panelAnimator.AnimationEnd += (_, _) => completion.TrySetResult();
-
-        var scrimAnimator = Android.Animation.ObjectAnimator.OfFloat(scrim, "alpha", scrim.Alpha, scrimAlpha)!;
-        scrimAnimator.SetDuration(_overlayDurationMs);
-
-        if (alsoFadePanel)
+        if (entry.Closing)
         {
-            var panelFadeAnimator = Android.Animation.ObjectAnimator.OfFloat(panel, "alpha", panel.Alpha, scrimAlpha)!;
-            panelFadeAnimator.SetDuration(_overlayDurationMs);
-            panelFadeAnimator.Start();
+            // Concurrent close: ride the in-flight one (same UI context; RunContinuationsAsynchronously).
+#pragma warning disable VSTHRD003
+            await entry.ClosedTcs.Task;
+#pragma warning restore VSTHRD003
+
+            return;
         }
 
-        panelAnimator.Start();
-        scrimAnimator.Start();
+        entry.Closing = true;
+        var request = entry.Request;
 
-        return completion.Task;
+        // Owner cleanup runs BEFORE the exit animation (matching the original primitive):
+        // state clears immediately, so a rapid re-open is never blocked by the animation tail.
+        request.Cleanup?.Invoke();
+
+        await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
+
+        (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
+        (entry.ScrimPlatform.Parent as AViewGroup)?.RemoveView(entry.ScrimPlatform);
+        _overlays.Remove(entry);
+
+        ScaffoldOverlayAnimations.ResetContent(request.Content);
+        entry.ScrimView.DisconnectHandlers();
+
+        if (request.DisconnectContentOnClose)
+        {
+            request.Content.DisconnectHandlers();
+        }
+
+        entry.ClosedTcs.TrySetResult();
+        scaffold.UpdateBackCallbackEnabled();
     }
 }

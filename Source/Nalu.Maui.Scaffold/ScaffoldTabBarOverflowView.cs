@@ -54,9 +54,12 @@ public sealed class ScaffoldTabBarOverflowView : Border
             propertyChanged: static panel => (_, value) => panel.Shadow = value
         );
 
-    /// <summary>Bindable property for <see cref="ScrimColor"/>.</summary>
-    public static readonly BindableProperty ScrimColorProperty =
-        GenericBindableProperty<ScaffoldTabBarOverflowView>.Create(nameof(ScrimColor), Colors.Black.WithAlpha(0.45f));
+    /// <summary>Bindable property for <see cref="Scrim"/>.</summary>
+    public static readonly BindableProperty ScrimProperty =
+        GenericBindableProperty<ScaffoldTabBarOverflowView>.Create<Brush?>(
+            nameof(Scrim),
+            defaultValueCreator: static _ => new SolidColorBrush(Colors.Black.WithAlpha(0.45f))
+        );
 
     /// <summary>
     /// Gets or sets the panel background. Drives the view's own
@@ -83,14 +86,14 @@ public sealed class ScaffoldTabBarOverflowView : Border
     }
 
     /// <summary>
-    /// Gets or sets the scrim color shown behind the panel. The scrim renders below the tab bar
-    /// in z-order — the bar stays undimmed and interactive while the panel is open. Read when
-    /// the panel opens.
+    /// Gets or sets the scrim brush shown behind the panel (gradients supported). The scrim
+    /// renders below the tab bar in z-order — the bar stays undimmed and interactive while the
+    /// panel is open. Read when the panel opens.
     /// </summary>
-    public Color ScrimColor
+    public Brush? Scrim
     {
-        get => (Color)GetValue(ScrimColorProperty);
-        set => SetValue(ScrimColorProperty, value);
+        get => (Brush?)GetValue(ScrimProperty);
+        set => SetValue(ScrimProperty, value);
     }
 
     internal ScaffoldTabBarOverflowView(ScaffoldTabBarView barView, Func<Task> closeAsync)

@@ -53,7 +53,7 @@ public class ScaffoldTabBar : ScaffoldArea
     /// <param name="root">The root to select; must belong to this tab bar's <see cref="ScaffoldArea.Roots"/>.</param>
     /// <returns>True when the navigation was executed (even if a guard canceled it midway).</returns>
     public Task<bool> SelectRootAsync(ScaffoldRoot root)
-        => this.FindScaffold() is { } scaffold ? scaffold.SelectRootGatedAsync(root) : Task.FromResult(false);
+        => this.GetScaffoldOrDefault() is { } scaffold ? scaffold.SelectRootGatedAsync(root) : Task.FromResult(false);
 
     /// <summary>
     /// Gets the view the presenter mounts as the bar (the default template or a user
@@ -100,14 +100,14 @@ public class ScaffoldTabBar : ScaffoldArea
     /// <summary>
     /// Presents a panel anchored above the bottom chrome with the tab bar kept interactive —
     /// the same primitive the default template's "More" overflow uses, for custom tab bars
-    /// (e.g. a special button opening its own panel). Toggle semantics: when an overlay is
-    /// already presented, the call dismisses it instead.
-    /// See <see cref="Scaffold.OpenTabBarPanelAsync"/> for the full contract.
+    /// (e.g. a special button opening its own panel).
+    /// See <see cref="Scaffold.ShowTabBarPanelAsync"/> for the full contract.
     /// </summary>
     /// <param name="content">The panel view (reusable; horizontal margin insets it).</param>
-    /// <param name="scrimColor">The scrim color; a theme-aware translucent black when omitted.</param>
-    public Task OpenPanelAsync(View content, Color? scrimColor = null)
-        => this.FindScaffold() is { } scaffold ? scaffold.OpenTabBarPanelAsync(content, scrimColor) : Task.CompletedTask;
+    /// <param name="scrim">The scrim brush; a theme-aware translucent black when omitted.</param>
+    /// <param name="closeIfOpened">Toggle (true, default) vs replace-in-place (false) when a panel is already presented.</param>
+    public Task ShowPanelAsync(View content, Brush? scrim = null, bool closeIfOpened = true)
+        => this.GetScaffoldOrDefault() is { } scaffold ? scaffold.ShowTabBarPanelAsync(content, scrim, closeIfOpened) : Task.CompletedTask;
 
     /// <summary>
     /// Opens the overflow panel listing the roots that don't fit the bar (toggling when already
@@ -116,37 +116,38 @@ public class ScaffoldTabBar : ScaffoldArea
     /// </summary>
     internal Task OpenOverflowAsync()
     {
-        if (this.FindScaffold() is not { Presenter: { } presenter }
+        if (this.GetScaffoldOrDefault() is not { } scaffold
             || TabBarView is not ScaffoldTabBarView { OverflowRoots.Count: > 0 } barView)
         {
             return Task.CompletedTask;
         }
 
-        if (presenter.HasOverlay)
+        if (scaffold.HasTabBarPanel)
         {
             // Toggle: the bar stays interactive above the scrim, so a second More tap can only
             // mean "dismiss" (the flyout's fullscreen scrim makes any other overlay unreachable).
-            return presenter.CloseOverlayAsync();
+            return scaffold.CloseTabBarPanelAsync();
         }
 
-        var panel = new ScaffoldTabBarOverflowView(barView, presenter.CloseOverlayAsync)
+        var panel = new ScaffoldTabBarOverflowView(barView, scaffold.CloseTabBarPanelAsync)
         {
             Margin = new Thickness(barView.BarMargin.Left, 0, barView.BarMargin.Right, 0)
         };
 
         // Logical parenting: the panel participates in the element tree while presented
         // (BindingContext/resource flow, visual-tree visibility for tooling and UI tests).
-        // Must precede the ScrimColor read below — implicit styles have applied by then.
+        // Must precede the Scrim read below — implicit styles have applied by then.
         AddLogicalChild(panel);
 
         // The overflow set is recomputed per layout pass: rotation/resize migrating items
         // between bar and panel invalidates an open panel.
         barView.OverflowRootsChanged += OnOverflowRootsChanged;
 
-        return presenter.OpenTabBarPanelAsync(
+        return scaffold.ShowTabBarPanelCoreAsync(
             panel,
-            panel.ScrimColor,
-            disconnectOnClose: true,
+            panel.Scrim,
+            closeIfOpened: true,
+            disconnectContentOnClose: true,
             cleanup: () =>
             {
                 barView.OverflowRootsChanged -= OnOverflowRootsChanged;
@@ -155,6 +156,6 @@ public class ScaffoldTabBar : ScaffoldArea
             }
         );
 
-        void OnOverflowRootsChanged() => _ = presenter.CloseOverlayAsync();
+        void OnOverflowRootsChanged() => _ = scaffold.CloseTabBarPanelAsync();
     }
 }

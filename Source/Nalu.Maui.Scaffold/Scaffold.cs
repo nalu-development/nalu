@@ -317,34 +317,82 @@ public partial class Scaffold : ContentPage, IDisposable
         }
     }
 
+    private ScaffoldOverlayRequest? _flyoutRequest;
+    private ScaffoldOverlayRequest? _tabBarPanelRequest;
+
+    /// <summary>Gets whether a tab bar panel is currently presented.</summary>
+    public bool HasTabBarPanel => _tabBarPanelRequest is not null;
+
+    /// <summary>The default overlay scrim: a theme-aware translucent black.</summary>
+    internal static Brush CreateDefaultScrim()
+    {
+        var dark = (Application.Current?.RequestedTheme ?? AppTheme.Light) == AppTheme.Dark;
+
+        return new SolidColorBrush(Colors.Black.WithAlpha(dark ? 0.55f : 0.45f));
+    }
+
     /// <summary>
     /// Opens the flyout for the given side, resolving its content from the current page,
     /// then the current area, then the scaffold's own value. No-op when the drawer does not
     /// exist — no content configured at any level, its mode resolves to
     /// <see cref="ScaffoldFlyoutMode.Disabled"/> (or <see cref="ScaffoldFlyoutMode.Auto"/>
-    /// while pages are pushed) — or the scaffold is not presented yet.
+    /// while pages are pushed) — or the scaffold is not presented yet, or a flyout is
+    /// already open.
     /// </summary>
     /// <param name="side">The edge the flyout slides in from.</param>
-    public Task OpenFlyoutAsync(ScaffoldFlyoutSide side)
-        => Presenter is { } presenter && ComputeFlyoutAvailable(side) && ResolveFlyoutContent(side) is { } content
-            ? presenter.OpenFlyoutAsync(side, content)
-            : Task.CompletedTask;
+    public async Task OpenFlyoutAsync(ScaffoldFlyoutSide side)
+    {
+        if (Presenter is not { } presenter
+            || _flyoutRequest is not null
+            || !ComputeFlyoutAvailable(side)
+            || ResolveFlyoutContent(side) is not { } content)
+        {
+            return;
+        }
 
-    /// <summary>Closes the open flyout (or any other presented overlay), if any.</summary>
+        var request = new ScaffoldOverlayRequest
+        {
+            Kind = ScaffoldOverlayKind.Flyout,
+            Content = content,
+            FlyoutSide = side,
+            Scrim = GetEffectiveFlyoutOptions(side).ComputeScrim(),
+            ScrimAutomationId = "ScaffoldFlyoutScrim"
+        };
+
+        request.Cleanup = () =>
+        {
+            if (ReferenceEquals(_flyoutRequest, request))
+            {
+                _flyoutRequest = null;
+            }
+
+            OnFlyoutDismissed(side);
+        };
+
+        _flyoutRequest = request;
+
+        // The guard beats a close racing the enter animation: cleanup runs (and clears the
+        // request) BEFORE presentation settles, and the late presented-event must not overwrite
+        // the dismissed state.
+        if (await presenter.ShowOverlayAsync(request).ConfigureAwait(true)
+            && ReferenceEquals(_flyoutRequest, request))
+        {
+            OnFlyoutPresented(side);
+        }
+    }
+
+    /// <summary>Closes the open flyout, if any (other overlays are unaffected).</summary>
     public Task CloseFlyoutAsync()
-        => Presenter is { } presenter ? presenter.CloseOverlayAsync() : Task.CompletedTask;
-
-    /// <summary>Dismisses the currently presented overlay (flyout or bottom panel), if any.</summary>
-    public Task CloseOverlayAsync()
-        => Presenter is { } presenter ? presenter.CloseOverlayAsync() : Task.CompletedTask;
+        => Presenter is { } presenter && _flyoutRequest is { } request
+            ? presenter.CloseOverlayAsync(request)
+            : Task.CompletedTask;
 
     /// <summary>
     /// Presents a panel anchored above the bottom chrome — the primitive behind the default
     /// tab bar template's "More" overflow, available to custom tab bars too. A fullscreen scrim
     /// renders BELOW the tab bar in z-order: the bar stays undimmed and interactive (a bar tap
     /// dismisses the panel and performs its own action). Scrim tap, system back and any
-    /// navigation dismiss the panel. Toggle semantics: when an overlay is already presented,
-    /// the call dismisses it instead.
+    /// navigation dismiss the panel.
     /// </summary>
     /// <param name="content">
     /// The panel view; its horizontal <see cref="View.Margin"/> insets it from the container
@@ -352,17 +400,38 @@ public partial class Scaffold : ContentPage, IDisposable
     /// already has a parent) and is reusable across presentations — handlers are not
     /// disconnected on close.
     /// </param>
-    /// <param name="scrimColor">The scrim color; a theme-aware translucent black when omitted.</param>
-    public Task OpenTabBarPanelAsync(View content, Color? scrimColor = null)
+    /// <param name="scrim">The scrim brush; a theme-aware translucent black when omitted.</param>
+    /// <param name="closeIfOpened">
+    /// When true (the default) and a panel is already presented, the call dismisses it (toggle).
+    /// When false, the presented panel's content is REPLACED in place — content crossfades, the
+    /// scrim brush updates, no scrim re-animation.
+    /// </param>
+    public Task ShowTabBarPanelAsync(View content, Brush? scrim = null, bool closeIfOpened = true)
+        => ShowTabBarPanelCoreAsync(content, scrim, closeIfOpened, disconnectContentOnClose: false, cleanup: null);
+
+    /// <summary>Closes the presented tab bar panel, if any.</summary>
+    public Task CloseTabBarPanelAsync()
+        => Presenter is { } presenter && _tabBarPanelRequest is { } request
+            ? presenter.CloseOverlayAsync(request)
+            : Task.CompletedTask;
+
+    /// <summary>The tab bar panel machinery shared by the public API and the default template's overflow.</summary>
+    internal async Task ShowTabBarPanelCoreAsync(View content, Brush? scrim, bool closeIfOpened, bool disconnectContentOnClose, Action? cleanup)
     {
         if (Presenter is not { } presenter)
         {
-            return Task.CompletedTask;
+            cleanup?.Invoke();
+
+            return;
         }
 
-        if (presenter.HasOverlay)
+        if (_tabBarPanelRequest is { } current && closeIfOpened)
         {
-            return presenter.CloseOverlayAsync();
+            // Toggle: the caller's fresh resources are released untouched.
+            cleanup?.Invoke();
+            await presenter.CloseOverlayAsync(current).ConfigureAwait(true);
+
+            return;
         }
 
         var attach = content.Parent is null;
@@ -372,14 +441,41 @@ public partial class Scaffold : ContentPage, IDisposable
             AddLogicalChild(content);
         }
 
-        var dark = (Application.Current?.RequestedTheme ?? AppTheme.Light) == AppTheme.Dark;
+        var request = new ScaffoldOverlayRequest
+        {
+            Kind = ScaffoldOverlayKind.TabBarPanel,
+            Content = content,
+            Scrim = scrim ?? CreateDefaultScrim(),
+            DisconnectContentOnClose = disconnectContentOnClose,
+            ScrimAutomationId = "TabBarPanelScrim"
+        };
 
-        return presenter.OpenTabBarPanelAsync(
-            content,
-            scrimColor ?? Colors.Black.WithAlpha(dark ? 0.55f : 0.45f),
-            disconnectOnClose: false,
-            cleanup: attach ? () => RemoveLogicalChild(content) : null
-        );
+        request.Cleanup = () =>
+        {
+            if (ReferenceEquals(_tabBarPanelRequest, request))
+            {
+                _tabBarPanelRequest = null;
+            }
+
+            if (attach)
+            {
+                RemoveLogicalChild(content);
+            }
+
+            cleanup?.Invoke();
+        };
+
+        var replace = _tabBarPanelRequest is not null;
+        _tabBarPanelRequest = request;
+
+        if (replace)
+        {
+            await presenter.ReplaceTabBarPanelAsync(request).ConfigureAwait(true);
+        }
+        else
+        {
+            await presenter.ShowOverlayAsync(request).ConfigureAwait(true);
+        }
     }
 
     /// <summary>
@@ -687,11 +783,11 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <returns>True when a pop was dispatched.</returns>
     protected override bool OnBackButtonPressed()
     {
-        // Overlays (flyout, tab bar overflow panel) dismiss before the navigation engine
-        // is ever consulted — the same policy §7.2 defines for popups.
+        // Overlays dismiss (topmost first) before the navigation engine is ever consulted —
+        // the same policy §7.2 defines for popups.
         if (Presenter is { HasOverlay: true } presenter)
         {
-            Dispatcher.Dispatch(() => presenter.CloseOverlayAsync().FireAndForget(Handler));
+            Dispatcher.Dispatch(() => presenter.CloseTopOverlayAsync().FireAndForget(Handler));
 
             return true;
         }

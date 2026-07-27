@@ -45,11 +45,11 @@ public partial class Scaffold
 
     private void HandleSystemBack()
     {
-        // Overlays (flyout, tab bar overflow panel) dismiss before the navigation engine
-        // is ever consulted — the same policy §7.2 defines for popups.
+        // Overlays dismiss (topmost first) before the navigation engine is ever consulted —
+        // the same policy §7.2 defines for popups.
         if (Presenter is { HasOverlay: true } presenter)
         {
-            Dispatcher.Dispatch(() => presenter.CloseOverlayAsync().FireAndForget(Handler));
+            Dispatcher.Dispatch(() => presenter.CloseTopOverlayAsync().FireAndForget(Handler));
 
             return;
         }

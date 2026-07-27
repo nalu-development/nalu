@@ -70,13 +70,24 @@ public class ScaffoldProxyTests
             return Task.CompletedTask;
         }
 
-        public Task OpenFlyoutAsync(ScaffoldFlyoutSide side, View content) => Task.CompletedTask;
+        public Task<bool> ShowOverlayAsync(ScaffoldOverlayRequest request) => Task.FromResult(true);
 
-        public Task OpenTabBarPanelAsync(View content, Color scrimColor, bool disconnectOnClose, Action? cleanup) => Task.CompletedTask;
+        public Task ReplaceTabBarPanelAsync(ScaffoldOverlayRequest replacement) => Task.CompletedTask;
+
+        public Task CloseOverlayAsync(ScaffoldOverlayRequest request)
+        {
+            request.Cleanup?.Invoke();
+
+            return Task.CompletedTask;
+        }
+
+        public Task CloseTopOverlayAsync() => Task.CompletedTask;
+
+        public Task CloseAllOverlaysAsync() => Task.CompletedTask;
 
         public bool HasOverlay => false;
 
-        public Task CloseOverlayAsync() => Task.CompletedTask;
+        public bool IsOverlayPresented(ScaffoldOverlayRequest request) => false;
     }
 
     private readonly ServiceProvider _serviceProvider;

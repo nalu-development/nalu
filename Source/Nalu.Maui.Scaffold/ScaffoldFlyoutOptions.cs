@@ -23,9 +23,9 @@ public sealed class ScaffoldFlyoutOptions : BindableObject
     public static readonly BindableProperty MaximumWidthProperty =
         BindableProperty.Create(nameof(MaximumWidth), typeof(double), typeof(ScaffoldFlyoutOptions), 360d);
 
-    /// <summary>Bindable property for <see cref="ScrimColor"/>.</summary>
-    public static readonly BindableProperty ScrimColorProperty =
-        BindableProperty.Create(nameof(ScrimColor), typeof(Color), typeof(ScaffoldFlyoutOptions), null);
+    /// <summary>Bindable property for <see cref="Scrim"/>.</summary>
+    public static readonly BindableProperty ScrimProperty =
+        BindableProperty.Create(nameof(Scrim), typeof(Brush), typeof(ScaffoldFlyoutOptions), null);
 
     /// <summary>
     /// Gets or sets the explicit drawer width in device-independent units; it wins over the
@@ -58,13 +58,13 @@ public sealed class ScaffoldFlyoutOptions : BindableObject
     }
 
     /// <summary>
-    /// Gets or sets the scrim color behind the open drawer. Null (the default) uses the
-    /// built-in translucent black.
+    /// Gets or sets the scrim brush behind the open drawer (gradients supported). Null (the
+    /// default) uses the built-in translucent black.
     /// </summary>
-    public Color? ScrimColor
+    public Brush? Scrim
     {
-        get => (Color?)GetValue(ScrimColorProperty);
-        set => SetValue(ScrimColorProperty, value);
+        get => (Brush?)GetValue(ScrimProperty);
+        set => SetValue(ScrimProperty, value);
     }
 
     // EdgeSwipeEnabled is reserved for this object: it arrives with the P2 gesture work.
@@ -73,6 +73,6 @@ public sealed class ScaffoldFlyoutOptions : BindableObject
     internal double ComputeWidth(double containerWidth)
         => Width >= 0 ? Width : Math.Min(containerWidth * WidthRatio, MaximumWidth);
 
-    /// <summary>Resolves the effective scrim color.</summary>
-    internal Color ComputeScrimColor() => ScrimColor ?? Colors.Black.WithAlpha(0.4f);
+    /// <summary>Resolves the effective scrim brush.</summary>
+    internal Brush ComputeScrim() => Scrim ?? new SolidColorBrush(Colors.Black.WithAlpha(0.4f));
 }
