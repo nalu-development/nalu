@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Microsoft.Maui.Handlers;
 
 namespace Nalu;
 

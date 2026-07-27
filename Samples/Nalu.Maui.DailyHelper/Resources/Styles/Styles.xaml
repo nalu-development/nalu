@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    xmlns:nalu="https://nalu-development.github.com/nalu/scaffold">
 
     <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
@@ -60,6 +61,64 @@
 
     <Style TargetType="Switch">
         <Setter Property="OnColor" Value="{StaticResource Accent}" />
+    </Style>
+
+    <!-- Scaffold chrome. Every styling property of the default components carries a real
+         default value, so plain implicit styles override it — no palette resolver, no theme
+         subscriptions, just AppThemeBinding where it belongs. -->
+
+    <Style TargetType="nalu:ScaffoldNavBarView">
+        <Setter Property="BarBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="nalu:ScaffoldNavBarTitle">
+        <Setter Property="FontFamily" Value="SemiBold" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+    </Style>
+
+    <!-- Back, close and both drawer buttons at once. -->
+    <Style TargetType="nalu:ScaffoldNavBarButtonBase" ApplyToDerivedTypes="True">
+        <Setter Property="IconColor" Value="{StaticResource Accent}" />
+    </Style>
+
+    <!-- The bar itself: pill container only. -->
+    <Style TargetType="nalu:ScaffoldTabBarView">
+        <Setter Property="BarBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Item + badge appearance: applies to bar items AND overflow rows (same component). -->
+    <Style TargetType="nalu:ScaffoldTabBarItemView">
+        <Setter Property="FontFamily" Value="Regular" />
+        <Setter Property="TextColor" Value="{StaticResource TabIcon}" />
+        <Setter Property="SelectedTextColor" Value="{StaticResource Accent}" />
+        <Setter Property="BadgeTextColor" Value="{StaticResource AccentContrast}" />
+        <Setter Property="SelectionPillBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}" />
+            </Setter.Value>
+        </Setter>
+        <Setter Property="BadgeBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{StaticResource Accent}" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="nalu:ScaffoldTabBarOverflowView">
+        <Setter Property="PanelBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

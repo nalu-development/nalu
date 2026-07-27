@@ -236,8 +236,15 @@ Layering, bottom-up — each layer testable without the one below:
 >   drawer-button policy via attached `Scaffold.FlyoutStart/EndButtonVisibility`
 >   (`Auto` default = shown at stack roots; `Visible` = always, side by side with back;
 >   `Hidden`), resolved Page → Area → Scaffold and derived into the context bools.
-> - Public primitives for custom bars: `ScaffoldBackButton`, `ScaffoldFlyoutButton` (Side),
->   `ScaffoldNavBarTitle` — drop-in, self-binding to the context.
+> - Public primitives for custom bars: `ScaffoldBackButton`, `ScaffoldCloseButton`,
+>   `ScaffoldFlyoutButton` (Side), `ScaffoldNavBarTitle` — drop-in, self-binding to the context.
+> - **Styling split (REVISED July 2026, §5.7)**: `ScaffoldNavBarView` owns ONLY the strip
+>   (`BarBackground`, `BarHeight`, `BarPadding`, `Spacing`). Title and glyph appearance live on
+>   the primitives themselves, styled directly — the earlier aggregator properties
+>   (`TextColor`, `IconColor`, `FontFamily`, `TitleFontSize`, `TitleFontAttributes`, `BackIcon`,
+>   `FlyoutStart/EndIcon`) were REMOVED: pushing them into the children set MANUAL values that
+>   outrank every style setter, making the public primitives un-styleable inside the default bar.
+>   One owner per value ⇒ the same `<Style>` works in the default bar and in a custom one.
 > - §5.4 top insets: the bar fills the top strip (background under the status bar, safe area
 >   consumed via .NET 10 `SafeAreaEdges`); measurement normalized to content height
 >   (measured − consumed inset, the NaluShellItemRenderer net10 pattern); iOS per-page
@@ -294,8 +301,8 @@ Layering, bottom-up — each layer testable without the one below:
 - **Visual language (decided): Telegram-style floating pill bar** — translucent dark/light rounded
   container floating above the content with margins (not edge-to-edge), icon + label per item,
   the selected item highlighted by a rounded pill tint with the accent color on the label; badge
-  support on any icon. Default accent = **Nalu logo wave blues**: `#68A3F1` on dark theme,
-  `#2C479D`/`#3C64BC` on light — shipped as a built-in themed ResourceDictionary style.
+  support on any icon. Default accent = **Nalu logo wave blue** `#2C479D`, baked into the
+  bindable properties' default values per §5.7 (no shipped ResourceDictionary).
 - **Icons render untinted (decided — no `IconColor`)**: the template draws the quintet's
   `ImageSource`s as-is; avatars-as-tabs work out of the box (Telegram "Profilo" case). Monochrome
   tinting is the *root's* concern (`FontImageSource` color, `AppThemeBinding` inside the Icon);
@@ -321,22 +328,26 @@ Layering, bottom-up — each layer testable without the one below:
   button itself shows the "current" pill tint and the row is highlighted in the panel. Scrim tap
   and Android system back dismiss the panel before the navigation engine is consulted (§7.2
   overlay-dismiss policy). Active-tab-pops-to-root applies to overflow rows too.
-- **Styling surface (decided; REVISED July 2026)**: the whole styling surface lives on the
-  default template COMPONENT — public `ScaffoldTabBarView` — not on `ScaffoldTabBar`
-  (an app installing a custom bar carries none of the default template's properties).
-  `ScaffoldTabBar.TabBarView` defaults to a fresh `ScaffoldTabBarView` via the bindable
-  property's default value factory; the component resolves its owning tab bar from the logical
-  parent when presented. Plain `Style TargetType="ScaffoldTabBarView"` + `AppThemeBinding`
-  covers theming. Property set —
-  - *Bar container*: `BarBackground` (Brush), `BarCornerRadius`, `BarMargin`, `BarPadding`,
-    `BarShadow` (Shadow), `BarHeightRequest`.
-  - *Items*: `ItemWidth`, `TextColor`, `SelectedTextColor`, `FontFamily`, `FontSize`,
-    `SelectedFontAttributes`, `SelectionPillBackground`, `SelectionPillCornerRadius`, `IconSize`.
-  - *Badges*: `BadgeBackground`, `BadgeTextColor`, `BadgeFontSize`; the badge value is a
-    per-root bindable (`BadgeText` attached/bindable property) so it's data-bindable per tab.
-  - *Overflow*: `OverflowIcon`, `OverflowTitle` (localizable "More"), `ScrimColor`,
-    `OverflowPanelBackground`, `OverflowPanelCornerRadius`, `OverflowPanelShadow`,
-    `OverflowItemTemplate` (optional; default row otherwise).
+- **Styling surface (decided; REVISED AGAIN July 2026 — component split per §5.7 rule 3)**:
+  the styling surface lives on the default template COMPONENTS, not on `ScaffoldTabBar`
+  (an app installing a custom bar carries none of the default template's properties), and is
+  split one-public-type-per-concern so each is targeted by a plain implicit `<Style>` — the same
+  decomposition as the nav bar primitives:
+  - **`ScaffoldTabBarView`** (the bar itself; `ScaffoldTabBar.TabBarView` defaults to a fresh
+    instance via the property's default value factory; resolves its owning tab bar from the
+    logical parent when presented): `BarBackground`, `BarCornerRadius`, `BarMargin`,
+    `BarPadding` (mirrored by the overflow panel — slot-geometry parity), `BarShadow`,
+    `ItemWidth` (the single layout input), `OverflowIcon`, `OverflowTitle` (localizable "More"),
+    and the `BadgeText` ATTACHED property (per-root data channel, bindable per tab).
+  - **`ScaffoldTabBarItemView`** (public type, INTERNAL ctor — instances are generated, one per
+    visible root plus "More"; the overflow panel reuses the same component, so ONE style covers
+    bar items and overflow rows alike): `IconSize`, `TextColor`, `SelectedTextColor`,
+    `FontFamily`, `FontSize`, `SelectionPillBackground`, `SelectionPillCornerRadius`, plus the
+    badge appearance `BadgeBackground`, `BadgeTextColor`, `BadgeFontSize` (the badge is rendered
+    by the item — same owner, same style).
+  - **`ScaffoldTabBarOverflowView`** (public type, internal ctor — built per open):
+    `PanelBackground`, `PanelCornerRadius`, `PanelShadow`, `ScrimColor` (read when the panel
+    opens, AFTER logical parenting so implicit styles have applied).
 - **Full replacement supported**: user provides their own virtual view (DataTemplate or direct view);
   the Scaffold supplies a binding context exposing the roots, selection state, and a select command.
   Tab selection routes through `NavigationService` (guards respected) — never a direct view swap.
@@ -508,6 +519,50 @@ Key rules (as implemented):
 - Back policy: hardware/system back and scrim tap dismiss the topmost overlay before the
   navigation engine is consulted (same rule §7.2 states for popups); the Android back callback's
   `Enabled` state accounts for open overlays.
+
+### 5.7 Chrome styling model — plain MAUI styles (decided July 2026)
+
+The first implementation resolved appearance at runtime: `null`-as-unset properties, a
+`ScaffoldTabBarPalette.Resolve()` returning a `ScaffoldTabBarStyleValues` record, a
+`ScaffoldNavBarDefaults.Foreground(dark)` helper, `Application.RequestedThemeChanged`
+subscriptions in four constructors, and a catch-all `OnPropertyChanged` string switch re-applying
+the whole surface. **All of it is deleted.** The model is now ordinary MAUI:
+
+1. **Every styling property carries a REAL default value** (no `null` sentinels). Defaults sit at
+   the bottom of MAUI's value precedence, so an implicit `<Style>` — including one whose setters
+   are `AppThemeBinding`s — simply wins. Theming is the app's `<Style>`, and MAUI re-evaluates it
+   on theme change for free (no subscriptions, no leaks). Reference styles live in the docs and
+   in `Samples/Nalu.Maui.DailyHelper/Resources/Styles/Styles.xaml`; the baked defaults are a
+   single light-leaning palette, so a dark-mode app is expected to supply the style.
+2. **One `propertyChanged` callback per property**, doing exactly the one assignment it implies.
+   No shared "apply everything" path — changing `FontSize` must not re-allocate the bar shadow —
+   and no `OnPropertyChanged` override (that switch ran on every layout-driven property change of
+   the underlying `Grid`, `X`/`Y`/`Width`/`Height` included).
+3. **A value is owned by exactly ONE type.** A parent must never push appearance into a public
+   child: assignment from code is a MANUAL value and outranks every style setter, which would
+   silently make the child un-styleable. Hence §5.2's aggregator removal, the drawer menu's
+   `ScaffoldFlyoutMenuItemView` / `ScaffoldFlyoutMenuGroupHeader` becoming **public** with their
+   own properties, and the tab bar's second pass: `ScaffoldTabBarItemView` and
+   `ScaffoldTabBarOverflowView` are public styling surfaces owning their own values (§5.3) —
+   the owner-push `Update*` machinery they replaced is gone. A generated child (public type,
+   internal ctor) is still a perfectly good style target.
+4. **Corollary — never set an INHERITED property in a constructor** to get a non-zero default;
+   that is the same manual-value trap. Introduce an owned property instead and let its callback
+   drive the inherited one: `BarMargin` → `Padding`, `BarBackground` → `Background`,
+   `PanelBackground` → `Background`, `HeaderPadding` → the inner label's `Padding`.
+   The group header hosts a `Label` rather than deriving from one for exactly this reason.
+5. Defaults never raise `propertyChanged`, so each constructor **seeds its children once** from
+   the current property values. That is the only bulk-apply left, and it runs once per instance.
+6. **CAVEAT (cost a debugging session, July 2026): implicit styles are applied by the
+   `VisualElement` BASE ctor** (`MergedStyle` in the ctor chain), i.e. BEFORE the derived class's
+   ctor body has built its subviews. Every `propertyChanged` callback dereferencing a
+   ctor-assigned field must therefore tolerate `null` (C# 14 null-conditional assignment:
+   `view._pill?.Background = value`), and rule 5's ctor seeding is what makes the style value
+   land anyway — the seed reads the final property value AFTER the subviews exist. Symptom when
+   violated: NRE during chrome construction inside the presenter → silently blank app.
+
+Reference-type defaults (`Brush`, `Shadow`) use `defaultValueCreator`, not a shared static: MAUI
+re-parents those values on assignment, so one instance handed to two owners breaks the first.
 
 ---
 

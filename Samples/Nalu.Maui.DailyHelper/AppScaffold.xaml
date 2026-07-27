@@ -4,18 +4,11 @@
                xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
                xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
                x:Class="Nalu.Maui.DailyHelper.AppScaffold"
+               nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}"
                nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
 
     <!-- The whole application structure: one tab bar, three roots, each hosting its own
          navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->
-
-    <nalu:Scaffold.NavBarView>
-        <nalu:ScaffoldNavBarView FontFamily="SemiBold"
-                                 TitleFontSize="20"
-                                 IconColor="{StaticResource Accent}"
-                                 TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
-                                 BarBackground="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
-    </nalu:Scaffold.NavBarView>
 
     <nalu:ScaffoldTabBar>
         <nalu:ScaffoldRoot Title="Today" PageType="{x:Type pages:TodayPage}">

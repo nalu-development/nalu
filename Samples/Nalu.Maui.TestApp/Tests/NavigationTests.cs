@@ -96,7 +96,7 @@ public partial class NavHomePageModel(INavigationService navigationService) : Na
     protected override string Name => "Home";
 
     [ObservableProperty]
-    private string _resolvedValue = "-";
+    public partial string ResolvedValue { get; set; } = "-";
 
     public Task PushDetail() => NavigationService.GoToAsync(Navigation.Relative().Push<NavDetailPageModel>());
 
@@ -124,7 +124,7 @@ public partial class NavDetailPageModel(INavigationService navigationService) : 
     protected override string Name => "Detail";
 
     [ObservableProperty]
-    private string _receivedIntent = "-";
+    public partial string ReceivedIntent { get; set; } = "-";
 
     public ValueTask OnEnteringAsync(ProductIntent intent)
     {
@@ -174,7 +174,7 @@ public partial class NavEditorPageModel(INavigationService navigationService) : 
     protected override string Name => "Editor";
 
     [ObservableProperty]
-    private bool _canLeave;
+    public partial bool CanLeave { get; set; }
 
     public ValueTask<bool> CanLeaveAsync()
     {

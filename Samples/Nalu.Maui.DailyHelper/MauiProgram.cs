@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.DevFlow.Agent;
 using Nalu.Maui.DailyHelper.Services;
 
 namespace Nalu.Maui.DailyHelper;
@@ -29,6 +30,10 @@ public static class MauiProgram
 
 #if DEBUG
         builder.Logging.AddDebug();
+
+        // DevFlow in-app agent: exposes visual tree, screenshots, interactions and logs
+        // to the `maui devflow` CLI / MCP server (port 9223).
+        builder.AddMauiDevFlowAgent();
 #endif
 
         return builder.Build();

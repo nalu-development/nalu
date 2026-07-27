@@ -19,7 +19,7 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IDisposa
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasWeather))]
-    private CurrentConditions? _current;
+    public partial CurrentConditions? Current { get; set; }
 
     public bool HasWeather => Current is not null;
 

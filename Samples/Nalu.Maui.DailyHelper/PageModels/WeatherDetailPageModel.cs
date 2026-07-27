@@ -14,7 +14,7 @@ public partial class WeatherDetailPageModel : ObservableObject, IDisposable
     private readonly ReadOnlyObservableCollection<HourForecast> _nextHours;
 
     [ObservableProperty]
-    private CurrentConditions? _current;
+    public partial CurrentConditions? Current { get; set; }
 
     /// <summary>The next 24 hours, rendered by a horizontal VirtualScroll strip.</summary>
     public IVirtualScrollAdapter NextHoursAdapter { get; }

@@ -48,13 +48,13 @@ public partial class ForecastPageModel : ObservableObject, IEnteringAware, IDisp
     // Flyout toggles: which metrics each hourly row shows. Pure view state, the flyout
     // binds to them directly because per-page flyout content inherits the page's BindingContext.
     [ObservableProperty]
-    private bool _showPrecipitation = true;
+    public partial bool ShowPrecipitation { get; set; } = true;
 
     [ObservableProperty]
-    private bool _showWind;
+    public partial bool ShowWind { get; set; }
 
     [ObservableProperty]
-    private bool _showHumidity;
+    public partial bool ShowHumidity { get; set; }
 
     public bool ShowFullWeek
     {

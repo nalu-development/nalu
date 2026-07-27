@@ -136,6 +136,7 @@ public class ScaffoldTabBar : ScaffoldArea
 
         // Logical parenting: the panel participates in the element tree while presented
         // (BindingContext/resource flow, visual-tree visibility for tooling and UI tests).
+        // Must precede the ScrimColor read below — implicit styles have applied by then.
         AddLogicalChild(panel);
 
         // The overflow set is recomputed per layout pass: rotation/resize migrating items
@@ -144,7 +145,7 @@ public class ScaffoldTabBar : ScaffoldArea
 
         return presenter.OpenTabBarPanelAsync(
             panel,
-            barView.EffectiveStyle.ScrimColor,
+            panel.ScrimColor,
             disconnectOnClose: true,
             cleanup: () =>
             {

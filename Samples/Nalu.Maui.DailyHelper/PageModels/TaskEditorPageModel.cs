@@ -14,23 +14,23 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
     private TodoItem? _original;
 
     [ObservableProperty]
-    private string _pageTitle = "New task";
+    public partial string PageTitle { get; set; } = "New task";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSave))]
-    private string _title = string.Empty;
+    public partial string Title { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private string _notes = string.Empty;
+    public partial string Notes { get; set; } = string.Empty;
 
     [ObservableProperty]
-    private bool _hasDueDate;
+    public partial bool HasDueDate { get; set; }
 
     [ObservableProperty]
-    private DateTime _dueDate = DateTime.Today;
+    public partial DateTime DueDate { get; set; } = DateTime.Today;
 
     [ObservableProperty]
-    private bool _canDelete;
+    public partial bool CanDelete { get; set; }
 
     public ValueTask OnEnteringAsync()
     {

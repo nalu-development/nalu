@@ -1,3 +1,5 @@
+using Nalu.Internals;
+
 namespace Nalu;
 
 /// <summary>
@@ -5,74 +7,77 @@ namespace Nalu;
 /// <see cref="Scaffold.NavBarViewProperty"/> default at the scaffold level. Slots, in order:
 /// start-drawer button, back button, title (or the page's
 /// <see cref="Scaffold.TitleViewProperty"/> content), end-drawer button — all driven by the
-/// <see cref="ScaffoldNavBarContext"/> binding context. Style it (including with
-/// <c>AppThemeBinding</c>) or replace it entirely with any custom view; the building blocks
-/// (<see cref="ScaffoldBackButton"/>, <see cref="ScaffoldFlyoutButton"/>,
-/// <see cref="ScaffoldNavBarTitle"/>) are public for custom bars.
+/// <see cref="ScaffoldNavBarContext"/> binding context. Style it or replace it entirely with any
+/// custom view.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The component spans the whole top strip (its background extends under the status bar) and
 /// opts into the safe area itself, so its content sits below the status inset while the bar
 /// contributes its footprint to the page per §5.4.
+/// </para>
+/// <para>
+/// It owns ONLY the strip itself (background, height, padding, spacing). Title and button
+/// appearance belong to the primitives — <see cref="ScaffoldNavBarTitle"/>,
+/// <see cref="ScaffoldBackButton"/>, <see cref="ScaffoldCloseButton"/>,
+/// <see cref="ScaffoldFlyoutButton"/> — which are public and styled directly, so the SAME style
+/// applies whether they sit in this bar or in a custom one:
+/// <code>
+/// &lt;Style TargetType="nalu:ScaffoldNavBarView"&gt;
+///     &lt;Setter Property="BarBackground" Value="{AppThemeBinding Light=..., Dark=...}" /&gt;
+/// &lt;/Style&gt;
+/// &lt;Style TargetType="nalu:ScaffoldNavBarTitle"&gt;
+///     &lt;Setter Property="FontFamily" Value="SemiBold" /&gt;
+/// &lt;/Style&gt;
+/// &lt;Style TargetType="nalu:ScaffoldNavBarButtonBase" ApplyToDerivedTypes="True"&gt;
+///     &lt;Setter Property="IconColor" Value="{StaticResource Accent}" /&gt;
+/// &lt;/Style&gt;
+/// </code>
+/// </para>
 /// </remarks>
 public sealed class ScaffoldNavBarView : Grid
 {
     private readonly Grid _row;
-    private readonly ScaffoldFlyoutButton _flyoutStartButton;
-    private readonly ScaffoldBackButton _backButton;
-    private readonly ScaffoldNavBarTitle _title;
-    private readonly ScaffoldFlyoutButton _flyoutEndButton;
-    private readonly ScaffoldCloseButton _closeButton;
+
+    // Null-conditionals below: implicit styles apply from the VisualElement base ctor, before
+    // _row exists; the ctor seeds the final values.
 
     /// <summary>Bindable property for <see cref="BarBackground"/>.</summary>
     public static readonly BindableProperty BarBackgroundProperty =
-        BindableProperty.Create(nameof(BarBackground), typeof(Brush), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarView>.Create<Brush?>(
+            nameof(BarBackground),
+            defaultValueCreator: static _ => new SolidColorBrush(Color.FromArgb("#F7FFFFFF")),
+            propertyChanged: static view => (_, value) => view.Background = value
+        );
 
     /// <summary>Bindable property for <see cref="BarHeight"/>.</summary>
     public static readonly BindableProperty BarHeightProperty =
-        BindableProperty.Create(nameof(BarHeight), typeof(double), typeof(ScaffoldNavBarView), 48.0, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarView>.Create(
+            nameof(BarHeight),
+            48.0,
+            propertyChanged: static view => (_, value) => view._row?.HeightRequest = value
+        );
 
     /// <summary>Bindable property for <see cref="BarPadding"/>.</summary>
     public static readonly BindableProperty BarPaddingProperty =
-        BindableProperty.Create(nameof(BarPadding), typeof(Thickness), typeof(ScaffoldNavBarView), new Thickness(8, 0), propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarView>.Create(
+            nameof(BarPadding),
+            new Thickness(8, 0),
+            propertyChanged: static view => (_, value) => view._row?.Padding = value
+        );
 
     /// <summary>Bindable property for <see cref="Spacing"/>.</summary>
     public static readonly BindableProperty SpacingProperty =
-        BindableProperty.Create(nameof(Spacing), typeof(double), typeof(ScaffoldNavBarView), 8.0, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarView>.Create(
+            nameof(Spacing),
+            8.0,
+            propertyChanged: static view => (_, value) => view._row?.ColumnSpacing = value
+        );
 
-    /// <summary>Bindable property for <see cref="TextColor"/>.</summary>
-    public static readonly BindableProperty TextColorProperty =
-        BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="IconColor"/>.</summary>
-    public static readonly BindableProperty IconColorProperty =
-        BindableProperty.Create(nameof(IconColor), typeof(Color), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="FontFamily"/>.</summary>
-    public static readonly BindableProperty FontFamilyProperty =
-        BindableProperty.Create(nameof(FontFamily), typeof(string), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="TitleFontSize"/>.</summary>
-    public static readonly BindableProperty TitleFontSizeProperty =
-        BindableProperty.Create(nameof(TitleFontSize), typeof(double), typeof(ScaffoldNavBarView), 17.0, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="TitleFontAttributes"/>.</summary>
-    public static readonly BindableProperty TitleFontAttributesProperty =
-        BindableProperty.Create(nameof(TitleFontAttributes), typeof(FontAttributes), typeof(ScaffoldNavBarView), FontAttributes.Bold, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="BackIcon"/>.</summary>
-    public static readonly BindableProperty BackIconProperty =
-        BindableProperty.Create(nameof(BackIcon), typeof(ImageSource), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="FlyoutStartIcon"/>.</summary>
-    public static readonly BindableProperty FlyoutStartIconProperty =
-        BindableProperty.Create(nameof(FlyoutStartIcon), typeof(ImageSource), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Bindable property for <see cref="FlyoutEndIcon"/>.</summary>
-    public static readonly BindableProperty FlyoutEndIconProperty =
-        BindableProperty.Create(nameof(FlyoutEndIcon), typeof(ImageSource), typeof(ScaffoldNavBarView), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarView)b).ApplyStyling());
-
-    /// <summary>Gets or sets the bar background (extends under the status bar). Theme-aware translucent surface when unset.</summary>
+    /// <summary>
+    /// Gets or sets the bar background (extends under the status bar). Drives the view's own
+    /// <see cref="VisualElement.Background"/> — style THIS, not <c>Background</c>.
+    /// </summary>
     public Brush? BarBackground
     {
         get => (Brush?)GetValue(BarBackgroundProperty);
@@ -104,62 +109,6 @@ public sealed class ScaffoldNavBarView : Grid
         set => SetValue(SpacingProperty, value);
     }
 
-    /// <summary>Gets or sets the title color. Theme-aware default when unset.</summary>
-    public Color? TextColor
-    {
-        get => (Color?)GetValue(TextColorProperty);
-        set => SetValue(TextColorProperty, value);
-    }
-
-    /// <summary>Gets or sets the glyph color of the back/drawer buttons. Theme-aware default when unset.</summary>
-    public Color? IconColor
-    {
-        get => (Color?)GetValue(IconColorProperty);
-        set => SetValue(IconColorProperty, value);
-    }
-
-    /// <summary>Gets or sets the title font family.</summary>
-    public string? FontFamily
-    {
-        get => (string?)GetValue(FontFamilyProperty);
-        set => SetValue(FontFamilyProperty, value);
-    }
-
-    /// <summary>Gets or sets the title font size.</summary>
-    public double TitleFontSize
-    {
-        get => (double)GetValue(TitleFontSizeProperty);
-        set => SetValue(TitleFontSizeProperty, value);
-    }
-
-    /// <summary>Gets or sets the title font attributes.</summary>
-    public FontAttributes TitleFontAttributes
-    {
-        get => (FontAttributes)GetValue(TitleFontAttributesProperty);
-        set => SetValue(TitleFontAttributesProperty, value);
-    }
-
-    /// <summary>Gets or sets an icon replacing the built-in back chevron.</summary>
-    public ImageSource? BackIcon
-    {
-        get => (ImageSource?)GetValue(BackIconProperty);
-        set => SetValue(BackIconProperty, value);
-    }
-
-    /// <summary>Gets or sets an icon replacing the built-in start-drawer hamburger glyph.</summary>
-    public ImageSource? FlyoutStartIcon
-    {
-        get => (ImageSource?)GetValue(FlyoutStartIconProperty);
-        set => SetValue(FlyoutStartIconProperty, value);
-    }
-
-    /// <summary>Gets or sets an icon replacing the built-in end-drawer hamburger glyph.</summary>
-    public ImageSource? FlyoutEndIcon
-    {
-        get => (ImageSource?)GetValue(FlyoutEndIconProperty);
-        set => SetValue(FlyoutEndIconProperty, value);
-    }
-
     /// <summary>Initializes the default nav bar.</summary>
     public ScaffoldNavBarView()
     {
@@ -170,12 +119,6 @@ public sealed class ScaffoldNavBarView : Grid
         // below the status inset (and clear of landscape notches), background covers it all.
         SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.Container);
 
-        _flyoutStartButton = new ScaffoldFlyoutButton { Side = ScaffoldFlyoutSide.Start, AutomationId = "NavBarFlyoutStartButton" };
-        _backButton = new ScaffoldBackButton { AutomationId = "NavBarBackButton" };
-        _title = new ScaffoldNavBarTitle { AutomationId = "NavBarTitle" };
-        _flyoutEndButton = new ScaffoldFlyoutButton { Side = ScaffoldFlyoutSide.End, AutomationId = "NavBarFlyoutEndButton" };
-        _closeButton = new ScaffoldCloseButton { AutomationId = "NavBarCloseButton" };
-
         // The leading buttons sit flush (zero spacing): the 44dp tap targets' inner whitespace
         // around the 24dp glyphs provides equal optical gaps — edge→glyph and glyph→glyph.
         // Hidden buttons are skipped entirely by the stack, so the rhythm survives every
@@ -184,8 +127,22 @@ public sealed class ScaffoldNavBarView : Grid
                              {
                                  Spacing = 0,
                                  VerticalOptions = LayoutOptions.Center,
-                                 Children = { _flyoutStartButton, _backButton }
+                                 Children =
+                                 {
+                                     new ScaffoldFlyoutButton { Side = ScaffoldFlyoutSide.Start, AutomationId = "NavBarFlyoutStartButton" },
+                                     new ScaffoldBackButton { AutomationId = "NavBarBackButton" }
+                                 }
                              };
+
+        var trailingButtons = new HorizontalStackLayout
+                              {
+                                  Spacing = 0,
+                                  Children =
+                                  {
+                                      new ScaffoldFlyoutButton { Side = ScaffoldFlyoutSide.End, AutomationId = "NavBarFlyoutEndButton" },
+                                      new ScaffoldCloseButton { AutomationId = "NavBarCloseButton" }
+                                  }
+                              };
 
         _row = new Grid
         {
@@ -197,45 +154,16 @@ public sealed class ScaffoldNavBarView : Grid
             }
         };
 
-        var trailingButtons = new HorizontalStackLayout { Spacing = 0 };
-        trailingButtons.Add(_flyoutEndButton);
-        trailingButtons.Add(_closeButton);
-
         _row.Add(leadingButtons, 0);
-        _row.Add(_title, 1);
+        _row.Add(new ScaffoldNavBarTitle { AutomationId = "NavBarTitle" }, 1);
         _row.Add(trailingButtons, 2);
 
         Add(_row);
 
-        if (Application.Current is { } application)
-        {
-            application.RequestedThemeChanged += (_, _) => ApplyStyling();
-        }
-
-        ApplyStyling();
-    }
-
-    private void ApplyStyling()
-    {
-        var dark = ScaffoldNavBarDefaults.IsDark;
-
-        Background = BarBackground ?? new SolidColorBrush(ScaffoldNavBarDefaults.BarBackground(dark));
-
+        // Defaults never raise propertyChanged: seed once from the current values.
+        Background = BarBackground;
         _row.HeightRequest = BarHeight;
         _row.Padding = BarPadding;
         _row.ColumnSpacing = Spacing;
-
-        _backButton.IconColor = IconColor;
-        _backButton.Icon = BackIcon;
-        _flyoutStartButton.IconColor = IconColor;
-        _flyoutStartButton.Icon = FlyoutStartIcon;
-        _closeButton.IconColor = IconColor;
-        _flyoutEndButton.IconColor = IconColor;
-        _flyoutEndButton.Icon = FlyoutEndIcon;
-
-        _title.TextColor = TextColor;
-        _title.FontFamily = FontFamily;
-        _title.FontSize = TitleFontSize;
-        _title.FontAttributes = TitleFontAttributes;
     }
 }

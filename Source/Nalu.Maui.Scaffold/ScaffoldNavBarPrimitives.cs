@@ -1,17 +1,16 @@
 using System.ComponentModel;
 using Microsoft.Maui.Controls.Shapes;
+using Nalu.Internals;
 using ShapePath = Microsoft.Maui.Controls.Shapes.Path;
 
 namespace Nalu;
 
-/// <summary>Theme-aware defaults shared by the nav bar component and its primitives.</summary>
+/// <summary>Shared helpers of the nav bar component and its primitives.</summary>
 internal static class ScaffoldNavBarDefaults
 {
-    internal static bool IsDark => (Application.Current?.RequestedTheme ?? AppTheme.Light) == AppTheme.Dark;
-
-    internal static Color Foreground(bool dark) => dark ? Colors.White : Color.FromArgb("#1C1C1E");
-
-    internal static Color BarBackground(bool dark) => dark ? Color.FromArgb("#F72E2E2E") : Color.FromArgb("#F7FFFFFF");
+    /// <summary>The default foreground of every nav bar primitive (title text, drawn glyphs).</summary>
+    // ReSharper disable once InconsistentNaming
+    internal static readonly Color Foreground = Color.FromArgb("#1C1C1E");
 
     internal static Geometry ParseGeometry(string pathData)
         => (Geometry)new PathGeometryConverter().ConvertFromInvariantString(pathData)!;
@@ -22,19 +21,34 @@ internal static class ScaffoldNavBarDefaults
 /// (or a user icon), visibility and command bound to the inherited
 /// <see cref="ScaffoldNavBarContext"/>.
 /// </summary>
+/// <remarks>
+/// Style the concrete buttons directly, or all of them at once with
+/// <c>&lt;Style TargetType="nalu:ScaffoldNavBarButtonBase" ApplyToDerivedTypes="True"&gt;</c>.
+/// </remarks>
 public abstract class ScaffoldNavBarButtonBase : Border
 {
     private readonly ShapePath _glyph;
     private readonly Image _iconImage;
     private readonly TapGestureRecognizer _tap = new();
 
+    // Callback caveat (applies to EVERY styling property here): implicit styles are applied by
+    // the VisualElement BASE ctor (MergedStyle), before this class's ctor body has built its
+    // subviews — callbacks must tolerate null fields; the ctor seeds the final values.
+
     /// <summary>Bindable property for <see cref="Icon"/>.</summary>
     public static readonly BindableProperty IconProperty =
-        BindableProperty.Create(nameof(Icon), typeof(ImageSource), typeof(ScaffoldNavBarButtonBase), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarButtonBase)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarButtonBase>.Create<ImageSource?>(
+            nameof(Icon),
+            propertyChanged: static button => (_, value) => button.ApplyIcon(value)
+        );
 
     /// <summary>Bindable property for <see cref="IconColor"/>.</summary>
     public static readonly BindableProperty IconColorProperty =
-        BindableProperty.Create(nameof(IconColor), typeof(Color), typeof(ScaffoldNavBarButtonBase), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarButtonBase)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarButtonBase>.Create(
+            nameof(IconColor),
+            ScaffoldNavBarDefaults.Foreground,
+            propertyChanged: static button => (_, value) => button._glyph?.Stroke = new SolidColorBrush(value)
+        );
 
     /// <summary>Gets or sets an icon replacing the built-in drawn glyph (rendered untinted).</summary>
     public ImageSource? Icon
@@ -43,10 +57,10 @@ public abstract class ScaffoldNavBarButtonBase : Border
         set => SetValue(IconProperty, value);
     }
 
-    /// <summary>Gets or sets the built-in glyph color. Theme-aware default when unset.</summary>
-    public Color? IconColor
+    /// <summary>Gets or sets the built-in glyph color (ignored while <see cref="Icon"/> is set).</summary>
+    public Color IconColor
     {
-        get => (Color?)GetValue(IconColorProperty);
+        get => (Color)GetValue(IconColorProperty);
         set => SetValue(IconColorProperty, value);
     }
 
@@ -87,12 +101,9 @@ public abstract class ScaffoldNavBarButtonBase : Border
 
         GestureRecognizers.Add(_tap);
 
-        if (Application.Current is { } application)
-        {
-            application.RequestedThemeChanged += (_, _) => ApplyStyling();
-        }
-
-        ApplyStyling();
+        // Defaults never raise propertyChanged: seed once from the current values.
+        _glyph.Stroke = new SolidColorBrush(IconColor);
+        ApplyIcon(Icon);
     }
 
     /// <summary>Binds the tap command with the given (trim-safe, typed) binding.</summary>
@@ -101,13 +112,18 @@ public abstract class ScaffoldNavBarButtonBase : Border
     /// <summary>Binds visibility with the given (trim-safe, typed) binding.</summary>
     private protected void BindVisibility(BindingBase binding) => this.SetBinding(IsVisibleProperty, binding);
 
-    private protected void ApplyStyling()
+    /// <summary>A user icon replaces the drawn glyph entirely (and renders untinted).</summary>
+    private void ApplyIcon(ImageSource? icon)
     {
-        var userIcon = Icon;
-        _iconImage.IsVisible = userIcon is not null;
-        _iconImage.Source = userIcon;
-        _glyph.IsVisible = userIcon is null;
-        _glyph.Stroke = new SolidColorBrush(IconColor ?? ScaffoldNavBarDefaults.Foreground(ScaffoldNavBarDefaults.IsDark));
+        if (_iconImage is null)
+        {
+            // Style applied from the base ctor — the ctor seeds after building the subviews.
+            return;
+        }
+
+        _iconImage.Source = icon;
+        _iconImage.IsVisible = icon is not null;
+        _glyph.IsVisible = icon is null;
     }
 }
 
@@ -194,26 +210,44 @@ public sealed class ScaffoldNavBarTitle : Grid
     private readonly Label _label;
     private ScaffoldNavBarContext? _observedContext;
 
+    // Null-conditionals below: implicit styles apply from the VisualElement base ctor, before
+    // _label exists; the ctor seeds the final values.
+
     /// <summary>Bindable property for <see cref="TextColor"/>.</summary>
     public static readonly BindableProperty TextColorProperty =
-        BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(ScaffoldNavBarTitle), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarTitle)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarTitle>.Create(
+            nameof(TextColor),
+            ScaffoldNavBarDefaults.Foreground,
+            propertyChanged: static title => (_, value) => title._label?.TextColor = value
+        );
 
     /// <summary>Bindable property for <see cref="FontFamily"/>.</summary>
     public static readonly BindableProperty FontFamilyProperty =
-        BindableProperty.Create(nameof(FontFamily), typeof(string), typeof(ScaffoldNavBarTitle), null, propertyChanged: (b, _, _) => ((ScaffoldNavBarTitle)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarTitle>.Create<string?>(
+            nameof(FontFamily),
+            propertyChanged: static title => (_, value) => title._label?.FontFamily = value
+        );
 
     /// <summary>Bindable property for <see cref="FontSize"/>.</summary>
     public static readonly BindableProperty FontSizeProperty =
-        BindableProperty.Create(nameof(FontSize), typeof(double), typeof(ScaffoldNavBarTitle), 17.0, propertyChanged: (b, _, _) => ((ScaffoldNavBarTitle)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarTitle>.Create(
+            nameof(FontSize),
+            17.0,
+            propertyChanged: static title => (_, value) => title._label?.FontSize = value
+        );
 
     /// <summary>Bindable property for <see cref="FontAttributes"/>.</summary>
     public static readonly BindableProperty FontAttributesProperty =
-        BindableProperty.Create(nameof(FontAttributes), typeof(FontAttributes), typeof(ScaffoldNavBarTitle), FontAttributes.Bold, propertyChanged: (b, _, _) => ((ScaffoldNavBarTitle)b).ApplyStyling());
+        GenericBindableProperty<ScaffoldNavBarTitle>.Create(
+            nameof(FontAttributes),
+            FontAttributes.Bold,
+            propertyChanged: static title => (_, value) => title._label?.FontAttributes = value
+        );
 
-    /// <summary>Gets or sets the title color. Theme-aware default when unset.</summary>
-    public Color? TextColor
+    /// <summary>Gets or sets the title color.</summary>
+    public Color TextColor
     {
-        get => (Color?)GetValue(TextColorProperty);
+        get => (Color)GetValue(TextColorProperty);
         set => SetValue(TextColorProperty, value);
     }
 
@@ -256,12 +290,11 @@ public sealed class ScaffoldNavBarTitle : Grid
 
         VerticalOptions = LayoutOptions.Center;
 
-        if (Application.Current is { } application)
-        {
-            application.RequestedThemeChanged += (_, _) => ApplyStyling();
-        }
-
-        ApplyStyling();
+        // Defaults never raise propertyChanged: seed once from the current values.
+        _label.TextColor = TextColor;
+        _label.FontFamily = FontFamily;
+        _label.FontSize = FontSize;
+        _label.FontAttributes = FontAttributes;
     }
 
     /// <inheritdoc />
@@ -314,13 +347,5 @@ public sealed class ScaffoldNavBarTitle : Grid
         {
             _label.IsVisible = true;
         }
-    }
-
-    private void ApplyStyling()
-    {
-        _label.TextColor = TextColor ?? ScaffoldNavBarDefaults.Foreground(ScaffoldNavBarDefaults.IsDark);
-        _label.FontFamily = FontFamily;
-        _label.FontSize = FontSize;
-        _label.FontAttributes = FontAttributes;
     }
 }
