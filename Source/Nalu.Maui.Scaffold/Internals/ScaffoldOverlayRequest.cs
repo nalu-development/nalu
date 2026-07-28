@@ -68,7 +68,11 @@ internal sealed class ScaffoldOverlayRequest
             StrokeThickness = 0,
             Background = Scrim,
             Opacity = 0,
-            AutomationId = ScrimAutomationId
+            AutomationId = ScrimAutomationId,
+
+            // Overlay chrome never self-insets (the net10 inset listener would pad it by its
+            // system-bar overlap) — the scrim must cover the whole window uniformly.
+            SafeAreaEdges = SafeAreaEdges.None
         };
 }
 

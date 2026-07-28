@@ -118,7 +118,7 @@ public sealed class ScaffoldBottomSheetView : Border
     private const uint _animationDuration = 250;
 
     private readonly ScaffoldBottomSheetOptions _options;
-    private readonly BoxView _handle;
+    private readonly RoundRectangle _handle;
 
     private double[] _detentOffsets = [0];
     private double _sheetHeight;
@@ -150,7 +150,7 @@ public sealed class ScaffoldBottomSheetView : Border
         GenericBindableProperty<ScaffoldBottomSheetView>.Create(
             nameof(HandleColor),
             Color.FromArgb("#4D8E8E93"),
-            propertyChanged: static sheet => (_, value) => sheet._handle?.Color = value
+            propertyChanged: static sheet => (_, value) => sheet._handle?.Fill = new SolidColorBrush(value)
         );
 
     /// <summary>
@@ -183,11 +183,16 @@ public sealed class ScaffoldBottomSheetView : Border
         StrokeThickness = 0;
         AutomationId = "ScaffoldBottomSheet";
 
-        _handle = new BoxView
+        // Overlay views never self-inset: the presenter owns the inset math, and the net10
+        // inset listener would otherwise pad the sheet by its system-bar overlap (content
+        // displaced and cut on Android).
+        SafeAreaEdges = SafeAreaEdges.None;
+
+        _handle = new RoundRectangle
         {
             WidthRequest = 36,
             HeightRequest = 4,
-            CornerRadius = 2,
+            CornerRadius = new CornerRadius(2),
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
             IsVisible = options.ShowDragHandle
@@ -195,6 +200,10 @@ public sealed class ScaffoldBottomSheetView : Border
 
         var layout = new Grid
         {
+            // Same trap as the tab bar (see ScaffoldTabBarView): a MAUI Grid self-pads from the
+            // root window insets on Android before it knows its real window position — an
+            // overlay-mounted grid gets offset by the status bar. Insets are the presenter's job.
+            SafeAreaEdges = SafeAreaEdges.None,
             RowDefinitions =
             {
                 new RowDefinition(options.ShowDragHandle ? new GridLength(20) : new GridLength(0)),
@@ -213,7 +222,7 @@ public sealed class ScaffoldBottomSheetView : Border
         // Defaults never raise propertyChanged: seed once from the current values.
         Background = SheetBackground;
         StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(SheetCornerRadius, SheetCornerRadius, 0, 0) };
-        _handle.Color = HandleColor;
+        _handle.Fill = new SolidColorBrush(HandleColor);
     }
 
     /// <summary>

@@ -182,7 +182,21 @@
       "Bash(git commit -q -m 'Scaffold overlay stack + tab bar panel API rework \\(popup system phase A\\) *)",
       "Bash(iconv -f UTF-16LE -t UTF-8 UITests/UITests.DevFlow/bin/Debug/net10.0/TestResults/UITests.DevFlow_net10.0_arm64.log)",
       "Bash(git commit -q -m 'Scaffold popups: ShowPopupAsync, placement, stacking \\(§5.6 phase B\\) *)",
-      "Bash(git commit -q -m 'Scaffold bottom sheets: ShowBottomSheetAsync, detents, drag \\(§5.6 phase C\\) *)"
+      "Bash(git commit -q -m 'Scaffold bottom sheets: ShowBottomSheetAsync, detents, drag \\(§5.6 phase C\\) *)",
+      "Bash(curl -s -m 3 http://localhost:9223/ui/status)",
+      "Bash(echo \"run-exit=$?\")",
+      "Bash(ls -t ~/Library/Logs/DiagnosticReports/ 2>/dev/null | head -3; xcrun simctl spawn 370FA1F4-7726-4096-8BA8-438090C9BEF0 launchctl list 2>/dev/null | grep -ci testapp || echo \"app not running\")",
+      "Bash(git commit -q -m 'Scaffold overlays: Android safe-area fixes + sheet handle polish *)",
+      "Bash(SOAK_ITERATIONS=80 dotnet test UITests/UITests.DevFlow --filter \"FullyQualifiedName~ZzSoakRepro\" -l \"console;verbosity=normal\")",
+      "Bash(chmod +x /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh)",
+      "Bash(/private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh)",
+      "Bash(curl -s -m 3 http://localhost:9223/status)",
+      "Bash(curl -s -m 3 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:9223/)",
+      "Bash(pkill -f \"hangwatch.sh|watch.sh\")",
+      "Bash(/private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/hangwatch.sh)",
+      "Bash(pkill -f \"hangwatch.sh\")",
+      "Bash(pkill -f /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh)",
+      "Bash(sed -i '' 's|pgrep -f \"Nalu.Maui.TestApp.app/Nalu.Maui.TestApp\"|pgrep -f \"Nalu.Maui.TestApp.app/Nalu.Maui.TestApp$\"|' /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/hangwatch.sh)"
     ]
   }
 }

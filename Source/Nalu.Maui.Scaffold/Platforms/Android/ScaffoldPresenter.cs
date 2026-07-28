@@ -1024,6 +1024,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _overlays.Add(entry);
         scaffold.UpdateBackCallbackEnabled();
 
+        // MAUI's net10 safe-area pass evaluates each layout at its FIRST traversal with an
+        // off-screen heuristic: a view laid out while translated off the screen receives FULL
+        // system-bar padding ("it will settle at origin"), permanently displacing overlay
+        // content. Let the subtree settle a traversal at its REAL position — hidden — before
+        // the entrance translation applies.
+        panel.Alpha = 0;
+        await Task.Delay(32);
+        panel.Alpha = 1;
+
         ScaffoldOverlayAnimations.PrepareEnter(request, flyoutOffscreen);
         await ScaffoldOverlayAnimations.EnterAsync(request, scrimView);
 
