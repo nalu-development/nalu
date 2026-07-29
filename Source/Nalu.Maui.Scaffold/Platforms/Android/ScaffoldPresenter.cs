@@ -918,7 +918,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             {
                 var systemInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
 
-                var margin = request.PopupOptions?.Margin ?? new Thickness(16);
+                var presentation = request.PopupPresentation!;
+                var margin = presentation.Margin;
 
                 var area = new Rect(
                     context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
@@ -942,7 +943,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
                 Rect? anchorBounds = null;
 
-                if (request.PopupOptions?.Anchor is { Handler.PlatformView: AView anchorView })
+                if (presentation.Anchor is { Handler.PlatformView: AView anchorView })
                 {
                     var anchorLocation = new int[2];
                     var containerLocation = new int[2];
@@ -957,7 +958,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
                     );
                 }
 
-                var rect = ScaffoldPopupPlacementResolver.Resolve(request.PopupOptions ?? new ScaffoldPopupOptions(), area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+                var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
 
                 var popupLayoutParams = new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(rect.Width), (int)context.ToPixels(rect.Height))
                 {

@@ -48,8 +48,8 @@ internal sealed class ScaffoldOverlayRequest
     /// <summary>The drawer side; meaningful for <see cref="ScaffoldOverlayKind.Flyout"/> only.</summary>
     public ScaffoldFlyoutSide FlyoutSide { get; init; }
 
-    /// <summary>The placement options; meaningful for <see cref="ScaffoldOverlayKind.Popup"/> only.</summary>
-    public ScaffoldPopupOptions? PopupOptions { get; init; }
+    /// <summary>The RESOLVED placement; meaningful for <see cref="ScaffoldOverlayKind.Popup"/> only.</summary>
+    public ScaffoldPopupPresentation? PopupPresentation { get; init; }
 
     /// <summary>The automation id of the scrim view (UI-test hook for scrim taps).</summary>
     public string? ScrimAutomationId { get; init; }

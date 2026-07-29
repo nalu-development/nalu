@@ -28,7 +28,11 @@ public static class MauiProgram
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseNaluTabBar()
-            .UseNaluScaffold()
+            .UseNaluScaffold(scaffold => scaffold
+                // Model-first overlays exercised by the "Scaffold Overlay Service Tests" harness.
+                .AddOverlay<Tests.VmSheetModel, Tests.VmSheetView>()
+                .AddOverlay<Tests.VmPopupModel, Tests.VmPopupView>()
+            )
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()

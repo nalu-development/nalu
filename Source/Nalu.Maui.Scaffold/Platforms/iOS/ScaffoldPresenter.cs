@@ -766,7 +766,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             {
                 var insets = controller.View!.SafeAreaInsets;
 
-                var margin = request.PopupOptions?.Margin ?? new Thickness(16);
+                var presentation = request.PopupPresentation!;
+                var margin = presentation.Margin;
 
                 var area = new Rect(
                     bounds.X + insets.Left + margin.Left,
@@ -783,13 +784,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
                 Rect? anchorBounds = null;
 
-                if (request.PopupOptions?.Anchor is { Handler.PlatformView: UIView anchorView })
+                if (presentation.Anchor is { Handler.PlatformView: UIView anchorView })
                 {
                     var frame = anchorView.ConvertRectToView(anchorView.Bounds, container);
                     anchorBounds = new Rect(frame.X, frame.Y, frame.Width, frame.Height);
                 }
 
-                var rect = ScaffoldPopupPlacementResolver.Resolve(request.PopupOptions ?? new ScaffoldPopupOptions(), area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+                var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
                 popupView.Arrange(rect);
                 container.AddSubview(panel);
 

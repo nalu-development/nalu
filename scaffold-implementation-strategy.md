@@ -620,26 +620,51 @@ separate mechanism the navigation engine never sees.
 - Harness: "Scaffold Modal Tests" + ScaffoldModalChromeTests (tab-bar cover, X close, plain
   modal programmatic close, Android system-back pop) — green on both platforms.
 
-### 7.2 Popups & sheets (presentation, separate from navigation — decided; **ships in v2**)
+### 7.2 Popups & sheets — IMPLEMENTED (July 2026; the former "v2" feature landed early)
 
-- **v2 feature — not part of the initial Scaffold release.** v1 ships modal pages only (§7.1);
-  v1's only obligation is that the overlay-layer design doesn't preclude this.
-- Reference model: [uxd-popups](https://github.com/UXDivers/uxd-popups)-style API — imperative
-  show/await-result (the pattern Nalu popups already use in `Nalu.Maui.Layouts` —
-  `PopupPageBase`/`PopupContainer`): **no route, no stack entry, no navigation lifecycle,
-  no guards, excluded from snapshot/restore.**
-- The Scaffold provides the **overlay layer** they render into (the shared primitive of §5.6 —
-  above page + chrome, below nothing), with scrim and safe-area handling per §5.4; back handling
-  policy: hardware/system back and back gestures dismiss the topmost overlay before the
-  navigation engine is ever consulted.
-- A sheet is a popup with detent/drag behavior — implementation choice (native
-  `UISheetPresentationController` / Material bottom sheet vs Nalu-drawn for cross-platform
-  consistency) is part of THIS feature's design review, not the navigation engine's. The library's
-  iOS 15.0 floor is only needed by the native-sheet option.
-- Packaging (inside `Nalu.Maui.Scaffold` vs evolving the existing Layouts popup family on top of
-  the Scaffold overlay layer) — design review.
-- Win: `NaluShell.OnNavigating`'s CommunityToolkit-popup regex special-casing disappears — with a
-  custom host, popups never enter the navigation pipeline in the first place.
+Implemented in three phases on the §5.6 overlay STACK (see the phase commits), plus a
+model-first MVVM layer. **No route, no stack entry, no navigation lifecycle in the engine,
+no guards, excluded from snapshot/restore** — as originally decided.
+
+- **Low-level (view-first) API** on `Scaffold`: `ShowPopupAsync(View, ScaffoldPopupOptions?)` /
+  `ShowBottomSheetAsync(View, ScaffoldBottomSheetOptions?)` returning the `IScaffoldPopup`
+  lifetime handle (`IsOpen`, `Closed` — completes on EVERY close path — `CloseAsync`,
+  `IAsyncDisposable`); `ShowTabBarPanelAsync(View, Brush?, bool closeIfOpened)` /
+  `CloseTabBarPanelAsync` for the bottom-chrome panel (toggle or replace-in-place).
+- **Overlay stack semantics**: entries stack in open order, each above its own Brush scrim
+  (gradients supported; transparent = dropdown, always input-blocking); scrim tap and system
+  back dismiss the TOPMOST entry (per-entry policy flags); navigation commits dismiss ALL;
+  the tab bar panel keeps its below-strip z-slot. Popups/sheets ignore chrome insets entirely —
+  only SYSTEM insets shape the presentation area (Android: insets are CONSUMED at the overlay
+  boundary or MAUI's net10 inset handling displaces inner layouts).
+- **Placement**: Center / anchored (Below|Above|Start|End, auto-flip, RTL-mapped, clamped) /
+  `IScaffoldPopupPlacer` full custom; `Margin` insets the area; content
+  `MaximumWidth/HeightRequest` participate in the measure. Shared cross-platform resolver;
+  presenters only supply area + anchor frame + measured size (via VIRTUAL measure/arrange —
+  a manually-framed platform view leaves the MAUI Frame invalid and iOS silently skips
+  transforms).
+- **Sheets are Nalu-drawn** (no native sheet — cross-platform consistency; the iOS 15 floor
+  question is moot): public stylable `ScaffoldBottomSheetView` (SheetBackground,
+  SheetCornerRadius, HandleColor per §5.7), detents `Content|Fraction|Height` clamped to the
+  available height, WHOLE-SHEET pan at the virtual view layer (inner gesture-hungry controls
+  stop propagation themselves; drag clamps at the largest detent; pull past the smallest
+  dismisses), `SnapToDetentAsync`, `MaxWidth` for tablets (floats centered).
+- **Attached presentation properties** (`ScaffoldPopup.*` / `ScaffoldBottomSheet.*` on the
+  CONTENT view) declare how a view prefers to be presented; call-site options are ALL-NULLABLE
+  and override per property: `caller ?? attached ?? default`.
+- **MVVM layer** (`IOverlayService`, registered by `UseNaluScaffold`): model-first
+  `Show{Popup|BottomSheet}Async<TModel[, TResult]>(object? intent, options?)` mirroring the
+  navigation engine — intents delivered to `OnEnteringAsync(TIntent)` via the same
+  reflection-dispatch pattern (AOT-safe: `AddOverlay<TModel, TView>` annotations preserve
+  members; registrations are trim-safe closures, factory overload as the zero-magic hatch).
+  Construction: per-presentation DI scope; a wrapper provider serves the non-generic
+  `IOverlayRef` → model via `ActivatorUtilities` → view likewise with the model resolvable —
+  each ctor declares only what it needs (ONE public ctor per type). The model closes via
+  `IOverlayRef.CloseAsync(result)` — result type runtime-checked against the Show call's
+  `TResult` (throws on mismatch); the caller's task completes with the result, or `default`
+  on any dismissal. `ILeavingAware` + `IDisposable`/`IAsyncDisposable` run on close; a close
+  requested during `OnEnteringAsync` skips presentation entirely.
+- Win confirmed: popups never enter the navigation pipeline — no popup special-casing anywhere.
 
 ---
 

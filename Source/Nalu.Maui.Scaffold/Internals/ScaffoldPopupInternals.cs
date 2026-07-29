@@ -1,5 +1,14 @@
 namespace Nalu;
 
+/// <summary>The RESOLVED popup placement (call-site options ?? attached values ?? defaults).</summary>
+internal sealed record ScaffoldPopupPresentation(
+    ScaffoldPopupPlacement Placement,
+    View? Anchor,
+    Point AnchorOffset,
+    Thickness Margin,
+    IScaffoldPopupPlacer? CustomPlacer
+);
+
 /// <summary>
 /// <see cref="IScaffoldPopup"/> implementation: a thin identity over the overlay-entry request —
 /// the presenter's cleanup completes <see cref="Closed"/> on every close path.
@@ -39,14 +48,14 @@ internal sealed class ScaffoldPopupHandle : IScaffoldPopup
 /// </summary>
 internal static class ScaffoldPopupPlacementResolver
 {
-    public static Rect Resolve(ScaffoldPopupOptions options, Rect area, Size content, Rect? anchorBounds, bool isRtl)
+    public static Rect Resolve(ScaffoldPopupPresentation presentation, Rect area, Size content, Rect? anchorBounds, bool isRtl)
     {
-        if (options.CustomPlacer is { } placer)
+        if (presentation.CustomPlacer is { } placer)
         {
             return placer.Place(area, content, anchorBounds);
         }
 
-        if (anchorBounds is not { } anchor || options.Placement == ScaffoldPopupPlacement.Center)
+        if (anchorBounds is not { } anchor || presentation.Placement == ScaffoldPopupPlacement.Center)
         {
             return new Rect(
                 area.X + (area.Width - content.Width) / 2,
@@ -56,11 +65,11 @@ internal static class ScaffoldPopupPlacementResolver
             );
         }
 
-        var offset = options.AnchorOffset;
+        var offset = presentation.AnchorOffset;
         double x;
         double y;
 
-        switch (options.Placement)
+        switch (presentation.Placement)
         {
             case ScaffoldPopupPlacement.AnchorAbove:
                 x = StartAlignedX(anchor, content, offset, isRtl);
@@ -77,7 +86,7 @@ internal static class ScaffoldPopupPlacementResolver
             case ScaffoldPopupPlacement.AnchorEnd:
             {
                 // Physical side of the anchor the popup leans to (logical Start/End, RTL-mapped).
-                var toLeft = options.Placement == ScaffoldPopupPlacement.AnchorStart != isRtl;
+                var toLeft = presentation.Placement == ScaffoldPopupPlacement.AnchorStart != isRtl;
                 x = toLeft ? anchor.Left - content.Width - offset.X : anchor.Right + offset.X;
 
                 if (toLeft ? x < area.Left : x + content.Width > area.Right)

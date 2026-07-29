@@ -61,33 +61,131 @@ public sealed class ScaffoldBottomSheetOptions
     public Brush? Scrim { get; init; }
 
     /// <summary>Gets or sets whether tapping the scrim closes the sheet. Defaults to true.</summary>
-    public bool CloseOnScrimTap { get; init; } = true;
+    public bool? CloseOnScrimTap { get; init; }
 
     /// <summary>
     /// Gets or sets whether the system back gesture closes the sheet. Defaults to true; when
     /// false, back is consumed without closing while the sheet is topmost.
     /// </summary>
-    public bool CloseOnBack { get; init; } = true;
+    public bool? CloseOnBack { get; init; }
 
     /// <summary>
     /// Gets or sets the maximum sheet width. Defaults to unbounded (full window width); when
     /// the window is wider (tablets, landscape), the sheet floats centered at this width,
     /// still bottom-anchored.
     /// </summary>
-    public double MaxWidth { get; init; } = double.PositiveInfinity;
+    public double? MaxWidth { get; init; }
 
     /// <summary>Gets or sets the resting heights. Defaults to a single <see cref="ScaffoldSheetDetent.Content"/> detent.</summary>
-    public ScaffoldSheetDetent[] Detents { get; init; } = [ScaffoldSheetDetent.Content];
+    public ScaffoldSheetDetent[]? Detents { get; init; }
 
-    /// <summary>Gets or sets the index (into <see cref="Detents"/>) the sheet opens at.</summary>
-    public int InitialDetent { get; init; }
+    /// <summary>Gets or sets the index (into <see cref="Detents"/>) the sheet opens at. Defaults to 0.</summary>
+    public int? InitialDetent { get; init; }
 
     /// <summary>Gets or sets whether dragging below the smallest detent dismisses the sheet. Defaults to true.</summary>
-    public bool AllowPullDownToClose { get; init; } = true;
+    public bool? AllowPullDownToClose { get; init; }
 
     /// <summary>Gets or sets whether the built-in drag handle is shown. Defaults to true.</summary>
-    public bool ShowDragHandle { get; init; } = true;
+    public bool? ShowDragHandle { get; init; }
 }
+
+/// <summary>
+/// Attached presentation properties declared on a sheet CONTENT view — the view states how it
+/// prefers to be presented, right where it is defined (XAML-friendly, styleable). Call-site
+/// <see cref="ScaffoldBottomSheetOptions"/> override per property: a set option wins over the
+/// attached value, which wins over the built-in default.
+/// </summary>
+public static class ScaffoldBottomSheet
+{
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.Detents"/>.</summary>
+    public static readonly BindableProperty DetentsProperty =
+        BindableProperty.CreateAttached("Detents", typeof(ScaffoldSheetDetent[]), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.InitialDetent"/>.</summary>
+    public static readonly BindableProperty InitialDetentProperty =
+        BindableProperty.CreateAttached("InitialDetent", typeof(int?), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.AllowPullDownToClose"/>.</summary>
+    public static readonly BindableProperty AllowPullDownToCloseProperty =
+        BindableProperty.CreateAttached("AllowPullDownToClose", typeof(bool?), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.ShowDragHandle"/>.</summary>
+    public static readonly BindableProperty ShowDragHandleProperty =
+        BindableProperty.CreateAttached("ShowDragHandle", typeof(bool?), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.MaxWidth"/>.</summary>
+    public static readonly BindableProperty MaxWidthProperty =
+        BindableProperty.CreateAttached("MaxWidth", typeof(double?), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.Scrim"/>.</summary>
+    public static readonly BindableProperty ScrimProperty =
+        BindableProperty.CreateAttached("Scrim", typeof(Brush), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.CloseOnScrimTap"/>.</summary>
+    public static readonly BindableProperty CloseOnScrimTapProperty =
+        BindableProperty.CreateAttached("CloseOnScrimTap", typeof(bool?), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldBottomSheetOptions.CloseOnBack"/>.</summary>
+    public static readonly BindableProperty CloseOnBackProperty =
+        BindableProperty.CreateAttached("CloseOnBack", typeof(bool?), typeof(ScaffoldBottomSheet), null);
+
+    /// <summary>Gets the attached detents.</summary>
+    public static ScaffoldSheetDetent[]? GetDetents(BindableObject view) => (ScaffoldSheetDetent[]?)view.GetValue(DetentsProperty);
+
+    /// <summary>Sets the attached detents.</summary>
+    public static void SetDetents(BindableObject view, ScaffoldSheetDetent[]? value) => view.SetValue(DetentsProperty, value);
+
+    /// <summary>Gets the attached initial detent index.</summary>
+    public static int? GetInitialDetent(BindableObject view) => (int?)view.GetValue(InitialDetentProperty);
+
+    /// <summary>Sets the attached initial detent index.</summary>
+    public static void SetInitialDetent(BindableObject view, int? value) => view.SetValue(InitialDetentProperty, value);
+
+    /// <summary>Gets the attached pull-down policy.</summary>
+    public static bool? GetAllowPullDownToClose(BindableObject view) => (bool?)view.GetValue(AllowPullDownToCloseProperty);
+
+    /// <summary>Sets the attached pull-down policy.</summary>
+    public static void SetAllowPullDownToClose(BindableObject view, bool? value) => view.SetValue(AllowPullDownToCloseProperty, value);
+
+    /// <summary>Gets the attached drag-handle visibility.</summary>
+    public static bool? GetShowDragHandle(BindableObject view) => (bool?)view.GetValue(ShowDragHandleProperty);
+
+    /// <summary>Sets the attached drag-handle visibility.</summary>
+    public static void SetShowDragHandle(BindableObject view, bool? value) => view.SetValue(ShowDragHandleProperty, value);
+
+    /// <summary>Gets the attached maximum sheet width.</summary>
+    public static double? GetMaxWidth(BindableObject view) => (double?)view.GetValue(MaxWidthProperty);
+
+    /// <summary>Sets the attached maximum sheet width.</summary>
+    public static void SetMaxWidth(BindableObject view, double? value) => view.SetValue(MaxWidthProperty, value);
+
+    /// <summary>Gets the attached scrim brush.</summary>
+    public static Brush? GetScrim(BindableObject view) => (Brush?)view.GetValue(ScrimProperty);
+
+    /// <summary>Sets the attached scrim brush.</summary>
+    public static void SetScrim(BindableObject view, Brush? value) => view.SetValue(ScrimProperty, value);
+
+    /// <summary>Gets the attached scrim-tap dismissal policy.</summary>
+    public static bool? GetCloseOnScrimTap(BindableObject view) => (bool?)view.GetValue(CloseOnScrimTapProperty);
+
+    /// <summary>Sets the attached scrim-tap dismissal policy.</summary>
+    public static void SetCloseOnScrimTap(BindableObject view, bool? value) => view.SetValue(CloseOnScrimTapProperty, value);
+
+    /// <summary>Gets the attached back dismissal policy.</summary>
+    public static bool? GetCloseOnBack(BindableObject view) => (bool?)view.GetValue(CloseOnBackProperty);
+
+    /// <summary>Sets the attached back dismissal policy.</summary>
+    public static void SetCloseOnBack(BindableObject view, bool? value) => view.SetValue(CloseOnBackProperty, value);
+}
+
+/// <summary>The RESOLVED sheet presentation (call-site options ?? attached values ?? defaults).</summary>
+internal sealed record ScaffoldSheetPresentation(
+    ScaffoldSheetDetent[] Detents,
+    int InitialDetent,
+    bool AllowPullDownToClose,
+    bool ShowDragHandle,
+    double MaxWidth
+);
 
 /// <summary>
 /// The bottom sheet chrome of <see cref="Scaffold.ShowBottomSheetAsync"/>: a top-rounded surface
@@ -117,7 +215,7 @@ public sealed class ScaffoldBottomSheetView : Border
     private const double _dismissThreshold = 56;
     private const uint _animationDuration = 250;
 
-    private readonly ScaffoldBottomSheetOptions _options;
+    private readonly ScaffoldSheetPresentation _presentation;
     private readonly RoundRectangle _handle;
 
     private double[] _detentOffsets = [0];
@@ -177,9 +275,9 @@ public sealed class ScaffoldBottomSheetView : Border
         set => SetValue(HandleColorProperty, value);
     }
 
-    internal ScaffoldBottomSheetView(View content, ScaffoldBottomSheetOptions options)
+    internal ScaffoldBottomSheetView(View content, ScaffoldSheetPresentation presentation)
     {
-        _options = options;
+        _presentation = presentation;
         StrokeThickness = 0;
         AutomationId = "ScaffoldBottomSheet";
 
@@ -195,7 +293,7 @@ public sealed class ScaffoldBottomSheetView : Border
             CornerRadius = new CornerRadius(2),
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.Center,
-            IsVisible = options.ShowDragHandle
+            IsVisible = presentation.ShowDragHandle
         };
 
         var layout = new Grid
@@ -206,7 +304,7 @@ public sealed class ScaffoldBottomSheetView : Border
             SafeAreaEdges = SafeAreaEdges.None,
             RowDefinitions =
             {
-                new RowDefinition(options.ShowDragHandle ? new GridLength(20) : new GridLength(0)),
+                new RowDefinition(presentation.ShowDragHandle ? new GridLength(20) : new GridLength(0)),
                 new RowDefinition(GridLength.Auto)
             }
         };
@@ -237,13 +335,13 @@ public sealed class ScaffoldBottomSheetView : Border
             return Task.CompletedTask;
         }
 
-        var height = ResolveDetentHeight(Math.Clamp(detentIndex, 0, _options.Detents.Length - 1));
+        var height = ResolveDetentHeight(Math.Clamp(detentIndex, 0, _presentation.Detents.Length - 1));
 
         return this.TranslateTo(0, _sheetHeight - height, _animationDuration, Easing.CubicOut);
     }
 
     /// <summary>The configured maximum sheet width (presenters clamp the window width by it).</summary>
-    internal double MaxWidth => _options.MaxWidth;
+    internal double MaxWidth => _presentation.MaxWidth;
 
     /// <summary>Applies the bottom system inset as content padding BEFORE the natural-height measure.</summary>
     internal void PrepareForMeasure(double bottomInset)
@@ -259,7 +357,7 @@ public sealed class ScaffoldBottomSheetView : Border
         _availableHeight = availableHeight;
         _naturalHeight = naturalHeight;
 
-        var detents = _options.Detents is { Length: > 0 } configured ? configured : [ScaffoldSheetDetent.Content];
+        var detents = _presentation.Detents is { Length: > 0 } configured ? configured : [ScaffoldSheetDetent.Content];
 
         var heights = detents
                       .Select(detent => detent.Resolve(availableHeight, naturalHeight))
@@ -272,7 +370,7 @@ public sealed class ScaffoldBottomSheetView : Border
         // TranslationY per detent, ascending ([0] = largest detent = fully open).
         _detentOffsets = [.. heights.Reverse().Select(height => _sheetHeight - height)];
 
-        InitialOffset = _sheetHeight - ResolveDetentHeight(Math.Clamp(_options.InitialDetent, 0, detents.Length - 1));
+        InitialOffset = _sheetHeight - ResolveDetentHeight(Math.Clamp(_presentation.InitialDetent, 0, detents.Length - 1));
 
         return _sheetHeight;
     }
@@ -281,7 +379,7 @@ public sealed class ScaffoldBottomSheetView : Border
     private double _naturalHeight;
 
     private double ResolveDetentHeight(int detentIndex)
-        => _options.Detents[detentIndex].Resolve(_availableHeight, _naturalHeight);
+        => _presentation.Detents[detentIndex].Resolve(_availableHeight, _naturalHeight);
 
     /// <summary>The translation of the initial detent.</summary>
     internal double InitialOffset { get; private set; }
@@ -332,7 +430,7 @@ public sealed class ScaffoldBottomSheetView : Border
         var position = TranslationY;
         var smallestDetentOffset = _detentOffsets[^1];
 
-        if (_options.AllowPullDownToClose
+        if (_presentation.AllowPullDownToClose
             && position > smallestDetentOffset + _dismissThreshold
             && _dismissAsync is { } dismissAsync)
         {

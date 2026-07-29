@@ -428,7 +428,6 @@ public partial class Scaffold : ContentPage, IDisposable
     /// </returns>
     public async Task<IScaffoldPopup> ShowPopupAsync(View content, ScaffoldPopupOptions? options = null)
     {
-        options ??= new ScaffoldPopupOptions();
         var handle = new ScaffoldPopupHandle();
 
         if (Presenter is not { } presenter)
@@ -445,15 +444,22 @@ public partial class Scaffold : ContentPage, IDisposable
             AddLogicalChild(content);
         }
 
+        // Per-property resolution: call-site option ?? the content's attached value ?? default.
         var request = new ScaffoldOverlayRequest
         {
             Kind = ScaffoldOverlayKind.Popup,
             Content = content,
-            Scrim = options.Scrim ?? CreateDefaultScrim(),
-            CloseOnScrimTap = options.CloseOnScrimTap,
-            CloseOnBack = options.CloseOnBack,
+            Scrim = options?.Scrim ?? ScaffoldPopup.GetScrim(content) ?? CreateDefaultScrim(),
+            CloseOnScrimTap = options?.CloseOnScrimTap ?? ScaffoldPopup.GetCloseOnScrimTap(content) ?? true,
+            CloseOnBack = options?.CloseOnBack ?? ScaffoldPopup.GetCloseOnBack(content) ?? true,
             DisconnectContentOnClose = true,
-            PopupOptions = options,
+            PopupPresentation = new ScaffoldPopupPresentation(
+                options?.Placement ?? ScaffoldPopup.GetPlacement(content) ?? ScaffoldPopupPlacement.Center,
+                options?.Anchor,
+                options?.AnchorOffset ?? Point.Zero,
+                options?.Margin ?? ScaffoldPopup.GetMargin(content) ?? new Thickness(16),
+                options?.CustomPlacer
+            ),
             ScrimAutomationId = "PopupScrim"
         };
 
@@ -494,7 +500,6 @@ public partial class Scaffold : ContentPage, IDisposable
     /// </returns>
     public async Task<IScaffoldPopup> ShowBottomSheetAsync(View content, ScaffoldBottomSheetOptions? options = null)
     {
-        options ??= new ScaffoldBottomSheetOptions();
         var handle = new ScaffoldPopupHandle();
 
         if (Presenter is not { } presenter)
@@ -504,16 +509,25 @@ public partial class Scaffold : ContentPage, IDisposable
             return handle;
         }
 
-        var sheetView = new ScaffoldBottomSheetView(content, options);
+        // Per-property resolution: call-site option ?? the content's attached value ?? default.
+        var presentation = new ScaffoldSheetPresentation(
+            options?.Detents ?? ScaffoldBottomSheet.GetDetents(content) ?? [ScaffoldSheetDetent.Content],
+            options?.InitialDetent ?? ScaffoldBottomSheet.GetInitialDetent(content) ?? 0,
+            options?.AllowPullDownToClose ?? ScaffoldBottomSheet.GetAllowPullDownToClose(content) ?? true,
+            options?.ShowDragHandle ?? ScaffoldBottomSheet.GetShowDragHandle(content) ?? true,
+            options?.MaxWidth ?? ScaffoldBottomSheet.GetMaxWidth(content) ?? double.PositiveInfinity
+        );
+
+        var sheetView = new ScaffoldBottomSheetView(content, presentation);
         AddLogicalChild(sheetView);
 
         var request = new ScaffoldOverlayRequest
         {
             Kind = ScaffoldOverlayKind.BottomSheet,
             Content = sheetView,
-            Scrim = options.Scrim ?? CreateDefaultScrim(),
-            CloseOnScrimTap = options.CloseOnScrimTap,
-            CloseOnBack = options.CloseOnBack,
+            Scrim = options?.Scrim ?? ScaffoldBottomSheet.GetScrim(content) ?? CreateDefaultScrim(),
+            CloseOnScrimTap = options?.CloseOnScrimTap ?? ScaffoldBottomSheet.GetCloseOnScrimTap(content) ?? true,
+            CloseOnBack = options?.CloseOnBack ?? ScaffoldBottomSheet.GetCloseOnBack(content) ?? true,
             DisconnectContentOnClose = true,
             ScrimAutomationId = "SheetScrim"
         };

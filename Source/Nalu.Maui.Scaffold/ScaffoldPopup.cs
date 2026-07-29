@@ -75,13 +75,13 @@ public sealed class ScaffoldPopupOptions
     public Brush? Scrim { get; init; }
 
     /// <summary>Gets or sets whether tapping the scrim closes the popup. Defaults to true.</summary>
-    public bool CloseOnScrimTap { get; init; } = true;
+    public bool? CloseOnScrimTap { get; init; }
 
     /// <summary>
     /// Gets or sets whether the system back gesture closes the popup. Defaults to true; when
     /// false, back is consumed without closing while this popup is topmost.
     /// </summary>
-    public bool CloseOnBack { get; init; } = true;
+    public bool? CloseOnBack { get; init; }
 
     /// <summary>
     /// Gets or sets the minimum gap kept between the popup and the safe-area edges (the
@@ -90,10 +90,10 @@ public sealed class ScaffoldPopupOptions
     /// <see cref="VisualElement.MaximumHeightRequest"/> on the content — both participate in
     /// the popup measure.
     /// </summary>
-    public Thickness Margin { get; init; } = new(16);
+    public Thickness? Margin { get; init; }
 
-    /// <summary>Gets or sets the placement. Anchor placements require <see cref="Anchor"/>.</summary>
-    public ScaffoldPopupPlacement Placement { get; init; } = ScaffoldPopupPlacement.Center;
+    /// <summary>Gets or sets the placement. Anchor placements require <see cref="Anchor"/>. Defaults to Center.</summary>
+    public ScaffoldPopupPlacement? Placement { get; init; }
 
     /// <summary>Gets or sets the view the anchor placements position relative to.</summary>
     public View? Anchor { get; init; }
@@ -103,4 +103,63 @@ public sealed class ScaffoldPopupOptions
 
     /// <summary>Gets or sets a fully custom placement, overriding <see cref="Placement"/>.</summary>
     public IScaffoldPopupPlacer? CustomPlacer { get; init; }
+}
+
+/// <summary>
+/// Attached presentation properties declared on a popup CONTENT view — the view states how it
+/// prefers to be presented, right where it is defined (XAML-friendly, styleable). Call-site
+/// <see cref="ScaffoldPopupOptions"/> override per property: a set option wins over the
+/// attached value, which wins over the built-in default.
+/// </summary>
+public static class ScaffoldPopup
+{
+    /// <summary>Attached counterpart of <see cref="ScaffoldPopupOptions.Placement"/>.</summary>
+    public static readonly BindableProperty PlacementProperty =
+        BindableProperty.CreateAttached("Placement", typeof(ScaffoldPopupPlacement?), typeof(ScaffoldPopup), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldPopupOptions.Scrim"/>.</summary>
+    public static readonly BindableProperty ScrimProperty =
+        BindableProperty.CreateAttached("Scrim", typeof(Brush), typeof(ScaffoldPopup), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldPopupOptions.Margin"/>.</summary>
+    public static readonly BindableProperty MarginProperty =
+        BindableProperty.CreateAttached("Margin", typeof(Thickness?), typeof(ScaffoldPopup), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldPopupOptions.CloseOnScrimTap"/>.</summary>
+    public static readonly BindableProperty CloseOnScrimTapProperty =
+        BindableProperty.CreateAttached("CloseOnScrimTap", typeof(bool?), typeof(ScaffoldPopup), null);
+
+    /// <summary>Attached counterpart of <see cref="ScaffoldPopupOptions.CloseOnBack"/>.</summary>
+    public static readonly BindableProperty CloseOnBackProperty =
+        BindableProperty.CreateAttached("CloseOnBack", typeof(bool?), typeof(ScaffoldPopup), null);
+
+    /// <summary>Gets the attached placement.</summary>
+    public static ScaffoldPopupPlacement? GetPlacement(BindableObject view) => (ScaffoldPopupPlacement?)view.GetValue(PlacementProperty);
+
+    /// <summary>Sets the attached placement.</summary>
+    public static void SetPlacement(BindableObject view, ScaffoldPopupPlacement? value) => view.SetValue(PlacementProperty, value);
+
+    /// <summary>Gets the attached scrim brush.</summary>
+    public static Brush? GetScrim(BindableObject view) => (Brush?)view.GetValue(ScrimProperty);
+
+    /// <summary>Sets the attached scrim brush.</summary>
+    public static void SetScrim(BindableObject view, Brush? value) => view.SetValue(ScrimProperty, value);
+
+    /// <summary>Gets the attached margin.</summary>
+    public static Thickness? GetMargin(BindableObject view) => (Thickness?)view.GetValue(MarginProperty);
+
+    /// <summary>Sets the attached margin.</summary>
+    public static void SetMargin(BindableObject view, Thickness? value) => view.SetValue(MarginProperty, value);
+
+    /// <summary>Gets the attached scrim-tap dismissal policy.</summary>
+    public static bool? GetCloseOnScrimTap(BindableObject view) => (bool?)view.GetValue(CloseOnScrimTapProperty);
+
+    /// <summary>Sets the attached scrim-tap dismissal policy.</summary>
+    public static void SetCloseOnScrimTap(BindableObject view, bool? value) => view.SetValue(CloseOnScrimTapProperty, value);
+
+    /// <summary>Gets the attached back dismissal policy.</summary>
+    public static bool? GetCloseOnBack(BindableObject view) => (bool?)view.GetValue(CloseOnBackProperty);
+
+    /// <summary>Sets the attached back dismissal policy.</summary>
+    public static void SetCloseOnBack(BindableObject view, bool? value) => view.SetValue(CloseOnBackProperty, value);
 }
