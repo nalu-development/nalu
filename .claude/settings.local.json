@@ -196,7 +196,10 @@
       "Bash(/private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/hangwatch.sh)",
       "Bash(pkill -f \"hangwatch.sh\")",
       "Bash(pkill -f /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh)",
-      "Bash(sed -i '' 's|pgrep -f \"Nalu.Maui.TestApp.app/Nalu.Maui.TestApp\"|pgrep -f \"Nalu.Maui.TestApp.app/Nalu.Maui.TestApp$\"|' /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/hangwatch.sh)"
+      "Bash(sed -i '' 's|pgrep -f \"Nalu.Maui.TestApp.app/Nalu.Maui.TestApp\"|pgrep -f \"Nalu.Maui.TestApp.app/Nalu.Maui.TestApp$\"|' /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/watch.sh /private/tmp/claude-501/-Users-alberto-github-nalu--claude-worktrees-zealous-visvesvaraya-802a5e/284970c1-c18b-4fd7-bdca-75af6e89afc8/scratchpad/hangwatch.sh)",
+      "Bash(ls ~/.nuget/packages/microsoft.maui.core/ 2>/dev/null | tail -5; dotnet tool list -g 2>/dev/null | grep -i ilspy)",
+      "Bash(SOAK_ITERATIONS=2 dotnet test UITests/UITests.DevFlow -- --filter-class Nalu.Maui.UITests.Tests.VirtualScrollStressSoakTests)",
+      "Bash(pkill -f \"scratchpad/watch.sh\")"
     ]
   }
 }
