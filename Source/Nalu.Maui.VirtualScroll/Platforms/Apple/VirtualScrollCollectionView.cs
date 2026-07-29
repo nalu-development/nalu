@@ -14,6 +14,20 @@ internal interface IVirtualScrollCellsLayoutController
     void SetCellLayoutCompleted();
 }
 
+#if NET10_0_OR_GREATER
+/// <summary>
+/// Access to MAUI's internal measure-invalidation propagation helper.
+/// </summary>
+internal static class VirtualScrollViewExtensionsProxy
+{
+    private static readonly Action<UIView> _invalidateAncestorsMeasures = typeof(ViewExtensions)
+                                                                          .GetMethod("InvalidateAncestorsMeasures", BindingFlags.Static | BindingFlags.NonPublic)!
+                                                                          .CreateDelegate<Action<UIView>>();
+
+    public static void InvalidateAncestorsMeasures(UIView view) => _invalidateAncestorsMeasures(view);
+}
+#endif
+
 /// <summary>
 /// Patched UICollectionView for <see cref="VirtualScroll"/> support.
 /// </summary>
@@ -30,9 +44,25 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     private readonly List<NSIndexPath> _invalidatedSectionFooters = new(8);
     private readonly List<NSIndexPath> _invalidatedPaths = new(20);
     private bool _needsCellsLayout;
+#if DEBUG
+    // Canary for the self-sizing livelock class (see VirtualScrollCellContent remarks):
+    // counts back-to-back layout passes that re-invalidated cells. A healthy list never
+    // sustains double-digit bursts.
+    private int _consecutiveCellInvalidations;
+#endif
     private CGSize _lastContentSize;
 
     bool IVirtualScrollCellsLayoutController.NeedsCellsLayout => _needsCellsLayout;
+
+#if !NET10_0_OR_GREATER
+    /// <summary>
+    /// True while this collection view is inside <see cref="LayoutSubviews"/>. Used by
+    /// <see cref="VirtualScrollCellContent"/> on .NET 9 (where MAUI's
+    /// IPlatformMeasureInvalidationController is internal) to tell frame-assignment
+    /// SetNeedsLayout side effects apart from genuine content measure invalidations.
+    /// </summary>
+    internal bool IsPerformingLayout { get; private set; }
+#endif
 
     /// <summary>
     /// Event raised when the content size changes.
@@ -55,9 +85,23 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
     /// <inheritdoc/>
     public override void LayoutSubviews()
     {
+#if NET10_0_OR_GREATER
         InvalidateNeedingMeasureCells();
         base.LayoutSubviews();
-        
+#else
+        IsPerformingLayout = true;
+
+        try
+        {
+            InvalidateNeedingMeasureCells();
+            base.LayoutSubviews();
+        }
+        finally
+        {
+            IsPerformingLayout = false;
+        }
+#endif
+
         // Detect content size changes to update fading edge
         var contentSize = ContentSize;
         if (!contentSize.Equals(_lastContentSize))
@@ -101,8 +145,20 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
 
         if (invalidatedCount > 0)
         {
+#if DEBUG
+            if (++_consecutiveCellInvalidations >= 10)
+            {
+                Console.WriteLine($"[VS-LIVELOCK] LayoutSubviews cell invalidation burst={_consecutiveCellInvalidations} count={invalidatedCount}");
+            }
+#endif
             CollectionViewLayout.InvalidateLayout(context);
         }
+#if DEBUG
+        else
+        {
+            _consecutiveCellInvalidations = 0;
+        }
+#endif
 
         cellsLayoutController.SetCellLayoutCompleted();
     }
@@ -235,12 +291,8 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         if (_invalidateParentWhenMovedToWindow)
         {
             _invalidateParentWhenMovedToWindow = false;
-            _invalidateAncestorsMeasuresMethodInfo(this);
+            VirtualScrollViewExtensionsProxy.InvalidateAncestorsMeasures(this);
         }
     }
-    
-    private static readonly Action<UIView> _invalidateAncestorsMeasuresMethodInfo = typeof(ViewExtensions)
-                                                                                    .GetMethod("InvalidateAncestorsMeasures", BindingFlags.Static | BindingFlags.NonPublic)!
-                                                                                    .CreateDelegate<Action<UIView>>();
 #endif
 }
