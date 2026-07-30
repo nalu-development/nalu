@@ -29,7 +29,9 @@ public abstract class ScaffoldNavBarButtonBase : Border
 {
     private readonly ShapePath _glyph;
     private readonly Image _iconImage;
+    private readonly Ellipse _pressHighlight;
     private readonly TapGestureRecognizer _tap = new();
+    private ScaffoldNavBarContext? _observedContext;
 
     // Callback caveat (applies to EVERY styling property here): implicit styles are applied by
     // the VisualElement BASE ctor (MergedStyle), before this class's ctor body has built its
@@ -47,7 +49,14 @@ public abstract class ScaffoldNavBarButtonBase : Border
         GenericBindableProperty<ScaffoldNavBarButtonBase>.Create(
             nameof(IconColor),
             ScaffoldNavBarDefaults.Foreground,
-            propertyChanged: static button => (_, value) => button._glyph?.Stroke = new SolidColorBrush(value)
+            propertyChanged: static button => (_, _) => button.ApplyEffectiveColors()
+        );
+
+    /// <summary>Bindable property for <see cref="PressedBrush"/>.</summary>
+    public static readonly BindableProperty PressedBrushProperty =
+        GenericBindableProperty<ScaffoldNavBarButtonBase>.Create<Brush?>(
+            nameof(PressedBrush),
+            propertyChanged: static button => (_, _) => button.ApplyEffectiveColors()
         );
 
     /// <summary>Gets or sets an icon replacing the built-in drawn glyph (rendered untinted).</summary>
@@ -57,11 +66,25 @@ public abstract class ScaffoldNavBarButtonBase : Border
         set => SetValue(IconProperty, value);
     }
 
-    /// <summary>Gets or sets the built-in glyph color (ignored while <see cref="Icon"/> is set).</summary>
+    /// <summary>
+    /// Gets or sets the built-in glyph color (ignored while <see cref="Icon"/> is set).
+    /// When not set (directly or via style), the effective
+    /// <see cref="ScaffoldNavBarContext.Foreground"/> applies.
+    /// </summary>
     public Color IconColor
     {
         get => (Color)GetValue(IconColorProperty);
         set => SetValue(IconColorProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the press-feedback brush (a circular pulse filling the 44dp tap target).
+    /// When not set, a translucent tint of the effective glyph color is used.
+    /// </summary>
+    public Brush? PressedBrush
+    {
+        get => (Brush?)GetValue(PressedBrushProperty);
+        set => SetValue(PressedBrushProperty, value);
     }
 
     private protected ScaffoldNavBarButtonBase(string glyphPathData)
@@ -97,12 +120,26 @@ public abstract class ScaffoldNavBarButtonBase : Border
             IsVisible = false
         };
 
-        Content = new Grid { Children = { _glyph, _iconImage } };
+        // The pulse sits BELOW the glyph, filling the tap target; InputTransparent keeps it out
+        // of every hit-test path.
+        _pressHighlight = new Ellipse
+        {
+            WidthRequest = 44,
+            HeightRequest = 44,
+            HorizontalOptions = LayoutOptions.Center,
+            VerticalOptions = LayoutOptions.Center,
+            Opacity = 0,
+            InputTransparent = true
+        };
+
+        var touchSurface = new Grid { Children = { _pressHighlight, _glyph, _iconImage } };
+        Content = touchSurface;
 
         GestureRecognizers.Add(_tap);
+        ScaffoldPressable.Observe(touchSurface, OnPressedPulse);
 
         // Defaults never raise propertyChanged: seed once from the current values.
-        _glyph.Stroke = new SolidColorBrush(IconColor);
+        ApplyEffectiveColors();
         ApplyIcon(Icon);
     }
 
@@ -111,6 +148,63 @@ public abstract class ScaffoldNavBarButtonBase : Border
 
     /// <summary>Binds visibility with the given (trim-safe, typed) binding.</summary>
     private protected void BindVisibility(BindingBase binding) => this.SetBinding(IsVisibleProperty, binding);
+
+    /// <inheritdoc />
+    protected override void OnBindingContextChanged()
+    {
+        base.OnBindingContextChanged();
+
+        if (_observedContext is not null)
+        {
+            _observedContext.PropertyChanged -= OnContextPropertyChanged;
+            _observedContext = null;
+        }
+
+        if (BindingContext is ScaffoldNavBarContext context)
+        {
+            _observedContext = context;
+            context.PropertyChanged += OnContextPropertyChanged;
+        }
+
+        ApplyEffectiveColors();
+    }
+
+    private void OnContextPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ScaffoldNavBarContext.Foreground))
+        {
+            ApplyEffectiveColors();
+        }
+    }
+
+    /// <summary>
+    /// The effective glyph color: an explicitly set (or styled) <see cref="IconColor"/> wins,
+    /// then the appearance-driven context foreground, then the built-in default. Read-path
+    /// only — nothing ever writes into <see cref="IconColorProperty"/>, so styles keep working.
+    /// </summary>
+    private void ApplyEffectiveColors()
+    {
+        if (_glyph is null)
+        {
+            // Style applied from the base ctor — the ctor seeds after building the subviews.
+            return;
+        }
+
+        var color = IsSet(IconColorProperty)
+            ? IconColor
+            : _observedContext?.Foreground ?? ScaffoldNavBarDefaults.Foreground;
+
+        _glyph.Stroke = new SolidColorBrush(color);
+        _pressHighlight.Fill = PressedBrush ?? new SolidColorBrush(color.WithAlpha(0.14f));
+    }
+
+    /// <summary>The press feedback: an instant-on, self-fading pulse (see <see cref="ScaffoldPressable"/>).</summary>
+    private void OnPressedPulse()
+    {
+        Microsoft.Maui.Controls.ViewExtensions.CancelAnimations(_pressHighlight);
+        _pressHighlight.Opacity = 1;
+        _ = _pressHighlight.FadeTo(0, 400, Easing.CubicOut);
+    }
 
     /// <summary>A user icon replaces the drawn glyph entirely (and renders untinted).</summary>
     private void ApplyIcon(ImageSource? icon)
@@ -218,7 +312,7 @@ public sealed class ScaffoldNavBarTitle : Grid
         GenericBindableProperty<ScaffoldNavBarTitle>.Create(
             nameof(TextColor),
             ScaffoldNavBarDefaults.Foreground,
-            propertyChanged: static title => (_, value) => title._label?.TextColor = value
+            propertyChanged: static title => (_, _) => title.ApplyEffectiveTextColor()
         );
 
     /// <summary>Bindable property for <see cref="FontFamily"/>.</summary>
@@ -291,10 +385,28 @@ public sealed class ScaffoldNavBarTitle : Grid
         VerticalOptions = LayoutOptions.Center;
 
         // Defaults never raise propertyChanged: seed once from the current values.
-        _label.TextColor = TextColor;
+        ApplyEffectiveTextColor();
         _label.FontFamily = FontFamily;
         _label.FontSize = FontSize;
         _label.FontAttributes = FontAttributes;
+    }
+
+    /// <summary>
+    /// The effective title color: an explicitly set (or styled) <see cref="TextColor"/> wins,
+    /// then the appearance-driven context foreground, then the built-in default. Read-path
+    /// only — nothing ever writes into <see cref="TextColorProperty"/>, so styles keep working.
+    /// </summary>
+    private void ApplyEffectiveTextColor()
+    {
+        if (_label is null)
+        {
+            // Style applied from the base ctor — the ctor seeds after building the subviews.
+            return;
+        }
+
+        _label.TextColor = IsSet(TextColorProperty)
+            ? TextColor
+            : _observedContext?.Foreground ?? ScaffoldNavBarDefaults.Foreground;
     }
 
     /// <inheritdoc />
@@ -314,14 +426,28 @@ public sealed class ScaffoldNavBarTitle : Grid
             context.PropertyChanged += OnContextPropertyChanged;
         }
 
+        ApplyEffectiveTextColor();
         UpdateTitleView();
     }
 
     private void OnContextPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ScaffoldNavBarContext.TitleView))
+        switch (e.PropertyName)
         {
-            UpdateTitleView();
+            case nameof(ScaffoldNavBarContext.TitleView):
+                UpdateTitleView();
+
+                break;
+
+            case nameof(ScaffoldNavBarContext.PageBindingContext):
+                ApplyTitleViewBindingContext();
+
+                break;
+
+            case nameof(ScaffoldNavBarContext.Foreground):
+                ApplyEffectiveTextColor();
+
+                break;
         }
     }
 
@@ -342,10 +468,24 @@ public sealed class ScaffoldNavBarTitle : Grid
         {
             _label.IsVisible = false;
             Add(titleView);
+            ApplyTitleViewBindingContext();
         }
         else
         {
             _label.IsVisible = true;
+        }
+    }
+
+    /// <summary>
+    /// TitleView content is PAGE content: it binds the current page's model, not this bar's
+    /// context. Adding it above propagated the slot's own context as inherited value — this
+    /// overrides it with the page's (a user-assigned BindingContext always wins over both).
+    /// </summary>
+    private void ApplyTitleViewBindingContext()
+    {
+        if (_observedContext is { TitleView: { } titleView } context)
+        {
+            SetInheritedBindingContext(titleView, context.PageBindingContext);
         }
     }
 }

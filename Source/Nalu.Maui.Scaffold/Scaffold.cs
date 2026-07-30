@@ -133,12 +133,53 @@ public partial class Scaffold : ContentPage, IDisposable
         );
 
     /// <summary>
+    /// Attached property holding the nav bar strip presentation
+    /// (<see cref="ScaffoldNavBarAppearance"/>). Each appearance property resolves
+    /// INDEPENDENTLY, most specific set value wins: current <see cref="Page"/> → current
+    /// <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> → built-in defaults — a
+    /// page-level appearance is a delta over the global one. The attached object inherits the
+    /// binding context of its element, so its properties can be bound (and animated) from
+    /// page state.
+    /// </summary>
+    public static readonly BindableProperty NavBarAppearanceProperty =
+        BindableProperty.CreateAttached(
+            "NavBarAppearance",
+            typeof(ScaffoldNavBarAppearance),
+            typeof(Scaffold),
+            null,
+            propertyChanged: OnNavBarAppearanceChanged
+        );
+
+    /// <summary>
     /// Attached property controlling navigation bar visibility for a <see cref="Page"/>.
     /// Defaults to true. Visibility changes animate and reach the page as a safe-area inset
     /// change, not a page relayout.
     /// </summary>
     public static readonly BindableProperty IsNavBarVisibleProperty =
         BindableProperty.CreateAttached("IsNavBarVisible", typeof(bool), typeof(Scaffold), true);
+
+    /// <summary>
+    /// Attached property (per <see cref="Page"/>) pointing at the page's primary scrollable
+    /// view: its NATIVE scroll position feeds <see cref="ScaffoldNavBarContext.ScrollOffset"/>
+    /// and <see cref="ScaffoldNavBarContext.IsScrolledUnder"/> per frame — the channel behind
+    /// scroll-driven chrome (large-title collapses, bar fade-ins). The referenced view need
+    /// not BE the scrollable: its platform subtree is searched a few levels deep for the
+    /// actual scrollable platform view (component roots often wrap it — e.g. VirtualScroll).
+    /// </summary>
+    public static readonly BindableProperty ScrollTrackerProperty =
+        BindableProperty.CreateAttached("ScrollTracker", typeof(View), typeof(Scaffold), null);
+
+    /// <summary>
+    /// Attached property (per <see cref="Page"/>, default false) laying the page out UNDER the
+    /// nav bar: the bar's footprint is not applied as a top inset — content starts at the very
+    /// top edge (the page's own <c>SafeAreaEdges</c> decides how it treats the raw system
+    /// insets) and the bar draws over it. Pair with a page-level
+    /// <see cref="NavBarAppearanceProperty"/> (e.g. a transparent <see
+    /// cref="ScaffoldNavBarAppearance.Background"/>) for full-bleed headers whose bar
+    /// materializes on scroll.
+    /// </summary>
+    public static readonly BindableProperty NavBarOverlapsContentProperty =
+        BindableProperty.CreateAttached("NavBarOverlapsContent", typeof(bool), typeof(Scaffold), false);
 
     /// <summary>
     /// Attached property controlling the nav bar's start-drawer button
@@ -822,11 +863,69 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets the navigation bar view attached to an element.</summary>
     public static void SetNavBarView(BindableObject bindable, View? value) => bindable.SetValue(NavBarViewProperty, value);
 
+    /// <summary>Gets the nav bar appearance attached to an element.</summary>
+    public static ScaffoldNavBarAppearance? GetNavBarAppearance(BindableObject bindable) => (ScaffoldNavBarAppearance?)bindable.GetValue(NavBarAppearanceProperty);
+
+    /// <summary>Sets the nav bar appearance attached to an element.</summary>
+    public static void SetNavBarAppearance(BindableObject bindable, ScaffoldNavBarAppearance? value) => bindable.SetValue(NavBarAppearanceProperty, value);
+
+    /// <summary>
+    /// The attached appearance inherits its element's binding context (the same treatment MAUI
+    /// gives <see cref="VisualElement.Shadow"/>) so its properties can be bound to page state.
+    /// The handler subscription is idempotent (remove-then-add) and dropped when cleared.
+    /// </summary>
+    private static void OnNavBarAppearanceChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        if (bindable is not Element element)
+        {
+            return;
+        }
+
+        element.BindingContextChanged -= OnAppearanceHostBindingContextChanged;
+
+        if (newValue is ScaffoldNavBarAppearance appearance)
+        {
+            SetInheritedBindingContext(appearance, element.BindingContext);
+            element.BindingContextChanged += OnAppearanceHostBindingContextChanged;
+        }
+    }
+
+    private static void OnAppearanceHostBindingContextChanged(object? sender, EventArgs e)
+    {
+        if (sender is Element element && GetNavBarAppearance(element) is { } appearance)
+        {
+            SetInheritedBindingContext(appearance, element.BindingContext);
+        }
+    }
+
+    /// <summary>
+    /// The appearance chain for the given page, most specific first — each appearance property
+    /// resolves independently through it (see <see cref="ScaffoldNavBarAppearance.Resolve{T}"/>).
+    /// </summary>
+    internal (ScaffoldNavBarAppearance? Page, ScaffoldNavBarAppearance? Area, ScaffoldNavBarAppearance? Scaffold) GetNavBarAppearanceChain(Page? currentPage)
+        => (
+            currentPage is null ? null : GetNavBarAppearance(currentPage),
+            CurrentArea is { } area ? GetNavBarAppearance(area) : null,
+            GetNavBarAppearance(this)
+        );
+
     /// <summary>Gets whether the navigation bar is visible for a page.</summary>
     public static bool GetIsNavBarVisible(BindableObject bindable) => (bool)bindable.GetValue(IsNavBarVisibleProperty);
 
     /// <summary>Sets whether the navigation bar is visible for a page.</summary>
     public static void SetIsNavBarVisible(BindableObject bindable, bool value) => bindable.SetValue(IsNavBarVisibleProperty, value);
+
+    /// <summary>Gets whether the nav bar draws over the page instead of insetting it.</summary>
+    public static bool GetNavBarOverlapsContent(BindableObject bindable) => (bool)bindable.GetValue(NavBarOverlapsContentProperty);
+
+    /// <summary>Sets whether the nav bar draws over the page instead of insetting it.</summary>
+    public static void SetNavBarOverlapsContent(BindableObject bindable, bool value) => bindable.SetValue(NavBarOverlapsContentProperty, value);
+
+    /// <summary>Gets the tracked scrollable attached to a page.</summary>
+    public static View? GetScrollTracker(BindableObject bindable) => (View?)bindable.GetValue(ScrollTrackerProperty);
+
+    /// <summary>Sets the tracked scrollable attached to a page.</summary>
+    public static void SetScrollTracker(BindableObject bindable, View? value) => bindable.SetValue(ScrollTrackerProperty, value);
 
     /// <summary>Gets the start-drawer button policy attached to an element.</summary>
     public static ScaffoldFlyoutButtonVisibility GetFlyoutStartButtonVisibility(BindableObject bindable) => (ScaffoldFlyoutButtonVisibility)bindable.GetValue(FlyoutStartButtonVisibilityProperty);

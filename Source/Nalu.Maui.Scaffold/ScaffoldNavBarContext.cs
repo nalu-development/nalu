@@ -19,6 +19,11 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     private Page? _observedPage;
     private string? _title;
     private View? _titleView;
+    private Page? _currentPage;
+    private object? _pageBindingContext;
+    private Color? _foreground;
+    private double _scrollOffset;
+    private bool _isScrolledUnder;
     private bool _canNavigateBack;
     private bool _isFlyoutStartButtonVisible;
     private bool _isFlyoutEndButtonVisible;
@@ -40,6 +45,62 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     {
         get => _titleView;
         internal set => SetField(ref _titleView, value);
+    }
+
+    /// <summary>
+    /// Gets the page currently on top of the presented stack — the escape hatch for custom
+    /// bars binding page-specific state (e.g. <c>CurrentPage.BindingContext.SomeCommand</c>;
+    /// such paths are reflection-mode bindings, not compilable).
+    /// </summary>
+    public Page? CurrentPage
+    {
+        get => _currentPage;
+        internal set => SetField(ref _currentPage, value);
+    }
+
+    /// <summary>
+    /// Gets the current page's binding context: the title slot propagates it to hosted
+    /// <see cref="TitleView"/> content, which is page content and binds the page model —
+    /// not this context.
+    /// </summary>
+    public object? PageBindingContext
+    {
+        get => _pageBindingContext;
+        internal set => SetField(ref _pageBindingContext, value);
+    }
+
+    /// <summary>
+    /// Gets the effective <see cref="ScaffoldNavBarAppearance.Foreground"/>: the color
+    /// fallback of every primitive (title text, glyphs) — a color set directly or via style
+    /// on a primitive wins over it.
+    /// </summary>
+    public Color? Foreground
+    {
+        get => _foreground;
+        internal set => SetField(ref _foreground, value);
+    }
+
+    /// <summary>
+    /// Gets the tracked scrollable's vertical offset in dp (see
+    /// <see cref="Scaffold.ScrollTrackerProperty"/>): 0 at rest, negative while
+    /// over-scrolling at the top. Updates per frame — bind chrome transforms to it
+    /// (e.g. via <see cref="NavBarBindingExtension"/> and a converter).
+    /// </summary>
+    public double ScrollOffset
+    {
+        get => _scrollOffset;
+        internal set
+        {
+            SetField(ref _scrollOffset, value);
+            IsScrolledUnder = value > 0.5;
+        }
+    }
+
+    /// <summary>Gets whether the tracked content has scrolled past its rest position.</summary>
+    public bool IsScrolledUnder
+    {
+        get => _isScrolledUnder;
+        private set => SetField(ref _isScrolledUnder, value);
     }
 
     /// <summary>Gets whether the current navigation stack has at least one pushed page.</summary>
@@ -128,6 +189,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         var isModal = pageMode != ScaffoldPageMode.Default;
 
         Title = currentPage.Title;
+        CurrentPage = currentPage;
+        PageBindingContext = currentPage.BindingContext;
         TitleView = Scaffold.GetTitleView(currentPage);
         IsModal = isModal;
         IsCloseButtonVisible = pageMode == ScaffoldPageMode.DismissableModal;
@@ -188,6 +251,11 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 
             case "TitleView":
                 TitleView = Scaffold.GetTitleView(page);
+
+                break;
+
+            case nameof(Page.BindingContext):
+                PageBindingContext = page.BindingContext;
 
                 break;
 

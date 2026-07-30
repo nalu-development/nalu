@@ -12,20 +12,18 @@ namespace Nalu;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The component spans the whole top strip (its background extends under the status bar) and
-/// opts into the safe area itself, so its content sits below the status inset while the bar
-/// contributes its footprint to the page per §5.4.
+/// The component spans the whole top strip and opts into the safe area itself, so its content
+/// sits below the status inset while the bar contributes its footprint to the page per §5.4.
+/// The strip BACKGROUND is not the bar's concern: it belongs to the chrome and is driven by the
+/// effective <see cref="ScaffoldNavBarAppearance"/> (attached via
+/// <see cref="Scaffold.NavBarAppearanceProperty"/>) — the same is true for any custom bar.
 /// </para>
 /// <para>
-/// It owns ONLY the strip itself (background, height, padding, spacing). Title and button
-/// appearance belong to the primitives — <see cref="ScaffoldNavBarTitle"/>,
-/// <see cref="ScaffoldBackButton"/>, <see cref="ScaffoldCloseButton"/>,
-/// <see cref="ScaffoldFlyoutButton"/> — which are public and styled directly, so the SAME style
-/// applies whether they sit in this bar or in a custom one:
+/// It owns ONLY the strip metrics (height, padding, spacing). Title and button appearance
+/// belong to the primitives — <see cref="ScaffoldNavBarTitle"/>, <see cref="ScaffoldBackButton"/>,
+/// <see cref="ScaffoldCloseButton"/>, <see cref="ScaffoldFlyoutButton"/> — which are public and
+/// styled directly, so the SAME style applies whether they sit in this bar or in a custom one:
 /// <code>
-/// &lt;Style TargetType="nalu:ScaffoldNavBarView"&gt;
-///     &lt;Setter Property="BarBackground" Value="{AppThemeBinding Light=..., Dark=...}" /&gt;
-/// &lt;/Style&gt;
 /// &lt;Style TargetType="nalu:ScaffoldNavBarTitle"&gt;
 ///     &lt;Setter Property="FontFamily" Value="SemiBold" /&gt;
 /// &lt;/Style&gt;
@@ -41,14 +39,6 @@ public sealed class ScaffoldNavBarView : Grid
 
     // Null-conditionals below: implicit styles apply from the VisualElement base ctor, before
     // _row exists; the ctor seeds the final values.
-
-    /// <summary>Bindable property for <see cref="BarBackground"/>.</summary>
-    public static readonly BindableProperty BarBackgroundProperty =
-        GenericBindableProperty<ScaffoldNavBarView>.Create<Brush?>(
-            nameof(BarBackground),
-            defaultValueCreator: static _ => new SolidColorBrush(Color.FromArgb("#F7FFFFFF")),
-            propertyChanged: static view => (_, value) => view.Background = value
-        );
 
     /// <summary>Bindable property for <see cref="BarHeight"/>.</summary>
     public static readonly BindableProperty BarHeightProperty =
@@ -73,16 +63,6 @@ public sealed class ScaffoldNavBarView : Grid
             8.0,
             propertyChanged: static view => (_, value) => view._row?.ColumnSpacing = value
         );
-
-    /// <summary>
-    /// Gets or sets the bar background (extends under the status bar). Drives the view's own
-    /// <see cref="VisualElement.Background"/> — style THIS, not <c>Background</c>.
-    /// </summary>
-    public Brush? BarBackground
-    {
-        get => (Brush?)GetValue(BarBackgroundProperty);
-        set => SetValue(BarBackgroundProperty, value);
-    }
 
     /// <summary>Gets or sets the bar content height (excluding the status-bar inset).</summary>
     public double BarHeight
@@ -161,7 +141,6 @@ public sealed class ScaffoldNavBarView : Grid
         Add(_row);
 
         // Defaults never raise propertyChanged: seed once from the current values.
-        Background = BarBackground;
         _row.HeightRequest = BarHeight;
         _row.Padding = BarPadding;
         _row.ColumnSpacing = Spacing;

@@ -17,7 +17,7 @@ namespace Nalu;
 /// tab bar strip and the §5.6 overlay layer. Single-visible-page policy: one fragment replaced
 /// per sync; the fragment back stack and the full transition engine arrive with P2.
 /// </summary>
-internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
+internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter, IDisposable
 {
     private const int _settleTimeoutMs = 2000;
     private const int _overlayDurationMs = 250;
@@ -35,7 +35,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
     private bool _barPresented;
     private Android.Animation.ObjectAnimator? _stripAnimator;
     private ScaffoldNavBarStripLayout? _navBarStrip;
-    private View? _currentNavBarView;
+    private ScaffoldNavBarHost? _navBarHost;
+    private ScaffoldArea? _observedNavBarArea;
+    private bool _scaffoldObserved;
     private int _lastNavStripHeight;
     private bool _navBarPresented;
     private Android.Animation.ObjectAnimator? _navStripAnimator;
@@ -109,23 +111,32 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
         var navBarView = scaffold.ResolveNavBarView(targetPage);
         var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(targetPage);
+
+        // Overlap mode: the bar still presents, but its footprint is not applied to the page —
+        // content lays out from the top edge and the bar draws over it.
+        var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(targetPage);
         var animated = hint != ScaffoldPresentationHint.None;
 
         // The context must carry the target page's state before the bar (or its bindings) mount.
         scaffold.NavBarContext.Update(root, targetPage);
 
+        // Chrome-LEVEL attached changes (scaffold/area NavBarView) must remap live, exactly
+        // like the page-level ones the current-page subscription already covers.
+        EnsureScaffoldObserver();
+        ObserveNavBarArea(scaffold.CurrentArea);
+
         // Inset intent BEFORE the fragment commit: the incoming page attaches with its final
         // insets while the outgoing page keeps its stale layout — no jumps during transitions.
         platformView.ChromeBottomDesired = barVisible;
         platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
-        platformView.ChromeTopDesired = navBarVisible;
-        platformView.PageTopInsetPx = navBarVisible ? _lastNavStripHeight : 0;
+        platformView.ChromeTopDesired = navBarInsets;
+        platformView.PageTopInsetPx = navBarInsets ? _lastNavStripHeight : 0;
 
         // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
         // page slides in (and back in sync on pop).
         // Nav bar first: its strip must sit BELOW the tab bar strip in z-order (behind-chrome
         // overlay scrims dim the nav bar while keeping the tab bar interactive).
-        var navChromeTask = UpdateNavBarChromeAsync(platformView, mauiContext, navBarView, navBarVisible, animated);
+        var navChromeTask = UpdateNavBarChromeAsync(platformView, mauiContext, targetPage, navBarView, navBarVisible, animated);
         var chromeTask = UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated);
 
         if (!ReferenceEquals(targetPage, _currentPage))
@@ -439,7 +450,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         _barPresented = false;
         _stripAnimator = null;
         _navBarStrip = null;
-        _currentNavBarView = null;
+        _navBarHost?.Dispose();
+        _navBarHost = null;
         _navBarPresented = false;
         _navStripAnimator = null;
         _backPreviewActive = false;
@@ -645,25 +657,35 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
     /// <summary>
     /// Brings the nav bar chrome to the desired state — same model as the tab bar strip:
-    /// mounted while a bar view resolves (hidden = translated above the screen edge),
-    /// retargeting slides, view swap only when the resolution changes.
+    /// mounted while a bar view resolves (hidden = translated above the screen edge) and
+    /// retargeting slides. The strip hosts the library-owned <see cref="ScaffoldNavBarHost"/>
+    /// (mounted once): bar-view resolution changes swap the bar VIRTUALLY inside it (instant,
+    /// no strip re-mount), and the effective <see cref="ScaffoldNavBarAppearance"/> lands on
+    /// the host — never on the bar view.
     /// </summary>
-    private Task UpdateNavBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, View? navBarView, bool navBarVisible, bool animated)
+    private Task UpdateNavBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, Page targetPage, View? navBarView, bool navBarVisible, bool animated)
     {
         if (navBarView is null)
         {
-            if (_currentNavBarView is { } detachedView)
+            if (_navBarHost is { } clearedHost)
             {
-                _currentNavBarView = null;
-                _navBarPresented = false;
-                _navBarStrip?.SetBar(null);
-
-                if (_navBarStrip is not null)
+                if (clearedHost.Bar is not null)
                 {
-                    _navBarStrip.Visibility = ViewStates.Gone;
+                    _navBarPresented = false;
+                    _navBarStrip?.SetBar(null);
+
+                    if (_navBarStrip is not null)
+                    {
+                        _navBarStrip.Visibility = ViewStates.Gone;
+                    }
+
+                    DetachNavBarHost(clearedHost);
+                    clearedHost.SetBar(null);
                 }
 
-                DetachNavBarView(detachedView);
+                // The host keeps tracking the CURRENT page even bar-less: the previous page's
+                // scroll observation (KVO / listeners) must not outlive its page.
+                clearedHost.UpdateSources(targetPage);
             }
 
             return Task.CompletedTask;
@@ -691,20 +713,18 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
             }
         }
 
-        if (!ReferenceEquals(navBarView, _currentNavBarView))
-        {
-            if (_currentNavBarView is { } previousView)
-            {
-                DetachNavBarView(previousView);
-            }
+        var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
+        var freshMount = host.Bar is null;
+        host.SetBar(navBarView);
+        host.UpdateSources(targetPage);
 
-            _currentNavBarView = navBarView;
-            navBarView.BindingContext = scaffold.NavBarContext;
-            _navBarStrip.SetBar(navBarView.ToPlatform(mauiContext));
+        if (freshMount)
+        {
+            _navBarStrip.SetBar(host.ToPlatform(mauiContext));
 
             if (animated && _lastNavStripHeight > 0)
             {
-                // A freshly appearing bar starts above the edge and slides in.
+                // A freshly appearing strip starts above the edge and slides in.
                 _navBarStrip.TranslationY = -_lastNavStripHeight;
             }
         }
@@ -713,14 +733,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         // hidden (the strip and platform view stay alive offscreen either way).
         if (navBarVisible)
         {
-            if (navBarView.Parent is null)
+            if (host.Parent is null)
             {
-                scaffold.AddLogicalChild(navBarView);
+                scaffold.AddLogicalChild(host);
             }
         }
         else
         {
-            DetachNavBarView(navBarView);
+            DetachNavBarHost(host);
         }
 
         _navBarStrip.Visibility = ViewStates.Visible;
@@ -763,12 +783,88 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
         }
     }
 
-    private void DetachNavBarView(View navBarView)
+    private void DetachNavBarHost(ScaffoldNavBarHost host)
     {
-        if (ReferenceEquals(navBarView.Parent, scaffold))
+        if (ReferenceEquals(host.Parent, scaffold))
         {
-            scaffold.RemoveLogicalChild(navBarView);
+            scaffold.RemoveLogicalChild(host);
         }
+    }
+
+    /// <summary>Lazily observes the scaffold itself: chrome-level attached changes remap live.</summary>
+    private void EnsureScaffoldObserver()
+    {
+        if (!_scaffoldObserved)
+        {
+            _scaffoldObserved = true;
+            scaffold.PropertyChanged += OnChromeSourcePropertyChanged;
+        }
+    }
+
+    /// <summary>Follows the current area (chrome-level NavBarView changes on it remap live).</summary>
+    private void ObserveNavBarArea(ScaffoldArea? area)
+    {
+        if (ReferenceEquals(_observedNavBarArea, area))
+        {
+            return;
+        }
+
+        if (_observedNavBarArea is not null)
+        {
+            _observedNavBarArea.PropertyChanged -= OnChromeSourcePropertyChanged;
+        }
+
+        _observedNavBarArea = area;
+
+        if (area is not null)
+        {
+            area.PropertyChanged += OnChromeSourcePropertyChanged;
+        }
+    }
+
+    private void OnChromeSourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Appearance changes are observed by the host itself; only the mounted-bar resolution
+        // needs the presenter.
+        if (e.PropertyName == "NavBarView")
+        {
+            RefreshNavBarChrome();
+        }
+    }
+
+    /// <summary>Re-resolves and re-presents the nav bar chrome for the current page.</summary>
+    private void RefreshNavBarChrome()
+    {
+        if (_currentPage is not { } page
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
+        {
+            return;
+        }
+
+        var navBarView = scaffold.ResolveNavBarView(page);
+        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
+        var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(page);
+
+        // Same-page toggle: the page itself must relayout to the new insets.
+        platformView.ChromeTopDesired = navBarInsets;
+        platformView.PageTopInsetPx = navBarInsets ? _lastNavStripHeight : 0;
+        RequestPageInsets();
+
+        UpdateNavBarChromeAsync(platformView, mauiContext, page, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+    }
+
+    /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
+    public void Dispose()
+    {
+        if (_scaffoldObserved)
+        {
+            _scaffoldObserved = false;
+            scaffold.PropertyChanged -= OnChromeSourcePropertyChanged;
+        }
+
+        ObserveNavBarArea(null);
+        _navBarHost?.Dispose();
+        _navBarHost = null;
     }
 
     private void OnCurrentPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -801,19 +897,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter
 
             case "IsNavBarVisible":
             case "NavBarView":
-            {
-                var navBarView = scaffold.ResolveNavBarView(page);
-                var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
-
-                // Same-page toggle: the page itself must relayout to the new insets.
-                platformView.ChromeTopDesired = navBarVisible;
-                platformView.PageTopInsetPx = navBarVisible ? _lastNavStripHeight : 0;
-                RequestPageInsets();
-
-                UpdateNavBarChromeAsync(platformView, mauiContext, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+            case "NavBarOverlapsContent":
+                RefreshNavBarChrome();
 
                 break;
-            }
         }
     }
 

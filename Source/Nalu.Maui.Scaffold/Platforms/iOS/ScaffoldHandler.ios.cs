@@ -44,6 +44,7 @@ public partial class ScaffoldHandler : ViewHandler<Scaffold, UIView>, IPlatformV
     {
         if (VirtualView is { } scaffold)
         {
+            (scaffold.Presenter as IDisposable)?.Dispose();
             scaffold.Presenter = null;
         }
 

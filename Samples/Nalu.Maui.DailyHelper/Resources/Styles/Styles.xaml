@@ -65,15 +65,9 @@
 
     <!-- Scaffold chrome. Every styling property of the default components carries a real
          default value, so plain implicit styles override it — no palette resolver, no theme
-         subscriptions, just AppThemeBinding where it belongs. -->
-
-    <Style TargetType="nalu:ScaffoldNavBarView">
-        <Setter Property="BarBackground">
-            <Setter.Value>
-                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
-            </Setter.Value>
-        </Setter>
-    </Style>
+         subscriptions, just AppThemeBinding where it belongs. The nav bar STRIP surface
+         (background/opacity/offset) is not a component property: it is the scaffold-level
+         ScaffoldNavBarAppearance set in AppScaffold.xaml (pages override per property). -->
 
     <Style TargetType="nalu:ScaffoldNavBarTitle">
         <Setter Property="FontFamily" Value="SemiBold" />
