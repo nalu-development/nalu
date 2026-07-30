@@ -42,6 +42,14 @@ public sealed record CurrentConditions(
     public string Photo => WeatherInfo.PhotoFor(WeatherCode);
 }
 
+/// <summary>A per-day roll-up of the hourly forecast (weather detail "Coming days" rows).</summary>
+public sealed record DaySummary(DateTime Date, int WeatherCode, double TemperatureMin, double TemperatureMax)
+{
+    public string DayLabel => Date.ToString("dddd d MMMM");
+    public string Glyph => WeatherInfo.GlyphFor(WeatherCode, night: false);
+    public string MinMaxLabel => $"{TemperatureMin:0}° / {TemperatureMax:0}°";
+}
+
 /// <summary>Maps WMO weather codes to descriptions, Material glyphs and a mood photo.</summary>
 public static class WeatherInfo
 {

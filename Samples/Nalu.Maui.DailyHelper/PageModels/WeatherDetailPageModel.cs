@@ -16,6 +16,10 @@ public partial class WeatherDetailPageModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial CurrentConditions? Current { get; set; }
 
+    /// <summary>Per-day roll-ups of the remaining forecast week ("Coming days" rows).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<DaySummary> Days { get; set; } = [];
+
     /// <summary>The next 24 hours, rendered by a horizontal VirtualScroll strip.</summary>
     public IVirtualScrollAdapter NextHoursAdapter { get; }
 
@@ -32,6 +36,22 @@ public partial class WeatherDetailPageModel : ObservableObject, IDisposable
         );
 
         NextHoursAdapter = VirtualScroll.CreateObservableCollectionAdapter(_nextHours);
+
+        // Daily roll-up: midday-representative glyph, min/max range, tomorrow onward.
+        _subscriptions.Add(
+            weather.Hours
+                   .ToCollection()
+                   .Subscribe(hours => Days = hours
+                                             .GroupBy(h => h.Time.Date)
+                                             .Where(g => g.Key > DateTime.Today)
+                                             .OrderBy(g => g.Key)
+                                             .Select(g => new DaySummary(
+                                                 g.Key,
+                                                 g.OrderBy(h => Math.Abs(h.Time.Hour - 13)).First().WeatherCode,
+                                                 g.Min(h => h.Temperature),
+                                                 g.Max(h => h.Temperature)))
+                                             .ToList())
+        );
 
         _subscriptions.Add(weather.Current.Subscribe(current => Current = current));
     }

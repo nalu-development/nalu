@@ -75,10 +75,9 @@
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
     </Style>
 
-    <!-- Back, close and both drawer buttons at once. -->
-    <Style TargetType="nalu:ScaffoldNavBarButtonBase" ApplyToDerivedTypes="True">
-        <Setter Property="IconColor" Value="{StaticResource Accent}" />
-    </Style>
+    <!-- Button glyph color comes from the scaffold-level appearance Foreground (AppScaffold):
+         a styled IconColor would WIN over per-page appearance overrides (weather hero) —
+         appearance is the color surface, styles carry typography. -->
 
     <!-- The bar itself: pill container only. -->
     <Style TargetType="nalu:ScaffoldTabBarView">
