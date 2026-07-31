@@ -24,6 +24,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     private Color? _foreground;
     private double _scrollOffset;
     private bool _isScrolledUnder;
+    private double _scrollRampStart;
+    private double _scrollRampEnd = 100;
     private bool _canNavigateBack;
     private bool _isFlyoutStartButtonVisible;
     private bool _isFlyoutEndButtonVisible;
@@ -101,6 +103,27 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     {
         get => _isScrolledUnder;
         private set => SetField(ref _isScrolledUnder, value);
+    }
+
+    /// <summary>
+    /// Gets the current page's default interpolation ramp start
+    /// (<see cref="Scaffold.ScrollRampStartProperty"/>): the <c>RampStart</c> fallback of every
+    /// scroll-value interpolation on the page.
+    /// </summary>
+    public double ScrollRampStart
+    {
+        get => _scrollRampStart;
+        internal set => SetField(ref _scrollRampStart, value);
+    }
+
+    /// <summary>
+    /// Gets the current page's default interpolation ramp end
+    /// (<see cref="Scaffold.ScrollRampEndProperty"/>).
+    /// </summary>
+    public double ScrollRampEnd
+    {
+        get => _scrollRampEnd;
+        internal set => SetField(ref _scrollRampEnd, value);
     }
 
     /// <summary>Gets whether the current navigation stack has at least one pushed page.</summary>
@@ -192,6 +215,7 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         CurrentPage = currentPage;
         PageBindingContext = currentPage.BindingContext;
         TitleView = Scaffold.GetTitleView(currentPage);
+        (ScrollRampStart, ScrollRampEnd) = _scaffold.ResolveScrollRamp(currentPage);
         IsModal = isModal;
         IsCloseButtonVisible = pageMode == ScaffoldPageMode.DismissableModal;
 
@@ -256,6 +280,12 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 
             case nameof(Page.BindingContext):
                 PageBindingContext = page.BindingContext;
+
+                break;
+
+            case "ScrollRampStart":
+            case "ScrollRampEnd":
+                (ScrollRampStart, ScrollRampEnd) = _scaffold.ResolveScrollRamp(page);
 
                 break;
 

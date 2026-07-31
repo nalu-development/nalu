@@ -56,7 +56,7 @@ public sealed class WeatherStore : IDisposable
             new WeatherForecastOptions(_latitude, _longitude)
             {
                 Start_date = today.ToString("yyyy-MM-dd"),
-                End_date = today.AddDays(6).ToString("yyyy-MM-dd"),
+                End_date = today.AddDays(7).ToString("yyyy-MM-dd"),
                 Timezone = "auto",
                 Hourly = new HourlyOptions(
                     [

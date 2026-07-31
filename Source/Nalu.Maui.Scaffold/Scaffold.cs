@@ -170,6 +170,23 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("ScrollTracker", typeof(View), typeof(Scaffold), null);
 
     /// <summary>
+    /// Attached property providing the default <c>RampStart</c> of every
+    /// <see cref="ScrollValueExtension"/>/<see cref="ThemeScrollValueExtension"/> usage on the
+    /// page (resolution: page → current area → scaffold → 0): declare the interpolation ramp
+    /// ONCE, use it everywhere on the page.
+    /// </summary>
+    public static readonly BindableProperty ScrollRampStartProperty =
+        BindableProperty.CreateAttached("ScrollRampStart", typeof(double), typeof(Scaffold), 0.0);
+
+    /// <summary>
+    /// Attached property providing the default <c>RampEnd</c> of every
+    /// <see cref="ScrollValueExtension"/>/<see cref="ThemeScrollValueExtension"/> usage on the
+    /// page (resolution: page → current area → scaffold → 100).
+    /// </summary>
+    public static readonly BindableProperty ScrollRampEndProperty =
+        BindableProperty.CreateAttached("ScrollRampEnd", typeof(double), typeof(Scaffold), 100.0);
+
+    /// <summary>
     /// Attached property (per <see cref="Page"/>, default false) laying the page out UNDER the
     /// nav bar: the bar's footprint is not applied as a top inset — content starts at the very
     /// top edge (the page's own <c>SafeAreaEdges</c> decides how it treats the raw system
@@ -927,6 +944,40 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets the tracked scrollable attached to a page.</summary>
     public static void SetScrollTracker(BindableObject bindable, View? value) => bindable.SetValue(ScrollTrackerProperty, value);
 
+    /// <summary>Gets the default interpolation ramp start attached to an element.</summary>
+    public static double GetScrollRampStart(BindableObject bindable) => (double)bindable.GetValue(ScrollRampStartProperty);
+
+    /// <summary>Sets the default interpolation ramp start attached to an element.</summary>
+    public static void SetScrollRampStart(BindableObject bindable, double value) => bindable.SetValue(ScrollRampStartProperty, value);
+
+    /// <summary>Gets the default interpolation ramp end attached to an element.</summary>
+    public static double GetScrollRampEnd(BindableObject bindable) => (double)bindable.GetValue(ScrollRampEndProperty);
+
+    /// <summary>Sets the default interpolation ramp end attached to an element.</summary>
+    public static void SetScrollRampEnd(BindableObject bindable, double value) => bindable.SetValue(ScrollRampEndProperty, value);
+
+    /// <summary>
+    /// Resolves the effective default ramp for the given page, most specific set value wins:
+    /// page → current area → scaffold → [0, 100].
+    /// </summary>
+    internal (double RampStart, double RampEnd) ResolveScrollRamp(Page? currentPage)
+        => (ResolveRampValue(ScrollRampStartProperty, currentPage), ResolveRampValue(ScrollRampEndProperty, currentPage));
+
+    private double ResolveRampValue(BindableProperty property, Page? currentPage)
+    {
+        if (currentPage is not null && currentPage.IsSet(property))
+        {
+            return (double)currentPage.GetValue(property);
+        }
+
+        if (CurrentArea is { } area && area.IsSet(property))
+        {
+            return (double)area.GetValue(property);
+        }
+
+        return (double)GetValue(property);
+    }
+
     /// <summary>Gets the start-drawer button policy attached to an element.</summary>
     public static ScaffoldFlyoutButtonVisibility GetFlyoutStartButtonVisibility(BindableObject bindable) => (ScaffoldFlyoutButtonVisibility)bindable.GetValue(FlyoutStartButtonVisibilityProperty);
 
@@ -974,6 +1025,28 @@ public partial class Scaffold : ContentPage, IDisposable
     /// nav bar views alike.
     /// </summary>
     public ScaffoldNavBarContext NavBarContext => field ??= new ScaffoldNavBarContext(this);
+
+    /// <summary>
+    /// Resolves the ambient <see cref="ScaffoldNavBarContext"/> from any element hosted in a
+    /// scaffold (walks the logical parents) — the code-behind counterpart of
+    /// <see cref="NavBarBindingExtension"/>, e.g. to observe
+    /// <see cref="ScaffoldNavBarContext.ScrollOffset"/> for scroll-driven chrome.
+    /// Null while the element is not attached to a scaffold's tree yet.
+    /// </summary>
+    public static ScaffoldNavBarContext? FindNavBarContext(Element? element)
+    {
+        while (element is not null)
+        {
+            if (element is Scaffold scaffold)
+            {
+                return scaffold.NavBarContext;
+            }
+
+            element = element.Parent;
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Resolves the nav bar view for the given page: page attachment → current area attachment

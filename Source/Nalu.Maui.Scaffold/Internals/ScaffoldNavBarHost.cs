@@ -178,6 +178,13 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         if (field is not null)
         {
             field.PropertyChanged -= OnAppearancePropertyChanged;
+
+            // Only clear the ambient-context stamp when the object left the chain entirely
+            // (one instance can sit at two levels of the chain at once).
+            if (!IsInChain(field))
+            {
+                field.SetContext(null);
+            }
         }
 
         field = value;
@@ -185,8 +192,14 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         if (value is not null)
         {
             value.PropertyChanged += OnAppearancePropertyChanged;
+            value.SetContext(_scaffold.NavBarContext);
         }
     }
+
+    private bool IsInChain(ScaffoldNavBarAppearance appearance)
+        => ReferenceEquals(_pageAppearance, appearance)
+            || ReferenceEquals(_areaAppearance, appearance)
+            || ReferenceEquals(_scaffoldAppearance, appearance);
 
     private void OnAppearancePropertyChanged(object? sender, PropertyChangedEventArgs e)
         => ApplyEffectiveAppearance();

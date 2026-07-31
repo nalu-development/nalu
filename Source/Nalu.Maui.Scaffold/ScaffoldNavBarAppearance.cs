@@ -75,6 +75,23 @@ public sealed class ScaffoldNavBarAppearance : BindableObject
         set => SetValue(OffsetYProperty, value);
     }
 
+    private static readonly BindablePropertyKey _contextPropertyKey =
+        BindableProperty.CreateReadOnly(nameof(Context), typeof(ScaffoldNavBarContext), typeof(ScaffoldNavBarAppearance), null);
+
+    /// <summary>Bindable property for <see cref="Context"/> (read-only).</summary>
+    public static readonly BindableProperty ContextProperty = _contextPropertyKey.BindableProperty;
+
+    /// <summary>
+    /// Gets the ambient <see cref="ScaffoldNavBarContext"/> while this appearance is part of
+    /// the presented resolution chain (null otherwise). Appearance objects live OUTSIDE the
+    /// visual tree, so ancestor-based bindings can't reach the context from here — this stamp
+    /// is what lets <see cref="ScrollValueExtension"/>/<see cref="ThemeScrollValueExtension"/>
+    /// bind scroll-driven values on appearance properties.
+    /// </summary>
+    public ScaffoldNavBarContext? Context => (ScaffoldNavBarContext?)GetValue(ContextProperty);
+
+    internal void SetContext(ScaffoldNavBarContext? context) => SetValue(_contextPropertyKey, context);
+
     /// <summary>
     /// Resolves one property across the chain: the first appearance that explicitly SET it
     /// wins; <paramref name="fallback"/> otherwise. Unset detection (not value comparison)

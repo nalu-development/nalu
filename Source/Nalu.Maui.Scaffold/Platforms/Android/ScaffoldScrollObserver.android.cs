@@ -13,8 +13,7 @@ internal static partial class ScaffoldScrollObserver
         private float _density = 1;
         private double _recyclerOffsetPx;
         private RecyclerScrollListener? _recyclerListener;
-        private ViewTreeObserver? _treeObserver;
-        private EventHandler? _treeScrollHandler;
+        private ScrollChangedListener? _scrollChangedListener;
 
         partial void PlatformAttach()
         {
@@ -37,12 +36,12 @@ internal static partial class ScaffoldScrollObserver
             }
             else
             {
-                // ViewTreeObserver.ScrollChanged is additive (unlike the single-slot
-                // View.SetOnScrollChangeListener, which MAUI may already occupy) and works on
-                // the API 21 floor; reading ScrollY per callback is cheap.
-                _treeScrollHandler = (_, _) => PushScrollY();
-                _treeObserver = target.ViewTreeObserver;
-                _treeObserver!.ScrollChanged += _treeScrollHandler;
+                // An EXPLICIT ViewTreeObserver listener object (never the C# event sugar):
+                // a pre-window-attach observer DIES on attach and silently migrates its
+                // listeners to the window's live observer — removal must target the CURRENT
+                // observer, which only works with a listener instance we own.
+                _scrollChangedListener = new ScrollChangedListener(this);
+                target.ViewTreeObserver!.AddOnScrollChangedListener(_scrollChangedListener);
                 PushScrollY();
             }
         }
@@ -52,18 +51,27 @@ internal static partial class ScaffoldScrollObserver
             if (_recyclerListener is not null)
             {
                 (_target as RecyclerView)?.RemoveOnScrollListener(_recyclerListener);
+                _recyclerListener.Disconnect();
                 _recyclerListener = null;
             }
 
-            if (_treeScrollHandler is not null)
+            if (_scrollChangedListener is not null)
             {
-                if (_treeObserver is { IsAlive: true })
+                try
                 {
-                    _treeObserver.ScrollChanged -= _treeScrollHandler;
+                    // The CURRENT observer (migrated listeners live there, not on the one we
+                    // registered with). A dead observer throws IllegalStateException.
+                    _target?.ViewTreeObserver?.RemoveOnScrollChangedListener(_scrollChangedListener);
+                }
+                catch (Java.Lang.IllegalStateException)
+                {
+                    // Observer already dead with no live successor: nothing to remove.
                 }
 
-                _treeObserver = null;
-                _treeScrollHandler = null;
+                // Belt and braces: even a stranded Java-side registration must not retain the
+                // subscription → tracked view → page chain.
+                _scrollChangedListener.Disconnect();
+                _scrollChangedListener = null;
             }
 
             _target = null;
@@ -117,10 +125,23 @@ internal static partial class ScaffoldScrollObserver
             return null;
         }
 
+        private sealed class ScrollChangedListener(Subscription owner) : Java.Lang.Object, ViewTreeObserver.IOnScrollChangedListener
+        {
+            private Subscription? _owner = owner;
+
+            public void Disconnect() => _owner = null;
+
+            public void OnScrollChanged() => _owner?.PushScrollY();
+        }
+
         private sealed class RecyclerScrollListener(Subscription owner) : RecyclerView.OnScrollListener
         {
+            private Subscription? _owner = owner;
+
+            public void Disconnect() => _owner = null;
+
             public override void OnScrolled(RecyclerView recyclerView, int dx, int dy)
-                => owner.OnRecyclerScrolled(dy);
+                => _owner?.OnRecyclerScrolled(dy);
         }
     }
 }

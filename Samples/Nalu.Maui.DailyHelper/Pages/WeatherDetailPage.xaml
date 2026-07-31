@@ -5,57 +5,59 @@
              xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
              xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
-             xmlns:conv="clr-namespace:Nalu.Maui.DailyHelper.Converters"
              x:Class="Nalu.Maui.DailyHelper.Pages.WeatherDetailPage"
              x:DataType="pm:WeatherDetailPageModel"
              nalu:Scaffold.TabBarVisibility="Auto"
              nalu:Scaffold.NavBarOverlapsContent="True"
              nalu:Scaffold.ScrollTracker="{x:Reference DetailScroll}"
+             nalu:Scaffold.ScrollRampStart="100"
+             nalu:Scaffold.ScrollRampEnd="200"
              Title="Weather">
 
-    <ContentPage.Resources>
-        <!-- One shared ramp for the whole chrome choreography: it starts as the hero's lower
-             half approaches the bar and completes right before the hero leaves the screen.
-             The code-behind mirrors the same constants for the appearance mutations. -->
-        <conv:ScrollProgressConverter x:Key="BarProgress" Start="100" Length="100" />
-    </ContentPage.Resources>
-
-    <!-- Scroll-driven chrome (§5.2): the strip starts TRANSPARENT over the full-bleed photo
-         (NavBarOverlapsContent removes the top inset) and materializes with scroll — the
-         background/foreground mutate in code-behind from Scrolled, while the TitleView fades
-         in purely in XAML through the ScrollTracker channel (NavBarBinding + progress). -->
+    <!-- Scroll-driven chrome (§5.2), fully declarative: the page declares its interpolation
+         ramp ONCE (ScrollRampStart/ScrollRampEnd above) and every {ScrollValue}/{ThemeScrollValue}
+         below rides it. The strip starts transparent over the full-bleed photo
+         (NavBarOverlapsContent removes the top inset) and materializes with scroll,
+         theme-aware endpoints included. -->
     <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance x:Name="BarAppearance" Foreground="White">
-            <nalu:ScaffoldNavBarAppearance.Background>
-                <SolidColorBrush x:Name="BarBrush" Color="Transparent" />
-            </nalu:ScaffoldNavBarAppearance.Background>
-        </nalu:ScaffoldNavBarAppearance>
+        <nalu:ScaffoldNavBarAppearance
+            Background="{nalu:ThemeScrollValue FromLight=Transparent,
+                                               ToLight={StaticResource BackgroundLight},
+                                               ToDark={StaticResource BackgroundDark}}"
+            Foreground="{nalu:ThemeScrollValue FromLight=White,
+                                               ToLight={StaticResource TextPrimaryLight},
+                                               ToDark={StaticResource TextPrimaryDark}}" />
     </nalu:Scaffold.NavBarAppearance>
 
+    <!-- The title fades in on the page ramp. -->
     <nalu:Scaffold.TitleView>
         <Label Text="Weather"
                FontFamily="SemiBold" FontSize="20"
                TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
                VerticalTextAlignment="Center"
-               Opacity="{nalu:NavBarBinding ScrollOffset, Converter={StaticResource BarProgress}}" />
+               Opacity="{nalu:ScrollValue From=0, To=1}" />
     </nalu:Scaffold.TitleView>
 
     <!-- The photo, temperature and icon carry the same TransitionName as the Today hero:
          pushing this page morphs them between the two layouts (pop and the iOS edge swipe
-         play the flight backwards). SafeAreaEdges None: the photo owns the very top edge. -->
-    <ScrollView x:Name="DetailScroll" SafeAreaEdges="None" Scrolled="OnDetailScrolled">
+         play the flight backwards). Per-edge safe area: None on top/sides (the photo owns the
+         very top edge), Default on the BOTTOM — scrolled content must still clear the system
+         bar at max scroll, or the last rows end up unreachable behind it. -->
+    <ScrollView x:Name="DetailScroll" SafeAreaEdges="None,None,None,Default">
         <VerticalStackLayout Spacing="16" Padding="0,0,0,32">
             <Grid HeightRequest="360">
-                <!-- Photo and its darkening layers parallax TOGETHER (one transform target):
-                     translating only the image would slide it out from under the overlays. -->
-                <Grid x:Name="HeroBackdrop">
+                <!-- Photo and its darkening layers parallax TOGETHER at half speed
+                     (Extend = speed factor). The backdrop bleeds 120dp above the hero so the
+                     iOS top bounce reveals more photo instead of a gap. -->
+                <Grid Margin="0,-120,0,0"
+                      TranslationY="{nalu:ScrollValue RampStart=0, RampEnd=100, From=0, To=50, Extrapolate=Extend}">
                     <Image nalu:Scaffold.TransitionName="weather-photo"
                            Source="{Binding Current.Photo}"
                            Aspect="AspectFill" />
                     <BoxView Color="Black" Opacity="0.32" InputTransparent="True" />
                     <!-- Top scrim: keeps the white chevron and status bar legible over bright
                          photos while the bar is still transparent. -->
-                    <BoxView VerticalOptions="Start" HeightRequest="130" InputTransparent="True">
+                    <BoxView VerticalOptions="Start" HeightRequest="130" Margin="0,120,0,0" InputTransparent="True">
                         <BoxView.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                 <GradientStop Color="#73000000" Offset="0" />
