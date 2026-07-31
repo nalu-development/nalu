@@ -284,6 +284,83 @@ public sealed class NaluApp : IAsyncLifetime
         }
     }
 
+    /// <summary>Programmatically focuses an element (raises the soft keyboard for inputs).</summary>
+    public async Task FocusAsync(string automationId, TimeSpan? timeout = null)
+    {
+        var element = await WaitForElementAsync(automationId, timeout).ConfigureAwait(false);
+
+        if (!await _client.FocusAsync(element.Id).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException($"Focus on '{automationId}' (element {element.Id}) failed.");
+        }
+    }
+
+    #region Android soft keyboard (host-side adb)
+
+    private double? _androidDisplayScale;
+
+    private static async Task<string> RunAdbAsync(string arguments)
+    {
+        using var process = Process.Start(new ProcessStartInfo("adb", arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        }) ?? throw new InvalidOperationException("Failed to start adb.");
+
+        var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+        await process.WaitForExitAsync().ConfigureAwait(false);
+
+        return output;
+    }
+
+    /// <summary>Whether the Android soft keyboard is currently visible (host-side adb dumpsys).</summary>
+    public async Task<bool> IsAndroidSoftKeyboardVisibleAsync()
+        => (await RunAdbAsync("shell dumpsys input_method").ConfigureAwait(false))
+            .Contains("mInputShown=true", StringComparison.Ordinal);
+
+    /// <summary>Polls until the Android soft keyboard reaches the expected visibility.</summary>
+    public async Task WaitForAndroidSoftKeyboardAsync(bool visible, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? _defaultTimeout);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await IsAndroidSoftKeyboardVisibleAsync().ConfigureAwait(false) == visible)
+            {
+                return;
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Android soft keyboard did not become {(visible ? "visible" : "hidden")} within {timeout ?? _defaultTimeout}.");
+    }
+
+    /// <summary>
+    /// A REAL input tap at the element's center (adb <c>input tap</c>): required for behaviors
+    /// listening to raw window touches (e.g. <c>Page.HideSoftInputOnTapped</c>) — agent taps
+    /// invoke handlers programmatically and never travel the platform input pipeline.
+    /// </summary>
+    public async Task AndroidRealTapAsync(string automationId)
+    {
+        var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
+
+        if (_androidDisplayScale is not { } scale)
+        {
+            // "Physical density: 480" (an "Override density" line, when present, is the
+            // effective one and comes last) → dp scale = density / 160.
+            var output = await RunAdbAsync("shell wm density").ConfigureAwait(false);
+            var densityLine = output.Split('\n').Last(line => line.Contains("density:", StringComparison.OrdinalIgnoreCase));
+            scale = int.Parse(densityLine.Split(':')[^1].Trim(), System.Globalization.CultureInfo.InvariantCulture) / 160.0;
+            _androidDisplayScale = scale;
+        }
+
+        await RunAdbAsync($"shell input tap {(int)(bounds.CenterX * scale)} {(int)(bounds.CenterY * scale)}").ConfigureAwait(false);
+    }
+
+    #endregion
+
     /// <summary>Waits for the (input) element and replaces its text.</summary>
     public async Task FillAsync(string automationId, string text, TimeSpan? timeout = null)
     {

@@ -10,7 +10,7 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
 {
     // ReSharper disable once InconsistentNaming
     public static readonly object InheritedBindingContext = new();
-    
+
     private WeakReference<IView>? _weakVirtualView;
     private UIView? _nativeView;
     private bool _needsMeasure;
@@ -37,14 +37,14 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
             _weakVirtualView = new WeakReference<IView>(value);
         }
     }
-    
+
     public UIView? NativeView
     {
         get => _nativeView;
         private set => _nativeView = value;
     }
 
-    public new VirtualScrollCellContent ContentView { get; private set; } 
+    public new VirtualScrollCellContent ContentView { get; private set; }
 
     [Export("initWithFrame:")]
     public VirtualScrollCell(CGRect frame) : base(frame)
@@ -160,17 +160,23 @@ internal sealed class VirtualScrollCell : UICollectionViewCell
         _readyForReuse = false;
     }
 
-    public override void SetNeedsLayout()
+    /// <summary>
+    /// Marks the cell as needing a measure-driven layout invalidation: called by
+    /// <see cref="VirtualScrollCellContent"/> when the MAUI content's measure is invalidated
+    /// (and NOT for frame-assignment side effects — see the remarks there).
+    /// </summary>
+    internal void OnContentMeasureInvalidated()
     {
-        base.SetNeedsLayout();
-
-        if (!_readyForReuse && ContentView.NeedsMeasure)
+        if (_readyForReuse)
         {
-            _needsMeasure = true;
-            if (Superview is VirtualScrollCollectionView collectionView)
-            {
-                collectionView.SetNeedsCellsLayout();
-            }
+            return;
+        }
+
+        _needsMeasure = true;
+
+        if (Superview is VirtualScrollCollectionView collectionView)
+        {
+            collectionView.SetNeedsCellsLayout();
         }
     }
 
