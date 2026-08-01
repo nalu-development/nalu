@@ -204,13 +204,21 @@ public sealed class NaluApp : IAsyncLifetime
         var stopwatch = Stopwatch.StartNew();
         var effectiveTimeout = timeout ?? _defaultTimeout;
 
+        var found = false;
+
         while (true)
         {
             var matches = await _client.QueryAsync(text: text).ConfigureAwait(false);
-            var element = matches.FirstOrDefault(m => m.IsVisible);
+
+            // Only on-screen matches: text queries also hit abstract structure elements
+            // (Shell's Tab) that report IsVisible but have no window bounds — tapping those
+            // spins until timeout.
+            var element = matches.FirstOrDefault(m => m.IsVisible && m.WindowBounds is { Width: > 0, Height: > 0 });
 
             if (element is not null)
             {
+                found = true;
+
                 if (await _client.TapAsync(element.Id).ConfigureAwait(false))
                 {
                     return;
@@ -221,10 +229,23 @@ public sealed class NaluApp : IAsyncLifetime
                 // (The single-element endpoint drops ParentId, so we cannot walk the tree.)
                 if (element.WindowBounds is { } wb)
                 {
-                    var hitTestJson = await _client.HitTestAsync(wb.X + (wb.Width / 2), wb.Y + (wb.Height / 2)).ConfigureAwait(false);
+                    // Integral coordinates only: fractional values get culture-mangled somewhere
+                    // in the transport (it-IT decimal comma → "249,3" reparsed as 2493 → empty
+                    // off-screen hit test). Element centers don't need sub-dp precision anyway.
+                    var hitTestJson = await _client.HitTestAsync(
+                        Math.Round(wb.X + (wb.Width / 2)),
+                        Math.Round(wb.Y + (wb.Height / 2))
+                    ).ConfigureAwait(false);
                     using var hitTest = JsonDocument.Parse(hitTestJson);
 
-                    foreach (var ancestor in hitTest.RootElement.GetProperty("elements").EnumerateArray().Take(5))
+                    // The hit-test stack is innermost-first but may interleave SIBLING branches
+                    // (page content under floating chrome comes before the chrome's own stack):
+                    // the matched element's ancestors are the entries AFTER it — start there,
+                    // not at the top of the list.
+                    var stack = hitTest.RootElement.GetProperty("elements").EnumerateArray().ToList();
+                    var selfIndex = stack.FindIndex(e => e.GetProperty("id").GetString() == element.Id);
+
+                    foreach (var ancestor in stack.Skip(selfIndex + 1).Take(5))
                     {
                         var ancestorId = ancestor.GetProperty("id").GetString();
 
@@ -235,12 +256,16 @@ public sealed class NaluApp : IAsyncLifetime
                     }
                 }
 
-                throw new InvalidOperationException($"Tap on element with text '{text}' (element {element.Id}) and its ancestors failed.");
+                // A failed tap can mean the click handler THREW (the agent maps handler
+                // exceptions to a generic tap failure) — e.g. a tab tap navigating while the
+                // previous Shell animation is still committing. Transient: retry until timeout.
             }
 
             if (stopwatch.Elapsed >= effectiveTimeout)
             {
-                throw new TimeoutException($"Element with text '{text}' did not appear within {effectiveTimeout.TotalSeconds:0.#}s.");
+                throw found
+                    ? new InvalidOperationException($"Tap on element with text '{text}' (and its ancestors) kept failing for {effectiveTimeout.TotalSeconds:0.#}s.")
+                    : new TimeoutException($"Element with text '{text}' did not appear within {effectiveTimeout.TotalSeconds:0.#}s.");
             }
 
             await Task.Delay(_pollInterval).ConfigureAwait(false);
@@ -257,6 +282,83 @@ public sealed class NaluApp : IAsyncLifetime
             throw new InvalidOperationException($"Tap on '{automationId}' (element {element.Id}) failed.");
         }
     }
+
+    /// <summary>Programmatically focuses an element (raises the soft keyboard for inputs).</summary>
+    public async Task FocusAsync(string automationId, TimeSpan? timeout = null)
+    {
+        var element = await WaitForElementAsync(automationId, timeout).ConfigureAwait(false);
+
+        if (!await _client.FocusAsync(element.Id).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException($"Focus on '{automationId}' (element {element.Id}) failed.");
+        }
+    }
+
+    #region Android soft keyboard (host-side adb)
+
+    private double? _androidDisplayScale;
+
+    private static async Task<string> RunAdbAsync(string arguments)
+    {
+        using var process = Process.Start(new ProcessStartInfo("adb", arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        }) ?? throw new InvalidOperationException("Failed to start adb.");
+
+        var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+        await process.WaitForExitAsync().ConfigureAwait(false);
+
+        return output;
+    }
+
+    /// <summary>Whether the Android soft keyboard is currently visible (host-side adb dumpsys).</summary>
+    public async Task<bool> IsAndroidSoftKeyboardVisibleAsync()
+        => (await RunAdbAsync("shell dumpsys input_method").ConfigureAwait(false))
+            .Contains("mInputShown=true", StringComparison.Ordinal);
+
+    /// <summary>Polls until the Android soft keyboard reaches the expected visibility.</summary>
+    public async Task WaitForAndroidSoftKeyboardAsync(bool visible, TimeSpan? timeout = null)
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? _defaultTimeout);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await IsAndroidSoftKeyboardVisibleAsync().ConfigureAwait(false) == visible)
+            {
+                return;
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Android soft keyboard did not become {(visible ? "visible" : "hidden")} within {timeout ?? _defaultTimeout}.");
+    }
+
+    /// <summary>
+    /// A REAL input tap at the element's center (adb <c>input tap</c>): required for behaviors
+    /// listening to raw window touches (e.g. <c>Page.HideSoftInputOnTapped</c>) — agent taps
+    /// invoke handlers programmatically and never travel the platform input pipeline.
+    /// </summary>
+    public async Task AndroidRealTapAsync(string automationId)
+    {
+        var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
+
+        if (_androidDisplayScale is not { } scale)
+        {
+            // "Physical density: 480" (an "Override density" line, when present, is the
+            // effective one and comes last) → dp scale = density / 160.
+            var output = await RunAdbAsync("shell wm density").ConfigureAwait(false);
+            var densityLine = output.Split('\n').Last(line => line.Contains("density:", StringComparison.OrdinalIgnoreCase));
+            scale = int.Parse(densityLine.Split(':')[^1].Trim(), System.Globalization.CultureInfo.InvariantCulture) / 160.0;
+            _androidDisplayScale = scale;
+        }
+
+        await RunAdbAsync($"shell input tap {(int)(bounds.CenterX * scale)} {(int)(bounds.CenterY * scale)}").ConfigureAwait(false);
+    }
+
+    #endregion
 
     /// <summary>Waits for the (input) element and replaces its text.</summary>
     public async Task FillAsync(string automationId, string text, TimeSpan? timeout = null)
