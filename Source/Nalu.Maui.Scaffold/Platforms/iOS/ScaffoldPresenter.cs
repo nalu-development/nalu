@@ -372,10 +372,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var previousPage = _currentPage;
         var previousController = _currentController;
+
+        // BEFORE mounting the incoming page: resign any first responder on the outgoing one so
+        // the keyboard dismissal starts (and its insets collapse) ahead of the new page's
+        // layout — UIKit would resign it anyway on unmount, but only mid-transition.
+        previousController?.View?.EndEditing(true);
+
         var newController = targetPage.ToUIViewController(mauiContext);
         _currentPage = targetPage;
         _currentController = newController;
         targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
+
+        // MAUI page navigation events: features like HideSoftInputOnTapped are gated on
+        // Page.HasNavigatedTo, which only these raise.
+        ScaffoldPageNavigationEvents.SendNavigated(previousPage, targetPage, hint.ToNavigationType());
 
         // §5.4 per-page inset application: each page is laid out with the insets matching its
         // own chrome visibility from birth — the outgoing page keeps its insets while leaving.

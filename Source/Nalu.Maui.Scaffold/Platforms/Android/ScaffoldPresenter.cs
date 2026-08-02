@@ -146,6 +146,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             if (previousPage is not null)
             {
                 previousPage.PropertyChanged -= OnCurrentPagePropertyChanged;
+
+                // BEFORE the fragment commit: Android never dismisses the IME when the focused
+                // hierarchy is torn down — navigating away with the keyboard open would orphan
+                // it over the incoming page.
+                // KNOWN LIMITATION (net10 MAUI): if the commit lands while the IME hide is still
+                // animating, MauiWindowInsetListener swallows insets dispatches until the
+                // animation ends (IsImeAnimating gate) and the incoming page briefly shows with
+                // stale safe-area padding before snapping into place. Deliberately not worked
+                // around here — it would require polling MAUI internals via reflection.
+                HideSoftInputBeforeNavigation(previousPage);
             }
 
             // A committed predictive-back preview already settled the visuals (top page
@@ -183,6 +193,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             _currentFragment = fragment;
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
+
+            // MAUI page navigation events: features like HideSoftInputOnTapped are gated on
+            // Page.HasNavigatedTo, which only these raise.
+            ScaffoldPageNavigationEvents.SendNavigated(previousPage, targetPage, hint.ToNavigationType());
 
             // Async commit only: a synchronous commit can run while MAUI's own ScopedFragment
             // transaction is still executing on the same FragmentManager ("already executing").
@@ -245,6 +259,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
+
         scaffold.UpdateBackCallbackEnabled();
     }
 
@@ -851,6 +866,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         RequestPageInsets();
 
         UpdateNavBarChromeAsync(platformView, mauiContext, page, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+    }
+
+    /// <summary>Hides the soft keyboard when an input on the outgoing page holds focus.</summary>
+    private static void HideSoftInputBeforeNavigation(Page previousPage)
+    {
+        if (previousPage.Handler?.PlatformView is not AView previousPlatformView
+            || previousPlatformView.FindFocus() is not { } focusedView)
+        {
+            return;
+        }
+
+        if (previousPlatformView.Context?.GetSystemService(Android.Content.Context.InputMethodService) is Android.Views.InputMethods.InputMethodManager inputMethodManager)
+        {
+            inputMethodManager.HideSoftInputFromWindow(previousPlatformView.WindowToken, Android.Views.InputMethods.HideSoftInputFlags.None);
+        }
+
+        focusedView.ClearFocus();
     }
 
     /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
