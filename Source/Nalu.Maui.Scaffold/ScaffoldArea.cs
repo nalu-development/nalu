@@ -76,6 +76,52 @@ public class ScaffoldArea : Element
     public ScaffoldArea()
     {
         Roots = new ScaffoldElementCollection<ScaffoldRoot>(this);
+        ((System.Collections.Specialized.INotifyCollectionChanged)Roots).CollectionChanged += OnRootsCollectionChanged;
+    }
+
+    private bool _rootReconcileScheduled;
+
+    private void OnRootsCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        // Mirror of the Scaffold's area reconciliation for in-area edits: a root added AFTER
+        // initialization duplicating an existing root's page type REPLACES it (XAML hot reload
+        // re-adds the whole structure; the freshly inflated instance wins). Deferred to the
+        // dispatcher — ObservableCollection forbids mutating from inside its own change event.
+        if (Parent is not Scaffold { IsInitialized: true }
+            || e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add
+            || _rootReconcileScheduled)
+        {
+            return;
+        }
+
+        _rootReconcileScheduled = true;
+
+        Dispatcher.Dispatch(() =>
+        {
+            _rootReconcileScheduled = false;
+            ReconcileDuplicateRoots();
+        });
+    }
+
+    private void ReconcileDuplicateRoots()
+    {
+        for (var i = Roots.Count - 1; i >= 0; i--)
+        {
+            if (Roots[i].PageType is not { } pageType)
+            {
+                continue;
+            }
+
+            // The LAST root wins (hot reload appends the fresh structure).
+            for (var j = i - 1; j >= 0; j--)
+            {
+                if (Roots[j].PageType == pageType)
+                {
+                    Roots.RemoveAt(j);
+                    i--;
+                }
+            }
+        }
     }
 
     /// <summary>

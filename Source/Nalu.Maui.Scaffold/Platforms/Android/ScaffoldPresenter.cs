@@ -540,6 +540,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             if (!ReferenceEquals(barView, _currentBarView))
             {
                 var previousArea = _currentTabBarArea;
+                var previousBarView = _currentBarView;
                 _currentBarView = barView;
                 _currentTabBarArea = tabBarArea;
                 _tabBarStrip.SetBar(barView.ToPlatform(mauiContext));
@@ -547,7 +548,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 if (previousArea is not null && !ReferenceEquals(previousArea, tabBarArea))
                 {
+                    // Area switch: the outgoing area's bar stays alive for the return.
                     previousArea.OnBarViewUnmounted();
+                }
+                else if (previousBarView is not null && ReferenceEquals(previousArea, tabBarArea))
+                {
+                    // Same-area live swap (runtime replacement / XAML hot reload): the old bar
+                    // is gone for good.
+                    tabBarArea.OnBarViewReplaced(previousBarView);
                 }
             }
 
@@ -845,6 +853,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             RefreshNavBarChrome();
         }
+        else if (e.PropertyName == "TabBarView")
+        {
+            RefreshTabBarChrome();
+        }
+    }
+
+    /// <summary>Re-mounts the tab bar chrome after a live <c>TabBarView</c> swap (runtime replacement or XAML hot reload).</summary>
+    private void RefreshTabBarChrome()
+    {
+        if (_currentPage is not { } page
+            || _currentRoot is not { } root
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
+        {
+            return;
+        }
+
+        var tabBarArea = root.Parent as ScaffoldTabBar;
+        var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, page);
+        UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated: false).FireAndForget(scaffold.Handler);
     }
 
     /// <summary>Re-resolves and re-presents the nav bar chrome for the current page.</summary>

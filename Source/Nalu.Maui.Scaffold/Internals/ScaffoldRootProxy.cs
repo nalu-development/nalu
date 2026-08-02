@@ -79,4 +79,28 @@ internal sealed class ScaffoldRootProxy : IShellSectionProxy, IShellContentProxy
         // Trimming has no pop lifecycle: disposal of the removed pages is the engine's
         // responsibility (it tracks them in its dispose bag), matching the Shell adapter.
         => Root.NavigationStack.RemoveFromTop(count);
+
+    /// <summary>
+    /// Adopts the LIVE navigation stack of a same-segment predecessor (XAML hot reload
+    /// replaces the whole structure with fresh instances): the pages migrate into this root's
+    /// stack, so the presented content — and all preserved state — survives the replacement
+    /// without any navigation.
+    /// </summary>
+    internal void AdoptStackFrom(ScaffoldRootProxy predecessor)
+    {
+        var previousStack = predecessor.Root.NavigationStack;
+        var newStack = Root.NavigationStack;
+
+        // RemoveFromTop returns entries top-first; re-push bottom-first.
+        var pushed = previousStack.RemoveFromTop();
+        var rootPage = previousStack.RootPage;
+        previousStack.RootPage = null;
+
+        newStack.RootPage = rootPage;
+
+        for (var i = pushed.Count - 1; i >= 0; i--)
+        {
+            newStack.Push(pushed[i]);
+        }
+    }
 }

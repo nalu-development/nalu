@@ -89,6 +89,22 @@ public class ScaffoldTabBar : ScaffoldArea
     /// non-tab-bar area): the element tree reflects the actually-presented chrome.
     /// <see cref="GetOrCreateBarView"/> re-attaches on the next mount.
     /// </summary>
+    /// <summary>
+    /// Releases a bar view PERMANENTLY replaced by a live <c>TabBarView</c> swap (runtime
+    /// replacement or XAML hot reload): unlike an area switch — where the outgoing bar stays
+    /// alive for the return — a replaced bar is never remounted, so it is detached and its
+    /// handlers disconnected.
+    /// </summary>
+    internal void OnBarViewReplaced(View oldBarView)
+    {
+        if (ReferenceEquals(oldBarView.Parent, this))
+        {
+            RemoveLogicalChild(oldBarView);
+        }
+
+        oldBarView.DisconnectHandlers();
+    }
+
     internal void OnBarViewUnmounted()
     {
         if (TabBarView is { } barView && ReferenceEquals(barView.Parent, this))

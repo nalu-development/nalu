@@ -327,6 +327,7 @@ public partial class Scaffold : ContentPage, IDisposable
     public Scaffold()
     {
         Areas = new ScaffoldElementCollection<ScaffoldArea>(this);
+        ((System.Collections.Specialized.INotifyCollectionChanged)Areas).CollectionChanged += OnAreasCollectionChanged;
 
         // Hosted pages chain their Page.Navigation to this proxy (they are logical children):
         // pops requested through the classic INavigation API route into the engine.
@@ -1128,6 +1129,58 @@ public partial class Scaffold : ContentPage, IDisposable
         if (Presenter is { } presenter && Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy currentRoot)
         {
             await presenter.SynchronizeAsync(currentRoot.Root, ScaffoldPresentationHint.None);
+        }
+    }
+
+    /// <summary>True once the navigation engine has been initialized on this scaffold.</summary>
+    internal bool IsInitialized => _initialized;
+
+    private bool _areaReconcileScheduled;
+
+    private void OnAreasCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        // XAML hot reload re-runs the whole initialization on the LIVE scaffold, re-ADDING the
+        // structure: an area added AFTER initialization whose root page types intersect an
+        // existing area's REPLACES it (the freshly inflated instance wins). Pre-initialization
+        // duplicates are legitimate app structure (the same page type may root multiple
+        // stacks) and are left untouched. Deferred to the dispatcher: ObservableCollection
+        // forbids mutating from inside its own change event.
+        if (!_initialized || e.Action != System.Collections.Specialized.NotifyCollectionChangedAction.Add || _areaReconcileScheduled)
+        {
+            return;
+        }
+
+        _areaReconcileScheduled = true;
+
+        Dispatcher.Dispatch(() =>
+        {
+            _areaReconcileScheduled = false;
+            ReconcileDuplicateAreas();
+        });
+    }
+
+    private void ReconcileDuplicateAreas()
+    {
+        for (var i = Areas.Count - 1; i >= 0; i--)
+        {
+            var area = Areas[i];
+            var pageTypes = area.Roots.Select(r => r.PageType).Where(t => t is not null).ToHashSet();
+
+            if (pageTypes.Count == 0)
+            {
+                continue;
+            }
+
+            // The LAST area wins (hot reload appends the fresh structure): remove any EARLIER
+            // area sharing a root page type with it.
+            for (var j = i - 1; j >= 0; j--)
+            {
+                if (Areas[j].Roots.Any(r => r.PageType is { } t && pageTypes.Contains(t)))
+                {
+                    Areas.RemoveAt(j);
+                    i--;
+                }
+            }
         }
     }
 
