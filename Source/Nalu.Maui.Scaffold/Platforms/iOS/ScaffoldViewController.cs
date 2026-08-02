@@ -26,6 +26,15 @@ internal sealed class ScaffoldViewController : UIViewController
     private bool _navBarPresented;
     private int _navBarAnimating;
 
+    /// <summary>
+    /// The scaffold page hosted by this controller. MAUI's PageHandler-driven appearing
+    /// plumbing does not run for a custom root handler, so the controller forwards its own
+    /// UIKit appearance callbacks into the page's MAUI events (§10) — parity with
+    /// PageHandler-hosted pages (backgrounding/foregrounding stays window-level, as for
+    /// every MAUI page).
+    /// </summary>
+    public Scaffold? Scaffold { get; set; }
+
     /// <summary>The controller page view controllers are added to (UIKit containment).</summary>
     public UIViewController ContentHost => _contentHost;
 
@@ -74,6 +83,18 @@ internal sealed class ScaffoldViewController : UIViewController
         contentView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
         container.AddSubview(contentView);
         _contentHost.DidMoveToParentViewController(this);
+    }
+
+    public override void ViewDidAppear(bool animated)
+    {
+        base.ViewDidAppear(animated);
+        (Scaffold as IPageController)?.SendAppearing();
+    }
+
+    public override void ViewDidDisappear(bool animated)
+    {
+        base.ViewDidDisappear(animated);
+        (Scaffold as IPageController)?.SendDisappearing();
     }
 
     /// <summary>

@@ -33,6 +33,11 @@ public partial class ScaffoldHandler : ViewHandler<Scaffold, UIView>, IPlatformV
 
         if (VirtualView is { } scaffold && MauiContext is { } mauiContext)
         {
+            if (_viewController is { } viewController)
+            {
+                viewController.Scaffold = scaffold;
+            }
+
             // One presenter per connection: a re-attached handler starts from clean mount state.
             scaffold.Presenter = new ScaffoldPresenter(scaffold);
             _ = scaffold.InitializeAndPresentAsync(mauiContext.Services);
@@ -46,6 +51,11 @@ public partial class ScaffoldHandler : ViewHandler<Scaffold, UIView>, IPlatformV
         {
             (scaffold.Presenter as IDisposable)?.Dispose();
             scaffold.Presenter = null;
+        }
+
+        if (_viewController is { } viewController)
+        {
+            viewController.Scaffold = null;
         }
 
         _viewController = null;
