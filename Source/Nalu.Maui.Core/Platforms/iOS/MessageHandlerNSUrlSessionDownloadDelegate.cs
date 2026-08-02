@@ -219,6 +219,10 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     {
         Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
 
+        // Runs synchronously on the delegate queue: unlike DidFinishDownloading there is no
+        // temp file at stake and the body is quick — handle bookkeeping plus TrySet*
+        // completions, whose continuations run asynchronously by construction
+        // (TaskCreationOptions.RunContinuationsAsynchronously) — so deferring buys nothing.
         Logger.LogDebug("DidCompleteWithError {TaskDescription} with {State}", task.TaskDescription, task.State);
 
         if (string.IsNullOrWhiteSpace(task.TaskDescription))
@@ -245,11 +249,9 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         // Abnormal completion (error/cancel/unexpected state): ensure we have a handle to fault.
-        if (!_pendingRequests.TryGetValue(requestIdentifier, out var handle))
-        {
-            handle = new NSUrlRequestHandle(requestIdentifier, null, null, true);
-            _pendingRequests[requestIdentifier] = handle;
-        }
+        // GetOrAdd: processing runs in parallel, a get-then-set could produce two competing
+        // lost handles for callbacks of the same request.
+        var handle = _pendingRequests.GetOrAdd(requestIdentifier, static id => new NSUrlRequestHandle(id, null, null, true));
 
         if (_processingInBackgroundCompletionHandler is not null)
         {
@@ -342,9 +344,24 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     {
         Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
 
+        // SECURE FIRST, PROCESS LATER. The system guarantees the downloaded file only while
+        // this callback executes, and the delegate queue is SERIAL: every millisecond spent
+        // here delays the callbacks queued behind this one, leaving THEIR temp files exposed
+        // to nsurlsessiond cleanup — observed in the field as "Downloaded file was removed by
+        // the system" after bursts of simultaneous completions. The callback therefore only
+        // renames the file into app-owned storage (microseconds) and defers everything else.
+        var stagedFilePath = SecureDownloadedFile(location);
+        var originalSourcePath = location.Path;
+
+        ProcessCallback(() => ProcessFinishedDownload(task, stagedFilePath, originalSourcePath));
+    }
+
+    private void ProcessFinishedDownload(NSUrlSessionDownloadTask task, string? stagedFilePath, string? originalSourcePath)
+    {
         if (string.IsNullOrWhiteSpace(task.TaskDescription))
         {
             Logger.LogError("DidFinishDownloading TaskDescription is null or empty");
+            DeleteStagedFile(stagedFilePath);
 
             return;
         }
@@ -352,15 +369,14 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var requestIdentifier = task.TaskDescription!;
         Logger.LogDebug("DidFinishDownloading {RequestIdentifier}", requestIdentifier);
 
-        if (!_pendingRequests.TryGetValue(requestIdentifier, out var handle))
-        {
-            handle = new NSUrlRequestHandle(requestIdentifier, null, null, true);
-            _pendingRequests[requestIdentifier] = handle;
-        }
+        // GetOrAdd: processing runs in parallel, a get-then-set could produce two competing
+        // lost handles for callbacks of the same request.
+        var handle = _pendingRequests.GetOrAdd(requestIdentifier, static id => new NSUrlRequestHandle(id, null, null, true));
 
         if (handle.ResponseCompletionSource.Task.IsCompleted)
         {
             Logger.LogDebug("Response task for {RequestIdentifier} already completed, ignoring", requestIdentifier);
+            DeleteStagedFile(stagedFilePath);
 
             return;
         }
@@ -374,6 +390,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         if (task.Response is not NSHttpUrlResponse response)
         {
             Logger.LogError("Response is not NSHttpUrlResponse");
+            DeleteStagedFile(stagedFilePath);
             handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Response is not NSHttpUrlResponse"));
             CompleteAndRemoveHandle(handle);
 
@@ -382,52 +399,43 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         // https://developer.apple.com/documentation/foundation/urlsessiondownloaddelegate/1411575-urlsession/
         // Because the file is temporary, you must either open the file for reading or move it to a permanent location in your app's sandbox container directory before returning from this delegate method.
-        // We should be good with a temporary file path considering we're going to read it right away.
+        // The file was already secured into app-owned storage by DidFinishDownloading; here it
+        // is renamed to the request's deterministic response path and opened for reading.
         handle.ResponseContentFile = Path.Combine(Path.GetTempPath(), ToSafeUnixFileName(requestIdentifier) + ".nsresponse");
 
         FileStream fileStream;
 
         var targetResponseContentFilePath = handle.ResponseContentFile;
-        var targetResponseContentDir = Path.GetDirectoryName(targetResponseContentFilePath)!;
 
         try
         {
             // Use NSFileManager to move the file - this handles iOS sandbox and symbolic link quirks
             // that can cause .NET's File.Move to fail (e.g., /.nofollow/ prefix in paths)
-            // Example: IO_FileNotFound_FileName, /.nofollow/private/var/mobile/Containers/Data/Application/<app guid here>/Library/Caches/com.apple.nsurlsessiond/Downloads/<app id here>/CFNetworkDownload_JfXk68.tmp
             var fileManager = NSFileManager.DefaultManager;
             var destinationUrl = NSUrl.FromFilename(targetResponseContentFilePath);
 
-            // Ensure destination directory exists (iOS may purge /tmp under memory pressure)
-            // Example: IO_PathNotFound_Path, /private/var/mobile/Containers/Data/Application/<app guid here>/tmp/3ba00ae620ee4dd18dcbd3fd90787fad.nsresponse
-            var isDirectory = false;
-            if (!fileManager.FileExists(targetResponseContentDir, ref isDirectory) || !isDirectory)
+            if (stagedFilePath is not null)
             {
-                if (!fileManager.CreateDirectory(targetResponseContentDir, true, (NSDictionary?)null, out var dirError))
+                // Remove existing file if present (NSFileManager.Move doesn't overwrite)
+                if (fileManager.FileExists(targetResponseContentFilePath) && !fileManager.Remove(targetResponseContentFilePath, out var removeError))
                 {
-                    var dirErrorMessage = dirError?.LocalizedDescription ?? "Unknown error";
-                    throw new IOException($"Failed to create temp directory: {dirErrorMessage}. Path: {targetResponseContentDir}");
+                    // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+                    var removeErrorMessage = removeError?.LocalizedDescription ?? "Unknown error";
+                    throw new IOException($"NSFileManager.Remove failed: {removeErrorMessage}. Path: {targetResponseContentFilePath}");
+                }
+
+                if (!fileManager.Move(NSUrl.FromFilename(stagedFilePath), destinationUrl, out var moveError))
+                {
+                    // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+                    var errorMessage = moveError?.LocalizedDescription ?? "Unknown error";
+                    throw new IOException($"NSFileManager.Move failed: {errorMessage}. Source: {stagedFilePath}, Destination: {targetResponseContentFilePath}");
                 }
             }
-
-            // Remove existing file if present (NSFileManager.Move doesn't overwrite)
-            if (fileManager.FileExists(targetResponseContentFilePath) && !fileManager.Remove(targetResponseContentFilePath, out var removeError))
+            else
             {
-                var removeErrorMessage = removeError?.LocalizedDescription ?? "Unknown error";
-                throw new IOException($"NSFileManager.Remove failed: {removeErrorMessage}. Path: {targetResponseContentFilePath}");
-            }
-
-            // Source may have been removed by the system (e.g. nsurlsessiond cleanup); fail fast with a clear message
-            var sourcePath = location.Path;
-            if (string.IsNullOrEmpty(sourcePath) || !fileManager.FileExists(sourcePath))
-            {
-                throw new IOException($"Downloaded file was removed by the system before it could be processed. Source: {sourcePath}");
-            }
-
-            if (!fileManager.Move(location, destinationUrl, out var moveError))
-            {
-                var errorMessage = moveError?.LocalizedDescription ?? "Unknown error";
-                throw new IOException($"NSFileManager.Move failed: {errorMessage}. Source: {location.Path}, Destination: {targetResponseContentFilePath}");
+                // The system purged the download before it could be secured
+                // (e.g. nsurlsessiond cache cleanup).
+                throw new IOException($"Downloaded file was removed by the system before it could be processed. Source: {originalSourcePath}");
             }
 
             fileStream = new FileStream(targetResponseContentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -437,19 +445,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             Logger.LogError(ex, "Failed to process downloaded file for {RequestIdentifier} at {Url}. Source: {Source}, Destination: {Destination}, DestExists: {DestExists}",
                 requestIdentifier,
                 (task.CurrentRequest ?? task.OriginalRequest)?.Url.ToString() ?? "Missing URL",
-                location.Path,
+                originalSourcePath,
                 targetResponseContentFilePath,
                 File.Exists(targetResponseContentFilePath));
 
+            DeleteStagedFile(stagedFilePath);
             handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Failed to process downloaded file", ex));
             CompleteAndRemoveHandle(handle);
 
             return;
-        }
-        finally
-        {
-            // This might have taken a while, so let's update the last completed task timestamp
-            Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
         }
 
         var httpResponseMessage = new HttpResponseMessage(task.GetHttpStatusCode())
@@ -505,6 +509,88 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         _pendingRequests.TryRemove(handle.Identifier, out _);
     }
 
+    /// <summary>
+    /// Runs download processing OFF the serial delegate queue, fire-and-forget. Keeping
+    /// <see cref="DidFinishDownloading" /> near-instant is what lets burst completions all
+    /// secure their temp files before the system reclaims them. Once a download is secured,
+    /// tasks are fully independent — state lives on each request's own handle, the shared maps
+    /// are concurrent, and completion races are settled by TrySet* — so processing runs in
+    /// parallel with no ordering requirements.
+    /// </summary>
+    private void ProcessCallback(Action action)
+        => _ = Task.Run(() =>
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Unhandled error while processing a session callback");
+                }
+                finally
+                {
+                    Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
+                }
+            });
+
+    /// <summary>
+    /// Renames the system-provided download into app-owned storage. MUST be the first thing
+    /// <see cref="DidFinishDownloading" /> does, synchronously: the file is guaranteed only
+    /// while that callback executes, and a bare rename is what keeps the serial delegate queue
+    /// draining fast enough during completion bursts. Returns null when the file is already gone.
+    /// </summary>
+    private string? SecureDownloadedFile(NSUrl location)
+    {
+        if (string.IsNullOrEmpty(location.Path))
+        {
+            return null;
+        }
+
+        var stagedFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.nsdownload");
+        var stagedUrl = NSUrl.FromFilename(stagedFilePath);
+        var fileManager = NSFileManager.DefaultManager;
+
+        if (fileManager.Move(location, stagedUrl, out var moveError))
+        {
+            return stagedFilePath;
+        }
+
+        // One retry after ensuring the temp directory exists (iOS may purge it wholesale).
+        var tempDir = Path.GetTempPath();
+        var isDirectory = false;
+
+        if ((!fileManager.FileExists(tempDir, ref isDirectory) || !isDirectory)
+            && fileManager.CreateDirectory(tempDir, true, (NSDictionary?)null, out _)
+            && fileManager.Move(location, stagedUrl, out moveError))
+        {
+            return stagedFilePath;
+        }
+
+        Logger.LogWarning(
+            "Failed to stage downloaded file {Source}: {Error}",
+            location.Path,
+            moveError?.LocalizedDescription ?? "Unknown error");
+
+        return null;
+    }
+
+    private void DeleteStagedFile(string? stagedFilePath)
+    {
+        try
+        {
+            if (stagedFilePath is not null && File.Exists(stagedFilePath))
+            {
+                File.Delete(stagedFilePath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to delete staged download file {Path}", stagedFilePath);
+        }
+    }
+
+    // ReSharper disable once AsyncVoidMethod
     private async void WaitEventsProcessingAndNotify()
     {
         if (_processingInBackgroundCompletionHandler is not { } completionHandler)
@@ -621,6 +707,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         // Update managed cookie container from Set-Cookie headers
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         if (setCookieValues is { Count: > 0 } && cookieContainer is not null && response.Url?.AbsoluteString is { } absoluteUrl)
         {
             var absoluteUri = new Uri(absoluteUrl);
@@ -720,6 +807,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// chain: <c>NSError.ToString()</c> only returns <c>LocalizedDescription</c>, which for
     /// e.g. <c>NSURLErrorDomain</c> code -1 is a useless bare "unknown error".
     /// </summary>
+    // ReSharper disable once InconsistentNaming
     private static string FormatNSError(NSError? error)
     {
         if (error is null)
@@ -733,6 +821,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         return builder.ToString();
     }
 
+    // ReSharper disable once InconsistentNaming
     private static void AppendNSError(StringBuilder builder, NSError error, int depth)
     {
         builder.Append(error.LocalizedDescription)
@@ -742,6 +831,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                .Append(error.Code)
                .Append(']');
 
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
         if (error.UserInfo?[_failingUrlErrorKey] is { } failingUrl)
         {
             builder.Append(" Url=").Append(failingUrl);
@@ -758,7 +848,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         => LoggerFactory.Create(_ => { }).CreateLogger<MessageHandlerNSUrlSessionDownloadDelegate>();
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider()
-        => IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+        => IPlatformApplication.Current?.Services.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
 
     // Build an NSUrl from a managed Uri using NSUrlComponents and HttpUtility.ParseQueryString for accurate query parsing.
     private static NSUrl BuildNativeUrl(Uri uri)
