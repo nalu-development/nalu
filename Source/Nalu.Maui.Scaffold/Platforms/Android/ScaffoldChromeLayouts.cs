@@ -69,16 +69,15 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 }
 
 /// <summary>
-/// Bottom chrome strip hosting the MAUI tab bar platform view: measures it against the full
-/// width, adds the system bottom inset below it (the floating pill sits above the system
-/// navigation area), and stays touch-transparent outside the bar content.
-/// Mirrors NaluShellItemRendererTabBarLayout, including the MauiWindowInsetListener
-/// registration required on .NET 10 so hosted MAUI views participate in the insets chain.
+/// Bottom chrome strip hosting the MAUI tab bar platform view: the bar FILLS the strip flush
+/// to the screen's bottom edge and OWNS the bottom system inset (SafeAreaEdges semantics,
+/// symmetric with the nav strip) — a consuming bar measures inset-included, an edge-to-edge
+/// bar measures content-only. Stays touch-transparent outside the bar content. Includes the
+/// MauiWindowInsetListener registration required on .NET 10 so hosted MAUI views participate
+/// in the insets chain.
 /// </summary>
 internal sealed class ScaffoldTabBarStripLayout : FrameLayout
 {
-    private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
-
     private AView? _bar;
     private int _barMeasuredHeight;
     private bool _insetsFrozen;
@@ -149,6 +148,8 @@ internal sealed class ScaffoldTabBarStripLayout : FrameLayout
         }
     }
 
+    private static readonly int _unspecifiedHeightSpec = MeasureSpec.MakeMeasureSpec(0, MeasureSpecMode.Unspecified);
+
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
         if (_bar is null)
@@ -158,24 +159,35 @@ internal sealed class ScaffoldTabBarStripLayout : FrameLayout
             return;
         }
 
-        MeasureChild(_bar, widthMeasureSpec, heightMeasureSpec);
+        // Height UNSPECIFIED: stretchy custom roots (star rows) would fill any finite spec
+        // newer ConstraintLayout/Android versions hand down. The BAR owns the bottom system
+        // inset (SafeAreaEdges semantics, nav-strip parity): a consuming bar measures with its
+        // self-applied inset padding included, an edge-to-edge bar measures content only — the
+        // strip is exactly the bar's measured height, nothing added.
+        _bar.Measure(widthMeasureSpec, _unspecifiedHeightSpec);
         _barMeasuredHeight = _bar.MeasuredHeight;
 
-        var bottomInset = ViewCompat.GetRootWindowInsets(this)?.GetInsets(_systemBarsInsetsType)?.Bottom ?? 0;
-        SetMeasuredDimension(_bar.MeasuredWidth, _barMeasuredHeight + bottomInset);
+        SetMeasuredDimension(_bar.MeasuredWidth, _barMeasuredHeight);
     }
 
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
     {
+        // The bar FILLS the strip, system-inset region included: custom bars can paint under
+        // the system navigation area (their SafeAreaEdges decides any inner padding), while
+        // the default template's Auto-row root keeps its pill above the inset (Auto rows
+        // top-align at their measured height).
+        var width = right - left;
+        var height = bottom - top;
+
         if (_bar is LayoutViewGroup layoutViewGroup)
         {
             // MAUI layout roots need the explicit cross-platform arrange call (net10 behavior,
-            // mirrored from NaluShellItemRendererTabBarLayout).
-            layoutViewGroup.Layout(0, 0, right - left, _barMeasuredHeight);
+            // mirrored from NaluShellItemRendererNavigationLayout).
+            layoutViewGroup.Layout(0, 0, width, height);
         }
         else
         {
-            _bar?.Layout(0, 0, right - left, _barMeasuredHeight);
+            _bar?.Layout(0, 0, width, height);
         }
     }
 

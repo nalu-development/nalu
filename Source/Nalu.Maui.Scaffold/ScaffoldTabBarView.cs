@@ -37,6 +37,7 @@ namespace Nalu;
 public sealed class ScaffoldTabBarView : Grid
 {
     private readonly Border _pill;
+    private readonly Grid _insetHost;
     private readonly ScaffoldTabBarItemsLayout _items;
     private ScaffoldTabBar? _tabBar;
 
@@ -66,7 +67,7 @@ public sealed class ScaffoldTabBarView : Grid
         GenericBindableProperty<ScaffoldTabBarView>.Create(
             nameof(BarMargin),
             new Thickness(10, 0, 10, 10),
-            propertyChanged: static view => (_, value) => view.Padding = value
+            propertyChanged: static view => (_, value) => view._insetHost?.Padding = value
         );
 
     /// <summary>Bindable property for <see cref="BarPadding"/>.</summary>
@@ -108,8 +109,8 @@ public sealed class ScaffoldTabBarView : Grid
     /// <summary>
     /// Gets or sets the margin around the floating bar pill, relative to the safe area
     /// (the bottom margin is measured from the top of the system inset). Part of the bar's
-    /// safe-area footprint contribution to the hosted page. Drives the view's own
-    /// <see cref="Layout.Padding"/> — style THIS, not <c>Padding</c>.
+    /// safe-area footprint contribution to the hosted page. Drives the internal
+    /// inset-consuming host's padding — style THIS, not <c>Padding</c>.
     /// </summary>
     public Thickness BarMargin
     {
@@ -225,18 +226,32 @@ public sealed class ScaffoldTabBarView : Grid
             Content = _items
         };
 
-        // The strip hosting the bar reserves the bottom system inset itself (on both
-        // platforms) — the bar must never consume safe-area padding on top of that. This also
-        // guards the Android hide/show slide: a translated strip overlaps the system bars and
-        // the net10 inset listener would otherwise pad the bar by the overlap, and the stale
-        // padding survived the slide back in (bar re-appearing ABOVE its resting position).
+        // The BAR owns the bottom system inset (the strip is exactly the bar's measured
+        // height, nav-strip parity), and it is consumed by an inner wrapper — NOT this root:
+        // on iOS, root-level SafeAreaEdges on a natively-hosted view never propagates its
+        // safe-area-driven size change to the native host (MauiView's changed-branch only
+        // notifies MAUI superviews), so the strip would keep a stale measure. Child-level
+        // consumption invalidates through the MAUI tree and reaches the host reliably.
+        // Android hide/show slides are guarded by the strip's FreezeInsets (a translated
+        // strip overlapping the system bars must not re-pad the bar mid-animation).
         SafeAreaEdges = SafeAreaEdges.None;
 
-        Add(_pill);
+        // The wrapper is FLUSH with the bar (the root carries no padding): its safe-area
+        // padding is the full system inset, and BarMargin stacks INSIDE it — the pill's
+        // bottom margin is measured from the top of the inset, matching the documented
+        // BarMargin contract.
+        _insetHost = new Grid
+        {
+            RowDefinitions = { new RowDefinition(GridLength.Auto) },
+            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None, SafeAreaRegions.None, SafeAreaRegions.None, SafeAreaRegions.Container)
+        };
+
+        _insetHost.Add(_pill);
+        Add(_insetHost);
 
         // Defaults never raise propertyChanged: seed the pill from the current values once.
         // Every later change lands through that property's own callback.
-        Padding = BarMargin;
+        _insetHost.Padding = BarMargin;
         _pill.Padding = BarPadding;
         _pill.Background = BarBackground;
         _pill.Shadow = BarShadow;

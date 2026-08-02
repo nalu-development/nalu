@@ -666,6 +666,36 @@ public sealed class NaluApp : IAsyncLifetime
                ?? throw new InvalidOperationException("Could not determine the window width for pixel sampling.");
     }
 
+    /// <summary>Window size in DIPs, derived from the first fully bounded element in the tree
+    /// (the tree root may carry no bounds — same caveat as <see cref="GetWindowWidthAsync"/>).</summary>
+    public async Task<(double Width, double Height)> GetWindowSizeAsync()
+    {
+        var tree = await _client.GetTreeAsync(3).ConfigureAwait(false);
+
+        static (double Width, double Height)? FindSize(IEnumerable<ElementInfo> elements)
+        {
+            foreach (var element in elements)
+            {
+                var bounds = element.WindowBounds ?? element.Bounds;
+
+                if (bounds is { Width: > 0, Height: > 0 })
+                {
+                    return (bounds.Width, bounds.Height);
+                }
+
+                if (element.Children is { } children && FindSize(children) is { } size)
+                {
+                    return size;
+                }
+            }
+
+            return null;
+        }
+
+        return FindSize(tree)
+               ?? throw new InvalidOperationException("Could not determine the window size.");
+    }
+
     /// <summary>Waits until the sampled pixel color satisfies the given predicate (e.g. after a re-render).</summary>
     public async Task<(byte R, byte G, byte B)> WaitForPixelColorAsync(
         string automationId,

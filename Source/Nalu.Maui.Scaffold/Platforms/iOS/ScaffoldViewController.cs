@@ -56,9 +56,13 @@ internal sealed class ScaffoldViewController : UIViewController
 
     /// <summary>
     /// Bar footprint (points) above the system inset — the page-facing inset contribution.
-    /// Zero when no bar is mounted.
+    /// The strip's measured height INCLUDES any bottom inset the bar consumed (SafeAreaEdges),
+    /// and the page already receives the system inset from the system safe area, so the
+    /// contribution is the measured height minus the system inset. Zero when no bar is mounted.
     /// </summary>
-    public nfloat BarHeight => _tabBarStrip?.BarHeight ?? 0;
+    public nfloat BarHeight => _tabBarStrip is { } strip
+        ? (nfloat)Math.Max(0, strip.BarHeight - (View?.SafeAreaInsets.Bottom ?? 0))
+        : 0;
 
     /// <summary>
     /// Full height (points) of the bottom chrome strip measured from the screen's bottom edge:
@@ -118,10 +122,13 @@ internal sealed class ScaffoldViewController : UIViewController
         View!.AddSubview(strip);
 
         var bounds = View.Bounds;
-        var safeBottom = View.SafeAreaInsets.Bottom;
         strip.Measure(bounds.Width);
 
-        var stripHeight = strip.BarHeight + safeBottom;
+        // The strip is exactly the bar's measured height: the BAR owns the bottom inset
+        // (SafeAreaEdges semantics, nav-strip parity) — a consuming bar measures inset
+        // included, an edge-to-edge bar measures content only. The first (pre-placement)
+        // measure has no inset contribution yet; the layout pass re-measures once placed.
+        var stripHeight = strip.BarHeight;
         PositionStrip(strip, bounds, stripHeight);
         strip.Transform = startHidden ? CGAffineTransform.MakeTranslation(0, stripHeight) : CGAffineTransform.MakeIdentity();
         _barPresented = !startHidden;
@@ -340,7 +347,7 @@ internal sealed class ScaffoldViewController : UIViewController
                 strip.Measure(bounds.Width);
             }
 
-            var stripHeight = strip.BarHeight + safeBottom;
+            var stripHeight = strip.BarHeight;
             PositionStrip(strip, bounds, stripHeight);
             ChromeBottomFootprint = _barPresented ? stripHeight : 0;
 
@@ -377,9 +384,11 @@ internal sealed class ScaffoldViewController : UIViewController
 
 /// <summary>
 /// Bottom chrome strip hosting the MAUI tab bar platform view: measures it (cached until
-/// invalidated — the NaluTabBarContainerView pattern), lays it out above the system inset, and
-/// passes touches through everywhere the bar itself is not hit (the floating pill's side margins
-/// must not swallow page taps).
+/// invalidated — the NaluTabBarContainerView pattern) and lets the bar FILL the strip flush to
+/// the screen's bottom edge. The BAR owns the bottom system inset (SafeAreaEdges semantics,
+/// symmetric with the nav strip): a consuming bar measures inset-included, an edge-to-edge bar
+/// measures content-only. Touches pass through everywhere the bar itself is not hit (the
+/// floating pill's side margins must not swallow page taps).
 /// </summary>
 internal sealed class ScaffoldTabBarStrip : UIView
 {
@@ -420,7 +429,12 @@ internal sealed class ScaffoldTabBarStrip : UIView
     public override void LayoutSubviews()
     {
         base.LayoutSubviews();
-        Bar.Frame = new CGRect(0, 0, Bounds.Width, BarHeight);
+
+        // The bar FILLS the strip, system-inset region included: custom bars can paint under
+        // the home indicator (their SafeAreaEdges decides any inner padding), while the
+        // default template's Auto-row root keeps its pill above the inset (Auto rows
+        // top-align at their measured height).
+        Bar.Frame = Bounds;
     }
 
     public override UIView? HitTest(CGPoint point, UIEvent? uievent)
