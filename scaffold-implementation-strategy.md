@@ -36,23 +36,50 @@
   for custom bars, §5.4 top-inset augmentation. Suites: `ScaffoldNavBarChromeTests` (6 green per
   platform); full regression green (iOS 53, Android 37).
 
+- **Flyout completion (§5.5) IMPLEMENTED and verified on both platforms (July 2026)**:
+  `ScaffoldFlyoutMode` (Auto/Disabled/Flyout, both sides default Disabled),
+  `ScaffoldFlyoutMenuView`, `ScaffoldRoot.SelectCommand` (scaffold-wide busy gate, shared
+  with tab-bar selection), `ScaffoldFlyoutOptions`, RTL mapping, per-side open state +
+  events, `IScaffoldFlyoutController` (page scope), area-icon removal, stack-of-overrides
+  resolution with page-content lifecycle cleanup. Edge-swipe open still open (transition-
+  engine territory).
+- **Modal pages (§7.1) IMPLEMENTED (July 2026)**: `Scaffold.PageMode`
+  (Default/Modal/DismissableModal) composing the §5/§8 machinery — no dedicated modal engine.
+- **Transition engine (§8) IMPLEMENTED (July 2026), verified on both platforms**: declarative
+  `ScaffoldPageTransition` spec + `Scaffold.PageTransition` attached resolution,
+  `Scaffold.TransitionName` shared elements, iOS interactive edge-swipe pop (manual scrub),
+  Android predictive back (peek preview, engine-committed handoff). Predictive-back SET
+  seeking investigated and PARKED (§8.1); per-navigation `WithTransition(...)` DROPPED.
+- **Popups, sheets & overlay stack (§5.6/§7.2) IMPLEMENTED (July 2026)** — the former "v2"
+  feature landed early: `ShowPopupAsync`/`ShowBottomSheetAsync` (placement, detents, drag),
+  overlay stack semantics, attached presentation properties, and the model-first
+  `IOverlayService` MVVM layer (`AddOverlay<TModel, TView>`).
+- **Chrome styling model (§5.7)**: plain-MAUI-styles rework applied across all chrome.
+- **Nav bar §5.2 REVISED (July–August 2026)**: `ScaffoldNavBarAppearance` per-property merge
+  chain, native strip-level application, `NavBarBinding`, press pulse,
+  `Scaffold.NavBarOverlapsContent`, and the scroll channel (`Scaffold.ScrollTracker` +
+  `ScrollValue`/`ThemeScrollValue` extensions with page-level ramps) — see §5.2.
+- **Keyboard/IME correctness (August 2026)**: the Scaffold raises `NavigatedTo/From` via
+  `[UnsafeAccessor]` (`ScaffoldPageNavigationEvents`, `disconnectHandlers: false`) so
+  `HideSoftInputOnTapped` works on Scaffold pages; the soft keyboard is dismissed BEFORE every
+  page swap (Android + iOS). KNOWN LIMITATION (net10 MAUI): committing a navigation while the
+  IME hide animation is still running briefly shows the incoming page with stale safe-area
+  padding — `MauiWindowInsetListener` swallows every inset dispatch while its internal
+  `IsImeAnimating` is set and only re-applies on animation end; deliberately NOT worked
+  around (would require polling MAUI internals via reflection; upstream issue filed).
+  Suites: `ScaffoldImeTests` (4) + `VirtualScrollImeTests` (2) green on Android.
+
 **Next steps, in recommended order:**
 
-1. **Flyout completion (§5.5): IMPLEMENTED and verified on both platforms (July 2026)** —
-   `ScaffoldFlyoutMode` (Auto/Disabled/Flyout, both sides default Disabled),
-   `ScaffoldFlyoutMenuView`, `ScaffoldRoot.SelectCommand` (scaffold-wide busy gate, shared
-   with tab-bar selection), `ScaffoldFlyoutOptions`, RTL mapping, per-side open state +
-   events, `IScaffoldFlyoutController` (page scope), area-icon removal, stack-of-overrides
-   resolution with page-content lifecycle cleanup. Edge-swipe open lands with the
-   transition engine (P2).
-2. **Modal pages** (§7.1) — the one P0 contract surface not yet exercised end-to-end.
-4. P2: transition engine port from the PoC (`PageTransition` spec, `TransitionTag`,
-   interactive pop, predictive-back seeking — androidx seeking-version check still pending).
-5. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
+1. **§10 gap**: forward `ViewDidAppear`/`Disappear` from `ScaffoldViewController` into MAUI's
+   page events for the scaffold page itself.
+2. **P3**: snapshot/restore (§9), deep-link mapping (URI → `INavigationInfo`), docfx
+   conceptual docs + NaluShell migration guide.
+3. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
 
 **Known open issue (Shell host, not Scaffold):** NaluTabBar renders full-height tab items on the
 Android API 37 emulator (visually broken, taps may fail; files untouched since commit `66c626f`) —
-likely an Android 16/17 behavior change; needs its own investigation.
+likely an Android 16/17 behavior change; fix in progress on `main`.
 
 ## 1. Goals
 
@@ -252,19 +279,42 @@ Layering, bottom-up — each layer testable without the one below:
 >   Same keep-alive-offscreen + interruptible animation model as the tab bar; the nav strip
 >   sits BELOW the tab strip in z-order (behind-chrome overlay scrims dim it).
 
+> **REVISED (August 2026) — appearance chain & scroll-linked chrome, verified on both platforms:**
+> - **`Scaffold.NavBarAppearance` attached** (`ScaffoldNavBarAppearance`: `Background`,
+>   `Foreground`, `Opacity`, `OffsetY`) with PER-PROPERTY merge, page → area → scaffold — a
+>   page overrides only what it sets. `Foreground` flows through `ScaffoldNavBarContext` into
+>   the default bar's primitives (per §5.7, styles still win at the primitive level).
+> - **Applied at the native STRIP level** (paint / alpha / translate — no MAUI relayout), so
+>   scroll-driven appearance animates at frame cadence; scaffold/area-level `NavBarView`
+>   changes remap LIVE without recreating the strip.
+> - **`TitleView` binds to the `ScaffoldNavBarContext`** like the rest of the bar; the
+>   **`{nalu:NavBarBinding ...}`** markup extension reaches THROUGH the context to the page's
+>   own BindingContext for page-model data inside `TitleView`/custom bars.
+> - `ScaffoldNavBarButtonBase` press pulse — virtual, consistent on both platforms.
+> - **`Scaffold.NavBarOverlapsContent` attached bool** ("parallax mode"): the bar's footprint
+>   stops contributing top insets — content starts at the top edge and the bar draws over it.
+>   Pair with a page-level transparent `NavBarAppearance.Background` for full-bleed headers
+>   whose bar materializes on scroll.
+
 - **Deliberately minimal API in P1** (title, back button, drawer buttons, title view).
   ToolbarItems, search boxes etc. are explicitly post-v1 — this is where Shell replacements die.
   Custom bars (full replacement + primitives) are the v1 escape hatch.
-- **Scroll-linked chrome** (the AppBarLayout / iOS large-title replacement): a `ScrollChrome`-style
-  primitive observing the content's NATIVE scroll offset (iOS: KVO on `contentOffset`; Android:
-  `NestedScrollView.ScrollChange` / RecyclerView listener) and publishing `(progress, offsetDp)`
-  per frame on the UI thread. Built-in behaviors (collapse, title cross-fade, parallax factor,
-  hide-on-scroll) + user-custom handlers setting plain MAUI properties. **PoC'd (spike D)**:
-  MAUI-property-driven chrome holds display-refresh cadence (Android fling: ~65 events/s, worst
-  gap 20ms), so custom parallax is ~10 lines of user code. Rules: collapse is transform-only
-  (content reserves expanded height statically — no per-frame relayout); negative offsets (iOS
-  bounce) feed stretch effects; VirtualScroll needs its own offset source (its root isn't a
-  UIScrollView on iOS — see DevFlow notes).
+- **Scroll-linked chrome IMPLEMENTED (August 2026)** (the AppBarLayout / iOS large-title
+  replacement): **`Scaffold.ScrollTracker`** attached (per page) points at the page's primary
+  scrollable `View` — the platform subtree is searched a few levels deep for the actual native
+  scrollable (component roots often wrap it, e.g. VirtualScroll) — and its NATIVE offset feeds
+  `ScaffoldNavBarContext.ScrollOffset`/`IsScrolledUnder` per frame (iOS: KVO on
+  `contentOffset`; Android: scroll listeners). Consumption is declarative:
+  **`{nalu:ScrollValue From=…, To=…}`** and **`{nalu:ThemeScrollValue FromLight=…, ToLight=…,
+  FromDark=…, ToDark=…}`** markup extensions interpolate ANY bindable property from the scroll
+  offset; the interpolation window defaults to the page-level **`Scaffold.ScrollRampStart` /
+  `ScrollRampEnd`** attached values (resolution page → area → scaffold → 0/100), overridable
+  per usage via `RampStart`/`RampEnd`. Combined with `NavBarAppearance` +
+  `NavBarOverlapsContent` this gives fully declarative scroll-driven hero chrome — reference
+  implementation: the DailyHelper weather detail page. Spike D's finding holds in production:
+  MAUI-property-driven chrome sustains display-refresh cadence (Android fling ~65 events/s,
+  worst gap 20ms). Rules: collapse is transform-only (content reserves expanded height
+  statically); negative offsets (iOS bounce) feed stretch effects.
 - Safe-area / edge-to-edge handling reuses the patterns already built for the NaluTabBar renderers
   (scrim views, `AdditionalSafeAreaInsets` on iOS, insets layouts on Android), re-authored for the
   Scaffold container.
@@ -935,6 +985,10 @@ The Scaffold must own, with exact ordering:
 > verified byte-identical to the Shell host on both platforms (the `NavLog` sequences match).
 > Verified: covered pages are detached, never destroyed — platform view state (scroll offset,
 > entry text) survives push/pop on both platforms; disposal-on-pop asserted by the leak checks.
+> Added (August 2026): the Scaffold raises MAUI's `NavigatedTo`/`NavigatedFrom` on page swaps
+> (`ScaffoldPageNavigationEvents`, `[UnsafeAccessor]` into the internal senders with
+> `disconnectHandlers: false` — the scaffold preserves covered pages) so `HasNavigatedTo`-gated
+> MAUI features (`HideSoftInputOnTapped`) work on Scaffold pages.
 > Still pending: forwarding `ViewDidAppear`/`Disappear` from `ScaffoldViewController` into MAUI's
 > page-appearing events for the scaffold page itself (lands with the chrome work).
 
@@ -984,32 +1038,36 @@ The Scaffold must own, with exact ordering:
 
 ### P1 — structure & chrome
 
-> **Status (July 2026): in progress.**
+> **Status (August 2026): COMPLETE.**
 > ✅ Full hierarchy incl. cross-area/root navigation with stack preservation (exercised by the
->   shared UI suite). ✅ Back policy per §6. ✅ Flyout STRUCTURE (attached props, resolution,
->   open/close, scrim, auto-close on navigation) — templates/styling pending.
-> ✅ Tab bar (§5.3) + §5.6 overlay primitive (flyout refactored onto it) + §5.4 bottom-inset
->   distribution — implemented and verified on both platforms (July 2026).
-> ✅ Nav bar (§5.2) + §5.4 top-inset distribution — implemented and verified on both platforms
->   (July 2026).
-> ⬜ Flyout default template, width/styling API, RTL.
-> ⬜ Minimal nav bar + §5.4 inset distribution.
-> ⬜ Modal pages (§7.1).
+>   shared UI suite). ✅ Back policy per §6.
+> ✅ Tab bar (§5.3) + §5.6 overlay primitive + §5.4 bottom-inset distribution.
+> ✅ Nav bar (§5.2, incl. the appearance/scroll revision) + §5.4 top-inset distribution.
+> ✅ Flyout completion (§5.5): modes, default menu template, options/styling, RTL, controller.
+> ✅ Modal pages (§7.1) via `Scaffold.PageMode`.
+> ✅ Chrome styling model (§5.7) applied across all chrome.
 
 - Full hierarchy: `ScaffoldArea` base, `ScaffoldTabBar` (default template + custom view replacement,
   stack preservation, active-tab-pops-to-root), cross-item/stack navigation.
 - Start/End flyouts with resolution order (Page → Area → global), default template + custom content.
 - Minimal nav bar (title, TitleView, back button, toolbar items, visibility), safe-area/edge-to-edge.
 - Back policy per §6 (system back interception; no gestures yet).
-- **Exit**: a real-world sample app shape (tabs + drawer + modals) fully navigable with guards.
+- **Exit (met)**: a real-world sample app shape (tabs + drawer + modals) fully navigable with
+  guards — see `Samples/Nalu.Maui.DailyHelper`.
 
 ### P2 — transitions & gestures
+
+> **Status (August 2026): COMPLETE** (see §8). Declarative `ScaffoldPageTransition` spec +
+> attached resolution, shared elements (`Scaffold.TransitionName`), iOS interactive edge-swipe
+> pop, Android predictive back. Popups & sheets (§7.2) also landed in this window despite being
+> planned for v2. Remaining follow-ups, parked: predictive-back SET seeking (§8.1 —
+> UX upgrade, not correctness), flyout edge-swipe open.
+
 - PoC spikes A + B → engine decision → implement engine + `TransitionTag` API
   (`WithTransition(...)` dropped July 2026 — attached-property resolution covers it).
 - Platform-parity push/pop animations, then shared elements, then interactive pop (iOS) and
   predictive back (Android), honoring the guard policy.
-- (Popups/sheets are §7.2 — v2, out of the initial release entirely.)
-- **Exit**: photo-grid→detail scenario shipping quality on both platforms, interruptible.
+- **Exit (met)**: photo-grid→detail scenario shipping quality on both platforms, interruptible.
 
 ### P3 — restore, deep links, polish
 - Snapshot/restore per §9 (DEBUG DevEx first).
@@ -1043,17 +1101,19 @@ The Scaffold must own, with exact ordering:
 2. ~~Terse XAML forms for single-stack areas~~ — RESOLVED: implicit conversion operators
    (parse-time composition of real elements, see §3).
 3. Flyout items targeting a specific stack inside an item — v1 proposal is **no** (item-level only).
-4. Modal presentation config: per-page attached property vs push-time builder option (or both).
-   Popups/sheets are settled as a separate non-navigation family shipping in v2 (§7.2, uxd-popups
-   reference); its sub-questions (native vs Nalu-drawn sheets, packaging) belong to the v2 review.
+4. ~~Modal presentation config~~ — RESOLVED (July 2026): per-page attached property
+   (`Scaffold.PageMode`, §7.1); no push-time builder option (consistent with dropping
+   `WithTransition(...)`). Popups/sheets shipped early as the separate non-navigation family
+   (§7.2) with Nalu-drawn sheets.
 5. Drawer "locked/side-by-side" mode — post-v1, but does the v1 API shape need to reserve room for it?
 6. Snapshot storage location & retention policy (cache dir, single slot vs per-build slot).
 7. Does `Scaffold` need a Shell-style "current page changed" public event surface beyond the existing
    `NavigationEvent` telemetry? (Consumers may want it for analytics.)
 8. `Scaffold` currently derives `ContentPage` only as a historical artifact (its `Content` is dead
    weight since the lean handler ignores it) — drop to `Page` at the next API review?
-9. Flyout API naming/shape (`OpenFlyoutAsync`/`ScaffoldFlyoutSide`, width/scrim styling,
-   explicit "none" sentinel to suppress an inherited flyout) — design review.
+9. ~~Flyout API naming/shape~~ — RESOLVED (July 2026): implemented per §5.5
+   (`ScaffoldFlyoutMode` incl. `Disabled` as the suppression sentinel, `ScaffoldFlyoutOptions`
+   for width/scrim styling, `IScaffoldFlyoutController` page scope, RTL mapping).
 10. Should `ScaffoldViewController` forward appearing/disappearing to the scaffold page's MAUI
     events (parity with PageHandler-hosted pages)?
 
@@ -1064,6 +1124,17 @@ The Scaffold must own, with exact ordering:
 Platform and framework behaviors discovered while building P0/P1; they shaped decisions above and
 will bite again if forgotten:
 
+- **net10 `MauiWindowInsetListener` IME gate (August 2026, diagnosed frame-by-frame + via
+  reflection probes)**: while an IME animation is in flight the listener sets an internal
+  `IsImeAnimating` and SWALLOWS every `OnApplyWindowInsets` dispatch (parking only the LAST
+  view as `_pendingView`); combined with padding being reset on detach, a page (re)attached
+  mid-hide keeps ZERO safe-area padding until the animation ends (~250ms) and then jumps.
+  Nothing can bypass it: manual `DispatchApplyWindowInsets` into the subtree is swallowed too,
+  and the state is unobservable from outside — the listener registers animation callbacks with
+  `DispatchModeStop` (events never reach non-MAUI views; DecorView and `android.R.id.content`
+  callbacks receive nothing), and in the default soft-input mode the IME never appears in the
+  window's insets at all (`ime=0, visible=false` with the keyboard fully open). Accepted as a
+  KNOWN LIMITATION (§0); the only working fix was polling the flag via reflection — rejected.
 - **MAUI element tree**: `Page.OnParentSet` throws unless the parent is a Page, Window/Application,
   or `BaseShellItem` (Shell's private carve-out). Scaffold-hosted pages are therefore logically
   parented to the **Scaffold itself**, wired inside the stack model so every mutation path stays
