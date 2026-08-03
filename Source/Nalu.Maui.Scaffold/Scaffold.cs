@@ -199,6 +199,19 @@ public partial class Scaffold : ContentPage, IDisposable
         BindableProperty.CreateAttached("NavBarOverlapsContent", typeof(bool), typeof(Scaffold), false);
 
     /// <summary>
+    /// Attached property declaring the system status bar (and Android navigation bar) ICON
+    /// style over a page's content (default <see cref="ScaffoldSystemBarStyle.Auto"/>).
+    /// Resolution, most specific set value wins: current <see cref="Page"/> →
+    /// current <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> — but an OPAQUE chrome
+    /// surface covering the status-bar region (a materialized nav bar, an open flyout) always
+    /// wins by its own brightness: the declaration describes the page's content, not the
+    /// chrome above it. Declare it on full-bleed pages whose top content brightness the
+    /// scaffold cannot know (photos, custom drawings).
+    /// </summary>
+    public static readonly BindableProperty SystemBarStyleProperty =
+        BindableProperty.CreateAttached("SystemBarStyle", typeof(ScaffoldSystemBarStyle), typeof(Scaffold), ScaffoldSystemBarStyle.Auto);
+
+    /// <summary>
     /// Attached property controlling the nav bar's start-drawer button
     /// (<see cref="ScaffoldFlyoutButtonVisibility.Auto"/> default: shown at stack roots only).
     /// Resolution, most specific set value wins: current <see cref="Page"/> →
@@ -933,6 +946,12 @@ public partial class Scaffold : ContentPage, IDisposable
     /// <summary>Sets whether the navigation bar is visible for a page.</summary>
     public static void SetIsNavBarVisible(BindableObject bindable, bool value) => bindable.SetValue(IsNavBarVisibleProperty, value);
 
+    /// <summary>Gets the declared system bar icon style of an element.</summary>
+    public static ScaffoldSystemBarStyle GetSystemBarStyle(BindableObject bindable) => (ScaffoldSystemBarStyle)bindable.GetValue(SystemBarStyleProperty);
+
+    /// <summary>Sets the declared system bar icon style of an element.</summary>
+    public static void SetSystemBarStyle(BindableObject bindable, ScaffoldSystemBarStyle value) => bindable.SetValue(SystemBarStyleProperty, value);
+
     /// <summary>Gets whether the nav bar draws over the page instead of insetting it.</summary>
     public static bool GetNavBarOverlapsContent(BindableObject bindable) => (bool)bindable.GetValue(NavBarOverlapsContentProperty);
 
@@ -1026,6 +1045,9 @@ public partial class Scaffold : ContentPage, IDisposable
     /// nav bar views alike.
     /// </summary>
     public ScaffoldNavBarContext NavBarContext => field ??= new ScaffoldNavBarContext(this);
+
+    /// <summary>The system status/navigation bar icon-style owner (see <see cref="SystemBarStyleProperty"/>).</summary>
+    internal ScaffoldSystemBars SystemBars => field ??= new ScaffoldSystemBars(this);
 
     /// <summary>
     /// Resolves the ambient <see cref="ScaffoldNavBarContext"/> from any element hosted in a

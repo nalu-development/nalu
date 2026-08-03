@@ -243,6 +243,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
 
         scaffold.UpdateBackCallbackEnabled();
+
+        // Presentation at rest: the pixels under the status bar are final — read fresh.
+        scaffold.SystemBars.OnPresentationSettled();
     }
 
     private const float _backPreviewMaxShift = 0.4f;
@@ -653,6 +656,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// </summary>
     private Task UpdateNavBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, Page targetPage, View? navBarView, bool navBarVisible, bool animated)
     {
+        EnsureSystemBarApplier(platformView);
+        scaffold.SystemBars.NavBarVisible = navBarView is not null && navBarVisible;
+
         if (navBarView is null)
         {
             if (_navBarHost is { } clearedHost)
@@ -877,6 +883,119 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         focusedView.ClearFocus();
     }
 
+    /// <summary>
+    /// Routes the resolved system-bar icon style to the window (SystemUI fades the change) and
+    /// installs the PixelCopy sampler — the ground-truth read of the app pixels rendered under
+    /// the status bar (the status bar itself is a SystemUI window, never part of the copy).
+    /// Covers theme toggles too: MAUI raises RequestedThemeChanged on uiMode configuration
+    /// changes (the activity is NOT recreated — ConfigChanges.UiMode — so the theme's
+    /// windowLightStatusBar attribute, resolved only at creation, would otherwise go stale).
+    /// </summary>
+    private void EnsureSystemBarApplier(ScaffoldLayout platformView)
+    {
+        if (_systemBarApplierAttached)
+        {
+            return;
+        }
+
+        _systemBarApplierAttached = true;
+
+        scaffold.SystemBars.SetApplier(lightIcons =>
+        {
+            if (WindowOf(platformView) is { } window)
+            {
+                // AppearanceLight* = true means DARK icons over a light bar.
+                var controller = new WindowInsetsControllerCompat(window, platformView);
+                controller.AppearanceLightStatusBars = !lightIcons;
+                controller.AppearanceLightNavigationBars = !lightIcons;
+            }
+        });
+
+        scaffold.SystemBars.SetSampler(() => OperatingSystem.IsAndroidVersionAtLeast(26)
+            ? SampleStatusBarStripAsync(platformView)
+            : Task.FromResult<double?>(null));
+    }
+
+    private bool _systemBarApplierAttached;
+
+    private static Android.Views.Window? WindowOf(AView view)
+    {
+        var context = view.Context;
+
+        while (context is Android.Content.ContextWrapper wrapper and not Android.App.Activity)
+        {
+            context = wrapper.BaseContext;
+        }
+
+        return context is Android.App.Activity { Window: { } window } ? window : null;
+    }
+
+    /// <summary>
+    /// Average luminance [0, 1] of the app content under the status bar: PixelCopy of the strip
+    /// downsampled into a tiny bitmap (the copy scales, so the cost is microseconds) — null when
+    /// the window is not ready or the copy fails.
+    /// </summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("android26.0")]
+    private static Task<double?> SampleStatusBarStripAsync(ScaffoldLayout platformView)
+    {
+        if (WindowOf(platformView) is not { } window
+            || window.DecorView is not { Width: > 0, IsAttachedToWindow: true } decor)
+        {
+            return Task.FromResult<double?>(null);
+        }
+
+        var inset = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.StatusBars()) is { } insets ? insets.Top : 0;
+
+        if (inset < 1)
+        {
+            return Task.FromResult<double?>(null);
+        }
+
+        const int sampleWidth = 32;
+        const int sampleHeight = 4;
+        var bitmap = Android.Graphics.Bitmap.CreateBitmap(sampleWidth, sampleHeight, Android.Graphics.Bitmap.Config.Argb8888!);
+        var completion = new TaskCompletionSource<double?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        PixelCopy.Request(
+            window,
+            new Android.Graphics.Rect(0, 0, decor.Width, inset),
+            bitmap,
+            new PixelCopyListener(status =>
+            {
+                if (status == (int)PixelCopyResult.Success)
+                {
+                    var pixels = new int[sampleWidth * sampleHeight];
+                    bitmap.GetPixels(pixels, 0, sampleWidth, 0, 0, sampleWidth, sampleHeight);
+                    double total = 0;
+
+                    foreach (var pixel in pixels)
+                    {
+                        var r = (pixel >> 16) & 0xFF;
+                        var g = (pixel >> 8) & 0xFF;
+                        var b = pixel & 0xFF;
+                        total += ((0.2126 * r) + (0.7152 * g) + (0.0722 * b)) / 255.0;
+                    }
+
+                    completion.TrySetResult(total / pixels.Length);
+                }
+                else
+                {
+                    completion.TrySetResult(null);
+                }
+
+                bitmap.Recycle();
+            }),
+            new Android.OS.Handler(Android.OS.Looper.MainLooper!));
+
+        return completion.Task;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("android26.0")]
+    private sealed class PixelCopyListener(Action<int> onFinished) : Java.Lang.Object, PixelCopy.IOnPixelCopyFinishedListener
+    {
+        public void OnPixelCopyFinished(int copyResult) => onFinished(copyResult);
+    }
+
     /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
     public void Dispose()
     {
@@ -884,6 +1003,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             _scaffoldObserved = false;
             scaffold.PropertyChanged -= OnChromeSourcePropertyChanged;
+        }
+
+        if (_systemBarApplierAttached)
+        {
+            _systemBarApplierAttached = false;
+            scaffold.SystemBars.SetSampler(null);
+            scaffold.SystemBars.SetApplier(null);
         }
 
         ObserveNavBarArea(null);
@@ -1021,6 +1147,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // Entrance offset rides the MAUI translation (dp), applied after mounting.
                 flyoutOffscreen = onLeft ? -widthDp : widthDp;
                 platformView.AddView(panel);
+
+                // The flyout covers the status-bar region: its surface drives the icon style
+                // while open (SystemUI fades the flip alongside the slide).
+                scaffold.SystemBars.OverlaySurface = ScaffoldSystemBars.SurfaceColorOf(request.Content);
 
                 break;
             }
@@ -1260,6 +1390,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Owner cleanup runs BEFORE the exit animation (matching the original primitive):
         // state clears immediately, so a rapid re-open is never blocked by the animation tail.
         request.Cleanup?.Invoke();
+
+        if (request.Kind == ScaffoldOverlayKind.Flyout)
+        {
+            // The icons return to the underlying resolution as the flyout starts sliding away.
+            scaffold.SystemBars.OverlaySurface = null;
+        }
 
         await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
 

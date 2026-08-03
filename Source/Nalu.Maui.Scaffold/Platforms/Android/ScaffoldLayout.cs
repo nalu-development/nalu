@@ -89,4 +89,5 @@ public sealed class ScaffoldLayout : FrameLayout
             ViewCompat.RequestApplyInsets(pageLayer);
         }
     }
+
 }

@@ -118,6 +118,10 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         {
             UpdateScrollTracking();
         }
+        else if (e.PropertyName == "SystemBarStyle")
+        {
+            _scaffold.SystemBars.Recompute();
+        }
     }
 
     /// <summary>
@@ -222,6 +226,10 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
 
         _scaffold.NavBarContext.Foreground = ScaffoldNavBarAppearance.Resolve<Color?>(
             ScaffoldNavBarAppearance.ForegroundProperty, _pageAppearance, _areaAppearance, _scaffoldAppearance, null);
+
+        // The system-bar icon style tracks the LIVE bar surface (this runs per-frame during
+        // scroll-driven appearance animation — the icons flip exactly when the bar materializes).
+        _scaffold.SystemBars.UpdateBar(_page, _content.Background, _content.Opacity);
     }
 
     public void Dispose()

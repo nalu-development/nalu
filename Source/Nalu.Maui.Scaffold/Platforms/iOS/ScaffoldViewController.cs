@@ -89,6 +89,34 @@ internal sealed class ScaffoldViewController : UIViewController
         _contentHost.DidMoveToParentViewController(this);
     }
 
+    private bool? _lightSystemBars;
+
+    /// <summary>
+    /// The scaffold-resolved status bar icon style (see <see cref="Nalu.Internals.ScaffoldSystemBars"/>);
+    /// UIKit animates the change with a cross-fade. Until first resolution the style is
+    /// <see cref="UIStatusBarStyle.Default"/> (theme-following).
+    /// </summary>
+    public override UIStatusBarStyle PreferredStatusBarStyle()
+        => _lightSystemBars switch
+        {
+            true => UIStatusBarStyle.LightContent,
+            // Default follows the theme on iOS 13+ — the correct dark-icon fallback pre-13.
+            false when OperatingSystem.IsIOSVersionAtLeast(13) => UIStatusBarStyle.DarkContent,
+            _ => UIStatusBarStyle.Default
+        };
+
+    /// <summary>Applies the resolved system-bar icon style (animated).</summary>
+    public void SetLightSystemBars(bool light)
+    {
+        if (_lightSystemBars == light)
+        {
+            return;
+        }
+
+        _lightSystemBars = light;
+        UIView.Animate(0.25, SetNeedsStatusBarAppearanceUpdate);
+    }
+
     public override void ViewDidAppear(bool animated)
     {
         base.ViewDidAppear(animated);

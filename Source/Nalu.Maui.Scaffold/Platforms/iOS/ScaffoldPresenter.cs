@@ -138,6 +138,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             : TransitionToPageAsync(controller, mauiContext, targetPage, hint, barVisible, navBarInsets);
 
         await Task.WhenAll(navChromeTask, chromeTask, pageTask);
+
+        // Presentation at rest: the pixels under the status bar are final — read fresh.
+        scaffold.SystemBars.OnPresentationSettled();
     }
 
     /// <summary>
@@ -728,6 +731,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// </summary>
     private Task UpdateNavBarChromeAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, View? navBarView, bool navBarVisible, bool animated)
     {
+        EnsureSystemBarApplier(controller);
+        scaffold.SystemBars.NavBarVisible = navBarView is not null && navBarVisible;
+
         if (navBarView is null)
         {
             if (_navBarHost is { } clearedHost)
@@ -783,6 +789,86 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
     }
 
+    /// <summary>
+    /// Routes the resolved system-bar icon style to the controller (UIKit fades the change) and
+    /// installs the pixel sampler — a tiny scaled snapshot of the window strip under the status
+    /// bar (the status bar itself lives in a system layer, never part of the render).
+    /// </summary>
+    private void EnsureSystemBarApplier(ScaffoldViewController controller)
+    {
+        if (!_systemBarApplierAttached)
+        {
+            _systemBarApplierAttached = true;
+            scaffold.SystemBars.SetApplier(controller.SetLightSystemBars);
+            scaffold.SystemBars.SetSampler(() => Task.FromResult(SampleStatusBarStrip(controller.View)));
+        }
+    }
+
+    private bool _systemBarApplierAttached;
+
+    /// <summary>
+    /// Average luminance [0, 1] of the app content under the status bar: the window's top strip
+    /// rendered scaled into a 32×4 RGBA bitmap context (last committed frame — cheap, GPU-backed).
+    /// </summary>
+    private static double? SampleStatusBarStrip(UIView? root)
+    {
+        if (root?.Window is not { } window)
+        {
+            return null;
+        }
+
+        var stripHeight = (double)window.SafeAreaInsets.Top;
+        var width = (double)window.Bounds.Width;
+
+        if (stripHeight < 1 || width < 1)
+        {
+            return null;
+        }
+
+        const int sampleWidth = 32;
+        const int sampleHeight = 4;
+
+        var format = new UIGraphicsImageRendererFormat { Scale = 1, Opaque = true };
+        var renderer = new UIGraphicsImageRenderer(new CGSize(sampleWidth, sampleHeight), format);
+
+        var image = renderer.CreateImage(context =>
+        {
+            context.CGContext.ScaleCTM((nfloat)(sampleWidth / width), (nfloat)(sampleHeight / stripHeight));
+            window.DrawViewHierarchy(new CGRect(0, 0, width, window.Bounds.Height), afterScreenUpdates: false);
+        });
+
+        if (image.CGImage is not { } cgImage)
+        {
+            return null;
+        }
+
+        // Normalize into a KNOWN layout (RGBA, 8 bpc) — renderer output byte order is device-defined.
+        using var colorSpace = CGColorSpace.CreateDeviceRGB();
+        using var bitmapContext = new CGBitmapContext(null, sampleWidth, sampleHeight, 8, sampleWidth * 4, colorSpace, CGImageAlphaInfo.PremultipliedLast);
+
+        if (bitmapContext.Data == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        bitmapContext.DrawImage(new CGRect(0, 0, sampleWidth, sampleHeight), cgImage);
+
+        var buffer = new byte[sampleWidth * sampleHeight * 4];
+        System.Runtime.InteropServices.Marshal.Copy(bitmapContext.Data, buffer, 0, buffer.Length);
+
+        double total = 0;
+
+        for (var i = 0; i < sampleWidth * sampleHeight; i++)
+        {
+            var r = buffer[i * 4];
+            var g = buffer[(i * 4) + 1];
+            var b = buffer[(i * 4) + 2];
+            total += ((0.2126 * r) + (0.7152 * g) + (0.0722 * b)) / 255.0;
+        }
+
+        return total / (sampleWidth * sampleHeight);
+    }
+
     /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
     public void Dispose()
     {
@@ -790,6 +876,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             _scaffoldObserved = false;
             scaffold.PropertyChanged -= OnChromeSourcePropertyChanged;
+        }
+
+        if (_systemBarApplierAttached)
+        {
+            _systemBarApplierAttached = false;
+            scaffold.SystemBars.SetSampler(null);
+            scaffold.SystemBars.SetApplier(null);
         }
 
         ObserveNavBarArea(null);
@@ -877,6 +970,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 flyoutView.Arrange(new Rect(onLeft ? 0 : bounds.Width - width, 0, width, bounds.Height));
                 flyoutOffscreen = onLeft ? -width : width;
                 container.AddSubview(panel);
+
+                // The flyout covers the status-bar region: its surface drives the icon style
+                // while open (UIKit fades the flip alongside the slide).
+                scaffold.SystemBars.OverlaySurface = ScaffoldSystemBars.SurfaceColorOf(request.Content);
 
                 break;
             }
@@ -1073,6 +1170,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Owner cleanup runs BEFORE the exit animation (matching the original primitive):
         // state clears immediately, so a rapid re-open is never blocked by the animation tail.
         request.Cleanup?.Invoke();
+
+        if (request.Kind == ScaffoldOverlayKind.Flyout)
+        {
+            // The icons return to the underlying resolution as the flyout starts sliding away.
+            scaffold.SystemBars.OverlaySurface = null;
+        }
 
         await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
 
