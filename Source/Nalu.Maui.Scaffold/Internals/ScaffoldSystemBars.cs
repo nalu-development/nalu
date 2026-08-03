@@ -35,6 +35,7 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
     private const int _sampleDebounceMs = 80;
 
     private Action<bool>? _applier;
+    private Action? _themeRefresher;
     private Func<Task<double?>>? _sampler;
     private bool? _lightIcons;
     private Page? _page;
@@ -74,6 +75,13 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
         _sampler = sampler;
         ScheduleSample();
     }
+
+    /// <summary>
+    /// Installs (or removes) a platform refresh invoked on every app-theme change, for window
+    /// state resolved from THEME ATTRIBUTES only at activity creation (Android's
+    /// navigationBarColor) — without a recreation those go stale on a system theme toggle.
+    /// </summary>
+    public void SetThemeRefresher(Action? themeRefresher) => _themeRefresher = themeRefresher;
 
     /// <summary>The nav bar host pushes the current page + the LIVE effective bar background here (per-frame safe).</summary>
     public void UpdateBar(Page? page, Brush? barBackground, double barOpacity)
@@ -163,6 +171,7 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
     {
         // Theme resources repaint everything: the previous pixels are meaningless.
         _sampledLuminance = null;
+        _themeRefresher?.Invoke();
         ScheduleSample();
         Recompute();
     }

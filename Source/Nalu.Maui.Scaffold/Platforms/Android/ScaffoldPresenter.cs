@@ -914,9 +914,39 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         scaffold.SystemBars.SetSampler(() => OperatingSystem.IsAndroidVersionAtLeast(26)
             ? SampleStatusBarStripAsync(platformView)
             : Task.FromResult<double?>(null));
+
+        scaffold.SystemBars.SetThemeRefresher(() => RefreshNavigationBarColor(platformView));
     }
 
     private bool _systemBarApplierAttached;
+
+    /// <summary>
+    /// Re-resolves the theme's <c>android:navigationBarColor</c> and re-applies it: the window
+    /// only reads the attribute at activity creation, so on a theme toggle without recreation
+    /// (ConfigChanges.UiMode) the bottom system bar keeps the previous theme's color — most
+    /// visible with 3-button navigation, which honors an opaque color even on Android 15+
+    /// (only gesture navigation ignores it under enforced edge-to-edge). The activity
+    /// resources are night-aware without a recreation, so resolving the attribute NOW yields
+    /// the new theme's value.
+    /// </summary>
+    private static void RefreshNavigationBarColor(ScaffoldLayout platformView)
+    {
+        if (WindowOf(platformView) is not { } window
+            || window.Context?.Theme is not { } theme)
+        {
+            return;
+        }
+
+        var value = new Android.Util.TypedValue();
+
+#pragma warning disable CA1422 // Obsolete FROM 35, but 3-button navigation still honors an opaque color there.
+        if (theme.ResolveAttribute(Android.Resource.Attribute.NavigationBarColor, value, resolveRefs: true)
+            && value.Type is >= Android.Util.DataType.FirstColorInt and <= Android.Util.DataType.LastColorInt)
+        {
+            window.SetNavigationBarColor(new Android.Graphics.Color(value.Data));
+        }
+#pragma warning restore CA1422
+    }
 
     private static Android.Views.Window? WindowOf(AView view)
     {
@@ -1009,6 +1039,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             _systemBarApplierAttached = false;
             scaffold.SystemBars.SetSampler(null);
+            scaffold.SystemBars.SetThemeRefresher(null);
             scaffold.SystemBars.SetApplier(null);
         }
 
