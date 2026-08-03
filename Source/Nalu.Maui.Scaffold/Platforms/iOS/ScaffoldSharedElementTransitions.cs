@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using CoreAnimation;
 using CoreGraphics;
+using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Platform;
 using UIKit;
 
@@ -8,16 +10,25 @@ namespace Nalu;
 /// <summary>
 /// iOS shared-element engine (ported from PoC spike A, §8): C# computes the flight geometry
 /// once, UIViewPropertyAnimator/Core Animation does all per-frame work natively.
-/// Image pairs morph their aspect crop inside a clipping flight container (corner radii read
-/// from the live views); any other pair transform-matches with a cross-fade. The page motion
-/// matches the presenter's plain slide, so transitions with and without shared elements move
-/// identically.
+/// Every pair flies inside the shared overlay as a clipping flight container so stacking is
+/// controlled (images at the bottom, scrims/labels above, matching the live layouts). Flights
+/// travel between VISIBLE rects — an element partially clipped by an ancestor (parallax bleeds,
+/// scrolled-out content) flies as the user sees it, not as its unclipped frame says.
+/// Image pairs morph their aspect crop; any other pair cross-fades two pre-rendered copies.
+/// The page motion matches the presenter's plain slide, so transitions with and without shared
+/// elements move identically.
 /// </summary>
 internal static class ScaffoldSharedElementTransitions
 {
     private const double _layoutWaitTimeoutMs = 500;
 
-    private sealed record TagPair(string Name, UIView From, UIView To);
+    private sealed record TagPair(string Name, UIView From, UIView To, nfloat FromRadius, nfloat ToRadius, bool IsImagePair);
+
+    private sealed record PairGeometry(CGRect FromFull, CGRect FromVisible, CGRect ToFull, CGRect ToVisible);
+
+    private sealed record ImageFlight(UIView Flight, UIImageView FlyingImage, CGRect FromAspect, CGRect ToAspect);
+
+    private sealed record SnapshotFlight(UIView Flight, UIView FromSnapshot, UIView ToSnapshot, CGRect FromInner, CGRect ToInner, nfloat FromAlpha, nfloat ToAlpha);
 
     /// <summary>
     /// Animates a push with shared elements. Returns false (without animating) when no pair
@@ -99,11 +110,26 @@ internal static class ScaffoldSharedElementTransitions
         {
             if (to.TryGetValue(name, out var toView))
             {
-                pairs.Add(new TagPair(name, fromView.ToPlatform(mauiContext), toView.ToPlatform(mauiContext)));
+                var fromPlatform = fromView.ToPlatform(mauiContext);
+                var toPlatform = toView.ToPlatform(mauiContext);
+
+                pairs.Add(new TagPair(
+                    name,
+                    fromPlatform,
+                    toPlatform,
+                    CornerRadiusOf(fromView, fromPlatform),
+                    CornerRadiusOf(toView, toPlatform),
+                    IsImagePair: fromPlatform is UIImageView { Image: not null } && toPlatform is UIImageView));
             }
         }
 
-        return pairs;
+        // Overlay stacking: images at the bottom, then larger elements (scrims) below smaller
+        // ones (labels) — everything that sits ON a photo in the live layouts keeps the same
+        // stacking order mid-flight. Collect order comes from a dictionary, so sort explicitly.
+        return pairs
+            .OrderBy(p => p.IsImagePair ? 0 : 1)
+            .ThenByDescending(p => (double)(p.From.Bounds.Width * p.From.Bounds.Height))
+            .ToList();
     }
 
     private static bool IsLaidOut(UIView view)
@@ -159,7 +185,6 @@ internal static class ScaffoldSharedElementTransitions
         }
 
         var overlay = new UIView(container.Bounds) { UserInteractionEnabled = false };
-        var width = (double)container.Bounds.Width;
         var identity = new ScaffoldTransitionMotion();
 
         var elements = new List<IScrubElement>
@@ -182,76 +207,51 @@ internal static class ScaffoldSharedElementTransitions
 
         foreach (var pair in pairs)
         {
-            var fromFrame = pair.From.ConvertRectToView(pair.From.Bounds, container);
-            var toFrame = pair.To.ConvertRectToView(pair.To.Bounds, container);
+            var geometry = MeasurePair(pair, container);
 
-            if (pair.From is UIImageView { Image: not null } fromImage && pair.To is UIImageView)
+            if (pair.IsImagePair)
             {
-                var image = fromImage.Image!;
-                var fromFill = fromImage.ContentMode is UIViewContentMode.ScaleAspectFill;
-                var toFill = pair.To is UIImageView { ContentMode: UIViewContentMode.ScaleAspectFill };
-
-                var flight = new UIView(fromFrame) { ClipsToBounds = true, BackgroundColor = UIColor.Clear };
-                flight.Layer.CornerRadius = EffectiveCornerRadius(fromImage);
-
-                var flyingImage = new UIImageView(image)
-                {
-                    ContentMode = UIViewContentMode.ScaleToFill,
-                    Frame = AspectRect(fromFrame.Size, image.Size, fill: fromFill)
-                };
-                flight.AddSubview(flyingImage);
-                overlay.AddSubview(flight);
-
-                var fromView = fromImage;
-                var toView = pair.To;
-                fromView.Alpha = 0;
-                toView.Alpha = 0;
-                cleanup.Add(() =>
-                {
-                    fromView.Alpha = 1;
-                    toView.Alpha = 1;
-                });
+                var flight = BuildImageFlight(overlay, pair, geometry);
 
                 elements.Add(new ImageMorphElement(
-                    flight,
-                    flyingImage,
-                    fromFrame,
-                    toFrame,
-                    EffectiveCornerRadius(fromImage),
-                    EffectiveCornerRadius(pair.To),
-                    AspectRect(fromFrame.Size, image.Size, fill: fromFill),
-                    AspectRect(toFrame.Size, image.Size, fill: toFill)
+                    flight.Flight,
+                    flight.FlyingImage,
+                    geometry.FromVisible,
+                    geometry.ToVisible,
+                    pair.FromRadius,
+                    pair.ToRadius,
+                    flight.FromAspect,
+                    flight.ToAspect
                 ));
             }
             else
             {
-                // SNAPSHOT flight (interactive-only): transforms set directly on MAUI-managed
-                // views never render during the scrub — every per-frame page-transform change
-                // invalidates the container layout and MAUI's arrange pass re-sets the pair
-                // views' frames, visually cancelling the transform (measured on iOS 26).
-                // Overlay-hosted snapshots are ours and immune; the live views hide via alpha
-                // (which DOES survive layout).
-                var fromView = pair.From;
-                var toView = pair.To;
-                var fromSnapshot = fromView.SnapshotView(false) ?? new UIView();
-                var toSnapshot = toView.SnapshotView(true) ?? new UIView();
-                fromSnapshot.Frame = fromFrame;
-                toSnapshot.Frame = fromFrame;
-                toSnapshot.Alpha = 0;
-                overlay.AddSubview(toSnapshot);
-                overlay.AddSubview(fromSnapshot);
+                var flight = BuildSnapshotFlight(overlay, pair, geometry);
 
-                fromView.Alpha = 0;
-                toView.Alpha = 0;
-
-                cleanup.Add(() =>
-                {
-                    fromView.Alpha = 1;
-                    toView.Alpha = 1;
-                });
-
-                elements.Add(new SnapshotMatchElement(fromSnapshot, toSnapshot, fromFrame, toFrame));
+                elements.Add(new SnapshotMatchElement(
+                    flight,
+                    geometry.FromVisible,
+                    geometry.ToVisible,
+                    pair.FromRadius,
+                    pair.ToRadius
+                ));
             }
+
+            // AFTER the copies are rendered: hide the live pair views for the flight's duration.
+            // Restore the ORIGINAL alphas — a pair view's platform alpha is its MAUI Opacity
+            // (a 0.32 scrim forced back to 1 turns opaque), so 1 must never be assumed.
+            var fromView = pair.From;
+            var toView = pair.To;
+            var fromAlpha = fromView.Alpha;
+            var toAlpha = toView.Alpha;
+            fromView.Alpha = 0;
+            toView.Alpha = 0;
+
+            cleanup.Add(() =>
+            {
+                fromView.Alpha = fromAlpha;
+                toView.Alpha = toAlpha;
+            });
         }
 
         container.AddSubview(overlay);
@@ -297,16 +297,22 @@ internal static class ScaffoldSharedElementTransitions
         }
     }
 
-    private sealed class SnapshotMatchElement(UIView fromSnapshot, UIView toSnapshot, CGRect fromFrame, CGRect toFrame) : IScrubElement
+    private sealed class SnapshotMatchElement(
+        SnapshotFlight flight,
+        CGRect fromFrame,
+        CGRect toFrame,
+        nfloat fromRadius,
+        nfloat toRadius) : IScrubElement
     {
         public void Apply(double progress)
         {
-            // Cross-dissolve morph between the two snapshots along the shared geometry path.
-            var rect = Lerp(fromFrame, toFrame, progress);
-            fromSnapshot.Frame = rect;
-            fromSnapshot.Alpha = (nfloat)(1 - progress);
-            toSnapshot.Frame = rect;
-            toSnapshot.Alpha = (nfloat)progress;
+            flight.Flight.Frame = Lerp(fromFrame, toFrame, progress);
+            flight.Flight.Layer.CornerRadius = (nfloat)Lerp((double)fromRadius, (double)toRadius, progress);
+            var inner = Lerp(flight.FromInner, flight.ToInner, progress);
+            flight.FromSnapshot.Frame = inner;
+            flight.ToSnapshot.Frame = inner;
+            flight.FromSnapshot.Alpha = (nfloat)(flight.FromAlpha * (1 - progress));
+            flight.ToSnapshot.Alpha = (nfloat)(flight.ToAlpha * progress);
         }
     }
 
@@ -319,16 +325,6 @@ internal static class ScaffoldSharedElementTransitions
             (nfloat)Lerp((double)from.Width, (double)to.Width, progress),
             (nfloat)Lerp((double)from.Height, (double)to.Height, progress));
 
-    /// <summary>Component-wise interpolation — exact for the scale+translate matrices used here.</summary>
-    private static CGAffineTransform LerpTransform(CGAffineTransform from, CGAffineTransform to, double progress)
-        => new(
-            (nfloat)Lerp((double)from.A, (double)to.A, progress),
-            (nfloat)Lerp((double)from.B, (double)to.B, progress),
-            (nfloat)Lerp((double)from.C, (double)to.C, progress),
-            (nfloat)Lerp((double)from.D, (double)to.D, progress),
-            (nfloat)Lerp((double)from.Tx, (double)to.Tx, progress),
-            (nfloat)Lerp((double)from.Ty, (double)to.Ty, progress));
-
     /// <summary>
     /// One transition session: an overlay carrying the flights + the page slide, all inside a
     /// single UIViewPropertyAnimator (seekable by construction — the interactive-pop hook).
@@ -338,6 +334,12 @@ internal static class ScaffoldSharedElementTransitions
         _ = counterpartView; // stays put — matches the plain slide choreography
 
         var (animator, completion) = BuildSession(container, pairs, movingView, movingFromOffscreen, durationSeconds);
+
+        // The moving page was (re)mounted this very runloop tick: its first layout+render commit
+        // is expensive and would otherwise land AFTER the animator's clock starts, eating the
+        // first frames of the flight (visible start jump). Pay the commit now, then start.
+        CATransaction.Flush();
+
         animator.StartAnimation();
         await completion;
     }
@@ -358,17 +360,53 @@ internal static class ScaffoldSharedElementTransitions
 
         foreach (var pair in pairs)
         {
-            var fromFrame = pair.From.ConvertRectToView(pair.From.Bounds, container);
-            var toFrame = pair.To.ConvertRectToView(pair.To.Bounds, container);
+            var geometry = MeasurePair(pair, container);
 
-            if (pair.From is UIImageView { Image: not null } fromImage && pair.To is UIImageView)
+            if (pair.IsImagePair)
             {
-                BuildImageMorph(overlay, fromImage, pair.To, fromFrame, toFrame, prep, animations, cleanup);
+                var flight = BuildImageFlight(overlay, pair, geometry);
+
+                animations.Add(() =>
+                {
+                    flight.Flight.Frame = geometry.ToVisible;
+                    flight.Flight.Layer.CornerRadius = pair.ToRadius;
+                    flight.FlyingImage.Frame = flight.ToAspect;
+                });
             }
             else
             {
-                BuildTransformMatch(pair.From, pair.To, fromFrame, toFrame, movingFromOffscreen, width, prep, animations, cleanup);
+                var flight = BuildSnapshotFlight(overlay, pair, geometry);
+
+                animations.Add(() =>
+                {
+                    flight.Flight.Frame = geometry.ToVisible;
+                    flight.Flight.Layer.CornerRadius = pair.ToRadius;
+                    flight.FromSnapshot.Frame = flight.ToInner;
+                    flight.FromSnapshot.Alpha = 0;
+                    flight.ToSnapshot.Frame = flight.ToInner;
+                    flight.ToSnapshot.Alpha = flight.ToAlpha;
+                });
             }
+
+            // The copies are rendered at build time (above): hiding the live views can safely
+            // happen in prep without racing the captures. Cleanup restores the ORIGINAL alphas —
+            // a pair view's platform alpha is its MAUI Opacity (a 0.32 scrim forced back to 1
+            // turns opaque), so 1 must never be assumed.
+            var fromView = pair.From;
+            var toView = pair.To;
+            var fromAlpha = fromView.Alpha;
+            var toAlpha = toView.Alpha;
+
+            prep.Add(() =>
+            {
+                fromView.Alpha = 0;
+                toView.Alpha = 0;
+            });
+            cleanup.Add(() =>
+            {
+                fromView.Alpha = fromAlpha;
+                toView.Alpha = toAlpha;
+            });
         }
 
         movingView.Transform = savedTransform;
@@ -416,142 +454,172 @@ internal static class ScaffoldSharedElementTransitions
         return (animator, completion.Task);
     }
 
+    private static PairGeometry MeasurePair(TagPair pair, UIView container)
+    {
+        var fromFull = pair.From.ConvertRectToView(pair.From.Bounds, container);
+        var toFull = pair.To.ConvertRectToView(pair.To.Bounds, container);
+
+        return new PairGeometry(
+            fromFull,
+            ClipToAncestors(pair.From, container, fromFull),
+            toFull,
+            ClipToAncestors(pair.To, container, toFull));
+    }
+
+    /// <summary>
+    /// The part of <paramref name="fullFrame"/> the user can actually see: every clipping
+    /// ancestor (ScrollView, clipped layouts) shrinks it. Flights must travel between VISIBLE
+    /// rects — e.g. the DailyHelper detail photo bleeds 120pt off-screen for its parallax, and
+    /// flying the unclipped frame lands the flight where the live view never was (crop shift +
+    /// snap the instant the overlay comes off).
+    /// </summary>
+    private static CGRect ClipToAncestors(UIView view, UIView container, CGRect fullFrame)
+    {
+        var visible = fullFrame;
+
+        for (var ancestor = view.Superview; ancestor is not null && ancestor != container; ancestor = ancestor.Superview)
+        {
+            if (ancestor.ClipsToBounds)
+            {
+                visible = CGRect.Intersect(visible, ancestor.ConvertRectToView(ancestor.Bounds, container));
+            }
+        }
+
+        return visible.IsEmpty ? fullFrame : visible;
+    }
+
     /// <summary>
     /// Image shared element whose scaling mode may differ between pages: a clipping flight
-    /// container carries a raw UIImageView whose frame is computed fill-at-source and
-    /// fit-at-destination — animating both frames together morphs the visible crop.
-    /// Corner radii are read from the live views (source view or its clipping wrapper).
+    /// container carries a raw UIImageView whose frame is computed against the pair's FULL
+    /// frames and positioned relative to the visible rect — animating container and image
+    /// together morphs the visible crop exactly between what each page shows.
     /// </summary>
-    private static void BuildImageMorph(
-        UIView overlay,
-        UIImageView fromImage,
-        UIView toView,
-        CGRect fromFrame,
-        CGRect toFrame,
-        List<Action> prep,
-        List<Action> animations,
-        List<Action> cleanup)
+    private static ImageFlight BuildImageFlight(UIView overlay, TagPair pair, PairGeometry geometry)
     {
+        var fromImage = (UIImageView)pair.From;
         var image = fromImage.Image!;
         var imageSize = image.Size;
-        var fromRadius = EffectiveCornerRadius(fromImage);
-        var toRadius = EffectiveCornerRadius(toView);
         var fromFill = fromImage.ContentMode is UIViewContentMode.ScaleAspectFill;
-        var toFill = toView is UIImageView { ContentMode: UIViewContentMode.ScaleAspectFill };
+        var toFill = pair.To is UIImageView { ContentMode: UIViewContentMode.ScaleAspectFill };
 
-        var flight = new UIView(fromFrame) { ClipsToBounds = true, BackgroundColor = UIColor.Clear };
-        flight.Layer.CornerRadius = fromRadius;
+        var flight = new UIView(geometry.FromVisible) { ClipsToBounds = true, BackgroundColor = UIColor.Clear };
+        flight.Layer.CornerRadius = pair.FromRadius;
 
         var flyingImage = new UIImageView(image)
         {
             ContentMode = UIViewContentMode.ScaleToFill,
-            Frame = AspectRect(fromFrame.Size, imageSize, fill: fromFill)
+            Frame = InnerRect(AspectRect(geometry.FromFull.Size, imageSize, fill: fromFill), geometry.FromFull, geometry.FromVisible)
         };
         flight.AddSubview(flyingImage);
         overlay.AddSubview(flight);
 
-        prep.Add(() =>
-        {
-            fromImage.Alpha = 0;
-            toView.Alpha = 0;
-        });
-        animations.Add(() =>
-        {
-            flight.Frame = toFrame;
-            flight.Layer.CornerRadius = toRadius;
-            flyingImage.Frame = AspectRect(toFrame.Size, imageSize, fill: toFill);
-        });
-        cleanup.Add(() =>
-        {
-            fromImage.Alpha = 1;
-            toView.Alpha = 1;
-        });
-    }
-
-    /// <summary>Corner radius of the view itself or its clipping MAUI wrapper (Border content etc.).</summary>
-    private static nfloat EffectiveCornerRadius(UIView view)
-    {
-        if (view.Layer.CornerRadius > 0)
-        {
-            return view.Layer.CornerRadius;
-        }
-
-        var parent = view.Superview;
-
-        return parent is not null && parent.ClipsToBounds && parent.Layer.CornerRadius > 0
-            ? parent.Layer.CornerRadius
-            : 0;
+        return new ImageFlight(
+            flight,
+            flyingImage,
+            flyingImage.Frame,
+            InnerRect(AspectRect(geometry.ToFull.Size, imageSize, fill: toFill), geometry.ToFull, geometry.ToVisible));
     }
 
     /// <summary>
-    /// Generic shared element (labels, boxes): no snapshots — the live destination view flies in
-    /// from the source geometry via an affine transform while the source flies out, cross-fading.
+    /// Generic shared element (labels, scrims, boxes): two pre-rendered stretchable copies
+    /// cross-fade inside a clipping flight container while it travels the visible-rect path.
     /// </summary>
-    private static void BuildTransformMatch(
-        UIView fromView,
-        UIView toView,
-        CGRect fromFrame,
-        CGRect toFrame,
-        bool movingFromOffscreen,
-        double width,
-        List<Action> prep,
-        List<Action> animations,
-        List<Action> cleanup)
+    private static SnapshotFlight BuildSnapshotFlight(UIView overlay, TagPair pair, PairGeometry geometry)
     {
-        // The pair views animate via transforms ON THE LIVE VIEWS, but one of them lives INSIDE
-        // the sliding page: its effective position is pageTranslation + ownTransform. The match
-        // frames are measured in un-translated space, so the view on the MOVING page must
-        // compensate the page offset wherever the page is not at identity — otherwise the pair
-        // rides the page slide (flies in from / out to the side even when its X barely changes).
-        // Push (movingFromOffscreen): the TO view's page STARTS at +width — compensate the prep.
-        // Pop: the FROM view's page ENDS at +width — compensate the end transform.
-        prep.Add(() =>
-        {
-            var enter = MatchTransform(toFrame, fromFrame);
+        var (fromSnapshot, fromAlpha) = RenderedCopy(pair.From, afterScreenUpdates: false);
+        var (toSnapshot, toAlpha) = RenderedCopy(pair.To, afterScreenUpdates: true);
 
-            if (movingFromOffscreen)
-            {
-                enter.Tx -= (nfloat)width;
-            }
+        var flight = new UIView(geometry.FromVisible) { ClipsToBounds = true, BackgroundColor = UIColor.Clear };
+        flight.Layer.CornerRadius = pair.FromRadius;
 
-            toView.Alpha = 0;
-            toView.Transform = enter;
-        });
-        animations.Add(() =>
-        {
-            var exit = MatchTransform(fromFrame, toFrame);
+        var fromInner = InnerRect(new CGRect(CGPoint.Empty, geometry.FromFull.Size), geometry.FromFull, geometry.FromVisible);
+        var toInner = InnerRect(new CGRect(CGPoint.Empty, geometry.ToFull.Size), geometry.ToFull, geometry.ToVisible);
 
-            if (!movingFromOffscreen)
-            {
-                exit.Tx -= (nfloat)width;
-            }
+        fromSnapshot.Frame = fromInner;
+        fromSnapshot.Alpha = fromAlpha;
+        toSnapshot.Frame = fromInner;
+        toSnapshot.Alpha = 0;
+        flight.AddSubview(toSnapshot);
+        flight.AddSubview(fromSnapshot);
+        overlay.AddSubview(flight);
 
-            toView.Alpha = 1;
-            toView.Transform = CGAffineTransform.MakeIdentity();
-            fromView.Alpha = 0;
-            fromView.Transform = exit;
-        });
-        cleanup.Add(() =>
-        {
-            fromView.Alpha = 1;
-            fromView.Transform = CGAffineTransform.MakeIdentity();
-            toView.Alpha = 1;
-            toView.Transform = CGAffineTransform.MakeIdentity();
-        });
+        return new SnapshotFlight(flight, fromSnapshot, toSnapshot, fromInner, toInner, fromAlpha, toAlpha);
     }
 
-    /// <summary>Transform that makes a view with natural frame <paramref name="from"/> render at <paramref name="to"/>.</summary>
-    private static CGAffineTransform MatchTransform(CGRect from, CGRect to)
-    {
-        var sx = to.Width / Math.Max((double)from.Width, 1);
-        var sy = to.Height / Math.Max((double)from.Height, 1);
-        var dx = to.GetMidX() - from.GetMidX();
-        var dy = to.GetMidY() - from.GetMidY();
+    /// <summary>Positions a rect computed in FULL-frame space inside the flight container (whose origin is the VISIBLE rect).</summary>
+    private static CGRect InnerRect(CGRect rect, CGRect full, CGRect visible)
+        => new(rect.X + full.X - visible.X, rect.Y + full.Y - visible.Y, rect.Width, rect.Height);
 
-        // Scale about the (center) anchor point, then move the center: exact frame mapping.
-        return CGAffineTransform.Multiply(
-            CGAffineTransform.MakeScale((nfloat)sx, (nfloat)sy),
-            CGAffineTransform.MakeTranslation(dx, dy));
+    /// <summary>
+    /// A stretchable rendered copy of a live view (content at alpha 1 + the view's own alpha
+    /// returned separately so cross-fades can multiply it in). SnapshotView is deliberately NOT
+    /// used: its afterScreenUpdates capture happens at the next commit — by then the live pair
+    /// views are already hidden for the flight and the capture comes back blank. Rendering into
+    /// an image NOW is deterministic, and a plain UIImageView stretches smoothly when its frame
+    /// animates between the two pair sizes.
+    /// </summary>
+    private static (UIView View, nfloat Alpha) RenderedCopy(UIView view, bool afterScreenUpdates)
+    {
+        var size = view.Bounds.Size;
+
+        if (size.Width < 1 || size.Height < 1)
+        {
+            return (new UIView(), 1);
+        }
+
+        var alpha = view.Alpha;
+        view.Alpha = 1;
+        var renderer = new UIGraphicsImageRenderer(size);
+        var image = renderer.CreateImage(_ => view.DrawViewHierarchy(new CGRect(CGPoint.Empty, size), afterScreenUpdates));
+        view.Alpha = alpha;
+
+        return (new UIImageView(image) { ContentMode = UIViewContentMode.ScaleToFill }, alpha);
+    }
+
+    /// <summary>
+    /// Corner radius of the pair view: its own layer, its clipping platform wrapper, or —
+    /// because MAUI Border clips through a mask layer invisible to <c>Layer.CornerRadius</c> —
+    /// the nearest MAUI Border ancestor, counted only when the element actually spans the
+    /// Border content (a small label inside a rounded card is not itself round).
+    /// </summary>
+    private static nfloat CornerRadiusOf(View element, UIView platformView)
+    {
+        if (platformView.Layer.CornerRadius > 0)
+        {
+            return platformView.Layer.CornerRadius;
+        }
+
+        var wrapper = platformView.Superview;
+
+        if (wrapper is not null && wrapper.ClipsToBounds && wrapper.Layer.CornerRadius > 0)
+        {
+            return wrapper.Layer.CornerRadius;
+        }
+
+        for (var parent = element.Parent; parent is View; parent = parent.Parent)
+        {
+            if (parent is Border border)
+            {
+                if (border.StrokeShape is not RoundRectangle rounded || border.Handler?.PlatformView is not UIView borderView)
+                {
+                    return 0;
+                }
+
+                var frame = platformView.ConvertRectToView(platformView.Bounds, borderView);
+                var bounds = borderView.Bounds;
+                var spans = Math.Abs(frame.X - bounds.X) < 2
+                    && Math.Abs(frame.Y - bounds.Y) < 2
+                    && Math.Abs(frame.Right - bounds.Right) < 2
+                    && Math.Abs(frame.Bottom - bounds.Bottom) < 2;
+                var corner = rounded.CornerRadius;
+
+                return spans
+                    ? (nfloat)Math.Max(Math.Max(corner.TopLeft, corner.TopRight), Math.Max(corner.BottomLeft, corner.BottomRight))
+                    : 0;
+            }
+        }
+
+        return 0;
     }
 
     private static CGRect AspectRect(CGSize container, CGSize image, bool fill)

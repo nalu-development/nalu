@@ -31,7 +31,9 @@
                             <Image nalu:Scaffold.TransitionName="weather-photo"
                                    Source="{Binding Current.Photo}"
                                    Aspect="AspectFill" />
-                            <BoxView Color="Black" Opacity="0.32" />
+                            <!-- The scrim is a shared element too: pairing it with the detail
+                                 scrim keeps the photo dimming constant during the flight. -->
+                            <BoxView nalu:Scaffold.TransitionName="weather-scrim" Color="Black" Opacity="0.32" />
                             <Grid Padding="18,14" RowDefinitions="Auto,*,Auto,Auto">
                                 <Label Text="{Binding Current.Place}" TextColor="White" FontFamily="SemiBold" FontSize="14" Opacity="0.9" />
                                 <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" VerticalOptions="Center">

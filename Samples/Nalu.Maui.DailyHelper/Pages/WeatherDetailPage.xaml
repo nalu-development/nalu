@@ -54,7 +54,7 @@
                     <Image nalu:Scaffold.TransitionName="weather-photo"
                            Source="{Binding Current.Photo}"
                            Aspect="AspectFill" />
-                    <BoxView Color="Black" Opacity="0.32" InputTransparent="True" />
+                    <BoxView nalu:Scaffold.TransitionName="weather-scrim" Color="Black" Opacity="0.32" InputTransparent="True" />
                     <!-- Top scrim: keeps the white chevron and status bar legible over bright
                          photos while the bar is still transparent. -->
                     <BoxView VerticalOptions="Start" HeightRequest="130" Margin="0,120,0,0" InputTransparent="True">
