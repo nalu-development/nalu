@@ -30,6 +30,25 @@
       href: navigation-tabbar.md
     - name: Testing & Troubleshooting
       href: navigation-testing.md
+- name: Scaffold
+  href: scaffold.md
+  items:
+    - name: Overview
+      href: scaffold.md
+    - name: Structure & Tab Bar
+      href: scaffold-structure.md
+    - name: Nav Bar
+      href: scaffold-navbar.md
+    - name: Flyouts
+      href: scaffold-flyout.md
+    - name: Popups & Sheets
+      href: scaffold-overlays.md
+    - name: Transitions & Modals
+      href: scaffold-transitions.md
+    - name: System Bars
+      href: scaffold-systembars.md
+    - name: Migrating from NaluShell
+      href: scaffold-migration.md
 - name: VirtualScroll
   href: virtualscroll.md
   items:
