@@ -9,8 +9,9 @@
 
 **Done (verified on iOS simulator + Android emulator, all suites green):**
 
-- Library `Source/Nalu.Maui.Scaffold` in `Nalu.slnx` (net10.0 / -android / -ios26.0; iOS floor 12.2;
-  deliberately NOT in `Nalu.Pack.slnf` nor the `Nalu.Maui` meta package until releasable).
+- Library `Source/Nalu.Maui.Scaffold` in `Nalu.slnx` (net10.0 / -android / -ios26.0; iOS floor 12.2).
+  Now in `Nalu.Pack.slnf` (August 2026): `11.0.0-scaffoldN.N` preview nupkgs are being cut for
+  real-app testing; `Nalu.Maui` meta-package inclusion still pending the release decision.
 - Public structure API (§3): `Scaffold` → `ScaffoldArea`/`ScaffoldTabBar` → `ScaffoldRoot`,
   terse XAML via implicit conversions, engine-owned read-only selection
   (`CurrentArea`/`CurrentRoot`/`IsSelected`), template metadata quintet
@@ -68,18 +69,37 @@
   `IsImeAnimating` is set and only re-applies on animation end; deliberately NOT worked
   around (would require polling MAUI internals via reflection; upstream issue filed).
   Suites: `ScaffoldImeTests` (4) + `VirtualScrollImeTests` (2) green on Android.
+- **§10 gap CLOSED (August 2026)**: `ScaffoldViewController` forwards `ViewDidAppear`/`Disappear`
+  into the scaffold page's MAUI appearing events.
+- **XAML hot reload / live structure (§4.2, August 2026)**: observed `Areas`/`Roots` collections
+  with proxy re-sync, same-segment stack ADOPTION across re-inflation, current-root-removal
+  fallback via real engine navigation, live `TabBarView` swap, post-init duplicate
+  reconciliation. Verified via the "Scaffold Hot Reload Tests" harness (5 suites, both
+  platforms); a REAL IDE hot reload session (VS/Rider patcher path) is still unverified.
+- **Shared elements OVERHAULED for truthfulness (§8.1 revision, August 2026)**: iOS flights
+  travel clip-aware VISIBLE rects with overlay-hosted label/scrim cross-fades and a pre-start
+  commit flush; Android's androidx `TransitionSet` was REPLACED by a custom overlay engine
+  mirroring the iOS choreography (animated corner radii, cross-fades, controlled stacking).
+  Frame-capture verified on both platforms (DailyHelper hero).
+- **System bars (§5.8, August 2026)**: `Scaffold.SystemBarStyle` (Auto/LightContent/DarkContent)
+  driving status-bar (and Android gesture-bar) icon styles from the visible surface stack, with
+  PIXEL-SAMPLED Auto (PixelCopy / scaled window snapshot), theme-change re-application (fixes
+  stale icons AND stale Android `navigationBarColor` on uiMode toggles without recreation).
+  6 ground-truth UI tests + 12 resolver unit tests, both platforms.
 
 **Next steps, in recommended order:**
 
-1. **§10 gap**: forward `ViewDidAppear`/`Disappear` from `ScaffoldViewController` into MAUI's
-   page events for the scaffold page itself.
-2. **P3**: snapshot/restore (§9), deep-link mapping (URI → `INavigationInfo`), docfx
+1. **P3**: snapshot/restore (§9), deep-link mapping (URI → `INavigationInfo`), docfx
    conceptual docs + NaluShell migration guide.
-3. Housekeeping when releasable: add to `Nalu.Pack.slnf` + meta package, docfx pages.
+2. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
+   object-level effects only).
+3. Housekeeping when releasable: `Nalu.Maui` meta-package inclusion decision, docfx pages.
+4. Optional/parked: flyout edge-swipe open; predictive-back shared-element flights — newly
+   FEASIBLE since the Android engine replacement (see §8.1 addendum).
 
-**Known open issue (Shell host, not Scaffold):** NaluTabBar renders full-height tab items on the
-Android API 37 emulator (visually broken, taps may fail; files untouched since commit `66c626f`) —
-likely an Android 16/17 behavior change; fix in progress on `main`.
+**Resolved (August 2026):** the NaluTabBar full-height issue on Android API 37 (Shell host) is
+fixed on `fix/nalutabbar-api37` (`RowDefinitions="Auto"` root + height-only Unspecified measure
+spec + the reporter's `View.Layout` NRE fix), awaiting merge to `main`.
 
 ## 1. Goals
 
@@ -111,8 +131,8 @@ Build a complete replacement for MAUI `Shell` on mobile platforms that:
   `Nalu.Maui.Layouts` (the default tab bar overflow panel builds on `HorizontalWrapLayout`).
   IMPLEMENTED: net10.0 / net10.0-android / net10.0-ios26.0 (net11 later); iOS floor 12.2, Android 21
   (repo low-floor policy — native sheets would be runtime-guarded, §7.2); `InternalsVisibleTo`
-  grants from Core and Navigation; **not** in `Nalu.Pack.slnf` / `Nalu.Maui` meta package until
-  there is something releasable (avoids publishing a stub on the next release tag).
+  grants from Core and Navigation. In `Nalu.Pack.slnf` since August 2026 (preview nupkgs for
+  real-app testing); `Nalu.Maui` meta-package inclusion waits for the release decision.
 - `Nalu.Maui.Navigation` keeps working with MAUI Shell exactly as today — existing users unaffected
   (verified: zero engine changes; all pre-existing tests green throughout).
 - The host-abstraction contracts stay `internal`, consumed via IVT (see §4).
@@ -238,6 +258,31 @@ Layering, bottom-up — each layer testable without the one below:
    engine (guard-aware aliases of `Relative().Pop()`), pushes/modals throw with guidance toward
    `INavigationService`. Kept deliberately: DevFlow-style automation used by customers drives
    back/pop through this channel.
+
+### 4.2 Live structure mutations & XAML hot reload (August 2026)
+
+XAML hot reload re-runs page initialization on LIVE instances, re-`Add`ing `Areas`/`Roots` and
+replacing `TabBarView`. The scaffold now supports live structure mutation as a first-class
+behavior (which also enables runtime structure edits by apps):
+
+- `Scaffold`/`ScaffoldArea` observe their collections post-init; mutations from inside
+  CollectionChanged are DEFERRED via `Dispatcher.Dispatch` with a coalescing flag
+  (ObservableCollection reentrancy: >1 listener forbids nested mutation).
+- `ScaffoldProxy.SyncStructure()` rebuilds the proxy tree REUSING instances; a re-inflated root
+  with the same segment ADOPTS the predecessor's live navigation stack (page state survives a
+  hot reload), via an in-area pass plus a global adoption pass.
+- Removing the CURRENT root pins the removed root's stack alive (the engine cannot navigate
+  from an empty current section and resolves contents BY SEGMENT mid-flight — both crash/break
+  otherwise), navigates to a fallback target computed from the NEW tree, then disposes the
+  removed content.
+- Post-init duplicate reconciliation (`ReconcileDuplicateAreas`/`Roots`): hot reload re-Adding
+  the full structure yields duplicates by root-PageType intersection — last-in wins.
+- Live `TabBarView` swap: same-area swaps disconnect the previous bar's handlers
+  (`OnBarViewReplaced`); presenters re-resolve chrome non-animated.
+
+Verified by the "Scaffold Hot Reload Tests" harness + `ScaffoldHotReloadChromeTests` (5 suites,
+both platforms) — these simulate the object-level effects of the IDE patcher; an end-to-end
+session against the REAL VS/Rider XAML hot reload channel is still pending.
 
 ---
 
@@ -614,6 +659,39 @@ the whole surface. **All of it is deleted.** The model is now ordinary MAUI:
 Reference-type defaults (`Brush`, `Shadow`) use `defaultValueCreator`, not a shared static: MAUI
 re-parents those values on assignment, so one instance handed to two owners breaks the first.
 
+### 5.8 System bars — status/navigation bar icon styles (August 2026)
+
+`Scaffold.SystemBarStyle` attached property (`Auto`/`LightContent`/`DarkContent`, resolution
+page → area → scaffold) drives the STATUS BAR icon style on both platforms plus the Android
+gesture-navigation bar. The icons contrast with the VISIBLE surface stack, resolved by
+`Internals/ScaffoldSystemBars` (state contributors + pure, unit-tested resolver):
+
+1. **Open flyout** — its surface luminance (set at present, cleared at close start).
+2. **Nav bar** (visible AND opaque enough, alpha·opacity ≥ 0.5) by luminance — fed LIVE from
+   `ScaffoldNavBarHost.ApplyEffectiveAppearance`, so scroll-materializing bars flip the icons at
+   the threshold. Outranks declarations: chrome above content is the actual surface.
+3. **Declared style** — author intent over the page's own content (photos the sampler would
+   read "wrong" for aesthetic consistency).
+4. **Pixel sample** — ground truth of the rendered strip under the status bar: Android
+   `PixelCopy` into a 32×4 bitmap (API 26+; the copy scales, cost is negligible), iOS a scaled
+   `DrawViewHierarchy` snapshot. Event-driven + debounced (80 ms), refreshed at
+   presentation-settle points (never a mid-transition frame), last sample kept until replaced
+   (no flicker). Handles photos/scrims no semantic rule can know — the DailyHelper hero needs
+   NO declaration.
+5. **Semantic page surface** — top-spanning first child (`SafeAreaEdges` None) background, else
+   the page background.
+6. **Theme default**, re-resolved on `RequestedThemeChanged`. This also fixes two Android
+   staleness bugs on system theme toggles WITHOUT activity recreation (`ConfigChanges.UiMode`):
+   status-bar icon appearance (`windowLightStatusBar` resolves only at creation) and the bottom
+   bar's `navigationBarColor` (re-resolved from the night-aware theme and re-applied — 3-button
+   navigation honors an opaque color even on Android 15+).
+
+Platform application: iOS via `ScaffoldViewController.PreferredStatusBarStyle` (UIKit fades;
+verified end-to-end through MAUI's root VC chain), Android via `WindowInsetsControllerCompat`.
+Tests: 12 resolver unit tests + `ScaffoldSystemBarTests` (6 scenarios per platform) asserting on
+PLATFORM ground truth read in-app (iOS effective `StatusBarManager.StatusBarStyle`, Android
+`AppearanceLightStatusBars`).
+
 ---
 
 ## 6. Back handling, gestures & guards
@@ -847,6 +925,40 @@ Key facts anchoring the decision:
 >     BEFORE the start-state capture so the below page's pair views are drawable at all.
 >     Seeking is a pure UX upgrade (hero morphs under the finger, parity with the iOS
 >     interactive pop), not a correctness fix.
+
+> **§8.1 ADDENDUM — truthful-flights overhaul (August 2026).** Frame-by-frame capture of the
+> DailyHelper hero exposed quality gaps in both engines; both were reworked:
+>
+> - **iOS**: flights now travel between CLIP-INTERSECTED VISIBLE rects (the detail photo's
+>   120pt parallax bleed corrupted end geometry → crop shift + snap at overlay removal);
+>   non-image pairs fly as PRE-RENDERED stretchable copies INSIDE the overlay, stacked
+>   images-first then larger-below-smaller (they used to ride live-view transforms UNDER the
+>   opaque photo flight — invisible until the end); `RenderedCopy` replaces `SnapshotView`
+>   (afterScreenUpdates capture races the alpha-hiding of pair views → blank copies);
+>   `CATransaction.Flush()` before `StartAnimation` (the freshly-mounted page's first render
+>   commit was eating the opening ~30% of the flight); corner radii also read from a MAUI
+>   `Border` ancestor (MAUI clips via mask layer, invisible to `Layer.CornerRadius`); cleanup
+>   restores ORIGINAL pair alphas (a 0.32 scrim forced to 1 turned opaque black). Scrims can be
+>   paired (`weather-scrim` in the DailyHelper) so photo dimming stays constant mid-flight.
+> - **Android: the native androidx SET is GONE** — replaced by a custom overlay engine
+>   (`Platforms/Android/ScaffoldSharedElementTransitions.cs`) mirroring the iOS choreography.
+>   The SET could not animate corner radii (rounded cards snapped square at pop end), could not
+>   scale text (label pairs teleported), could not cross-fade pairs, gave no stacking control —
+>   and managed `Transition` subclasses lose their peer on the framework clone, so it could not
+>   be extended. Source side captured at presenter commit (page at rest); destination measured
+>   at the incoming fragment's first pre-draw (`OnFirstPreDraw` hook replaces the postpone
+>   machinery); flights live in the fragment container's `ViewGroupOverlay` (above both pages,
+>   immune to MAUI layout), driven by ONE `ValueAnimator` through `Apply(progress)` elements —
+>   geometry frames measured relative to the PAGE ROOT (immune to the page's slide transform),
+>   image drawables captured at prepare time (async pipeline may clear them a frame later), and
+>   any failure degrades to the plain slide (live views hide only after every flight built).
+>   Page motion returns to the normal fragment animators, so shared and plain navigations move
+>   identically. `ScaffoldPageRestore` stays as a no-op safety (the SET's `setTransitionAlpha`
+>   hiding is gone with it).
+> - **Consequence for the parked seeking design above**: its premise (fragment SET machinery)
+>   no longer exists. The new engine's `Apply(progress)` elements are EXACTLY the scrub surface
+>   the iOS interactive pop uses — wiring shared-element flights into the predictive-back peek
+>   is now a bounded follow-up, not a re-implementation of `setSharedElementState`.
 
 ### 8.2 Cross-platform API (independent of engine choice)
 
