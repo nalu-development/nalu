@@ -167,10 +167,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 && hint == ScaffoldPresentationHint.Pop
                 && ReferenceEquals(handoffPage, targetPage);
 
-            // Shared elements (§8, PoC spike B): matching Scaffold.TransitionName pairs between
-            // the two pages ride the native androidx transition framework. Both push AND pop are
-            // Replace-based here (no fragment back stack), so both directions wire the pairs as
-            // an ENTER transition on the incoming fragment.
+            // Shared elements (§8): matching Scaffold.TransitionName pairs between the two
+            // pages fly in OUR overlay engine (ScaffoldSharedElementTransitions) — the native
+            // androidx TransitionSet cannot animate corner radii, text scale or cross-fades
+            // and cannot be extended (managed Transition subclasses lose their peer on clone).
             var sharedNames = !predictivelySettled && previousPage is not null && animated
                 ? ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage))
                 : [];
@@ -189,7 +189,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 };
 
             var previousFragment = _currentFragment;
-            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, pageTransition, postponeForSharedElements: sharedNames.Count > 0);
+            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, pageTransition);
             _currentFragment = fragment;
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
@@ -206,40 +206,22 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             if (sharedNames.Count > 0)
             {
-                var outgoingTagged = ScaffoldTransitions.Collect(previousPage!);
-                fragment.SharedElementEnterTransition = CreateSharedElementTransition();
+                // Source side captured NOW (the outgoing page is still at rest); the flights
+                // start at the incoming fragment's first pre-draw — the destination geometry
+                // exists exactly then, and it is the same frame that page becomes visible.
+                var flightSession = ScaffoldSharedElementTransitions.Prepare(
+                    mauiContext,
+                    container,
+                    previousPage!,
+                    targetPage,
+                    sharedNames,
+                    ScaffoldTransitions.Collect(previousPage!),
+                    pageTransition.DurationSeconds);
 
-                // The fragment framework IGNORES animators on transition-involved fragments, so
-                // the incoming page's slide must ride the transition framework too (the shared
-                // element pairs are excluded from it and follow the SET instead).
-                var slideEdge = hint switch
+                if (flightSession is not null)
                 {
-                    ScaffoldPresentationHint.Push or ScaffoldPresentationHint.SlideEnd => (int)GravityFlags.End,
-                    ScaffoldPresentationHint.SlideStart => (int)GravityFlags.Start,
-                    _ => 0
-                };
-
-                if (slideEdge != 0)
-                {
-                    var slide = new AndroidX.Transitions.Slide(slideEdge);
-                    slide.SetDuration(_overlayDurationMs);
-                    fragment.EnterTransition = slide;
+                    fragment.OnFirstPreDraw = flightSession.Start;
                 }
-
-                var sharedSourceViews = new List<View>(sharedNames.Count);
-
-                foreach (var name in sharedNames)
-                {
-                    var sharedView = outgoingTagged[name];
-                    var sharedPlatformView = sharedView.ToPlatform(mauiContext);
-                    ViewCompat.SetTransitionName(sharedPlatformView, name);
-                    transaction.AddSharedElement(sharedPlatformView, name);
-                    sharedSourceViews.Add(sharedView);
-                }
-
-                // The SET hides these sources via setTransitionAlpha(0) and only the return SET
-                // restores them — record them so paths that skip it (predictive back) can repair.
-                ScaffoldPageRestore.CaptureSharedElementSources(previousPage!, sharedSourceViews);
             }
 
             // The CURRENT navigation decides how the outgoing page leaves (a pop replays the
@@ -428,23 +410,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             _pageLayer?.RemoveView(peekView);
         }
-    }
-
-    /// <summary>
-    /// The native shared-element choreography (PoC spike B): bounds, transform, image aspect
-    /// and clip morph natively at display cadence. Built fresh per transaction — the fragment
-    /// framework clones transitions, and a MANAGED Transition subclass loses its peer on clone.
-    /// </summary>
-    private static AndroidX.Transitions.Transition CreateSharedElementTransition()
-    {
-        var set = new AndroidX.Transitions.TransitionSet();
-        set.AddTransition(new AndroidX.Transitions.ChangeBounds());
-        set.AddTransition(new AndroidX.Transitions.ChangeTransform());
-        set.AddTransition(new AndroidX.Transitions.ChangeImageTransform());
-        set.AddTransition(new AndroidX.Transitions.ChangeClipBounds());
-        set.SetDuration(_overlayDurationMs);
-
-        return set;
     }
 
     private FragmentContainerView EnsureContainer(ScaffoldLayout platformView)

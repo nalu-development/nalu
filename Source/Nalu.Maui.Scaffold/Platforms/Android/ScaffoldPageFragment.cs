@@ -13,18 +13,18 @@ namespace Nalu;
 /// uses on Android, and the base for predictive-back integration later).
 /// Page transitions are animator-based (<see cref="OnCreateAnimator"/>): the supported seekable
 /// path, and immune to the managed-peer loss that breaks managed Transition subclasses.
-/// Shared elements (§8, PoC spike B) ride on the native androidx transition framework:
-/// <c>transitionName</c>s are stamped on tagged views, and when the presenter wires
-/// <c>AddSharedElement</c> + <c>SharedElementEnterTransition</c> the enter transition is
-/// POSTPONED until the first pre-draw so the end geometry exists (gate #1).
+/// Shared elements (§8) fly in the presenter's overlay engine
+/// (<see cref="ScaffoldSharedElementTransitions"/>): the presenter captures the source side
+/// before the commit and hooks <see cref="OnFirstPreDraw"/> so the flights start at this
+/// fragment's first pre-draw — the destination geometry exists by then (gate #1) and it is
+/// the same frame this page becomes visible, making the live-view handoff seamless.
 /// </summary>
 internal sealed class ScaffoldPageFragment(
     IMauiContext mauiContext,
     Page page,
     ScaffoldPresentationHint hint,
     AView container,
-    ScaffoldPageTransition transition,
-    bool postponeForSharedElements = false) : Fragment
+    ScaffoldPageTransition transition) : Fragment
 {
     private const long _transitionDurationMs = 250;
 
@@ -40,14 +40,18 @@ internal sealed class ScaffoldPageFragment(
     public Task DismissedTask => _dismissed.Task;
 
     /// <summary>
+    /// Invoked at this fragment's first pre-draw — the traversal where its view is laid out and
+    /// about to render. The presenter uses it to start shared-element flights (gate #1: the
+    /// destination geometry exists exactly then).
+    /// </summary>
+    public Action? OnFirstPreDraw { get; set; }
+
+    /// <summary>
     /// Whether this fragment's entry is animated by OUR animator (its presented signal comes from
-    /// the animator end). A shared-element entry never is: the fragment framework IGNORES
-    /// animators on fragments involved in a transition, so the postponed path signals presented
-    /// at first pre-draw and rides the transition framework for any page motion.
+    /// the animator end).
     /// A pop entry (the revealed page) animates only when the spec declares a Behind motion.
     /// </summary>
-    private bool HasAnimatedEnter => !postponeForSharedElements
-        && transition.IsAnimated
+    private bool HasAnimatedEnter => transition.IsAnimated
         && hint switch
         {
             ScaffoldPresentationHint.Push => !transition.Enter.IsIdentity,
@@ -97,26 +101,10 @@ internal sealed class ScaffoldPageFragment(
     {
         base.OnViewCreated(view, savedInstanceState);
 
-        // Stamp android:transitionName on every tagged view — the native SET matches by name.
-        foreach (var (name, taggedView) in ScaffoldTransitions.Collect(page))
-        {
-            ViewCompat.SetTransitionName(taggedView.ToPlatform(mauiContext), name);
-        }
-
-        if (postponeForSharedElements)
-        {
-            // Incoming-readiness gate: hold the shared-element transition until the first
-            // layout/draw pass so the end geometry exists.
-            PostponeEnterTransition();
-        }
-
         // Presented = first draw when no enter animation runs; the animator end wins otherwise.
         OneShotPreDrawListener.Add(view, new Java.Lang.Runnable(() =>
         {
-            if (postponeForSharedElements)
-            {
-                StartPostponedEnterTransition();
-            }
+            OnFirstPreDraw?.Invoke();
 
             if (!HasAnimatedEnter)
             {
@@ -141,13 +129,6 @@ internal sealed class ScaffoldPageFragment(
         {
             CompleteFor(enter);
 
-            return null;
-        }
-
-        if (enter && postponeForSharedElements)
-        {
-            // Involved in a shared-element transition: the framework would ignore this animator
-            // anyway — page motion comes from the transition set; presented fires at pre-draw.
             return null;
         }
 

@@ -114,6 +114,7 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 /// <c>Opacity="{nalu:ScrollValue From=0, To=1}"</c>. For theme-dependent endpoints use
 /// <see cref="ThemeScrollValueExtension"/>.
 /// </summary>
+[RequireService([typeof(IProvideValueTarget)])]
 public sealed class ScrollValueExtension : ScrollValueExtensionBase
 {
     /// <summary>Gets or sets the value at (and below) <c>RampStart</c>.</summary>
@@ -131,6 +132,7 @@ public sealed class ScrollValueExtension : ScrollValueExtensionBase
 /// <c>Background="{nalu:ThemeScrollValue FromLight=Transparent, ToLight=White, ToDark=Black}"</c>
 /// (dark endpoints fall back to the light ones when omitted).
 /// </summary>
+[RequireService([typeof(IProvideValueTarget)])]
 public sealed class ThemeScrollValueExtension : ScrollValueExtensionBase
 {
     /// <summary>Gets or sets the light-theme value at (and below) <c>RampStart</c>.</summary>
