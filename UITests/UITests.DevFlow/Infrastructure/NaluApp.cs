@@ -54,11 +54,14 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>
-    /// DEVFLOW_PORT when set; otherwise 9223 plus 10223 — the port the agent falls back to
-    /// when the app is relaunched while 9223 lingers in TIME_WAIT.
+    /// DEVFLOW_PORT when set; otherwise the per-platform agent ports — Android 9223 (via
+    /// adb forward), iOS simulator 9224, Mac Catalyst 9225 — each followed by its +1000
+    /// broker fallback (used when the app is relaunched while the port lingers in TIME_WAIT).
+    /// With apps on SEVERAL platforms running at once, discovery hits the first that answers:
+    /// set DEVFLOW_PORT to target a specific one.
     /// </summary>
     private static int[] CandidatePorts()
-        => int.TryParse(Environment.GetEnvironmentVariable("DEVFLOW_PORT"), out var p) ? [p] : [9223, 10223];
+        => int.TryParse(Environment.GetEnvironmentVariable("DEVFLOW_PORT"), out var p) ? [p] : [9223, 9224, 9225, 10223, 10224, 10225];
 
     public async ValueTask InitializeAsync()
     {
@@ -104,7 +107,8 @@ public sealed class NaluApp : IAsyncLifetime
                 throw new InvalidOperationException(
                     $"Cannot reach the DevFlow agent at {host} on port(s) {string.Join(", ", candidatePorts)}. " +
                     "Make sure Nalu.Maui.TestApp is running in DEBUG on the target platform. " +
-                    "For Android emulators run 'adb forward tcp:9223 tcp:9223' first. " +
+                    "Per-platform ports: Android 9223 (run 'adb forward tcp:9223 tcp:9223' first), " +
+                    "iOS simulator 9224, Mac Catalyst 9225. " +
                     "Host/port can be overridden with DEVFLOW_HOST / DEVFLOW_PORT.");
             }
 

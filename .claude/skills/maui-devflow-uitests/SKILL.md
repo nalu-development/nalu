@@ -19,8 +19,12 @@ DevFlow is the experimental testing/automation toolkit for .NET MAUI 10, born as
 Three pieces cooperate:
 
 1. **In-app agent** (`Microsoft.Maui.DevFlow.Agent`) — an HTTP server *inside* the app process
-   (default port **9223**) exposing the real MAUI visual tree, screenshots, interactions, logs.
-   Activated in DEBUG only, in `Samples/Nalu.Maui.TestApp/MauiProgram.cs`.
+   exposing the real MAUI visual tree, screenshots, interactions, logs. Activated in DEBUG only,
+   in `Samples/Nalu.Maui.TestApp/MauiProgram.cs`, with **per-platform ports** (also in the
+   DailyHelper): **Android 9223** (reached via `adb forward tcp:9223 tcp:9223`),
+   **iOS simulator 9224**, **Mac Catalyst 9225**. The simulator and Catalyst bind the HOST
+   loopback directly, so distinct ports let emulator + simulator sessions run SIMULTANEOUSLY
+   with no forward/terminate dance.
 2. **Driver** (`Microsoft.Maui.DevFlow.Driver`, class `AgentClient`) — .NET client used by our
    xUnit tests in `UITests/UITests.DevFlow`.
 3. **CLI + MCP** (`Microsoft.Maui.Cli`, command `maui`) — `maui devflow …` commands and
@@ -50,12 +54,21 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
       `-t:Run` in the same invocation right after wiping `bin/` fails with
       "The app must be built before the arguments to launch the app using mlaunch can be computed".
    3. `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios -t:Run` — **run in background**
-      (it can block while the app runs). The agent then comes up on 9223 — or **10223** if the
+      (it can block while the app runs). Alternative that avoids the blocking `-t:Run`
+      entirely: plain build, then `xcrun simctl install booted <path-to>.app` +
+      `xcrun simctl launch booted com.nalu.maui.testapp`.
+      The agent then comes up on its platform port (iOS 9224) — or **+1000** (10224) if the
       previous instance's port lingers in TIME_WAIT; probe with a no-op MCP call, never curl.
 
-   Also: a leftover `adb forward` on 9223 makes the iOS agent HALF-START (it logs
-   "Agent started on port 9223" but listens on nothing) — `adb forward --remove-all` first,
-   then relaunch the iOS app.
+   **Android rebuild/deploy trap**: Debug builds use FAST DEPLOYMENT — assemblies are NOT in
+   the APK. `adb install <apk>` runs the app with STALE assemblies (or breaks launch after an
+   uninstall); always deploy with `dotnet build -f net10.0-android -t:Install` (or `-t:Run`).
+
+   **Multiple agents / MCP targeting**: with apps on several platforms running at once, MCP
+   tools error with "Multiple MAUI DevFlow agents are connected" and list the ports — pass
+   `agentPort` (or terminate the apps you are not driving). The MCP broker also latches onto
+   whatever app is up: force-stop other agent-enabled apps (e.g. the DailyHelper) when it
+   grabs the wrong one.
 2. **Explore the running app** via MCP tools or `maui devflow` CLI: take a screenshot, dump the
    visual tree, tap around. Confirm the scenario works manually before encoding it in a test.
 3. **Add/extend a test page** in `Samples/Nalu.Maui.TestApp/Tests/` (`[TestPage("Name")]`),
@@ -63,8 +76,10 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
 4. **Write the test** in `UITests/UITests.DevFlow/Tests/` using the `NaluApp` wrapper —
    never call `AgentClient` from a test; extend the wrapper instead.
 5. **Run** `dotnet test UITests/UITests.DevFlow` (app must be running; `NaluApp` self-discovers
-   the agent on 9223 → 10223, `DEVFLOW_HOST`/`DEVFLOW_PORT` override). After a relaunch, wait
-   for readiness with a no-op MCP call (e.g. `maui_query`) retried until it responds —
+   the agent on 9223/9224/9225 then the +1000 fallbacks). With BOTH platforms running, target
+   deterministically: `DEVFLOW_PORT=9223 dotnet test …` (Android) / `DEVFLOW_PORT=9224 …` (iOS)
+   — back-to-back cross-platform runs need no relaunching. After a relaunch, wait for
+   readiness with a no-op MCP call (e.g. `maui_query`) retried until it responds —
    never curl-probe ports.
 6. **On failure**: screenshot + visual tree via MCP, read the wrapper's TimeoutException (it lists
    the AutomationIds actually present), fix test/page/library, repeat.
@@ -87,4 +102,17 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
   loop; Windows is postponed — DevFlow support there is still partial).
 - MAUI 10 only (DevFlow requires it); the TestApp uses MAUI 10.0.80. Never raise the *library*
   MAUI floor versions in the root `Directory.Build.props` for this.
-- One app instance per port: fixed 9223 assumes a single running TestApp at a time.
+- One app instance per PLATFORM at a time (Android 9223 / iOS 9224 / Catalyst 9225); different
+  platforms can run simultaneously thanks to the per-platform ports.
+- **Agent taps are in-process and reach UNPRESENTED elements**: overlay/flyout content exists
+  as a logical child even while closed (query shows `windowBounds` width/height −1), and
+  `maui_tap`/`TapAsync` still fires its handlers. Never use the overlay's own content as the
+  presented-state witness — wait on a presented-only element (e.g. the scrim automation id,
+  `ScaffoldFlyoutScrim`) instead.
+- Scaffold drawer modes default to **Disabled**: a harness scaffold must call
+  `SetFlyoutStartMode(this, ScaffoldFlyoutMode.Flyout)` or `OpenAsync` silently no-ops.
+- For pixel-truth verification the agent cannot see (system bar icons, animation smoothness):
+  read platform state in-app into a probe Label (e.g. iOS `StatusBarManager.StatusBarStyle`,
+  Android `WindowInsetsControllerCompat.AppearanceLightStatusBars`), or record the screen
+  (`xcrun simctl io booted recordVideo` / `adb shell screenrecord`) and extract frames with
+  `ffmpeg -vf fps=60`; measure regions with `signalstats` YAVG instead of eyeballing.

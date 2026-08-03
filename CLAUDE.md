@@ -11,7 +11,8 @@ Solution file: `Nalu.slnx` (XML solution format). Packable subset: `Nalu.Pack.sl
 
 UI tests live in `UITests/UITests.DevFlow` (xUnit v3, `net10.0`) and drive the **Nalu.Maui.TestApp**
 (`Samples/Nalu.Maui.TestApp`) through the **DevFlow** in-app agent (`Microsoft.Maui.DevFlow.Agent`,
-activated in DEBUG builds in `MauiProgram.cs`, default port **9223**).
+activated in DEBUG builds in `MauiProgram.cs`, per-platform ports: Android **9223**
+(via `adb forward`), iOS simulator **9224**, Mac Catalyst **9225**).
 
 - DevFlow is an **experimental preview** (dotnet/maui-labs). Versions are pinned in the csproj/tools files; bump them deliberately.
 - `Infrastructure/NaluApp.cs` is the **only** file allowed to use the `AgentClient` Driver API directly.
@@ -43,14 +44,16 @@ activated in DEBUG builds in `MauiProgram.cs`, default port **9223**).
 3. Add/extend the test page in the TestApp if needed; keep pages minimal and deterministic.
 4. Write the test in `UITests/UITests.DevFlow/Tests/` using the `NaluApp` wrapper (extend the wrapper rather than
    calling `AgentClient` from tests).
-5. Run `dotnet test UITests/UITests.DevFlow` (the app must already be running; `DEVFLOW_HOST`/`DEVFLOW_PORT`
-   override the default `localhost:9223`).
+5. Run `dotnet test UITests/UITests.DevFlow` (the app must already be running; `NaluApp`
+   self-discovers 9223/9224/9225 (+1000 fallbacks) — set `DEVFLOW_PORT` to target one
+   platform when apps on several platforms are running at once).
 6. On failure: take a screenshot + visual tree via MCP, diagnose, fix (test, page, or library), repeat.
 
 ### Current status / open points
 
 - Windows support in DevFlow is still partial; Windows UI tests are postponed.
-- Tests currently assume a single app instance per platform at a time (fixed port 9223).
+- Tests assume a single app instance per PLATFORM at a time (Android 9223 / iOS 9224 /
+  Catalyst 9225); different platforms can run simultaneously.
 - CI integration is deliberately postponed; tests run locally only.
 - Old Appium-based UITests were removed (July 2026) in favor of this setup.
 
