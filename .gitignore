@@ -362,3 +362,6 @@ obj/docfx/
 api/
 # Cowork/AI: files staged for manual deletion (device bridge cannot delete)
 _to_delete/
+
+# Local Claude Code permissions (per-machine)
+.claude/settings.local.json
