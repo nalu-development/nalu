@@ -122,6 +122,21 @@ public class VirtualScrollRecyclerView : RecyclerView, IOnApplyWindowInsetsListe
         }
     }
 
+    // Fading edges are positioned at the PADDED bounds by View.draw(), but our safe-area
+    // insets are padding with clipToPadding=false — content scrolls under the padding all the
+    // way to the physical edge, so the fades must sit there too. The padding-offset hooks
+    // extend the fade (and its saveLayer) bounds back to the view's real edges.
+
+    protected override bool IsPaddingOffsetRequired => true;
+
+    protected override int LeftPaddingOffset => -PaddingLeft;
+
+    protected override int TopPaddingOffset => -PaddingTop;
+
+    protected override int RightPaddingOffset => PaddingRight;
+
+    protected override int BottomPaddingOffset => PaddingBottom;
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
