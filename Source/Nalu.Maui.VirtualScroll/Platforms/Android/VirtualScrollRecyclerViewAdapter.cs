@@ -6,7 +6,7 @@ using AView = Android.Views.View;
 
 namespace Nalu;
 
-internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
+internal class VirtualScrollRecyclerViewAdapter : Platform.VirtualScrollNativeAdapter
 {
     private readonly VirtualScrollCellManager<VirtualScrollViewHolder> _cellManager = new(holder => holder.ViewWrapper.VirtualView);
     private readonly IMauiContext _mauiContext;
@@ -22,6 +22,10 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
         _reuseIdManager = new VirtualScrollPlatformReuseIdManager(recyclerView);
 
         HasStableIds = false;
+
+        // The count is CACHED Java-side (getItemCount is the hottest adapter callback);
+        // the notifier refreshes it on every changeset.
+        UpdateItemCount(adapter.GetItemCount());
     }
     
     public override long GetItemId(int position) => RecyclerView.NoId;
@@ -115,6 +119,4 @@ internal class VirtualScrollRecyclerViewAdapter : RecyclerView.Adapter
                 : new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
         return wrapperPlatformView;
     }
-
-    public override int ItemCount => _adapter.GetItemCount();
 }
