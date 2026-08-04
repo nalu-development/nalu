@@ -144,6 +144,7 @@ public class VirtualScrollListTests : ContentPage
         var scrollToItemButton = MakeButton("Scroll to", "ScrollToItemButton", ScrollToItem);
         var switchSourceButton = MakeButton("Static source", "SwitchSourceButton", SwitchToStaticSource);
         var visibleRangeButton = MakeButton("Range", "VisibleRangeButton", UpdateVisibleRange);
+        var toggleFadingButton = MakeButton("Fading", "ToggleFadingButton", () => _virtualScroll.FadingEdgeLength = _virtualScroll.FadingEdgeLength > 0 ? 0 : 60);
 
         _countLabel = new Label { AutomationId = "ItemCountLabel", FontSize = 14 };
         _rangeLabel = new Label { AutomationId = "VisibleRangeLabel", FontSize = 14, Text = "-" };
@@ -163,6 +164,7 @@ public class VirtualScrollListTests : ContentPage
                                  scrollToItemButton,
                                  switchSourceButton,
                                  visibleRangeButton,
+                                 toggleFadingButton,
                                  _countLabel,
                                  _rangeLabel
                              };
