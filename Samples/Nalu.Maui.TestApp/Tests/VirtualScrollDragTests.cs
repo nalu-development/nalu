@@ -121,6 +121,30 @@ public class VirtualScrollDragTests : ContentPage
                          Children = { orderLabel, statusLabel }
                      };
 
+#if IOS || MACCATALYST
+        // A real held long-press cannot be injected from the test host on Apple platforms:
+        // these buttons drive the library's drag pipeline through the internal simulator
+        // (same sequence as the gesture handler). Indices refer to the FRESH page order.
+        Button MakeSimButton(string text, string automationId, int fromIndex, int toIndex)
+        {
+            var button = new Button { Text = text, AutomationId = automationId, FontSize = 11 };
+            button.Clicked += async (_, _) => await VirtualScrollDragSimulator.SimulateDragAsync(virtualScroll, fromIndex, toIndex);
+
+            return button;
+        }
+
+        header.Add(new HorizontalStackLayout
+        {
+            Spacing = 8,
+            Children =
+            {
+                MakeSimButton("A→D", "SimDragAD", 0, 4),
+                MakeSimButton("PIN→E", "SimDragPIN", 2, 5),
+                MakeSimButton("B→D", "SimDragBD", 1, 4)
+            }
+        });
+#endif
+
         grid.Add(header);
         grid.Add(virtualScroll, 0, 1);
 

@@ -4,10 +4,13 @@ using Xunit;
 namespace Nalu.Maui.UITests.Tests;
 
 /// <summary>
-/// Gesture-driven item drag&amp;drop against the "Virtual Scroll Drag Tests" harness.
-/// Android-only: ItemTouchHelper drag needs a REAL held long-press followed by a move —
-/// synthetic agent gestures have no touch physics, so the drag is injected host-side via
-/// <see cref="NaluApp.AndroidLongPressDragAsync"/> (discrete adb motion events).
+/// Item drag&amp;drop against the "Virtual Scroll Drag Tests" harness.
+/// Android drives a REAL long-press drag host-side (<see cref="NaluApp.AndroidLongPressDragAsync"/>,
+/// discrete adb motion events — ItemTouchHelper needs a held long-press synthetic agent
+/// gestures cannot produce). Apple platforms cannot receive injected held long-presses from
+/// the test host at all, so the harness page exposes buttons driving the library's internal
+/// drag simulator — the same interactive-movement sequence the gesture handler performs,
+/// bypassing only Apple's long-press recognition.
 /// </summary>
 public class VirtualScrollDragTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
@@ -18,18 +21,23 @@ public class VirtualScrollDragTests(NaluApp app) : BaseUiTest(app), IAsyncLifeti
 
     public async ValueTask InitializeAsync()
     {
-        Assert.SkipWhen(!await IsAndroidAsync(), "Android-only: real long-press drags are injected via adb motion events.");
-
         await App.OpenTestPageAsync(PageName);
         await App.WaitForElementAsync("DragCellA");
         await App.WaitForTextAsync("DragOrderLabel", "A,B,PIN,C,D,E,F,G");
     }
 
-    public async ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync() => await App.ResetAsync();
+
+    /// <summary>Real gesture on Android; simulator button on Apple platforms.</summary>
+    private async Task DragAsync(string fromCellId, string toCellId, string simButtonId)
     {
         if (await IsAndroidAsync())
         {
-            await App.ResetAsync();
+            await App.AndroidLongPressDragAsync(fromCellId, toCellId);
+        }
+        else
+        {
+            await App.TapAsync(simButtonId);
         }
     }
 
@@ -37,11 +45,11 @@ public class VirtualScrollDragTests(NaluApp app) : BaseUiTest(app), IAsyncLifeti
     public async Task LongPressDragReordersItemAndRaisesLifecycle()
     {
         // Drag A (row 0) down over three rows and drop where D sits.
-        await App.AndroidLongPressDragAsync("DragCellA", "DragCellD");
+        await DragAsync("DragCellA", "DragCellD", "SimDragAD");
 
         // The collection order is the ground truth: A must have left the head and landed
         // between C and E (the exact slot may differ by one depending on where the final
-        // midpoint crossing happened — both are valid ItemTouchHelper outcomes).
+        // midpoint crossing happened — both are valid outcomes of the platform reorder).
         var order = await App.WaitForTextMatchAsync("DragOrderLabel", text => text is not null && !text.StartsWith("A,", StringComparison.Ordinal));
         Assert.True(order is "B,PIN,C,A,D,E,F,G" or "B,PIN,C,D,A,E,F,G", $"Unexpected order after drag: {order}");
 
@@ -54,12 +62,12 @@ public class VirtualScrollDragTests(NaluApp app) : BaseUiTest(app), IAsyncLifeti
     {
         // PIN is rejected by CanDragItem: the same gesture must produce no reorder and no
         // drag lifecycle at all.
-        await App.AndroidLongPressDragAsync("DragCellPIN", "DragCellE");
+        await DragAsync("DragCellPIN", "DragCellE", "SimDragPIN");
 
         // Deterministic settle point: run a REAL drag afterwards and observe its lifecycle —
         // if the vetoed gesture had produced anything, the final order or the counts would
         // differ from a single B-drag alone.
-        await App.AndroidLongPressDragAsync("DragCellB", "DragCellD");
+        await DragAsync("DragCellB", "DragCellD", "SimDragBD");
 
         var order = await App.WaitForTextMatchAsync("DragOrderLabel", text => text is not null && !text.StartsWith("A,B,", StringComparison.Ordinal));
         Assert.True(order is "A,PIN,C,B,D,E,F,G" or "A,PIN,C,D,B,E,F,G", $"Unexpected order after vetoed+real drag: {order}");
