@@ -1,0 +1,5 @@
+// Root build script of the Nalu VirtualScroll native layer (see README.md).
+// Invoked automatically by the .NET build through @(AndroidGradleProject).
+plugins {
+    id 'com.android.library' version '8.7.3' apply false
+}

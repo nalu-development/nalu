@@ -1,0 +1,5 @@
+<metadata>
+  <!-- Bind the native layer into the library's platform namespace instead of the
+       auto-generated Com.Nalu.Maui.Virtualscroll. -->
+  <attr path="/api/package[@name='com.nalu.maui.virtualscroll']" name="managedName">Nalu.Platform</attr>
+</metadata>
