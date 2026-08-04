@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.nalu.maui.virtualscroll'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    publishing {
+        singleVariant("release")
+    }
+}
+
+dependencies {
+    // compileOnly: the .NET side provides RecyclerView through the Xamarin.AndroidX.RecyclerView
+    // binding — keep this maven artifact in sync with the binding package's bound version.
+    compileOnly 'androidx.recyclerview:recyclerview:1.4.0'
+}
