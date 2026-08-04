@@ -28,6 +28,9 @@ public partial class AppearanceHomePageModel(INavigationService navigationServic
 [UsedImplicitly]
 public partial class AppearanceScrollPageModel(INavigationService navigationService) : ObservableObject, IDisposable
 {
+    /// <summary>Lets the page register its own island (page/scroll view) at dispose time.</summary>
+    public Action? DisposedCallback { get; set; }
+
     public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
 
     public void Dispose()
@@ -36,23 +39,45 @@ public partial class AppearanceScrollPageModel(INavigationService navigationServ
         // collection proves the scroll observation (iOS KVO token retains the UIScrollView)
         // was disposed on pop — a leaked observer would keep this whole chain alive.
         LeakTracker.ExpectCollected(this);
+        DisposedCallback?.Invoke();
         GC.SuppressFinalize(this);
     }
 }
 
 [UsedImplicitly]
-public partial class AppearanceOverlapPageModel(INavigationService navigationService) : ObservableObject
+public partial class AppearanceOverlapPageModel(INavigationService navigationService) : ObservableObject, IDisposable
 {
     public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
+
+    public void Dispose()
+    {
+        // Control sample: this page has NO scroll tracker and NO TitleView — if it leaks on
+        // pop too, the retention is generic to the pop path, not the scroll observation.
+        LeakTracker.ExpectCollected(this);
+        GC.SuppressFinalize(this);
+    }
 }
 
 [UsedImplicitly]
-public partial class AppearanceStyledPageModel(INavigationService navigationService) : ObservableObject
+public partial class AppearanceStyledPageModel(INavigationService navigationService) : ObservableObject, IDisposable
 {
     [ObservableProperty]
     private string _heading = "Model Heading";
 
+    /// <summary>Lets the page register its TitleView at dispose time (leak diagnostics).</summary>
+    public Action? DisposedCallback { get; set; }
+
     public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
+
+    public void Dispose()
+    {
+        // Control sample: this TitleView binds the PAGE MODEL (no NavBarBinding) — if it
+        // collects while the scroll page's NavBarBinding-bound title does not, the
+        // relative-source binding is the retainer.
+        LeakTracker.ExpectCollected(this);
+        DisposedCallback?.Invoke();
+        GC.SuppressFinalize(this);
+    }
 }
 
 /// <summary>Root page: rides the scaffold-level appearance untouched.</summary>
@@ -169,6 +194,7 @@ public class AppearanceStyledPage : ContentPage
         };
         titleView.SetBinding(Label.TextProperty, nameof(AppearanceStyledPageModel.Heading));
         Scaffold.SetTitleView(this, titleView);
+        model.DisposedCallback = () => LeakTracker.ExpectCollected(titleView);
 
         // Live mutation: the appearance object is observable — the strip reacts per property.
         var mutateButton = new Button { Text = "Dim bar", AutomationId = "MutateAppearance", FontSize = 11 };
@@ -231,8 +257,17 @@ public class AppearanceScrollPage : ContentPage
             FontAttributes = FontAttributes.Bold,
             VerticalTextAlignment = TextAlignment.Center
         };
-        offsetLabel.SetBinding(Label.TextProperty, new NavBarBindingExtension { Path = nameof(ScaffoldNavBarContext.ScrollOffset), StringFormat = "{0:F0}" }.ProvideValue(null!));
+        offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.ScrollOffset), stringFormat: "{0:F0}"));
         Scaffold.SetTitleView(this, offsetLabel);
+
+        // Diagnostic granularity: tracking the island members separately tells WHICH link leaks
+        // (page/scroll/title view vs. just the model) when the check fails.
+        model.DisposedCallback = () =>
+        {
+            LeakTracker.ExpectCollected(this);
+            LeakTracker.ExpectCollected(scrollView);
+            LeakTracker.ExpectCollected(offsetLabel);
+        };
 
         Content = scrollView;
     }

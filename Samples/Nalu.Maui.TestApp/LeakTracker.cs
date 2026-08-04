@@ -44,11 +44,17 @@ public static class LeakTracker
     /// <summary>Forces full collections and reports survivors as "Leaked:N name1,name2".</summary>
     public static async Task<string> CheckAsync()
     {
-        for (var attempt = 0; attempt < 5; attempt++)
+        for (var attempt = 0; attempt < 10; attempt++)
         {
             GC.Collect(2, GCCollectionMode.Forced, blocking: true);
             GC.WaitForPendingFinalizers();
             GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+
+#if ANDROID
+            // Cross-VM islands (managed view ↔ Java peer) only die when BOTH collectors run:
+            // the Mono GC bridge hands the cycle to ART, which must then actually collect it.
+            Java.Lang.JavaSystem.Gc();
+#endif
 
             lock (_lock)
             {
@@ -58,7 +64,7 @@ public static class LeakTracker
                 }
             }
 
-            await Task.Delay(150).ConfigureAwait(false);
+            await Task.Delay(250).ConfigureAwait(false);
         }
 
         lock (_lock)

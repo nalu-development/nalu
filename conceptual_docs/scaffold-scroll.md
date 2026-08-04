@@ -65,8 +65,16 @@ Background="{nalu:ThemeScrollValue FromLight=Transparent,
 They work on any element inside the scaffold's tree **and** on
 [`ScaffoldNavBarAppearance`](scaffold-navbar.md) properties, and must target a bindable
 property directly (styles/setters are not supported). In code-behind, bind the ambient values
-through the `NavBarBinding` extension
-(`offsetLabel.SetBinding(Label.TextProperty, new NavBarBindingExtension { Path = "ScrollOffset" }.ProvideValue(null!))`).
+with the `NavBarBindings` utility — string path or fully typed:
+
+```csharp
+offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create("ScrollOffset", stringFormat: "{0:F0}"));
+
+// Typed and compiled (trimming/AOT-safe):
+offsetLabel.SetBinding(Label.TextProperty,
+    static (Scaffold s) => s.NavBarContext.ScrollOffset,
+    source: NavBarBindings.ScaffoldAncestor);
+```
 
 ## Recipe: parallax header
 

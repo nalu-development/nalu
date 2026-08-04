@@ -10,6 +10,35 @@ using Insets = AndroidX.Core.Graphics.Insets;
 
 namespace Nalu;
 
+/// <summary>Shared helpers for the chrome strip layouts.</summary>
+internal static class ScaffoldChromeLayoutHelpers
+{
+    /// <summary>
+    /// Disables child-clipping through the mounted bar subtree: MAUI shadows draw OUTSIDE
+    /// their wrapper's bounds, and Android's ViewGroup default (<c>clipChildren=true</c>)
+    /// truncates them at the first layout boundary (visible as a hard seam around the tab bar
+    /// pill's shadow). MAUI's own clipping uses view-level ClipBounds and is unaffected.
+    /// </summary>
+    public static void DisableChildClipping(AView view)
+    {
+        if (view is not ViewGroup group)
+        {
+            return;
+        }
+
+        group.SetClipChildren(false);
+        group.SetClipToPadding(false);
+
+        for (var i = 0; i < group.ChildCount; i++)
+        {
+            if (group.GetChildAt(i) is { } child)
+            {
+                DisableChildClipping(child);
+            }
+        }
+    }
+}
+
 /// <summary>
 /// Hosts the page content (the presenter's fragment container) and rewrites the system-bars
 /// insets before they propagate down (§5.4): while the tab bar strip is visible, the bottom
@@ -145,6 +174,9 @@ internal sealed class ScaffoldTabBarStripLayout : FrameLayout
         {
             (bar.Parent as ViewGroup)?.RemoveView(bar);
             AddView(bar);
+
+            // The bar's shadow (e.g. the default pill) must not truncate at layout bounds.
+            ScaffoldChromeLayoutHelpers.DisableChildClipping(bar);
         }
     }
 
@@ -265,6 +297,9 @@ internal sealed class ScaffoldNavBarStripLayout : FrameLayout
         {
             (bar.Parent as ViewGroup)?.RemoveView(bar);
             AddView(bar);
+
+            // The bar's shadow (e.g. the default pill) must not truncate at layout bounds.
+            ScaffoldChromeLayoutHelpers.DisableChildClipping(bar);
         }
     }
 

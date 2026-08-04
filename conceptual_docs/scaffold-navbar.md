@@ -31,6 +31,10 @@ extension, which binds against the scaffold's `ScaffoldNavBarContext`:
        TextColor="{nalu:NavBarBinding Path=Foreground}" />
 ```
 
+In code-behind, the `NavBarBindings` utility is the counterpart — `NavBarBindings.Create("Title")`
+for a string path, or fully typed:
+`SetBinding(Label.TextProperty, static (Scaffold s) => s.NavBarContext.Title, source: NavBarBindings.ScaffoldAncestor)`.
+
 ## Appearance — a per-property merge chain
 
 `ScaffoldNavBarAppearance` styles the bar *surface* (never the mounted bar view's own

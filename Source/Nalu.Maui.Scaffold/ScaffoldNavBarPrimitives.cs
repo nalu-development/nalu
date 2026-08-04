@@ -379,7 +379,7 @@ public sealed class ScaffoldNavBarTitle : Grid
             VerticalOptions = LayoutOptions.Center,
             VerticalTextAlignment = TextAlignment.Center
         };
-        _label.SetBinding(Label.TextProperty, Binding.Create(static (ScaffoldNavBarContext c) => c.Title));
+        _label.SetBinding(Label.TextProperty, static (ScaffoldNavBarContext c) => c.Title);
         Add(_label);
 
         VerticalOptions = LayoutOptions.Center;
@@ -458,17 +458,19 @@ public sealed class ScaffoldNavBarTitle : Grid
         // Remove any previously hosted title view (children: label + optional title view).
         for (var i = Count - 1; i >= 0; i--)
         {
-            if (!ReferenceEquals(this[i], _label))
+            var child = this[i];
+            if (!ReferenceEquals(child, _label))
             {
                 RemoveAt(i);
+                (child as BindableObject)?.BindingContext = null;
             }
         }
 
         if (titleView is not null)
         {
             _label.IsVisible = false;
-            Add(titleView);
             ApplyTitleViewBindingContext();
+            Add(titleView);
         }
         else
         {
@@ -485,7 +487,7 @@ public sealed class ScaffoldNavBarTitle : Grid
     {
         if (_observedContext is { TitleView: { } titleView } context)
         {
-            SetInheritedBindingContext(titleView, context.PageBindingContext);
+            titleView.BindingContext = context.PageBindingContext;
         }
     }
 }

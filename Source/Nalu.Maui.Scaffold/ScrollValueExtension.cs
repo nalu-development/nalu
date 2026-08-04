@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using Microsoft.Maui.Controls.Xaml;
+using Microsoft.Maui.Controls.Internals;
 using Nalu.Internals;
 
 namespace Nalu;
@@ -83,22 +83,66 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 
         if (provideValueTarget.TargetObject is ScaffoldNavBarAppearance appearance)
         {
-            multiBinding.Bindings.Add(new Binding($"{nameof(ScaffoldNavBarAppearance.Context)}.{nameof(ScaffoldNavBarContext.ScrollOffset)}", source: appearance));
-            multiBinding.Bindings.Add(new Binding($"{nameof(ScaffoldNavBarAppearance.Context)}.{nameof(ScaffoldNavBarContext.ScrollRampStart)}", source: appearance));
-            multiBinding.Bindings.Add(new Binding($"{nameof(ScaffoldNavBarAppearance.Context)}.{nameof(ScaffoldNavBarContext.ScrollRampEnd)}", source: appearance));
+            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollOffset, nameof(ScaffoldNavBarContext.ScrollOffset), appearance));
+            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampStart, nameof(ScaffoldNavBarContext.ScrollRampStart), appearance));
+            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampEnd, nameof(ScaffoldNavBarContext.ScrollRampEnd), appearance));
         }
         else
         {
-            var scaffoldAncestor = new RelativeBindingSource(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
-            multiBinding.Bindings.Add(new Binding($"{nameof(Scaffold.NavBarContext)}.{nameof(ScaffoldNavBarContext.ScrollOffset)}") { Source = scaffoldAncestor });
-            multiBinding.Bindings.Add(new Binding($"{nameof(Scaffold.NavBarContext)}.{nameof(ScaffoldNavBarContext.ScrollRampStart)}") { Source = scaffoldAncestor });
-            multiBinding.Bindings.Add(new Binding($"{nameof(Scaffold.NavBarContext)}.{nameof(ScaffoldNavBarContext.ScrollRampEnd)}") { Source = scaffoldAncestor });
+            var source = new RelativeBindingSource(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
+            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollOffset, nameof(ScaffoldNavBarContext.ScrollOffset), source));
+            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampStart, nameof(ScaffoldNavBarContext.ScrollRampStart), source));
+            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampEnd, nameof(ScaffoldNavBarContext.ScrollRampEnd), source));
         }
 
-        multiBinding.Bindings.Add(new Binding(nameof(ScrollValueThemeListener.Theme), source: ScrollValueThemeListener.Instance));
+        multiBinding.Bindings.Add(CreateThemeTypedBinding());
 
         return multiBinding;
     }
+
+    private static TypedBinding<ScrollValueThemeListener, AppTheme> CreateThemeTypedBinding()
+        => new(
+               tl => (tl.Theme, true),
+               null,
+               [Tuple.Create<Func<ScrollValueThemeListener, object>, string>(o => o, nameof(ScrollValueThemeListener.Theme))]
+           )
+           {
+               Source = ScrollValueThemeListener.Instance
+           };
+
+    private static TypedBinding<ScaffoldNavBarAppearance, TProperty> CreateNavBarContextTypedBinding<TProperty>(
+        Func<ScaffoldNavBarContext, TProperty> propertyGetter,
+        string propertyName,
+        ScaffoldNavBarAppearance source
+    )
+        => new(
+               a => a.Context is { } context ? (propertyGetter(context), true) : (default!, false),
+               null,
+               [
+                   Tuple.Create<Func<ScaffoldNavBarAppearance, object>, string>(o => o, nameof(ScaffoldNavBarAppearance.Context)),
+                   Tuple.Create<Func<ScaffoldNavBarAppearance, object>, string>(o => o.Context!, propertyName)
+               ]
+           )
+           {
+               Source = source
+           };
+    
+    private static TypedBinding<Scaffold, TProperty> CreateNavBarContextTypedBinding<TProperty>(
+        Func<ScaffoldNavBarContext, TProperty> propertyGetter,
+        string propertyName,
+        RelativeBindingSource source
+    )
+        => new(
+               a => a.NavBarContext is { } context ? (propertyGetter(context), true) : (default!, false),
+               null,
+               [
+                   Tuple.Create<Func<Scaffold, object>, string>(o => o, nameof(Scaffold.NavBarContext)),
+                   Tuple.Create<Func<Scaffold, object>, string>(o => o.NavBarContext, propertyName)
+               ]
+           )
+           {
+               Source = source
+           };
 
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
 }
