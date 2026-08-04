@@ -1184,13 +1184,15 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
     /// </summary>
     internal async Task InitializeAndPresentAsync(IServiceProvider services)
     {
-        await InitializeAsync(services);
+        var initTask = InitializeAsync(services);
 
         // Initial display: synchronize the presenter with the startup destination.
         if (Presenter is { } presenter && Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy currentRoot)
         {
             await presenter.SynchronizeAsync(currentRoot.Root, ScaffoldPresentationHint.None);
         }
+        
+        await initTask;
     }
 
     /// <summary>True once the navigation engine has been initialized on this scaffold.</summary>
@@ -1265,8 +1267,6 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         Proxy = proxy;
 
         var initialSegmentName = proxy.ResolveInitialSegmentName(InitialRootPageType, navigationService.Configuration);
-        proxy.InitializeWithContent(initialSegmentName);
-
         return navigationService.InitializeAsync(proxy, initialSegmentName, InitialIntent);
     }
 
