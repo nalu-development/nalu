@@ -375,3 +375,9 @@ dotnet_diagnostic.CA2000.severity = suggestion
 dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1051.severity = none
 configure_await_analysis_mode = ui
+
+# Generated Android binding sources (AndroidGradleProject / AndroidLibrary Bind) are compiled
+# from obj/ and must not be style-analyzed.
+[**/obj/**/generated/**.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

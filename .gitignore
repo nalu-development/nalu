@@ -365,3 +365,8 @@ _to_delete/
 
 # Local Claude Code permissions (per-machine)
 .claude/settings.local.json
+
+# AndroidNative gradle layers (built by @(AndroidGradleProject) during the .NET build)
+Source/**/AndroidNative/.gradle/
+Source/**/AndroidNative/**/build/
+Source/**/AndroidNative/local.properties

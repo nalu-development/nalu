@@ -61,6 +61,15 @@
     <PackageReference Condition="$(TargetFramework.StartsWith('net10'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion10)"/>
   </ItemGroup>
 
+  <!-- Native Android layer (MAUI-style): the .NET build drives the gradle project and binds
+       the resulting aar. Hot-path logic (per-frame fade offsets, per-recycle focus checks)
+       lives in Java so framework callbacks never cross into managed code — see
+       AndroidNative/README.md. -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidGradleProject Include="AndroidNative/build.gradle" ModuleName="virtualscroll" />
+    <TransformFile Include="AndroidNative/Transforms/Metadata.xml" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
   </ItemGroup>
