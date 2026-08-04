@@ -177,16 +177,17 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     {
         _scaffold = scaffold;
 
-        BackCommand = new Command(() =>
-        {
-            if (scaffold.NavigationService is { } navigationService)
-            {
-                scaffold.Dispatcher.Dispatch(() => navigationService.GoToAsync(Navigation.Relative().Pop()).FireAndForget(scaffold.Handler));
-            }
-        });
+        // Non-reentrant commands: CanExecute stays false while the operation is in flight, so
+        // fast repeated taps can't queue duplicate pops / flyout openings.
+        BackCommand = new NaluAsyncCommand(
+            () => scaffold.NavigationService is { } navigationService
+                ? scaffold.Dispatcher.DispatchAsync(() => navigationService.GoToAsync(Navigation.Relative().Pop()))
+                : Task.CompletedTask,
+            () => scaffold.Handler
+        );
 
-        OpenFlyoutStartCommand = new Command(() => scaffold.OpenFlyoutAsync(ScaffoldFlyoutSide.Start).FireAndForget(scaffold.Handler));
-        OpenFlyoutEndCommand = new Command(() => scaffold.OpenFlyoutAsync(ScaffoldFlyoutSide.End).FireAndForget(scaffold.Handler));
+        OpenFlyoutStartCommand = new NaluAsyncCommand(() => scaffold.OpenFlyoutAsync(ScaffoldFlyoutSide.Start), () => scaffold.Handler);
+        OpenFlyoutEndCommand = new NaluAsyncCommand(() => scaffold.OpenFlyoutAsync(ScaffoldFlyoutSide.End), () => scaffold.Handler);
     }
 
     /// <summary>
