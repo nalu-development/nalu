@@ -34,7 +34,7 @@ namespace Nalu;
 /// </code>
 /// </remarks>
 [ContentProperty(nameof(Areas))]
-public partial class Scaffold : ContentPage, IDisposable
+public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 {
     private bool _initialized;
 
@@ -275,6 +275,45 @@ public partial class Scaffold : ContentPage, IDisposable
     /// </summary>
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     public Type? InitialRootPageType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the intent delivered to the startup root page (see
+    /// <see cref="InitialRootPageType"/>): its model receives it through the standard
+    /// <c>IEnteringAware&lt;TIntent&gt;</c> / <c>IAppearingAware&lt;TIntent&gt;</c> pipeline,
+    /// exactly as if the root had been navigated to with that intent. Optional.
+    /// </summary>
+    public object? InitialIntent { get; set; }
+
+    private static readonly BindablePropertyKey _currentPagePropertyKey =
+        BindableProperty.CreateReadOnly(nameof(CurrentPage), typeof(Page), typeof(Scaffold), null);
+
+    /// <summary>Bindable property for <see cref="CurrentPage"/>.</summary>
+    public static readonly BindableProperty CurrentPageProperty = _currentPagePropertyKey.BindableProperty;
+
+    /// <summary>
+    /// Gets the page currently presented by the scaffold: the top of the current root's
+    /// navigation stack. Read-only and observable via binding; null only before the scaffold
+    /// has initialized. Also exposed through <see cref="IPageContainer{T}"/>.
+    /// </summary>
+    public Page? CurrentPage => (Page?)GetValue(CurrentPageProperty);
+
+    Page IPageContainer<Page>.CurrentPage => CurrentPage!;
+
+    /// <summary>
+    /// Recomputes <see cref="CurrentPage"/> from the proxy state — invoked by the proxy on
+    /// selection changes and by the navigation stacks on push/pop/root mutations.
+    /// </summary>
+    internal void UpdateCurrentPage()
+    {
+        var stack = (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack;
+        var page = stack is null
+            ? null
+            : stack.PushedPages.Count > 0
+                ? stack.PushedPages[^1].Page
+                : stack.RootPage;
+
+        SetValue(_currentPagePropertyKey, page);
+    }
 
     /// <summary>Gets the destination areas composing the application structure.</summary>
     public IList<ScaffoldArea> Areas { get; }
@@ -1228,7 +1267,7 @@ public partial class Scaffold : ContentPage, IDisposable
         var initialSegmentName = proxy.ResolveInitialSegmentName(InitialRootPageType, navigationService.Configuration);
         proxy.InitializeWithContent(initialSegmentName);
 
-        return navigationService.InitializeAsync(proxy, initialSegmentName, null);
+        return navigationService.InitializeAsync(proxy, initialSegmentName, InitialIntent);
     }
 
     internal void SendNavigationLifecycleEvent(NavigationLifecycleEventArgs args)

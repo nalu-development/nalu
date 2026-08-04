@@ -87,10 +87,20 @@
   stale icons AND stale Android `navigationBarColor` on uiMode toggles without recreation).
   6 ground-truth UI tests + 12 resolver unit tests, both platforms.
 
+- **Host conveniences (August 2026)**: `Scaffold` implements MAUI's `IPageContainer<Page>`
+  with an observable read-only `CurrentPage` bindable (recomputed from the proxy on stack
+  mutations and selection changes); `Scaffold.InitialIntent` delivers a startup intent to the
+  initial root through the standard entering pipeline (also the §9 replay seam — unit-verified);
+  `GetScaffold`/`GetScaffoldOrDefault` retarget `IElement` and UNIFY the app-level lookup
+  (`Application` IS an `IElement`: when the parent walk reaches an `IApplication` — or starts
+  there — the first scaffold-hosted window's scaffold is returned; no conflicting overloads).
+- **Conceptual docs + migration guide SHIPPED (August 2026)**: eight docfx pages
+  (`conceptual_docs/scaffold*.md`) incl. the NaluShell → Scaffold migration guide.
+
 **Next steps, in recommended order:**
 
-1. **P3**: snapshot/restore (§9), deep-link mapping (URI → `INavigationInfo`), docfx
-   conceptual docs + NaluShell migration guide.
+1. **P3**: snapshot/restore (§9 — design DECIDED, see below; implementation next), deep-link
+   mapping (URI → `INavigationInfo`).
 2. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
    object-level effects only).
 3. Housekeeping when releasable: `Nalu.Maui` meta-package inclusion decision, docfx pages.
@@ -1018,65 +1028,89 @@ recording (`maui_recording_start`) for side-by-side comparison.
 
 ## 9. Navigation-state snapshot & restore
 
-### 9.1 Mechanism
+> **DESIGN DECIDED (August 2026, design review with Alberto): developer-driven tracking.**
+> Automatic capture was rejected — the edge-case space (which pages/intents are restorable,
+> conditional redirects during replay, wizard flows that must NOT resurrect) cannot be decided
+> framework-side. Restorability is an explicit, per-page developer decision.
 
-- **Capture**: on every successful `CommitNavigationAsync`, serialize:
-  current item/stack/root segments + the ordered push stack (segment names) + per-page intent payloads
-  (+ modal stack). Written async, cheap JSON, to app cache.
-- **Invalidation key**: app version + hash of the registered route table (page renames/removals
-  invalidate the snapshot instead of crashing the replay).
-- **Restore**: at startup (opt-in), replay as absolute navigation with **animations suppressed** and
-  **`IgnoreGuards`**. `OnEnteringAsync` re-runs naturally — pages re-fetch data; we restore *location*,
-  not stale state.
-- **Fail-open, always**: any exception during replay ⇒ discard snapshot, boot to default root.
-  Restore must never be able to brick startup.
-- **Startup destination precedence** (decided): valid snapshot → `Scaffold.InitialRootPageType` →
-  first root of the first area. The property stays a dumb configuration value; the precedence
-  lives entirely in the host's startup wiring.
-- **Truncation**: a page whose intent can't round-trip breaks the chain at that point —
-  restore lands N−1 levels deep rather than failing entirely.
-- **Scoping**: DEBUG-only by default (DevEx: restart and land where you were). Production use
-  (Android process-death restoration) is the same mechanism, enabled deliberately later.
+### 9.1 The `IScaffoldRestore` service (decided)
 
-### 9.2 Intent serializability design
-
-Question raised: `ISerializableIntent` with `string Serialize()` + default interface method using
-System.Text.Json?
-
-**Serialization is the easy half — the design constraint is *deserialization*:** the framework must
-reconstruct a **concrete type** from a payload, so it needs (a) a durable type identity in the snapshot
-and (b) a way to construct the instance. A `Serialize()` instance method alone can't provide either.
-
-Proposed design:
-
-```
-// Opt-in marker. Default path: System.Text.Json round-trip of the concrete type.
-public interface ISerializableIntent;
-
-// Escape hatch for custom wire formats / non-STJ-friendly types.
-public interface ICustomSerializableIntent : ISerializableIntent
+```csharp
+public interface IScaffoldRestore
 {
-    string Serialize();
-    static abstract object Deserialize(string payload);   // C# 11 static abstract
+    bool IsRestoring { get; }
+    void Track(object pageModel);                              // restorable, no intent
+    void Track(object pageModel, ISerializableIntent intent);  // restorable with intent
+    void Untrack(object pageModel);
+    event EventHandler<ScaffoldRestoreCompletedEventArgs>? RestoreCompleted;
 }
 ```
 
-- Snapshot stores `{ typeId, payload }` per intent. `typeId` is a **registered stable name**
-  (registration derived from the existing `AddPage<,>()` configuration or an explicit
-  `AddIntent<T>()`), *not* an assembly-qualified type name — renames/refactors then only invalidate,
-  never deserialize the wrong thing.
-- Default path (`ISerializableIntent` only): STJ serialize/deserialize of the concrete type.
-  Records with init-only/positional properties work out of the box.
-- Custom path: `ICustomSerializableIntent` for full control (invoked via a generic-constrained
-  helper so the static abstract resolves without reflection).
-- **Why not a DIM `Serialize()` on the base interface**: a default interface method body can do the STJ
-  call, but it buys nothing — the framework can call STJ itself when no custom implementation exists,
-  and DIMs complicate the AOT/trimming story for zero gain. Keep the marker empty.
-- **AOT/trimming caveat**: STJ reflection-based serialization works under iOS Mono AOT today but is
-  hostile to trimming/NativeAOT. Design the pipeline around an injectable `IIntentSerializer`
-  (default = STJ reflection; overridable with an STJ **source-gen `JsonSerializerContext`**) so
-  trimming-safe operation is a configuration, not a redesign.
-- Non-serializable intents (no marker) are simply not captured ⇒ truncation rule above applies.
+- **Only tracked pages restore.** Pages opt in from anywhere (typically `OnEnteringAsync` /
+  `OnAppearingAsync`) — untracked pages (checkout wizards, entity-creation flows) simply never
+  enter the snapshot.
+- **`Track` is last-write-wins per page model** (no separate `Replace`): re-tracking overrides
+  any previously tracked intent — including *removing* it (`Track(this)` after
+  `Track(this, x)`), or swapping the "create draft" intent for a "saved entity id" intent once
+  state materializes. `Untrack` removes the entry. Entries die automatically when their page
+  pops ("tracked and not popped"), enforced by construction: capture reads the LIVE stack and
+  looks tracked entries up by each frame's page model.
+- **Restore = the contiguous tracked prefix** of the last-used stack: A(tracked) →
+  B(untracked) → C(tracked) restores A only — resurrecting A/C would fabricate a stack that
+  never existed and C's context came from B.
+- **Root selection is captured automatically** (structural — the root exists either way);
+  `Track` on the root model additionally carries its intent. **Current root/stack only** (v1
+  decision, Alberto-confirmed); the schema field covers a later multi-root format.
+- **The tracked intent is delivered through the normal pipeline** on restore
+  (`IEnteringAware<TIntent>` — the engine's boot `InitializeAsync(proxy, segment, intent)`
+  already takes the root intent): a page's restore path IS its deep-entry path.
+- **`IsRestoring`** is true from replay start through the replay commit (restored pages see it
+  in their lifecycle) — this is how the redirect edge cases are DELEGATED to the developer
+  (`if (!restore.IsRestoring) redirect(...)`), replacing an earlier idea of auto-re-dispatching
+  `NavigationIgnored` requests (dropped: too much magic). Background: a navigation fired from
+  inside a lifecycle callback throws `InvalidNavigationException` by engine design (AsyncLocal
+  re-entrancy guard; fire-and-forget discards swallow it, Nalu's `.FireAndForget()` rethrows in
+  DEBUG); the prescribed `IDispatcher.DispatchDelayed` pattern lands after the commit — or gets
+  `NavigationIgnored` when a mid-replay dispatch interleaves — hence the explicit flag.
+- **Self-healing**: restored pages call `Track` again in their own entering, so the snapshot
+  converges to the restored state with no special handling.
+- The service is always injectable and INERT when restore is not enabled (`Track` no-ops,
+  `IsRestoring` false) — shared/library pages can call it unconditionally.
+
+### 9.2 Mechanism (decided)
+
+- **Capture**: tracked entries serialize their intent AT `Track` TIME (no live-object
+  retention; failures surface immediately — throw in DEBUG, log-and-drop in RELEASE).
+  Snapshot writes are debounced and fire-and-forget-swallowed (capture must never affect
+  navigation), triggered by Track/Untrack, successful commits (pops prune), and app
+  backgrounding. Store behind `IScaffoldRestoreStore` (default: JSON file in the app cache).
+- **Invalidation header**: schema version + app version/build + a hash of the registered route
+  table — renames/removals invalidate the snapshot instead of replaying into a renamed world.
+- **Restore at boot** (the `Scaffold.InitializeAsync` seam): read-and-DELETE the snapshot,
+  boot the engine on the snapshot's root segment (+ root intent), then replay the tracked
+  pushes as immediate (non-animated) navigations; re-persist after success. Delete-before-replay
+  is the crash-loop containment: a replay that crashes the app yields a clean next boot.
+  No guard bypass needed: at boot there is nothing to leave, so `ILeavingGuard` cannot fire.
+- **Fail-open, always**: unknown segment/typeId truncates the prefix at that frame; any
+  exception discards the snapshot and boots the default destination. Restore must never brick
+  startup.
+- **Startup destination precedence**: valid snapshot → `Scaffold.InitialRootPageType` (with
+  `Scaffold.InitialIntent`) → first root of the first area.
+- **Policy**: opt-in via `UseNaluScaffold(s => s.WithRestore(...))`; DEBUG-only by default
+  (DevEx: restart and land where you were); production use (Android process death) is a
+  deliberate policy switch on the same mechanism.
+
+### 9.3 Intent serializability (decided)
+
+- `ISerializableIntent` is an **empty marker**; `Track(this, intent)` requires it at compile
+  time. The wire mechanism is an injectable `IIntentSerializer` (default: System.Text.Json
+  reflection; overridable with a source-gen `JsonSerializerContext` for trimming/NativeAOT).
+- Snapshot stores `{ typeId, payload }`; `typeId` is a **registered stable name**
+  (`WithRestore(r => r.AddIntent<T>("name"))`, name defaulting to the type's short name,
+  collision-checked) — never an assembly-qualified type name: renames only invalidate, never
+  deserialize the wrong thing.
+- The earlier `ICustomSerializableIntent` static-abstract escape hatch is DEFERRED (YAGNI):
+  replacing `IIntentSerializer` covers custom wire formats without a second interface.
 
 ---
 

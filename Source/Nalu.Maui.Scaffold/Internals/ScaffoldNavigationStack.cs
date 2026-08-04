@@ -43,6 +43,8 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
             {
                 FindHostPage()?.AddLogicalChild(value);
             }
+
+            NotifyCurrentPageMayHaveChanged();
         }
     }
 
@@ -54,6 +56,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     {
         _pushedPages.Add(entry);
         FindHostPage()?.AddLogicalChild(entry.Page);
+        NotifyCurrentPageMayHaveChanged();
     }
 
     /// <summary>Removes and returns the top page.</summary>
@@ -67,8 +70,16 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
         // attached content so the page model is not retained through it.
         Scaffold.CleanupPageFlyoutContent(entry.Page);
 
+        NotifyCurrentPageMayHaveChanged();
+
         return entry;
     }
+
+    /// <summary>
+    /// The scaffold's observable <see cref="Scaffold.CurrentPage"/> recomputes from the
+    /// PROXY state, so mutations on non-current stacks are naturally no-ops.
+    /// </summary>
+    private void NotifyCurrentPageMayHaveChanged() => (FindHostPage() as Scaffold)?.UpdateCurrentPage();
 
     private Page? FindHostPage()
     {

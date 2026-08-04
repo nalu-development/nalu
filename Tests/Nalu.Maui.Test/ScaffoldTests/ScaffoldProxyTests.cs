@@ -11,6 +11,8 @@ public class ScaffoldProxyTests
 {
     public interface IHomePageModel : INotifyPropertyChanged;
 
+    public sealed record ScaffoldStartupIntent;
+
     public interface ISearchPageModel : INotifyPropertyChanged;
 
     public interface ISettingsPageModel : INotifyPropertyChanged;
@@ -110,7 +112,7 @@ public class ScaffoldProxyTests
         mapping.Add(typeof(IDetailPageModel), typeof(DetailPage));
         mapping.Add(typeof(IDeepDetailPageModel), typeof(DeepDetailPage));
 
-        services.AddScoped(_ => Substitute.For<IHomePageModel>());
+        services.AddScoped(_ => Substitute.For<IHomePageModel, IEnteringAware<ScaffoldStartupIntent>>());
         services.AddScoped<HomePage>();
         services.AddScoped(_ => Substitute.For<ISearchPageModel>());
         services.AddScoped<SearchPage>();
@@ -174,6 +176,40 @@ public class ScaffoldProxyTests
         settingsArea.CurrentRoot!.IsSelected.Should().BeTrue();
         settingsArea.CurrentRoot.NavigationStack.RootPage.Should().BeOfType<SettingsPage>();
         _tabBar.Roots[0].IsSelected.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Scaffold, when initialized with InitialIntent, delivers it to the root page model")]
+    public async Task ScaffoldWhenInitializedWithInitialIntentDeliversItToTheRootPageModel()
+    {
+        var intent = new ScaffoldStartupIntent();
+        _scaffold.InitialIntent = intent;
+
+        await _scaffold.InitializeAsync(_serviceProvider);
+
+        var model = (IEnteringAware<ScaffoldStartupIntent>)_tabBar.Roots[0].NavigationStack.RootPage!.BindingContext;
+        await model.Received(1).OnEnteringAsync(intent);
+    }
+
+    [Fact(DisplayName = "Scaffold CurrentPage tracks initialization, pushes, pops and area switches")]
+    public async Task ScaffoldCurrentPageTracksNavigation()
+    {
+        _scaffold.CurrentPage.Should().BeNull("nothing is presented before initialization");
+
+        await _scaffold.InitializeAsync(_serviceProvider);
+        _scaffold.CurrentPage.Should().BeOfType<HomePage>();
+        ((IPageContainer<Page>)_scaffold).CurrentPage.Should().BeSameAs(_scaffold.CurrentPage);
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().Push<IDeepDetailPageModel>());
+        _scaffold.CurrentPage.Should().BeOfType<DeepDetailPage>();
+
+        await _navigationService.GoToAsync(Navigation.Relative().Pop());
+        _scaffold.CurrentPage.Should().BeOfType<DetailPage>();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<ISettingsPageModel>());
+        _scaffold.CurrentPage.Should().BeOfType<SettingsPage>();
+
+        await _navigationService.GoToAsync(Navigation.Absolute().Root<IHomePageModel>());
+        _scaffold.CurrentPage.Should().BeOfType<HomePage>("returning to the preserved home stack");
     }
 
     [Fact(DisplayName = "Scaffold, when pushing multiple pages in one navigation, synchronizes the presenter once")]

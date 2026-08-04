@@ -625,5 +625,6 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
         targetArea.Area.IsSelected = true;
         targetRoot.Root.IsSelected = true;
         _scaffold.CurrentArea = targetArea.Area;
+        _scaffold.UpdateCurrentPage();
     }
 }
