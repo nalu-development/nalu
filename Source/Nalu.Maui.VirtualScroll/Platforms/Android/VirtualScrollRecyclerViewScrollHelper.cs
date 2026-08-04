@@ -7,16 +7,13 @@ namespace Nalu;
 /// Helper class for scrolling RecyclerView with different ScrollToPosition options.
 /// </summary>
 // Forked from https://github.com/dotnet/maui/blob/main/src/Controls/src/Core/Handlers/Items/Android/ScrollHelper.cs
-internal class VirtualScrollRecyclerViewScrollHelper : RecyclerView.OnScrollListener
+// The KeepScrollOffset delta tracking lives in the Java layer (VirtualScrollNativeOffsetTracker):
+// once armed it runs on every scroll frame and must not cross the JNI boundary per frame.
+internal sealed class VirtualScrollRecyclerViewScrollHelper : IDisposable
 {
     private readonly RecyclerView _recyclerView;
     private Action? _pendingScrollAdjustment;
-    private bool _undoNextScrollAdjustment;
-    private bool _maintainingScrollOffsets;
-    private int _lastScrollX;
-    private int _lastScrollY;
-    private int _lastDeltaX;
-    private int _lastDeltaY;
+    private Platform.VirtualScrollNativeOffsetTracker? _offsetTracker;
 
     public VirtualScrollRecyclerViewScrollHelper(RecyclerView recyclerView)
     {
@@ -27,19 +24,7 @@ internal class VirtualScrollRecyclerViewScrollHelper : RecyclerView.OnScrollList
     /// Used to maintain scroll offset when using ItemsUpdatingScrollMode KeepScrollOffset.
     /// </summary>
     public void UndoNextScrollAdjustment()
-    {
-        // Don't start tracking the scroll offsets until we really need to
-        if (!_maintainingScrollOffsets)
-        {
-            _maintainingScrollOffsets = true;
-            _recyclerView.AddOnScrollListener(this);
-        }
-
-        _undoNextScrollAdjustment = true;
-
-        _lastScrollX = _recyclerView.ComputeHorizontalScrollOffset();
-        _lastScrollY = _recyclerView.ComputeVerticalScrollOffset();
-    }
+        => (_offsetTracker ??= new Platform.VirtualScrollNativeOffsetTracker(_recyclerView)).UndoNextScrollAdjustment();
 
     /// <summary>
     /// Adjusts scroll after a pending operation.
@@ -216,35 +201,11 @@ internal class VirtualScrollRecyclerViewScrollHelper : RecyclerView.OnScrollList
         _recyclerView.ScrollBy(offset, 0);
     }
 
-    private void TrackOffsets()
+    public void Dispose()
     {
-        var newXOffset = _recyclerView.ComputeHorizontalScrollOffset();
-        var newYOffset = _recyclerView.ComputeVerticalScrollOffset();
-
-        _lastDeltaX = Math.Max(newXOffset - _lastScrollX, 0);
-        _lastDeltaY = Math.Max(newYOffset - _lastScrollY, 0);
-
-        _lastScrollX = newXOffset;
-        _lastScrollY = newYOffset;
-
-        if (_undoNextScrollAdjustment)
-        {
-            // This last scroll adjustment happened because a new item was added, and it caused the scroll
-            // offset to shift; since the ItemsUpdatingScrollMode is set to KeepScrollOffset; we need to undo 
-            // that shift and stay where we were before the item was added
-
-            _undoNextScrollAdjustment = false;
-            _recyclerView.ScrollBy(-_lastDeltaX, -_lastDeltaY);
-
-            _lastDeltaX = 0;
-            _lastDeltaY = 0;
-        }
-    }
-
-    public override void OnScrolled(RecyclerView recyclerView, int dx, int dy)
-    {
-        base.OnScrolled(recyclerView, dx, dy);
-        TrackOffsets();
+        _offsetTracker?.Detach();
+        _offsetTracker?.Dispose();
+        _offsetTracker = null;
     }
 }
 
