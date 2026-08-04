@@ -650,7 +650,7 @@ public partial class VirtualScrollHandler
             // Enable scroll events - add listener if not already added
             if (handler._scrollListener is null)
             {
-                handler._scrollListener = new VirtualScrollRecyclerViewScrollListener((rv, scrollX, scrollY, totalWidth, totalHeight) =>
+                handler._scrollListener = new VirtualScrollRecyclerViewScrollListener((scrollX, scrollY, totalWidth, totalHeight) =>
                 {
                     if (virtualScroll is IVirtualScrollController controller)
                     {

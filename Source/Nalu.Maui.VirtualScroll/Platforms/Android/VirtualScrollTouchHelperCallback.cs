@@ -64,21 +64,46 @@ internal class VirtualScrollTouchHelperCallback : ItemTouchHelper.Callback
         }
 
         var dragInfo = new VirtualScrollDragInfo(adapter.GetItem(sectionIndex, itemIndex), sectionIndex, itemIndex);
-        dragHandler.OnDragInitiating(dragInfo);
+
+        // QUERY-ONLY: ItemTouchHelper re-invokes getMovementFlags during an in-flight drag,
+        // so the drag lifecycle must not fire from here (OnDragStarted lives in
+        // OnSelectedChanged, OnDragEnded in ClearView). Initiating still precedes the
+        // CanDragItem veto, but only for the selection attempt, not the re-queries.
+        if (_draggingItem is null)
+        {
+            dragHandler.OnDragInitiating(dragInfo);
+        }
+
         if (!dragHandler.CanDragItem(dragInfo))
         {
             return MakeMovementFlags(0, 0);
         }
-        
+
         var orientation = ((VirtualScrollRecyclerView) recyclerView).Orientation;
         var dragFlags = orientation == ItemsLayoutOrientation.Vertical ? ItemTouchHelper.Up | ItemTouchHelper.Down : ItemTouchHelper.Left | ItemTouchHelper.Right;
 
-        _originalSectionIndex = dragInfo.SectionIndex;
-        _originalItemIndex = dragInfo.ItemIndex;
-        _draggingItem = new WeakReference<object?>(dragInfo.Item);
-        dragHandler.OnDragStarted(dragInfo);
-
         return MakeMovementFlags(dragFlags, 0);
+    }
+
+    public override void OnSelectedChanged(RecyclerView.ViewHolder? viewHolder, int actionState)
+    {
+        base.OnSelectedChanged(viewHolder, actionState);
+
+        // The definitive "drag started" moment: the holder got SELECTED for dragging —
+        // exactly once per gesture, unlike the getMovementFlags queries.
+        if (actionState == ItemTouchHelper.ActionStateDrag &&
+            viewHolder is not null &&
+            _flattenedAdapter is not null &&
+            _virtualScroll?.DragHandler is { } dragHandler &&
+            _virtualScroll.Adapter is { } adapter &&
+            _flattenedAdapter.TryGetSectionAndItemIndex(viewHolder.AbsoluteAdapterPosition, out var sectionIndex, out var itemIndex))
+        {
+            var dragInfo = new VirtualScrollDragInfo(adapter.GetItem(sectionIndex, itemIndex), sectionIndex, itemIndex);
+            _originalSectionIndex = sectionIndex;
+            _originalItemIndex = itemIndex;
+            _draggingItem = new WeakReference<object?>(dragInfo.Item);
+            dragHandler.OnDragStarted(dragInfo);
+        }
     }
 
     public override bool OnMove(RecyclerView recyclerView, RecyclerView.ViewHolder current, RecyclerView.ViewHolder target)

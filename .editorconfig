@@ -381,3 +381,6 @@ configure_await_analysis_mode = ui
 [**/obj/**/generated/**.cs]
 generated_code = true
 dotnet_analyzer_diagnostic.severity = none
+# Compiler nullability mismatches in generated binding overrides (Invoker classes)
+dotnet_diagnostic.CS8764.severity = none
+dotnet_diagnostic.CS8765.severity = none

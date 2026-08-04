@@ -6,6 +6,7 @@ namespace Nalu;
 internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
 {
     private readonly VirtualScrollRecyclerViewAdapter _adapter;
+    private readonly IVirtualScrollFlattenedAdapter _flattenedAdapter;
     private readonly Action _onChangesApplied;
     private readonly IDisposable _subscription;
     private bool _disposed;
@@ -16,6 +17,7 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
     public VirtualScrollPlatformFlattenedAdapterNotifier(VirtualScrollRecyclerViewAdapter adapter, IVirtualScrollFlattenedAdapter flattenedAdapter, Action onChangesApplied)
     {
         _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
+        _flattenedAdapter = flattenedAdapter;
         _onChangesApplied = onChangesApplied;
         _subscription = flattenedAdapter.Subscribe(OnAdapterChanged);
     }
@@ -38,6 +40,11 @@ internal class VirtualScrollPlatformFlattenedAdapterNotifier : IDisposable
 
     private void ApplyChanges(VirtualScrollFlattenedChangeSet changeSet)
     {
+        // The flattened adapter already holds the FINAL count for the whole changeset; the
+        // Java-side cache must reflect it before the notify* calls reach the next layout pass
+        // (getItemCount is cached natively — see VirtualScrollNativeAdapter).
+        _adapter.UpdateItemCount(_flattenedAdapter.GetItemCount());
+
         foreach (var change in changeSet.Changes)
         {
             ApplyChange(change);

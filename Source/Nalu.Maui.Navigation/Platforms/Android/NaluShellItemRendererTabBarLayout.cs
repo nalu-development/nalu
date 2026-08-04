@@ -1,7 +1,6 @@
 #if NET10_0_OR_GREATER
 using System.Diagnostics.CodeAnalysis;
 using Java.Lang;
-using Microsoft.Maui.Platform;
 #endif
 using Android.Content;
 using Android.Runtime;
@@ -50,14 +49,21 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout
         }
     }
 
+    private static readonly int _unspecifiedHeightSpec = MeasureSpec.MakeMeasureSpec(0, Android.Views.MeasureSpecMode.Unspecified);
+
     protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
     {
         int width;
         int height;
-        
+
         if (_tabBar != null)
         {
-            MeasureChild(_tabBar, widthMeasureSpec, heightMeasureSpec);
+            // The strip wraps the bar vertically, so the bar's height must be measured
+            // UNCONSTRAINED: newer ConstraintLayout/Android versions (observed on API 37) hand
+            // wrap-content children a finite height spec where older ones passed UNSPECIFIED,
+            // and stretchy TabBarView roots would fill it (full-screen bar). The width spec
+            // passes through untouched.
+            _tabBar.Measure(widthMeasureSpec, _unspecifiedHeightSpec);
             width = _tabBar.MeasuredWidth;
             height = _tabBar.MeasuredHeight;
         }
@@ -66,7 +72,7 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout
             width = 0;
             height = 0;
         }
-        
+
         SetMeasuredDimension(width, height);
     }
 
@@ -75,7 +81,10 @@ public class NaluShellItemRendererTabBarLayout : FrameLayout
     {
         if (_tabBar != null)
         {
-            (_tabBar as LayoutViewGroup)!.Layout(0, 0, right, bottom - top);
+            // View.Layout, NOT a LayoutViewGroup cast: MAUI wraps the tab bar view in a
+            // ContainerView whenever it needs a container (Shadow, Clip, InputTransparent),
+            // and the cast made any such TabBarView crash with an NRE here.
+            _tabBar.Layout(0, 0, right, bottom - top);
         }
         else
         {

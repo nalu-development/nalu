@@ -38,6 +38,10 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Nalu.Maui.Benchmarks</_Parameter1>
     </AssemblyAttribute>
+    <!-- Test hooks (e.g. VirtualScrollDragSimulator) for the DevFlow UI-test harness app. -->
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Nalu.Maui.TestApp</_Parameter1>
+    </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
     </AssemblyAttribute>

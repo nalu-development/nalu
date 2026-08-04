@@ -349,7 +349,13 @@ public sealed class NaluApp : IAsyncLifetime
     public async Task AndroidRealTapAsync(string automationId)
     {
         var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
+        var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
 
+        await RunAdbAsync($"shell input tap {(int)(bounds.CenterX * scale)} {(int)(bounds.CenterY * scale)}").ConfigureAwait(false);
+    }
+
+    private async Task<double> GetAndroidDisplayScaleAsync()
+    {
         if (_androidDisplayScale is not { } scale)
         {
             // "Physical density: 480" (an "Override density" line, when present, is the
@@ -360,7 +366,41 @@ public sealed class NaluApp : IAsyncLifetime
             _androidDisplayScale = scale;
         }
 
-        await RunAdbAsync($"shell input tap {(int)(bounds.CenterX * scale)} {(int)(bounds.CenterY * scale)}").ConfigureAwait(false);
+        return scale;
+    }
+
+    /// <summary>
+    /// A REAL long-press drag between two elements' centers, driven by discrete
+    /// <c>input motionevent</c> steps in a single adb shell invocation — the only way to
+    /// trigger ItemTouchHelper drag&amp;drop: synthetic agent gestures have no touch physics
+    /// (no held long-press before the move), and the per-command injection latency provides
+    /// the natural drag pacing.
+    /// </summary>
+    public async Task AndroidLongPressDragAsync(string fromAutomationId, string toAutomationId, int moveSteps = 8)
+    {
+        var from = await GetBoundsAsync(fromAutomationId).ConfigureAwait(false);
+        var to = await GetBoundsAsync(toAutomationId).ConfigureAwait(false);
+        var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
+
+        // Integral device pixels only (the transport decimal-comma-mangles fractions on it-IT hosts).
+        var fromX = (int)Math.Round(from.CenterX * scale);
+        var fromY = (int)Math.Round(from.CenterY * scale);
+        var toX = (int)Math.Round(to.CenterX * scale);
+        var toY = (int)Math.Round(to.CenterY * scale);
+
+        var script = new System.Text.StringBuilder($"shell input motionevent DOWN {fromX} {fromY} ; sleep 0.8");
+
+        for (var step = 1; step <= moveSteps; step++)
+        {
+            var x = fromX + ((toX - fromX) * step / moveSteps);
+            var y = fromY + ((toY - fromY) * step / moveSteps);
+            script.Append($" ; input motionevent MOVE {x} {y}");
+        }
+
+        // Settle at the destination before releasing so ItemTouchHelper commits the last move.
+        script.Append($" ; sleep 0.3 ; input motionevent UP {toX} {toY}");
+
+        await RunAdbAsync(script.ToString()).ConfigureAwait(false);
     }
 
     #endregion

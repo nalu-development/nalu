@@ -1,42 +1,14 @@
-using AndroidX.RecyclerView.Widget;
-using Microsoft.Maui.Platform;
-
 namespace Nalu;
 
 /// <summary>
-/// Listener for RecyclerView scroll events in VirtualScroll on Android.
+/// Listener for RecyclerView scroll events in VirtualScroll on Android. The per-frame
+/// computation (offsets, ranges, density conversion) happens in the Java base class —
+/// this managed callback is the single boundary crossing per frame, receiving four ready
+/// device-independent values.
 /// </summary>
-internal class VirtualScrollRecyclerViewScrollListener : RecyclerView.OnScrollListener
+internal class VirtualScrollRecyclerViewScrollListener(Action<double, double, double, double> scrollHandler)
+    : Platform.VirtualScrollNativeScrollEventsListener
 {
-    private readonly Action<RecyclerView, double, double, double, double> _scrollHandler;
-
-    public VirtualScrollRecyclerViewScrollListener(Action<RecyclerView, double, double, double, double> scrollHandler)
-    {
-        _scrollHandler = scrollHandler;
-    }
-
-    public override void OnScrolled(RecyclerView recyclerView, int dx, int dy)
-    {
-        base.OnScrolled(recyclerView, dx, dy);
-        
-        // Get absolute scroll positions in pixels
-        var scrollX = recyclerView.ComputeHorizontalScrollOffset();
-        var scrollY = recyclerView.ComputeVerticalScrollOffset();
-        
-        // Get total scrollable range in pixels
-        var totalWidth = recyclerView.ComputeHorizontalScrollRange();
-        var totalHeight = recyclerView.ComputeVerticalScrollRange();
-        
-        // Convert from pixels to device-independent units
-        var context = recyclerView.Context;
-        if (context is not null)
-        {
-            var scrollXDp = context.FromPixels(scrollX);
-            var scrollYDp = context.FromPixels(scrollY);
-            var totalWidthDp = context.FromPixels(totalWidth);
-            var totalHeightDp = context.FromPixels(totalHeight);
-            
-            _scrollHandler?.Invoke(recyclerView, scrollXDp, scrollYDp, totalWidthDp, totalHeightDp);
-        }
-    }
+    public override void OnScrolledDp(double scrollX, double scrollY, double totalWidth, double totalHeight)
+        => scrollHandler(scrollX, scrollY, totalWidth, totalHeight);
 }
