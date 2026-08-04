@@ -29,6 +29,27 @@
                 </Grid>
             </Border>
 
+            <!-- Expected duration: tapping opens the duration-wheel bottom sheet (§7.2 overlay). -->
+            <Border Style="{StaticResource Card}" Padding="16,14">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <Label Text="Expected duration" VerticalOptions="Center" />
+                    <Label Grid.Column="1"
+                           Text="{Binding DurationLabel}"
+                           TextColor="{StaticResource Accent}"
+                           FontFamily="SemiBold"
+                           VerticalOptions="Center" />
+                    <Label Grid.Column="2"
+                           Text="&#xe5cc;"
+                           FontFamily="Material"
+                           FontSize="18"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                           VerticalOptions="Center" />
+                </Grid>
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding EditDurationCommand}" />
+                </Border.GestureRecognizers>
+            </Border>
+
             <Button Text="Save" Command="{Binding SaveCommand}" Margin="0,8,0,0" />
 
             <Button Text="Delete"

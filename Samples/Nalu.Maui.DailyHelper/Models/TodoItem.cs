@@ -14,6 +14,17 @@ public enum TodoBucket
 /// </summary>
 public sealed record TodoItem(Guid Id, string Title, string? Notes, DateOnly? DueDate, bool IsDone, int SortOrder)
 {
+    /// <summary>The expected effort, picked with the duration-wheel sheet (optional).</summary>
+    public TimeSpan? Duration { get; init; }
+
+    public bool HasDuration => Duration is not null;
+
+    public string DurationLabel
+        => Duration is not { } duration ? string.Empty
+            : duration.Hours > 0
+                ? duration.Minutes > 0 ? $"{duration.Hours} h {duration.Minutes} min" : $"{duration.Hours} h"
+                : $"{duration.Minutes} min";
+
     public TodoBucket Bucket
         => IsDone ? TodoBucket.Done
             : DueDate is { } due && due <= DateOnly.FromDateTime(DateTime.Today) ? TodoBucket.Today

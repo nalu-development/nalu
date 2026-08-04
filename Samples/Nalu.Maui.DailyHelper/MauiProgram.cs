@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.DevFlow.Agent;
+using Nalu.Maui.DailyHelper.Overlays;
 using Nalu.Maui.DailyHelper.Services;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 namespace Nalu.Maui.DailyHelper;
 
@@ -13,7 +15,12 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .UseNaluNavigation<App>(nav => nav.AddPages())
-            .UseNaluScaffold()
+
+            // Model-first overlays (§7.2): the duration sheet is shown via IOverlayService
+            // from the task editor's page model — no view references in the model.
+            .UseNaluScaffold(scaffold => scaffold.AddOverlay<DurationSheetModel, DurationSheetView>())
+            .UseSkiaSharp()
+            .UseNaluControls()
             .UseNaluVirtualScroll()
             .ConfigureFonts(fonts =>
                 {

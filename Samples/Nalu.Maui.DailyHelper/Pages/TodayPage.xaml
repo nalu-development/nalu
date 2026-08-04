@@ -75,6 +75,10 @@
                     <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
                         <Label Text="{Binding Title}" FontSize="16" />
                         <Label Text="{Binding Notes}" Style="{StaticResource Muted}" IsVisible="{Binding HasNotes}" LineBreakMode="TailTruncation" />
+                        <HorizontalStackLayout Spacing="4" IsVisible="{Binding HasDuration}">
+                            <Label Text="&#xe8b5;" FontFamily="Material" FontSize="12" TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                            <Label Text="{Binding DurationLabel}" Style="{StaticResource Muted}" FontSize="12" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
                         <VerticalStackLayout.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding Model.EditTaskCommand, Source={x:Reference Self}, x:DataType=pages:TodayPage}"
                                                   CommandParameter="{Binding .}" />

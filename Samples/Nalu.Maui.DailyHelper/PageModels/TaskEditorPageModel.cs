@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Nalu.Maui.DailyHelper.Models;
+using Nalu.Maui.DailyHelper.Overlays;
 using Nalu.Maui.DailyHelper.Services;
 
 namespace Nalu.Maui.DailyHelper.PageModels;
@@ -8,7 +9,7 @@ namespace Nalu.Maui.DailyHelper.PageModels;
 /// <summary>Navigation intent opening the editor on an existing task.</summary>
 public sealed record TaskEditorIntent(Guid Id);
 
-public partial class TaskEditorPageModel(INavigationService navigation, TodoStore todos)
+public partial class TaskEditorPageModel(INavigationService navigation, TodoStore todos, IOverlayService overlays)
     : ObservableObject, IEnteringAware, IEnteringAware<TaskEditorIntent>
 {
     private TodoItem? _original;
@@ -18,6 +19,7 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanSave))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     public partial string Title { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -31,6 +33,32 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
 
     [ObservableProperty]
     public partial bool CanDelete { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DurationLabel))]
+    public partial TimeSpan? Duration { get; set; }
+
+    public string DurationLabel
+        => Duration is not { } duration ? "None"
+            : duration.Hours > 0
+                ? duration.Minutes > 0 ? $"{duration.Hours} h {duration.Minutes} min" : $"{duration.Hours} h"
+                : $"{duration.Minutes} min";
+
+    /// <summary>
+    /// Opens the duration-wheel bottom sheet (a model-first §7.2 overlay). A null RESULT means
+    /// the sheet was dismissed (scrim/pull-down/back) — keep the current value; the wrapper's
+    /// null Duration is the explicit Clear.
+    /// </summary>
+    [RelayCommand]
+    private async Task EditDurationAsync()
+    {
+        var result = await overlays.ShowBottomSheetAsync<DurationSheetModel, DurationSheetResult>(new DurationSheetIntent(Duration));
+
+        if (result is not null)
+        {
+            Duration = result.Duration;
+        }
+    }
 
     public ValueTask OnEnteringAsync()
     {
@@ -51,6 +79,7 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
             Notes = _original.Notes ?? string.Empty;
             HasDueDate = _original.DueDate is not null;
             DueDate = _original.DueDate?.ToDateTime(TimeOnly.MinValue) ?? DateTime.Today;
+            Duration = _original.Duration;
             CanDelete = true;
         }
 
@@ -69,7 +98,8 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
                 {
                     Title = Title.Trim(),
                     Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-                    DueDate = HasDueDate ? DateOnly.FromDateTime(DueDate) : null
+                    DueDate = HasDueDate ? DateOnly.FromDateTime(DueDate) : null,
+                    Duration = Duration
                 }
             );
         }
