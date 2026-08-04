@@ -43,6 +43,8 @@ centered pill with icon+label items and **automatic overflow**: when items don't
 configured item width, the bar shows a "More" item opening a wrap-grid panel with the remaining
 roots (reusing the same item template).
 
+<img src="assets/images/scaffold-tabbar.gif" width="414" alt="The default tab bar pill switching between roots" />
+
 The default bar is styled with plain MAUI implicit styles (`ScaffoldTabBarView`,
 `ScaffoldTabBarItemView`, `ScaffoldTabBarOverflowView` are public types) — colors, pill
 background, spacing and fonts are all standard setters.

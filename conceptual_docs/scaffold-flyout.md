@@ -4,6 +4,11 @@ The Scaffold supports **two independent drawers** — start and end side — wit
 slide-in animation, RTL awareness and engine-routed selection. "It's just a drawer": any MAUI
 view can be the content.
 
+<img src="assets/images/scaffold-flyout.gif" width="300" alt="A page-level end drawer with custom options content opening over a fading scrim" />
+
+*The sample's Forecast page presents a page-level END drawer with custom content; the scrim
+fades, the drawer slides, and scrim tap dismisses.*
+
 ## Enabling a drawer
 
 Drawers are **opt-in**: content alone is not enough, the side's *mode* must allow it.

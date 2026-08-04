@@ -35,6 +35,11 @@ public static readonly ScaffoldPageTransition Reveal = new(
 Tag any view on both pages with the same `Scaffold.TransitionName` — matching pairs fly
 between their geometries during push and pop, riding the standard slide:
 
+<img src="assets/images/scaffold-shared-elements.gif" width="300" alt="Hero photo, temperature and icon flying between the card and the detail page" />
+
+*The card's photo, temperature, icon — and even the darkening scrim — fly between the two
+layouts on push and pop.*
+
 ```xml
 <!-- List page: the card photo -->
 <Image nalu:Scaffold.TransitionName="weather-photo" Source="..." Aspect="AspectFill" />

@@ -37,6 +37,11 @@ the placement area.
 
 ## Bottom sheets
 
+<img src="assets/images/scaffold-duration-sheet.gif" width="300" alt="A bottom sheet hosting a duration wheel, shown from a page model via IOverlayService" />
+
+*The sample's duration picker: a model-first bottom sheet (`IOverlayService`) hosting the
+`Nalu.Maui.Controls` DurationWheel, closing with a typed result.*
+
 ```csharp
 await scaffold.ShowBottomSheetAsync(new FilterSheet(), new ScaffoldBottomSheetOptions
 {

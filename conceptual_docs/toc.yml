@@ -39,6 +39,8 @@
       href: scaffold-structure.md
     - name: Nav Bar
       href: scaffold-navbar.md
+    - name: Scroll-Driven Effects
+      href: scaffold-scroll.md
     - name: Flyouts
       href: scaffold-flyout.md
     - name: Popups & Sheets

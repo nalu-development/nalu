@@ -106,17 +106,10 @@ live scroll offset with the `ScrollValue` / `ThemeScrollValue` markup extensions
 </ContentPage>
 ```
 
-Details:
-
-- `ScrollRampStart`/`ScrollRampEnd` on the page set the default window; each extension may
-  override them (`RampStart=`/`RampEnd=`).
-- `Extrapolate=Clamp` (default) holds endpoint values outside the window;
-  `Extrapolate=Extend` keeps extrapolating linearly — which turns a range mapping into a
-  *speed factor*, e.g. half-speed parallax:
-  `TranslationY="{nalu:ScrollValue RampStart=0, RampEnd=100, From=0, To=50, Extrapolate=Extend}"`.
-- An `Easing=` shapes the ramp interior.
-- Works on any element inside the scaffold tree **and** on `ScaffoldNavBarAppearance`
-  properties, for numeric, `Color` and solid `Brush` targets.
+This is one instance of the scaffold's general **scroll channel** — the same machinery drives
+parallax headers, fading titles and any other scroll-bound property on chrome or page content.
+Full API (tracker, ramps, `Extrapolate` semantics) and the parallax recipe:
+**[Scroll-Driven Effects](scaffold-scroll.md)**.
 
 The [system bar icons follow automatically](scaffold-systembars.md): when the materializing
 bar becomes opaque, status-bar icons flip to contrast with it.

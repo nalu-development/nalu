@@ -27,12 +27,18 @@ navigation — tab tap, back gesture, flyout selection — routes through the Na
 engine (guards, lifecycle, intents included). What you style is what renders, identically, on
 both platforms.
 
+<img src="assets/images/scaffold-scroll-chrome.gif" width="300" alt="Scroll-materializing nav bar over a full-bleed photo header" />
+
+*One page of the sample app: full-bleed photo header, scroll-materializing nav bar, fading
+title, parallax — and the status-bar icons flipping to match. All declarative.*
+
 **What you get:**
 
 | Feature | Docs |
 |---------|------|
 | Areas, roots and the tab bar (with overflow) | [Structure & Tab Bar](scaffold-structure.md) |
-| Nav bar, appearance system, scroll-driven chrome | [Nav Bar](scaffold-navbar.md) |
+| Nav bar and the appearance system | [Nav Bar](scaffold-navbar.md) |
+| Scroll tracker, materializing chrome, parallax | [Scroll-Driven Effects](scaffold-scroll.md) |
 | Drawers on both sides | [Flyouts](scaffold-flyout.md) |
 | Popups, bottom sheets, tab bar panels, MVVM overlays | [Popups & Sheets](scaffold-overlays.md) |
 | Page transitions, shared elements, modal pages, predictive back | [Transitions](scaffold-transitions.md) |
