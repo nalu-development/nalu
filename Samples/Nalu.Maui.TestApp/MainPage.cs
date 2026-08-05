@@ -217,7 +217,14 @@ internal static class TestPageDecorator
 
         contentPage.Content = null;
 
-        var grid = new Grid { AutomationId = TestPageRootAutomationId };
+        // The wrapper must be TRANSPARENT to safe-area insets: each test page owns its own
+        // safe-area decisions, and a defaulted wrapper would consume the bottom inset for
+        // everyone (found via the SlideBox flow-through probe).
+        var grid = new Grid
+                   {
+                       AutomationId = TestPageRootAutomationId,
+                       SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None)
+                   };
         grid.Add(content);
         grid.Add(resetButton);
 
