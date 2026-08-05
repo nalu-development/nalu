@@ -21,6 +21,14 @@ public sealed class SlideBoxItem : Element
         propertyChanged: static (bindable, _, _) => ((SlideBoxItem) bindable).OnTemplateChanged()
     );
 
+    /// <summary>Bindable property for <see cref="ContentBindingContext" />.</summary>
+    public static readonly BindableProperty ContentBindingContextProperty = BindableProperty.Create(
+        nameof(ContentBindingContext),
+        typeof(object),
+        typeof(SlideBoxItem),
+        propertyChanged: static (bindable, _, newvalue) => ((SlideBoxItem) bindable).OnContentBindingContextChanged(newvalue)
+    );
+
     /// <summary>Bindable property for <see cref="IsEnabled" />.</summary>
     public static readonly BindableProperty IsEnabledProperty = BindableProperty.Create(
         nameof(IsEnabled),
@@ -35,6 +43,31 @@ public sealed class SlideBoxItem : Element
     {
         get => (DataTemplate?) GetValue(TemplateProperty);
         set => SetValue(TemplateProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the <see cref="BindableObject.BindingContext" /> to force on the realized content.
+    /// </summary>
+    /// <remarks>
+    /// This helps to fulfill interface segregation principle by allowing the slide's content
+    /// to be bound to a property of the parent's binding context. Applied when the template is
+    /// realized and whenever the value changes; cleared when the content is torn down.
+    /// </remarks>
+    /// <example>
+    ///     <code>
+    /// <![CDATA[
+    ///     <nalu:SlideBoxItem ContentBindingContext="{Binding CurrentAnimal}">
+    ///         <DataTemplate>
+    ///             <AnimalView x:DataType="models:Animal" />
+    ///         </DataTemplate>
+    ///     </nalu:SlideBoxItem>
+    /// ]]>
+    /// </code>
+    /// </example>
+    public object? ContentBindingContext
+    {
+        get => GetValue(ContentBindingContextProperty);
+        set => SetValue(ContentBindingContextProperty, value);
     }
 
     /// <summary>
@@ -53,6 +86,14 @@ public sealed class SlideBoxItem : Element
 
     private void OnTemplateChanged()
         => (Parent as SlideBox)?.OnItemTemplateChanged(this);
+
+    private void OnContentBindingContextChanged(object? newvalue)
+    {
+        if (Content is { } content)
+        {
+            content.BindingContext = newvalue;
+        }
+    }
 
     private void OnIsEnabledChanged()
         => (Parent as SlideBox)?.OnItemIsEnabledChanged(this);

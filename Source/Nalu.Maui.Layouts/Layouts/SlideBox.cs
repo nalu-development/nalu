@@ -334,6 +334,11 @@ public class SlideBox : Layout
             item.Content = null;
             Remove(content);
             content.DisconnectHandlers();
+
+            if (item.IsSet(SlideBoxItem.ContentBindingContextProperty))
+            {
+                content.BindingContext = null;
+            }
         }
     }
 
@@ -346,6 +351,14 @@ public class SlideBox : Layout
 
         var content = (View) item.Template.CreateContent();
         content.IsVisible = false;
+
+        // Force the scoped context BEFORE mounting, so the content never observes (and
+        // cascades) the inherited binding context first.
+        if (item.IsSet(SlideBoxItem.ContentBindingContextProperty))
+        {
+            content.BindingContext = item.ContentBindingContext;
+        }
+
         item.Content = content;
         Add(content);
     }
