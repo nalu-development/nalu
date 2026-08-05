@@ -126,4 +126,102 @@ public class ScaffoldSystemBarsTests
 
         Resolve(Snapshot(navBarVisible: true, barBackground: gradient)).Should().BeTrue();
     }
+
+    private static (ScaffoldSystemBars Bars, Func<int> RefreshCount) CreateTracked()
+    {
+        var bars = new ScaffoldSystemBars(new Scaffold());
+        var count = 0;
+        bars.SetThemeRefresher(() => count++);
+
+        return (bars, () => count);
+    }
+
+    [Fact(DisplayName = "Theme refresh, given repeated identical solid backgrounds, fires once")]
+    public void ThemeRefreshGivenRepeatedIdenticalSolidBackgroundsFiresOnce()
+    {
+        var (bars, count) = CreateTracked();
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White), 1);
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White), 1);
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White), 1);
+
+        count().Should().Be(1, "only the first (significant) surface change triggers");
+    }
+
+    [Fact(DisplayName = "Theme refresh, when the effective transparency crosses a 10% step, fires")]
+    public void ThemeRefreshWhenTransparencyCrossesADecileFires()
+    {
+        var (bars, count) = CreateTracked();
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White.WithAlpha(0.71f)), 1);
+        var baseline = count();
+
+        // Same decile: no trigger.
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White.WithAlpha(0.7999f)), 1);
+        count().Should().Be(baseline);
+
+        // Crossing 79.99% -> 80%: trigger.
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White.WithAlpha(0.80f)), 1);
+        count().Should().Be(baseline + 1);
+
+        // And back below: trigger again.
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White.WithAlpha(0.7999f)), 1);
+        count().Should().Be(baseline + 2);
+    }
+
+    [Fact(DisplayName = "Theme refresh, when the color changes with identical alpha, fires")]
+    public void ThemeRefreshWhenColorChangesWithIdenticalAlphaFires()
+    {
+        var (bars, count) = CreateTracked();
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White.WithAlpha(0.5f)), 1);
+        var baseline = count();
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.Black.WithAlpha(0.5f)), 1);
+
+        count().Should().Be(baseline + 1, "the RGB changed even though the alpha did not");
+    }
+
+    [Fact(DisplayName = "Theme refresh, given a non-solid background, fires on every background change")]
+    public void ThemeRefreshGivenNonSolidBackgroundFiresOnEveryChange()
+    {
+        var (bars, count) = CreateTracked();
+
+        LinearGradientBrush MakeGradient() => new(
+        [
+            new GradientStop(Colors.Black, 0),
+            new GradientStop(Colors.White, 1)
+        ], new Point(0, 0), new Point(0, 1));
+
+        var gradient = MakeGradient();
+        bars.UpdateBar(null, gradient, 1);
+        var baseline = count();
+
+        // Same instance, same opacity: not a change.
+        bars.UpdateBar(null, gradient, 1);
+        count().Should().Be(baseline);
+
+        // A new instance always triggers (its pixels cannot be reasoned about).
+        bars.UpdateBar(null, MakeGradient(), 1);
+        count().Should().Be(baseline + 1);
+
+        // An opacity change on the same instance triggers too.
+        bars.UpdateBar(null, gradient, 0.5);
+        count().Should().Be(baseline + 2);
+    }
+
+    [Fact(DisplayName = "Theme refresh, when the bar opacity crosses a decile with a solid brush, fires")]
+    public void ThemeRefreshWhenBarOpacityCrossesADecileFires()
+    {
+        var (bars, count) = CreateTracked();
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White), 0.85);
+        var baseline = count();
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White), 0.89);
+        count().Should().Be(baseline, "0.85 and 0.89 share the 80% decile");
+
+        bars.UpdateBar(null, new SolidColorBrush(Colors.White), 0.9);
+        count().Should().Be(baseline + 1, "0.9 enters the 90% decile");
+    }
 }

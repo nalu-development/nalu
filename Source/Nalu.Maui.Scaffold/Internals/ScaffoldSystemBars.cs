@@ -97,6 +97,59 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
         _barOpacity = barOpacity;
         ScheduleSample();
         Recompute();
+
+        if (TrackBarSurfaceSignificantChange(barBackground, barOpacity))
+        {
+            // A meaningful bar-surface change (see TrackBarSurfaceSignificantChange) also
+            // re-runs the platform theme refresh (Android: navigationBarColor re-apply).
+            _themeRefresher?.Invoke();
+        }
+    }
+
+    private bool _lastBarWasSolid = true;
+    private Brush? _lastBarBrush;
+    private double _lastBarOpacity = 1;
+    private float _lastBarRed;
+    private float _lastBarGreen;
+    private float _lastBarBlue;
+    private int _lastBarAlphaBucket;
+
+    /// <summary>
+    /// Detects MEANINGFUL bar-surface changes without reacting to every scroll-ramp frame:
+    /// a change matters when the effective transparency crosses a 10% step (79.99% → 80%),
+    /// when the color itself (alpha ignored) changes, or — for non-solid brushes, whose
+    /// pixels we cannot reason about — on every background/opacity change. Snapshots color
+    /// COMPONENTS, not brush references: scroll-driven bindings may mutate the brush in place.
+    /// </summary>
+    private bool TrackBarSurfaceSignificantChange(Brush? barBackground, double barOpacity)
+    {
+        var (isSolid, color) = barBackground switch
+        {
+            null => (true, Colors.Transparent),
+            SolidColorBrush solid => (true, solid.Color ?? Colors.Transparent),
+            _ => (false, Colors.Transparent)
+        };
+
+        var alphaBucket = Math.Clamp((int) Math.Floor(color.Alpha * barOpacity * 10), 0, 10);
+
+        var significant = isSolid && _lastBarWasSolid
+            ? color.Red != _lastBarRed
+              || color.Green != _lastBarGreen
+              || color.Blue != _lastBarBlue
+              || alphaBucket != _lastBarAlphaBucket
+            : !ReferenceEquals(barBackground, _lastBarBrush)
+              || barOpacity != _lastBarOpacity
+              || isSolid != _lastBarWasSolid;
+
+        _lastBarWasSolid = isSolid;
+        _lastBarBrush = barBackground;
+        _lastBarOpacity = barOpacity;
+        _lastBarRed = color.Red;
+        _lastBarGreen = color.Green;
+        _lastBarBlue = color.Blue;
+        _lastBarAlphaBucket = alphaBucket;
+
+        return significant;
     }
 
     /// <summary>Whether the nav bar strip is currently shown for the presented page (set by the presenters).</summary>
