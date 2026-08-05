@@ -43,6 +43,24 @@ navigation, making SlideBox ideal for wizards, onboarding flows and tab-like con
 - Slide content inherits the `SlideBox`'s `BindingContext` as usual; `SlideBoxItem.IsEnabled`
   is bindable too (items are logical children).
 
+### Scoping the content with `ContentBindingContext`
+
+Like [`ViewBox`](layouts.md), each `SlideBoxItem` offers a `ContentBindingContext` property
+to scope the realized view to a given object — handy to hand each slide its own sub-model
+instead of the page-wide context:
+
+```xml
+<nalu:SlideBoxItem ContentBindingContext="{Binding ProStepModel}">
+    <DataTemplate>
+        <views:ProConfigStep x:DataType="models:ProStepModel" />
+    </DataTemplate>
+</nalu:SlideBoxItem>
+```
+
+When set, the value is forced on the content as soon as the template is realized (before it
+can observe the inherited context), kept in sync on later changes, and cleared when the
+content is torn down.
+
 ## Navigation
 
 | Member | Description |
@@ -106,5 +124,6 @@ afterwards to override them.
 | `TransitionDuration` | `250` | Slide transition duration in milliseconds. |
 | `TransitionEasing` | `CubicOut` | Slide transition easing. |
 
-`SlideBoxItem`: `Template` (content property), `IsEnabled` (bindable), `Content` (read-only
+`SlideBoxItem`: `Template` (content property), `IsEnabled` (bindable),
+`ContentBindingContext` (bindable, scopes the realized view), `Content` (read-only
 realized view, `null` until first visit or while disabled).
