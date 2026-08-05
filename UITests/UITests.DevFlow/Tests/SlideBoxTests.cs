@@ -106,6 +106,29 @@ public class SlideBoxTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     }
 
     [Fact]
+    public async Task PeekBandShowsTheIncomingSecondSlideDuringTheSettle()
+    {
+        Assert.SkipWhen(!await IsAndroidAsync(), "Mid-settle pixel sampling drives a real swipe via adb.");
+
+        // End-side peek on + slowed transition so the settle phase is sampleable.
+        await App.TapAsync("SlideTogglePeekButton");
+        await App.WaitForTextAsync("SlideCreatedLabel", "Created:2");
+        await App.TapAsync("SlideToggleSlowButton");
+
+        var box = await App.GetBoundsAsync("SlideBox");
+
+        // Swipe towards B and sample the peek band while the strip is still settling:
+        // slide C must already be riding the strip there — never the box background
+        // (DarkSlateGray) nor a late pop-in.
+        await App.AndroidRealSwipeAsync("SlideBox", -300, 0, durationMs: 500);
+        await Task.Delay(650);
+        var (r, g, b) = await App.GetPixelColorAsync("SlideBox", box.Width - 12, box.Height / 2);
+
+        Assert.True(g >= 120 && r <= 110, $"Peek band mid-settle was ({r},{g},{b}) — expected slide C's LightSeaGreen, not the box background");
+        await App.WaitForTextAsync("SlideIndexLabel", "Index:1");
+    }
+
+    [Fact]
     public async Task RealSwipeCommitsASlideChange()
     {
         Assert.SkipWhen(!await IsAndroidAsync(), "Real swipes are injected host-side via adb.");
