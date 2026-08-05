@@ -90,7 +90,9 @@ internal class ControlledTouchGestureRecognizer : UIGestureRecognizer
 
         if (!args.Propagates || State == UIGestureRecognizerState.Began)
         {
-            State = UIGestureRecognizerState.Changed;
+            // A MID-GESTURE claim (still Possible) must pass through Began: only that
+            // transition makes UIKit cancel the competing recognizers (e.g. a scroll pan).
+            State = State == UIGestureRecognizerState.Possible ? UIGestureRecognizerState.Began : UIGestureRecognizerState.Changed;
         }
     }
 
