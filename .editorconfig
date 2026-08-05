@@ -384,3 +384,4 @@ dotnet_analyzer_diagnostic.severity = none
 # Compiler nullability mismatches in generated binding overrides (Invoker classes)
 dotnet_diagnostic.CS8764.severity = none
 dotnet_diagnostic.CS8765.severity = none
+dotnet_diagnostic.CS8767.severity = none

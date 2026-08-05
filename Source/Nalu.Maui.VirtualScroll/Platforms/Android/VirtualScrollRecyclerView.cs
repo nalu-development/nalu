@@ -1,20 +1,19 @@
 using Android.Content;
 using Android.Runtime;
 using Android.Util;
-using AndroidX.Core.View;
 using Nalu.Platform;
-using AView = Android.Views.View;
 
 namespace Nalu;
 
 /// <summary>
-/// The VirtualScroll platform scrollable. Hot-path logic (fading-edge padding offsets on the
-/// per-frame draw path, focus tracking + orphaned-IME handling on the per-recycle detach
-/// path) lives in the Java base class <see cref="VirtualScrollNativeRecyclerView"/> so those
-/// framework callbacks never cross the JNI boundary; this managed side keeps the cold paths
-/// (window insets, scroll adjustment, MAUI integration).
+/// The VirtualScroll platform scrollable. Hot-path logic lives in the Java base class
+/// <see cref="VirtualScrollNativeRecyclerView"/> — fading-edge padding offsets (per-frame
+/// draw path), focus tracking + orphaned-IME handling (per-recycle detach path), and the
+/// positional safe-area self-padding incl. window-insets consumption (per-layout path) —
+/// so those framework callbacks never cross the JNI boundary; this managed side keeps the
+/// MAUI integration (scroll adjustment, adapter wiring).
 /// </summary>
-public class VirtualScrollRecyclerView : VirtualScrollNativeRecyclerView, IOnApplyWindowInsetsListener
+public class VirtualScrollRecyclerView : VirtualScrollNativeRecyclerView
 {
     private VirtualScrollRecyclerViewScrollHelper? _scrollHelper;
     public ItemsLayoutOrientation Orientation { get; set; } = ItemsLayoutOrientation.Vertical;
@@ -27,8 +26,8 @@ public class VirtualScrollRecyclerView : VirtualScrollNativeRecyclerView, IOnApp
 
     public VirtualScrollRecyclerView(Context context) : base(context)
     {
-        // Clip flags (clipToPadding=false, clipChildren=true) are set by the native base ctor.
-        ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+        // Clip flags, the insets listener and the self-padding model are all set up by the
+        // native base ctor.
     }
 
     public VirtualScrollRecyclerView(Context context, IAttributeSet? attrs) : base(context, attrs)
@@ -55,30 +54,8 @@ public class VirtualScrollRecyclerView : VirtualScrollNativeRecyclerView, IOnApp
         {
             _scrollHelper?.Dispose();
             _scrollHelper = null;
-            ViewCompat.SetOnApplyWindowInsetsListener(this, null);
         }
 
         base.Dispose(disposing);
-    }
-
-    private static readonly int _allInsetsType = WindowInsetsCompat.Type.SystemBars() |
-                                                 WindowInsetsCompat.Type.DisplayCutout() |
-                                                 WindowInsetsCompat.Type.NavigationBars() |
-                                                 WindowInsetsCompat.Type.StatusBars() |
-                                                 WindowInsetsCompat.Type.Ime();
-    private static readonly AndroidX.Core.Graphics.Insets _zeroInsets = AndroidX.Core.Graphics.Insets.None!;
-
-    WindowInsetsCompat AndroidX.Core.View.IOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
-    {
-        ArgumentNullException.ThrowIfNull(insets);
-        var size = insets.GetInsets(_allInsetsType) ?? _zeroInsets;
-        if (PaddingBottom != size.Bottom || PaddingLeft != size.Left || PaddingRight != size.Right || PaddingTop != size.Top)
-        {
-            SetPadding(size.Left, size.Top, size.Right, size.Bottom);
-            RequestLayout();
-        }
-
-        using var builder = new WindowInsetsCompat.Builder(insets);
-        return builder.SetInsets(_allInsetsType, _zeroInsets)!.Build()!;
     }
 }
