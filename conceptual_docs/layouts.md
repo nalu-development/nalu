@@ -23,6 +23,7 @@ Nalu.Maui.Layouts provides several powerful components:
 | [TemplateBox](layouts-viewbox.md#templatebox) | View holder based on `DataTemplate` or `DataTemplateSelector` |
 | [ToggleTemplate](layouts-viewbox.md#toggletemplate) | Conditional template switcher based on boolean value |
 | [ExpanderViewBox](layouts-expander.md) | Animated collapsible content container |
+| [SlideBox](layouts-slidebox.md) | Pager with lazy, state-retaining templated slides, swipe and peeking |
 | [HorizontalWrapLayout](layouts-wrap.md#horizontalwraplayout) | Flow layout that wraps children left-to-right, top-to-bottom |
 | [VerticalWrapLayout](layouts-wrap.md#verticalwraplayout) | Flow layout that wraps children top-to-bottom, left-to-right |
 | [Popups](layouts-popup.md) | Flexible modal popup system |

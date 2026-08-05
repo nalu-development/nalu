@@ -175,10 +175,18 @@ public class SlideBox : Layout
     /// Re-applied whenever <see cref="Orientation" /> changes; assign your own
     /// <c>SafeAreaEdges</c> afterwards to override.
     /// </summary>
+    /// <remarks>
+    /// The per-edge safe-area API only exists on .NET 10 / MAUI 10 — on MAUI 9 the platform
+    /// default behavior applies unchanged.
+    /// </remarks>
     private void ApplyOrientationSafeAreaDefaults()
-        => SafeAreaEdges = Orientation == SlideBoxOrientation.Horizontal
+    {
+#if NET10_0_OR_GREATER
+        SafeAreaEdges = Orientation == SlideBoxOrientation.Horizontal
             ? new SafeAreaEdges(SafeAreaRegions.Container, SafeAreaRegions.None, SafeAreaRegions.Container, SafeAreaRegions.None)
             : new SafeAreaEdges(SafeAreaRegions.None, SafeAreaRegions.Container, SafeAreaRegions.None, SafeAreaRegions.Container);
+#endif
+    }
 
     /// <summary>Moves to the nearest enabled slide after the current one. Returns false at the end.</summary>
     public bool Next() => Step(1);
