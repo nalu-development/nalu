@@ -5,6 +5,8 @@ interactive swiping and optional neighbor peeking. Each slide is a lazily-realiz
 `DataTemplate` whose content is **retained forever** once created — slide state survives
 navigation, making SlideBox ideal for wizards, onboarding flows and tab-like content areas.
 
+![SlideBox demo: swiping between slides, enabling the end-side peek, and swiping with the neighbor peeking](assets/images/slidebox.gif)
+
 ```xml
 <nalu:SlideBox SelectedIndex="{Binding Step, Mode=TwoWay}">
 
