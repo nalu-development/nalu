@@ -9,6 +9,8 @@
       href: layouts-viewbox.md
     - name: ExpanderViewBox
       href: layouts-expander.md
+    - name: SlideBox
+      href: layouts-slidebox.md
     - name: Wrap Layouts
       href: layouts-wrap.md
     - name: Popups
