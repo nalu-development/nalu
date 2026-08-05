@@ -90,6 +90,7 @@ public class SlideBoxTests : ContentPage
                                MakeButton("Last", "SlideLastButton", () => slideBox.SelectedIndex = 2),
                                MakeButton("Toggle B", "SlideToggleBButton", () => itemB.IsEnabled = !itemB.IsEnabled),
                                MakeButton("Peek", "SlideTogglePeekButton", () => slideBox.PeekAreaInsets = slideBox.PeekAreaInsets == default ? new Thickness(0, 0, 40, 0) : default),
+                               MakeButton("Slow", "SlideToggleSlowButton", () => slideBox.TransitionDuration = slideBox.TransitionDuration == 250 ? 1500u : 250u),
                                MakeButton("Probe", "SlideProbeButton", () => probeLabel.Text = MeasureBottomFlush(slideBox.SelectedItem?.Content)),
                                indexLabel,
                                createdLabel,
