@@ -6,21 +6,26 @@ import android.view.View;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.AbsListView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.OnApplyWindowInsetsListener;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 /**
- * Native base of the VirtualScroll RecyclerView hosting logic that sits on rendering or
- * recycling hot paths: keeping it in Java means the framework's per-frame and per-child
- * callbacks never cross the JNI boundary into managed code.
+ * Native base of the VirtualScroll RecyclerView hosting logic that sits on rendering,
+ * layout or recycling hot paths: keeping it in Java means the framework's per-frame and
+ * per-child callbacks never cross the JNI boundary into managed code.
  *
  * <p>The managed {@code VirtualScrollRecyclerView} derives from this class and keeps the
- * cold-path logic (window insets, scroll adjustment, MAUI integration) in C#.</p>
+ * MAUI integration (scroll adjustment, adapter wiring) in C#.</p>
  */
 public abstract class VirtualScrollNativeRecyclerView extends RecyclerView
-        implements ViewTreeObserver.OnGlobalFocusChangeListener {
+        implements ViewTreeObserver.OnGlobalFocusChangeListener, OnApplyWindowInsetsListener {
 
     /**
      * The direct child hosting the currently focused view (null when focus is elsewhere).
@@ -34,6 +39,7 @@ public abstract class VirtualScrollNativeRecyclerView extends RecyclerView
         super(context);
         setClipToPadding(false);
         setClipChildren(true);
+        ViewCompat.setOnApplyWindowInsetsListener(this, this);
     }
 
     public VirtualScrollNativeRecyclerView(@NonNull Context context, @Nullable AttributeSet attrs) {
@@ -148,5 +154,133 @@ public abstract class VirtualScrollNativeRecyclerView extends RecyclerView
         }
 
         return null;
+    }
+
+    // --- Positional safe-area self-padding (per-layout path) ---
+    //
+    // Self-padding emulates UIKit's POSITIONAL safe-area model (iOS gets this natively):
+    // each inset band is applied only where it intersects the list's REST footprint — the
+    // layout position with every ancestor scroll offset ignored. Rest coordinates keep the
+    // padding STABLE while an ancestor scroll view scrolls the list under a system bar
+    // (padding chased against the live position would relayout per frame and displace
+    // cells), while a full-screen list (rest position at the window edges) keeps its
+    // historical edge-to-edge padding, and a strip resting mid-page gets none.
+    // The re-check runs on EVERY layout pass and walks the ancestor chain — Java-side so
+    // neither the walk nor the per-ancestor reads cross the JNI boundary, and computed
+    // into scratch fields so the steady-state pass (padding unchanged) allocates NOTHING.
+
+    private static final int ALL_INSETS_TYPE = WindowInsetsCompat.Type.systemBars()
+            | WindowInsetsCompat.Type.displayCutout()
+            | WindowInsetsCompat.Type.navigationBars()
+            | WindowInsetsCompat.Type.statusBars()
+            | WindowInsetsCompat.Type.ime();
+
+    @Nullable
+    private Insets lastInsets;
+
+    // Rest-intersection scratch (main-thread confined, valid until the next compute) and the
+    // pre-bound apply runnable — no per-pass lambda allocation on the change path either.
+    private int restLeft;
+    private int restTop;
+    private int restRight;
+    private int restBottom;
+    private final Runnable applySelfPaddingRunnable = this::applySelfPadding;
+
+    @NonNull
+    @Override
+    public WindowInsetsCompat onApplyWindowInsets(@NonNull View view, @NonNull WindowInsetsCompat insets) {
+        lastInsets = insets.getInsets(ALL_INSETS_TYPE);
+        applySelfPadding();
+
+        // Insets are always consumed: cells must never see them.
+        return new WindowInsetsCompat.Builder(insets).setInsets(ALL_INSETS_TYPE, Insets.NONE).build();
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+
+        // Re-evaluate the rest-position self-padding now that geometry is known (the
+        // initial insets dispatch may pre-date layout); posted — padding cannot mutate
+        // mid-pass.
+        Insets insets = lastInsets;
+
+        if (insets != null) {
+            computeRestIntersection(insets);
+
+            if (selfPaddingDiffers()) {
+                post(applySelfPaddingRunnable);
+            }
+        }
+    }
+
+    private void applySelfPadding() {
+        Insets insets = lastInsets;
+
+        if (insets == null) {
+            return;
+        }
+
+        // Recomputed here (not reused from onLayout): geometry may have changed between the
+        // post and this run, and the insets dispatch calls in directly.
+        computeRestIntersection(insets);
+
+        if (selfPaddingDiffers()) {
+            setPadding(restLeft, restTop, restRight, restBottom);
+            requestLayout();
+        }
+    }
+
+    private boolean selfPaddingDiffers() {
+        return getPaddingBottom() != restBottom || getPaddingLeft() != restLeft
+                || getPaddingRight() != restRight || getPaddingTop() != restTop;
+    }
+
+    /** Computes the rest-footprint/inset intersection into the scratch fields. */
+    private void computeRestIntersection(@NonNull Insets size) {
+        // Rest position: accumulate LAYOUT offsets up the chain, deliberately ignoring
+        // every ancestor's scrollX/scrollY (scroll containers keep children's layout
+        // coordinates).
+        int left = getLeft();
+        int top = getTop();
+        View root = this;
+
+        for (ViewParent parent = getParent(); parent instanceof View; parent = ((View) parent).getParent()) {
+            View parentView = (View) parent;
+
+            // Inside a RECYCLING container the layout position itself is arbitrary
+            // (items are re-laid-out as they scroll): never self-pad there.
+            if (parentView instanceof RecyclerView || parentView instanceof AbsListView) {
+                restLeft = 0;
+                restTop = 0;
+                restRight = 0;
+                restBottom = 0;
+
+                return;
+            }
+
+            left += parentView.getLeft();
+            top += parentView.getTop();
+            root = parentView;
+        }
+
+        if (root.getWidth() <= 0 || root.getHeight() <= 0 || getWidth() <= 0 || getHeight() <= 0) {
+            // Pre-layout dispatch: geometry unknown — keep the historical full padding;
+            // onLayout re-applies with the real rest position right after.
+            restLeft = size.left;
+            restTop = size.top;
+            restRight = size.right;
+            restBottom = size.bottom;
+
+            return;
+        }
+
+        int right = left + getWidth();
+        int bottom = top + getHeight();
+
+        restLeft = Math.max(0, size.left - left);
+        restTop = Math.max(0, size.top - top);
+        restRight = Math.max(0, right - (root.getWidth() - size.right));
+        restBottom = Math.max(0, bottom - (root.getHeight() - size.bottom));
     }
 }
