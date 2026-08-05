@@ -4,8 +4,9 @@ namespace Nalu.Maui.TestApp.Tests;
 
 /// <summary>
 /// Harness for <see cref="SlideBox" />: three lazy slides (B toggleable), a created-counter
-/// proving lazy realization + forever-retention + teardown-on-disable, and a peek toggle
-/// proving eager neighbor realization only while a peek band is visible.
+/// proving lazy realization + forever-retention + teardown-on-disable, a peek toggle proving
+/// eager neighbor realization, and a PLATFORM probe proving the cross-axis safe-area inset is
+/// NOT consumed (the slide's platform view sits flush with the physical window bottom).
 /// </summary>
 [UsedImplicitly]
 [TestPage("Slide Box Tests")]
@@ -15,13 +16,22 @@ public class SlideBoxTests : ContentPage
 
     public SlideBoxTests()
     {
+        // The page must not consume any inset itself (and a loud background makes any
+        // accidental consumption visible as a colored band).
+        SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None);
+        BackgroundColor = Colors.MediumPurple;
+
+        // Distinct backgrounds at every level (page purple, box dark, slides pastel): any
+        // accidentally consumed inset shows up as a colored band.
         var slideBox = new SlideBox
                        {
-                           AutomationId = "SlideBox"
+                           AutomationId = "SlideBox",
+                           BackgroundColor = Colors.DarkSlateGray
                        };
 
         var createdLabel = new Label { AutomationId = "SlideCreatedLabel", FontSize = 13, Text = "Created:0" };
         var indexLabel = new Label { AutomationId = "SlideIndexLabel", FontSize = 13, Text = "Index:0" };
+        var probeLabel = new Label { AutomationId = "SlideProbeLabel", FontSize = 13, Text = "-" };
 
         SlideBoxItem MakeItem(string name, Color color)
             => new()
@@ -80,13 +90,13 @@ public class SlideBoxTests : ContentPage
                                MakeButton("Last", "SlideLastButton", () => slideBox.SelectedIndex = 2),
                                MakeButton("Toggle B", "SlideToggleBButton", () => itemB.IsEnabled = !itemB.IsEnabled),
                                MakeButton("Peek", "SlideTogglePeekButton", () => slideBox.PeekAreaInsets = slideBox.PeekAreaInsets == default ? new Thickness(0, 0, 40, 0) : default),
+                               MakeButton("Probe", "SlideProbeButton", () => probeLabel.Text = MeasureBottomFlush(slideBox.SelectedItem?.Content)),
                                indexLabel,
-                               createdLabel
+                               createdLabel,
+                               probeLabel
                            }
                        };
 
-        // SafeAreaEdges None + star row: the box reaches the PHYSICAL bottom edge, so tests
-        // can prove the cross-axis system-bar inset flows through to the slide templates.
         Content = new Grid
                   {
                       SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None),
@@ -95,5 +105,47 @@ public class SlideBoxTests : ContentPage
                   };
 
         ((Grid) Content).Add(slideBox, 0, 1);
+    }
+
+    /// <summary>
+    /// PLATFORM ground truth for the safe-area contract: measures — in native window
+    /// coordinates — whether the slide's platform view sits flush with the physical window
+    /// bottom, plus the real bottom system inset (0 means the check would be vacuous).
+    /// </summary>
+    private static string MeasureBottomFlush(View? slideContent)
+    {
+#if IOS || MACCATALYST
+        if (slideContent?.Handler?.PlatformView is not UIKit.UIView platformView || platformView.Window is not { } window)
+        {
+            return "Flush:n/a";
+        }
+
+        var frameInWindow = platformView.ConvertRectToView(platformView.Bounds, window);
+        var windowHeight = window.Bounds.Height;
+        var inset = window.SafeAreaInsets.Bottom;
+        var flush = Math.Abs(windowHeight - frameInWindow.Bottom) < 1.5;
+
+        return $"Flush:{flush} Inset:{(int) inset}";
+#elif ANDROID
+        if (slideContent?.Handler?.PlatformView is not Android.Views.View platformView || platformView.RootView is not { } rootView)
+        {
+            return "Flush:n/a";
+        }
+
+        var density = platformView.Resources!.DisplayMetrics!.Density;
+        var location = new int[2];
+        platformView.GetLocationInWindow(location);
+        var bottom = (location[1] + platformView.Height) / density;
+        var windowHeight = rootView.Height / density;
+        var insets = AndroidX.Core.View.ViewCompat.GetRootWindowInsets(platformView);
+        var inset = (insets?.GetInsets(AndroidX.Core.View.WindowInsetsCompat.Type.SystemBars())?.Bottom ?? 0) / density;
+        var flush = Math.Abs(windowHeight - bottom) < 1.5;
+
+        return $"Flush:{flush} Inset:{(int) inset}";
+#else
+        _ = slideContent;
+
+        return "Flush:n/a";
+#endif
     }
 }
