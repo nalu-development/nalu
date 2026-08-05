@@ -17,8 +17,7 @@ public class SlideBoxTests : ContentPage
     {
         var slideBox = new SlideBox
                        {
-                           AutomationId = "SlideBox",
-                           HeightRequest = 400
+                           AutomationId = "SlideBox"
                        };
 
         var createdLabel = new Label { AutomationId = "SlideCreatedLabel", FontSize = 13, Text = "Created:0" };
@@ -86,9 +85,12 @@ public class SlideBoxTests : ContentPage
                            }
                        };
 
+        // SafeAreaEdges None + star row: the box reaches the PHYSICAL bottom edge, so tests
+        // can prove the cross-axis system-bar inset flows through to the slide templates.
         Content = new Grid
                   {
-                      RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto)],
+                      SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None),
+                      RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
                       Children = { controls }
                   };
 

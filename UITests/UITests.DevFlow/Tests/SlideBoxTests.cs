@@ -91,6 +91,20 @@ public class SlideBoxTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     }
 
     [Fact]
+    public async Task CrossAxisSafeAreaFlowsThroughToTheSlides()
+    {
+        // Horizontal orientation: the box must NOT consume the VERTICAL safe-area insets —
+        // the slide template reaches the box's physical bottom edge (under the system bar);
+        // handling that inset is the template's own business.
+        var box = await App.GetBoundsAsync("SlideBox");
+        var slide = await App.GetBoundsAsync("SlideRootA");
+
+        Assert.True(box.Height > 400, $"The harness box should fill the page (was {box.Height})");
+        Assert.True(Math.Abs(box.Bottom - slide.Bottom) < 1, $"Slide bottom {slide.Bottom} should reach the box bottom {box.Bottom} (vertical inset must not be consumed)");
+        Assert.True(Math.Abs(box.Y - slide.Y) < 1, $"Slide top {slide.Y} should reach the box top {box.Y}");
+    }
+
+    [Fact]
     public async Task RealSwipeCommitsASlideChange()
     {
         Assert.SkipWhen(!await IsAndroidAsync(), "Real swipes are injected host-side via adb.");

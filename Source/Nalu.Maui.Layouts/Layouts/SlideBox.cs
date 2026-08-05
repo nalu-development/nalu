@@ -60,7 +60,12 @@ public class SlideBox : Layout
         typeof(SlideBoxOrientation),
         typeof(SlideBox),
         SlideBoxOrientation.Horizontal,
-        propertyChanged: static (bindable, _, _) => ((SlideBox) bindable).OnStructureChanged()
+        propertyChanged: static (bindable, _, _) =>
+        {
+            var slideBox = (SlideBox) bindable;
+            slideBox.ApplyOrientationSafeAreaDefaults();
+            slideBox.OnStructureChanged();
+        }
     );
 
     /// <summary>Bindable property for <see cref="PeekAreaInsets" />.</summary>
@@ -153,6 +158,7 @@ public class SlideBox : Layout
     public SlideBox()
     {
         IsClippedToBounds = true;
+        ApplyOrientationSafeAreaDefaults();
 
         var items = new ObservableCollection<SlideBoxItem>();
         items.CollectionChanged += OnItemsChanged;
@@ -161,6 +167,18 @@ public class SlideBox : Layout
         _pan.PanUpdated += OnPanUpdated;
         GestureRecognizers.Add(_pan);
     }
+
+    /// <summary>
+    /// Safe area is consumed on the SLIDING AXIS only (the page slot and peek bands must not
+    /// hide under a notch), while the cross-axis insets flow through untouched — handling them
+    /// belongs to the slide templates (e.g. full-bleed backgrounds under the system bars).
+    /// Re-applied whenever <see cref="Orientation" /> changes; assign your own
+    /// <c>SafeAreaEdges</c> afterwards to override.
+    /// </summary>
+    private void ApplyOrientationSafeAreaDefaults()
+        => SafeAreaEdges = Orientation == SlideBoxOrientation.Horizontal
+            ? new SafeAreaEdges(SafeAreaRegions.Container, SafeAreaRegions.None, SafeAreaRegions.Container, SafeAreaRegions.None)
+            : new SafeAreaEdges(SafeAreaRegions.None, SafeAreaRegions.Container, SafeAreaRegions.None, SafeAreaRegions.Container);
 
     /// <summary>Moves to the nearest enabled slide after the current one. Returns false at the end.</summary>
     public bool Next() => Step(1);
