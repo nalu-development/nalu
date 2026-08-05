@@ -1033,6 +1033,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 sheetView.Arrange(new Rect((bounds.Width - sheetWidth) / 2, bounds.Height - sheetHeight, sheetWidth, sheetHeight));
                 container.AddSubview(panel);
 
+                // Native cooperative drag: the MAUI pan is skipped on iOS (it would beat the
+                // inner scroll view's pan) — see ScaffoldBottomSheetGesture.
+                ScaffoldBottomSheetGesture.Attach(sheet, panel);
+
                 break;
             }
 

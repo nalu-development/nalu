@@ -218,10 +218,9 @@ public sealed class ScaffoldBottomSheetView : Border
     private readonly ScaffoldSheetPresentation _presentation;
     private readonly RoundRectangle _handle;
 
+    private readonly View _contentView;
     private double[] _detentOffsets = [0];
     private double _sheetHeight;
-    private double _panStartTranslationY;
-    private bool _panning;
     private Func<Task>? _dismissAsync;
 
     // Null-conditionals below: implicit styles apply from the VisualElement base ctor, before
@@ -310,12 +309,14 @@ public sealed class ScaffoldBottomSheetView : Border
         };
         layout.Add(_handle, 0, 0);
         layout.Add(content, 0, 1);
+        _contentView = content;
 
         Content = layout;
 
-        var pan = new PanGestureRecognizer();
-        pan.PanUpdated += OnPanUpdated;
-        GestureRecognizers.Add(pan);
+        // NO MAUI pan here: it steals moves from inner scrollables on BOTH platforms. The
+        // drag is platform-owned — iOS attaches a cooperative native recognizer at mount
+        // (ScaffoldBottomSheetGesture), Android hosts the sheet in a nested-scroll parent
+        // with a raw-touch fallback for non-scrollable surfaces (ScaffoldBottomSheetNestedHost).
 
         // Defaults never raise propertyChanged: seed once from the current values.
         Background = SheetBackground;
@@ -372,6 +373,12 @@ public sealed class ScaffoldBottomSheetView : Border
 
         InitialOffset = _sheetHeight - ResolveDetentHeight(Math.Clamp(_presentation.InitialDetent, 0, detents.Length - 1));
 
+        // The content row measures UNBOUNDED (Auto — required for Content-detent natural
+        // sizing), so scrollable content would inflate to its full content height and lose
+        // its scroll range. Clamp it to the space the sheet actually gives it.
+        var handleRowHeight = _presentation.ShowDragHandle ? 20 : 0;
+        _contentView.MaximumHeightRequest = Math.Max(0, _sheetHeight - handleRowHeight - Padding.VerticalThickness);
+
         return _sheetHeight;
     }
 
@@ -383,6 +390,29 @@ public sealed class ScaffoldBottomSheetView : Border
 
     /// <summary>The translation of the initial detent.</summary>
     internal double InitialOffset { get; private set; }
+
+    /// <summary>The full sheet height (translation at full dismissal); 0 before geometry init.</summary>
+    internal double SheetHeight => _sheetHeight;
+
+    /// <summary>Whether the sheet rests at its tallest detent (content may scroll freely).</summary>
+    internal bool IsFullyOpen => TranslationY <= 0.5;
+
+    /// <summary>
+    /// Platform gesture controllers drive the drag through these: <see cref="DragBy"/> moves
+    /// the sheet by a delta in device-independent units (clamped to the valid range) and
+    /// returns the amount actually consumed; <see cref="SettleFromGestureAsync"/> snaps to
+    /// the nearest detent or dismisses, exactly like a MAUI pan release.
+    /// </summary>
+    internal double DragBy(double deltaY)
+    {
+        var previous = TranslationY;
+        TranslationY = Math.Clamp(previous + deltaY, 0, _sheetHeight);
+
+        return TranslationY - previous;
+    }
+
+    /// <inheritdoc cref="DragBy"/>
+    internal Task SettleFromGestureAsync() => SettleAsync();
 
     /// <summary>Wired by the scaffold to the overlay-entry close path (scrim fade + cleanup included).</summary>
     internal void SetDismissCallback(Func<Task> dismissAsync) => _dismissAsync = dismissAsync;
@@ -398,31 +428,6 @@ public sealed class ScaffoldBottomSheetView : Border
     /// <summary>Slides out from the current position past the bottom edge.</summary>
     internal Task ExitAsync() => this.TranslateTo(0, _sheetHeight, _animationDuration, Easing.CubicIn);
 
-    private void OnPanUpdated(object? sender, PanUpdatedEventArgs e)
-    {
-        switch (e.StatusType)
-        {
-            case GestureStatus.Started:
-                _panning = true;
-                _panStartTranslationY = TranslationY;
-
-                break;
-
-            case GestureStatus.Running when _panning:
-                // Between fully open (0 — no over-drag past the largest detent: expansion only
-                // exists while a bigger detent does) and fully dismissed (_sheetHeight).
-                TranslationY = Math.Clamp(_panStartTranslationY + e.TotalY, 0, _sheetHeight);
-
-                break;
-
-            case GestureStatus.Completed:
-            case GestureStatus.Canceled:
-                _panning = false;
-                _ = SettleAsync();
-
-                break;
-        }
-    }
 
     /// <summary>Snaps to the nearest detent — or dismisses when pulled far enough below the smallest one.</summary>
     private async Task SettleAsync()

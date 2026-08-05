@@ -23,6 +23,8 @@ public class SheetHomePage : ContentPage
     private readonly Label _popupState;
     private IScaffoldPopup? _sheet;
     private IScaffoldPopup? _detentSheet;
+    private IScaffoldPopup? _scrollSheet;
+    private readonly Label _scrollState;
     private IScaffoldPopup? _popup;
 
     public SheetHomePage(SheetHomePageModel model)
@@ -31,6 +33,7 @@ public class SheetHomePage : ContentPage
         Title = "SheetHome";
 
         _sheetState = new Label { AutomationId = "SheetState", Text = "sheet:idle", FontSize = 12 };
+        _scrollState = new Label { AutomationId = "ScrollSheetState", Text = "scroll:idle", FontSize = 12 };
         _detentState = new Label { AutomationId = "DetentSheetState", Text = "detent:idle", FontSize = 12 };
         _popupState = new Label { AutomationId = "SheetPopupState", Text = "popup:idle", FontSize = 12 };
 
@@ -39,6 +42,9 @@ public class SheetHomePage : ContentPage
 
         var showDetentSheetButton = new Button { Text = "Show detent sheet", AutomationId = "ShowDetentSheetButton", FontSize = 12 };
         showDetentSheetButton.Clicked += async (_, _) => await ShowDetentSheetAsync();
+
+        var showScrollSheetButton = new Button { Text = "Show scroll sheet", AutomationId = "ShowScrollSheetButton", FontSize = 12 };
+        showScrollSheetButton.Clicked += async (_, _) => await ShowScrollSheetAsync();
 
         var exitButton = new Button { Text = "Exit", AutomationId = "ExitSheetTests", FontSize = 11, BackgroundColor = Colors.IndianRed };
         exitButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
@@ -52,6 +58,8 @@ public class SheetHomePage : ContentPage
                 new Label { Text = "Sheet Home", AutomationId = "SheetHomePage", FontSize = 22, FontAttributes = FontAttributes.Bold },
                 showSheetButton,
                 showDetentSheetButton,
+                showScrollSheetButton,
+                _scrollState,
                 _sheetState,
                 _detentState,
                 _popupState,
@@ -143,6 +151,46 @@ public class SheetHomePage : ContentPage
         => sheetContent.Parent?.Parent is ScaffoldBottomSheetView sheetView
             ? sheetView.SnapToDetentAsync(detentIndex)
             : Task.CompletedTask;
+
+    /// <summary>
+    /// A sheet whose content is a TALL ScrollView: covers the cooperative drag/scroll
+    /// hand-off (expand-then-scroll going up, scroll-to-top-then-collapse going down).
+    /// </summary>
+    private async Task ShowScrollSheetAsync()
+    {
+        var offsetLabel = new Label { AutomationId = "ScrollSheetOffset", Text = "off:0", FontSize = 12, Margin = new Thickness(16, 0) };
+
+        var stack = new VerticalStackLayout { Spacing = 0, Padding = new Thickness(16, 0) };
+
+        for (var i = 0; i < 40; i++)
+        {
+            stack.Add(new Label { Text = $"Row {i}", FontSize = 14, HeightRequest = 44, VerticalTextAlignment = TextAlignment.Center });
+        }
+
+        var scroll = new ScrollView { AutomationId = "ScrollSheetScroll", Content = stack };
+        scroll.Scrolled += (_, e) => offsetLabel.Text = $"off:{(int) e.ScrollY}";
+
+        var content = new Grid
+        {
+            RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)]
+        };
+        content.Add(offsetLabel);
+        content.Add(scroll, 0, 1);
+
+        var scaffold = this.GetScaffold();
+
+        _scrollSheet = await scaffold.ShowBottomSheetAsync(
+            content,
+            new ScaffoldBottomSheetOptions
+            {
+                Detents = [ScaffoldSheetDetent.Height(300), ScaffoldSheetDetent.Fraction(0.9)],
+                InitialDetent = 0
+            }
+        );
+
+        _scrollState.Text = _scrollSheet.IsOpen ? "scroll:open" : "scroll:failed";
+        ObserveClose(_scrollSheet, _scrollState, "scroll");
+    }
 
     private async Task ShowPopupOverSheetAsync()
     {

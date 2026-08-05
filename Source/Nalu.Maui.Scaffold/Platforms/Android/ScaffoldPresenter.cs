@@ -1266,11 +1266,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 var sheetHeight = sheet.InitializeGeometry(availableHeight, natural);
 
                 // Bottom-anchored, centered at the (possibly capped) width; the sheet's own
-                // TranslationY does the rest.
+                // TranslationY does the rest. The nested host between the container and the
+                // sheet provides the drag/scroll cooperative hand-off (expand-then-scroll,
+                // pull-down at scroll top) — see ScaffoldBottomSheetNestedHost.
                 var sheetLayoutParams = new Android.Widget.FrameLayout.LayoutParams(sheetWidthPx, (int)context.ToPixels(sheetHeight))
                 {
                     Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal
                 };
+
+                var nestedHost = new ScaffoldBottomSheetNestedHost(context, sheet);
+                nestedHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+                panel = nestedHost;
 
                 platformView.AddView(panel, sheetLayoutParams);
 

@@ -362,12 +362,22 @@ public sealed class NaluApp : IAsyncLifetime
     public async Task AndroidRealSwipeAsync(string automationId, double deltaXDp, double deltaYDp, int durationMs = 200)
     {
         var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
+        await AndroidRealSwipeAtPointAsync(bounds.CenterX, bounds.CenterY, deltaXDp, deltaYDp, durationMs).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A REAL directional swipe from an explicit window point (dp): for elements whose CENTER
+    /// sits offscreen (e.g. a tall scrollable inside a collapsed bottom sheet), anchor the
+    /// gesture on a visible landmark instead.
+    /// </summary>
+    public async Task AndroidRealSwipeAtPointAsync(double startXDp, double startYDp, double deltaXDp, double deltaYDp, int durationMs = 200)
+    {
         var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
 
-        var x1 = (int)Math.Round(bounds.CenterX * scale);
-        var y1 = (int)Math.Round(bounds.CenterY * scale);
-        var x2 = (int)Math.Round((bounds.CenterX + deltaXDp) * scale);
-        var y2 = (int)Math.Round((bounds.CenterY + deltaYDp) * scale);
+        var x1 = (int)Math.Round(startXDp * scale);
+        var y1 = (int)Math.Round(startYDp * scale);
+        var x2 = (int)Math.Round((startXDp + deltaXDp) * scale);
+        var y2 = (int)Math.Round((startYDp + deltaYDp) * scale);
 
         await RunAdbAsync($"shell input swipe {x1} {y1} {x2} {y2} {durationMs}").ConfigureAwait(false);
     }
