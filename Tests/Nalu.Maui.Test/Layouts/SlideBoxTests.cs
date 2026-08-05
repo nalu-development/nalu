@@ -123,4 +123,71 @@ public class SlideBoxTests
 
         box.Items[0].BindingContext.Should().BeSameAs(context);
     }
+
+    /// <summary>A box with a real page size, so templates actually realize.</summary>
+    private static SlideBox SizedBox(params SlideBoxItem[] items)
+    {
+        var box = new SlideBox
+        {
+            Frame = new Rect(0, 0, 300, 300)
+        };
+
+        foreach (var item in items)
+        {
+            box.Items.Add(item);
+        }
+
+        return box;
+    }
+
+    [Fact(DisplayName = "ContentBindingContext, should scope the realized content instead of the inherited context")]
+    public void ContentBindingContextShouldScopeTheRealizedContent()
+    {
+        var scoped = new object();
+        var item = Item();
+        item.ContentBindingContext = scoped;
+
+        var box = SizedBox(item);
+        box.BindingContext = new object();
+
+        item.Content.Should().NotBeNull();
+        item.Content!.BindingContext.Should().BeSameAs(scoped);
+    }
+
+    [Fact(DisplayName = "ContentBindingContext, when changed after realization, should update the content")]
+    public void ContentBindingContextWhenChangedShouldUpdateTheContent()
+    {
+        var item = Item();
+        item.ContentBindingContext = new object();
+        var box = SizedBox(item);
+
+        var replacement = new object();
+        item.ContentBindingContext = replacement;
+
+        box.Items[0].Content!.BindingContext.Should().BeSameAs(replacement);
+    }
+
+    [Fact(DisplayName = "ContentBindingContext, when the content is torn down, should be cleared from it")]
+    public void ContentBindingContextWhenTornDownShouldBeCleared()
+    {
+        var item = Item();
+        item.ContentBindingContext = new object();
+        _ = SizedBox(item, Item());
+
+        var content = item.Content!;
+        item.IsEnabled = false;
+
+        item.Content.Should().BeNull();
+        content.BindingContext.Should().BeNull();
+    }
+
+    [Fact(DisplayName = "ContentBindingContext, when unset, should let the content inherit the box context")]
+    public void ContentBindingContextWhenUnsetShouldInherit()
+    {
+        var context = new object();
+        var box = SizedBox(Item());
+        box.BindingContext = context;
+
+        box.Items[0].Content!.BindingContext.Should().BeSameAs(context);
+    }
 }
