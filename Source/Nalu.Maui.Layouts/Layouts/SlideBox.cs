@@ -481,11 +481,25 @@ public class SlideBox : Layout
         if (next >= 0 && (_dragging || PeeksTowards(1)))
         {
             EnsureContent(Items[next]);
+
+            // During a drag with an end-side peek, the slide AFTER next scrolls into the
+            // peek band mid-drag: it must already exist and move with the strip (otherwise
+            // the box background shows through and the late-realized slide pops in on its
+            // own timeline).
+            if (_dragging && PeeksTowards(1) && FindEnabled(next, 1) is var nextNext and >= 0)
+            {
+                EnsureContent(Items[nextNext]);
+            }
         }
 
         if (previous >= 0 && (_dragging || PeeksTowards(-1)))
         {
             EnsureContent(Items[previous]);
+
+            if (_dragging && PeeksTowards(-1) && FindEnabled(previous, -1) is var previousPrevious and >= 0)
+            {
+                EnsureContent(Items[previousPrevious]);
+            }
         }
 
         this.AbortAnimation(_transitionAnimationName);
@@ -502,7 +516,10 @@ public class SlideBox : Layout
 
             var distance = EnabledDistance(selected, i);
 
-            if (Math.Abs(distance) <= 1)
+            // The participating window spans TWO pages per side: with a peek band, the slide
+            // beyond the neighbor scrolls into view mid-drag/transition and must ride the
+            // strip at its true slot instead of popping in afterwards.
+            if (Math.Abs(distance) <= 2)
             {
                 var target = RestTranslation(distance) + drag;
 
@@ -545,9 +562,11 @@ public class SlideBox : Layout
                 }
                 else
                 {
-                    // Slide one page towards its side, then hide.
+                    // An exiting view moves EXACTLY one page with the strip (same speed as
+                    // every other participant), then hides.
                     var from = GetTranslation(view);
-                    var target = RestTranslation(Math.Sign(distance) * 2);
+                    var exitSide = direction != 0 ? -direction : Math.Sign(distance);
+                    var target = from + RestTranslation(exitSide);
                     var capturedView = view;
                     animation.Add(0, 1, new Animation(v => SetTranslation(capturedView, v), from, target));
                     (toHide ??= []).Add(view);
