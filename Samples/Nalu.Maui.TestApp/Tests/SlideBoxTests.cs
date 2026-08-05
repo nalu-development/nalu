@@ -33,6 +33,7 @@ public class SlideBoxTests : ContentPage
 
                            return new Grid
                                   {
+                                      AutomationId = $"SlideRoot{name}",
                                       BackgroundColor = color,
                                       Children =
                                       {

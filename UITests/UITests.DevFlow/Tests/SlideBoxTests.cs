@@ -73,15 +73,21 @@ public class SlideBoxTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     }
 
     [Fact]
-    public async Task PeekRealizesTheNeighborEagerly()
+    public async Task PeekRealizesTheNeighborEagerlyAndTogglingBackRestoresTheFullSlot()
     {
         await App.WaitForTextAsync("SlideCreatedLabel", "Created:1");
+        var fullWidth = (await App.GetBoundsAsync("SlideRootA")).Width;
 
         // Turning the end-side peek on makes the NEXT slide partially visible — it must
-        // realize right away without navigating.
+        // realize right away without navigating, and the current slide narrows by the peek.
         await App.TapAsync("SlideTogglePeekButton");
         await App.WaitForTextAsync("SlideCreatedLabel", "Created:2");
         await App.WaitForTextAsync("SlideIndexLabel", "Index:0");
+        await App.WaitForBoundsAsync("SlideRootA", bounds => bounds.Width < fullWidth - 1);
+
+        // Toggling the peek back off re-expands the slide to the full slot.
+        await App.TapAsync("SlideTogglePeekButton");
+        await App.WaitForBoundsAsync("SlideRootA", bounds => Math.Abs(bounds.Width - fullWidth) < 1);
     }
 
     [Fact]

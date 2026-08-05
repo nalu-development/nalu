@@ -391,7 +391,14 @@ public class SlideBox : Layout
         return enabledDistance > 0 ? peek.Bottom > 0 : peek.Top > 0;
     }
 
-    private void OnStructureChanged() => Present(animated: false);
+    private void OnStructureChanged()
+    {
+        // The page slot geometry changed: child frames must be re-arranged (translations
+        // alone don't cover it — without this, removing the peek would leave the current
+        // slide at its narrowed frame).
+        InvalidateMeasure();
+        Present(animated: false);
+    }
 
     /// <inheritdoc />
     protected override Size ArrangeOverride(Rect bounds)
