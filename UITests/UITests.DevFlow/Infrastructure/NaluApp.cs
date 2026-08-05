@@ -349,6 +349,24 @@ public sealed class NaluApp : IAsyncLifetime
         await RunAdbAsync($"shell input tap {(int)(bounds.CenterX * scale)} {(int)(bounds.CenterY * scale)}").ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// A REAL directional swipe across an element's center (adb <c>input swipe</c>): drives
+    /// platform gesture recognizers (e.g. MAUI pan) with actual touch physics, which the
+    /// agent's synthetic gestures lack.
+    /// </summary>
+    public async Task AndroidRealSwipeAsync(string automationId, double deltaXDp, double deltaYDp, int durationMs = 200)
+    {
+        var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
+        var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
+
+        var x1 = (int)Math.Round(bounds.CenterX * scale);
+        var y1 = (int)Math.Round(bounds.CenterY * scale);
+        var x2 = (int)Math.Round((bounds.CenterX + deltaXDp) * scale);
+        var y2 = (int)Math.Round((bounds.CenterY + deltaYDp) * scale);
+
+        await RunAdbAsync($"shell input swipe {x1} {y1} {x2} {y2} {durationMs}").ConfigureAwait(false);
+    }
+
     private async Task<double> GetAndroidDisplayScaleAsync()
     {
         if (_androidDisplayScale is not { } scale)
