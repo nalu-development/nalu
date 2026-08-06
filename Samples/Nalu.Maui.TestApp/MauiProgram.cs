@@ -24,10 +24,25 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .UseNaluNavigation<App>(nav => nav
                                            .AddPages()
+                                           // View-only pages (no page models) exercised by "Scaffold View Only Tests":
+                                           // AddPages() skips them (no matching model), the view-only overload registers them.
+                                           .AddPage<Tests.ViewOnlyOnePage>()
+                                           .AddPage<Tests.ViewOnlyTwoPage>()
+                                           .AddPage<Tests.ViewOnlyDetailPage>()
+                                           .AddPage<Tests.ViewOnlyGuardPage>()
+                                           // Page-lifecycle harness pages (also view-only).
+                                           .AddPage<Tests.ScaffoldLifecycleOnePage>()
+                                           .AddPage<Tests.ScaffoldLifecycleTwoPage>()
+                                           .AddPage<Tests.ScaffoldLifecycleDetailPage>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
             .UseNaluTabBar()
+            .UseNaluScaffold(scaffold => scaffold
+                // Model-first overlays exercised by the "Scaffold Overlay Service Tests" harness.
+                .AddOverlay<Tests.VmSheetModel, Tests.VmSheetView>()
+                .AddOverlay<Tests.VmPopupModel, Tests.VmPopupView>()
+            )
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()

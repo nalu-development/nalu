@@ -218,8 +218,8 @@ public sealed class NaluApp : IAsyncLifetime
             var matches = await _client.QueryAsync(text: text).ConfigureAwait(false);
 
             // Only on-screen matches: text queries also hit abstract structure elements
-            // (Shell's Tab) that report IsVisible but have no window bounds — tapping those
-            // spins until timeout.
+            // (Shell's Tab, the Scaffold's ScaffoldRoot Title) that report IsVisible but have
+            // no window bounds — tapping those spins until timeout.
             var element = matches.FirstOrDefault(m => m.IsVisible && m.WindowBounds is { Width: > 0, Height: > 0 });
 
             if (element is not null)
@@ -364,12 +364,22 @@ public sealed class NaluApp : IAsyncLifetime
     public async Task AndroidRealSwipeAsync(string automationId, double deltaXDp, double deltaYDp, int durationMs = 200)
     {
         var bounds = await GetBoundsAsync(automationId).ConfigureAwait(false);
+        await AndroidRealSwipeAtPointAsync(bounds.CenterX, bounds.CenterY, deltaXDp, deltaYDp, durationMs).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A REAL directional swipe from an explicit window point (dp): for elements whose CENTER
+    /// sits offscreen (e.g. a tall scrollable inside a collapsed bottom sheet), anchor the
+    /// gesture on a visible landmark instead.
+    /// </summary>
+    public async Task AndroidRealSwipeAtPointAsync(double startXDp, double startYDp, double deltaXDp, double deltaYDp, int durationMs = 200)
+    {
         var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
 
-        var x1 = (int)Math.Round(bounds.CenterX * scale);
-        var y1 = (int)Math.Round(bounds.CenterY * scale);
-        var x2 = (int)Math.Round((bounds.CenterX + deltaXDp) * scale);
-        var y2 = (int)Math.Round((bounds.CenterY + deltaYDp) * scale);
+        var x1 = (int)Math.Round(startXDp * scale);
+        var y1 = (int)Math.Round(startYDp * scale);
+        var x2 = (int)Math.Round((startXDp + deltaXDp) * scale);
+        var y2 = (int)Math.Round((startYDp + deltaYDp) * scale);
 
         await RunAdbAsync($"shell input swipe {x1} {y1} {x2} {y2} {durationMs}").ConfigureAwait(false);
     }
@@ -749,6 +759,36 @@ public sealed class NaluApp : IAsyncLifetime
                ?? throw new InvalidOperationException("Could not determine the window width for pixel sampling.");
     }
 
+    /// <summary>Window size in DIPs, derived from the first fully bounded element in the tree
+    /// (the tree root may carry no bounds — same caveat as <see cref="GetWindowWidthAsync"/>).</summary>
+    public async Task<(double Width, double Height)> GetWindowSizeAsync()
+    {
+        var tree = await _client.GetTreeAsync(3).ConfigureAwait(false);
+
+        static (double Width, double Height)? FindSize(IEnumerable<ElementInfo> elements)
+        {
+            foreach (var element in elements)
+            {
+                var bounds = element.WindowBounds ?? element.Bounds;
+
+                if (bounds is { Width: > 0, Height: > 0 })
+                {
+                    return (bounds.Width, bounds.Height);
+                }
+
+                if (element.Children is { } children && FindSize(children) is { } size)
+                {
+                    return size;
+                }
+            }
+
+            return null;
+        }
+
+        return FindSize(tree)
+               ?? throw new InvalidOperationException("Could not determine the window size.");
+    }
+
     /// <summary>Waits until the sampled pixel color satisfies the given predicate (e.g. after a re-render).</summary>
     public async Task<(byte R, byte G, byte B)> WaitForPixelColorAsync(
         string automationId,
@@ -781,7 +821,103 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>Navigates back (also closes the top-most modal page, e.g. a popup).</summary>
+    /// <remarks>
+    /// The agent's Back command only understands NavigationPage/Shell stacks: it refuses
+    /// ("stack may be empty") on custom hosts like the Nalu Scaffold. Use
+    /// <see cref="SystemBackAsync"/> to exercise the platform's real back channel.
+    /// </remarks>
     public Task BackAsync() => _client.BackAsync();
+
+    /// <summary>
+    /// Presses the platform's system back button. On Android this injects a real key event via
+    /// adb — exercising the OnBackPressedDispatcher exactly like a user would, host-agnostic.
+    /// On other platforms it falls back to the agent's Back command.
+    /// </summary>
+    public async Task SystemBackAsync()
+    {
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        if (platform.Contains("android", StringComparison.OrdinalIgnoreCase))
+        {
+            var startInfo = new ProcessStartInfo("adb")
+            {
+                ArgumentList = { "shell", "input", "keyevent", "4" },
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var process = Process.Start(startInfo)
+                                ?? throw new InvalidOperationException("Could not start 'adb' to send the system back key.");
+
+            await process.WaitForExitAsync().ConfigureAwait(false);
+
+            return;
+        }
+
+        await _client.BackAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether the Android device navigates by gestures (navigation_mode 2) — the predictive
+    /// back gesture only exists there. False on other platforms.
+    /// </summary>
+    public async Task<bool> IsAndroidGestureNavigationAsync()
+    {
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        if (!platform.Contains("android", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var mode = await RunAdbAsync("shell", "settings", "get", "secure", "navigation_mode").ConfigureAwait(false);
+
+        return mode.Trim() == "2";
+    }
+
+    /// <summary>
+    /// Performs a SLOW committed predictive-back edge scrub (Android, gesture navigation) via
+    /// discrete adb motion events. A plain 'input swipe' commits as a canned fling (and can even
+    /// dispatch a second back); the stepped scrub is what exercises the peek-mount path.
+    /// </summary>
+    public async Task PredictiveBackScrubAsync()
+    {
+        var size = await RunAdbAsync("shell", "wm", "size").ConfigureAwait(false);
+        var dimensions = size[(size.IndexOf(':') + 1)..].Trim().Split('x');
+        var width = int.Parse(dimensions[0], CultureInfo.InvariantCulture);
+        var height = int.Parse(dimensions[1], CultureInfo.InvariantCulture);
+
+        var y = height / 2;
+        var stops = new[] { 0.04, 0.1, 0.18, 0.28, 0.38, 0.48, 0.58 };
+
+        var script = $"input motionevent DOWN 5 {y}; "
+                     + string.Join("; ", stops.Select(s => $"input motionevent MOVE {(int) (width * s)} {y}"))
+                     + $"; input motionevent UP {(int) (width * 0.58)} {y}";
+
+        await RunAdbAsync("shell", script).ConfigureAwait(false);
+    }
+
+    private static async Task<string> RunAdbAsync(params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("adb")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo)
+                            ?? throw new InvalidOperationException("Could not start 'adb'.");
+
+        var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+        await process.WaitForExitAsync().ConfigureAwait(false);
+
+        return output;
+    }
 
     /// <summary>
     /// Brings the app back to the test-selection page.

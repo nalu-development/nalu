@@ -73,7 +73,7 @@ In the following example we use the community toolkit MVVM `ObservableObject` as
 ```csharp
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Nalu.Maui.Weather.PopupModels;
+namespace MyApp.PopupModels;
 
 public abstract class PopupModelBase<TIntent, TResult>(INavigationService navigationService) : ObservableObject, IEnteringAware<TIntent>
     where TIntent : AwaitableIntent<TResult>

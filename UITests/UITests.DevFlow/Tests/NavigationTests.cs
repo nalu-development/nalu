@@ -15,9 +15,22 @@ namespace Nalu.Maui.UITests.Tests;
 /// The shell harness has no harness ResetButton (Shell pages are not decorated):
 /// every page exposes an Exit{Name} button invoking the app-level reset instead.
 /// </remarks>
-public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
+public abstract class NavigationTestsBase(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Navigation Tests";
+    /// <summary>The [TestPage] name of the harness hosting the Nav pages.</summary>
+    protected abstract string PageName { get; }
+
+    /// <summary>Whether the host renders a tappable tab bar (Shell: NaluTabBar; Scaffold: not until P1).</summary>
+    protected virtual bool HasTabBarChrome => true;
+
+    /// <summary>Whether DevFlow's Back command can pop on the current platform/host.</summary>
+    protected virtual Task<bool> SupportsNativeBackAsync() => Task.FromResult(true);
+
+    /// <summary>
+    /// Expected leak residue after the multi-pop scenario
+    /// (see <see cref="AbsoluteRootIgnoringGuardsPopsGuardedStack"/>).
+    /// </summary>
+    protected virtual string MultiPopLeakReport => "Leaked:2 NavEditorPageModel,NavDetailPageModel";
 
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
@@ -285,7 +298,7 @@ public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         // up — the popped pages stay rooted even though Nalu disposed them correctly
         // (single-pop scenarios collect fine). Assert the exact residue so any change in
         // behavior (fix or worsening) is caught.
-        _expectedLeakReport = "Leaked:2 NavEditorPageModel,NavDetailPageModel";
+        _expectedLeakReport = MultiPopLeakReport;
     }
 
     [Fact]
@@ -330,6 +343,8 @@ public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     [Fact]
     public async Task NativeTabSwitchPreservesPushedPages()
     {
+        Assert.SkipUnless(HasTabBarChrome, "The host has no tappable tab bar chrome yet.");
+
         await OpenShellAsync();
 
         await App.TapAsync("PushDetailButton");
@@ -415,12 +430,14 @@ public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     [Fact]
     public async Task NativeBackButtonPopsWithLifecycle()
     {
+        Assert.SkipUnless(await SupportsNativeBackAsync(), "Native back cannot pop on this platform/host.");
+
         await OpenShellAsync();
 
         await App.TapAsync("PushDetailButton");
         await WaitForLogAsync("Detail", "Detail+A");
 
-        await App.BackAsync();
+        await App.SystemBackAsync();
         await App.WaitForElementAsync("NavPageHome");
 
         await App.WaitForTextMatchAsync("LogHome", t => t?.Contains("Detail-X") == true);
@@ -430,6 +447,8 @@ public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     [Fact]
     public async Task NativeBackButtonHonorsGuard()
     {
+        Assert.SkipUnless(await SupportsNativeBackAsync(), "Native back cannot pop on this platform/host.");
+
         await OpenShellAsync();
 
         await App.TapAsync("PushDetailButton");
@@ -437,9 +456,40 @@ public class NavigationTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         await App.TapAsync("PushEditorButton");
         await WaitForLogAsync("Editor", "Editor+A");
 
-        await App.BackAsync();
+        await App.SystemBackAsync();
 
         await App.WaitForTextMatchAsync("LogEditor", t => t?.Contains("Editor?Gn") == true);
         (await App.WaitForElementAsync("NavPageEditor")).IsVisible.Should().BeTrue();
     }
+}
+
+/// <summary>The suite against the MAUI Shell host (NavShell harness).</summary>
+public class NavigationTests(NaluApp app) : NavigationTestsBase(app)
+{
+    protected override string PageName => "Navigation Tests";
+
+    // UPSTREAM (MAUI 10.0.80): Shell still handles back through the legacy KEYCODE_BACK path,
+    // which predictive-back enforcement ignores (Android 16+/targetSdk 36) — the system back
+    // key does not pop Shell on modern emulators. The Scaffold host is unaffected (it registers
+    // an OnBackPressedDispatcher callback). Re-check on MAUI bumps.
+    protected override async Task<bool> SupportsNativeBackAsync() => await App.IsAppleAsync();
+}
+
+/// <summary>
+/// The SAME suite against the Nalu Scaffold host (NavScaffold harness) — the P0 exit gate:
+/// identical engine behavior on both hosts, asserted by identical tests.
+/// </summary>
+public class ScaffoldNavigationTests(NaluApp app) : NavigationTestsBase(app)
+{
+    protected override string PageName => "Scaffold Navigation Tests";
+
+    // P1: the default ScaffoldTabBar template renders tappable items (labels "HomeTab"/"SearchTab").
+
+    // Android system back pops via the OnBackPressedDispatcher callback; iOS has no system
+    // back and the Scaffold has no nav-bar back button until P1.
+    protected override async Task<bool> SupportsNativeBackAsync() => !await App.IsAppleAsync();
+
+    // The documented multi-pop leak is a MAUI Shell platform issue (native pop-to-root renderer
+    // trackers); the Scaffold's own presentation does not exhibit it.
+    protected override string MultiPopLeakReport => "Leaked:0";
 }

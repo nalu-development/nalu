@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/controls"
+             xmlns:scaffold="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:overlays="clr-namespace:Nalu.Maui.DailyHelper.Overlays"
+             x:Class="Nalu.Maui.DailyHelper.Overlays.DurationSheetView"
+             x:DataType="overlays:DurationSheetModel">
+
+    <!-- Sheet presentation declared ON the view (§7.2 attached options): natural height,
+         standard grabber, pull-down dismissal. The wheel maps one revolution to an hour. -->
+    <VerticalStackLayout Padding="24,8,24,16" Spacing="14"
+                         Background="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}">
+
+        <Label Text="Expected duration"
+               FontFamily="SemiBold" FontSize="17"
+               HorizontalOptions="Center" />
+
+        <!-- The live value sits INSIDE the wheel (input-transparent: drags pass through). -->
+        <Grid HorizontalOptions="Center">
+            <nalu:DurationWheel WidthRequest="240"
+                                HeightRequest="240"
+                                Duration="{Binding Duration, Mode=TwoWay}"
+                                WholeDuration="1:00:00"
+                                MaximumDuration="8:00:00"
+                                ValueWidth="16"
+                                OuterBackgroundColor="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}"
+                                InnerBackgroundColor="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}"
+                                MarkersColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                LowValueColor="{StaticResource Accent}"
+                                HighValueColor="{StaticResource Danger}" />
+
+            <Label Text="{Binding DurationLabel}"
+                   FontFamily="SemiBold" FontSize="22"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   InputTransparent="True"
+                   TextColor="{StaticResource Accent}" />
+        </Grid>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <Button Text="Clear"
+                    Command="{Binding ClearCommand}"
+                    BackgroundColor="Transparent"
+                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
+            <Button Grid.Column="1" Text="Done" Command="{Binding DoneCommand}" />
+        </Grid>
+
+    </VerticalStackLayout>
+</ContentView>

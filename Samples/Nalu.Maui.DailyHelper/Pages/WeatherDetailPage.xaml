@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
+             xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
+             x:Class="Nalu.Maui.DailyHelper.Pages.WeatherDetailPage"
+             x:DataType="pm:WeatherDetailPageModel"
+             nalu:Scaffold.TabBarVisibility="Auto"
+             nalu:Scaffold.NavBarOverlapsContent="True"
+             nalu:Scaffold.ScrollTracker="{x:Reference DetailScroll}"
+             nalu:Scaffold.ScrollRampStart="100"
+             nalu:Scaffold.ScrollRampEnd="200"
+             Title="Weather">
+
+    <!-- Scroll-driven chrome (§5.2), fully declarative: the page declares its interpolation
+         ramp ONCE (ScrollRampStart/ScrollRampEnd above) and every {ScrollValue}/{ThemeScrollValue}
+         below rides it. The strip starts transparent over the full-bleed photo
+         (NavBarOverlapsContent removes the top inset) and materializes with scroll,
+         theme-aware endpoints included. -->
+    <nalu:Scaffold.NavBarAppearance>
+        <nalu:ScaffoldNavBarAppearance
+            Background="{nalu:ThemeScrollValue FromLight=Transparent,
+                                               ToLight={StaticResource BackgroundLight},
+                                               ToDark={StaticResource BackgroundDark}}"
+            Foreground="{nalu:ThemeScrollValue FromLight=White,
+                                               ToLight={StaticResource TextPrimaryLight},
+                                               ToDark={StaticResource TextPrimaryDark}}" />
+    </nalu:Scaffold.NavBarAppearance>
+
+    <!-- The title fades in on the page ramp. -->
+    <nalu:Scaffold.TitleView>
+        <Label Text="Weather"
+               FontFamily="SemiBold" FontSize="20"
+               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+               VerticalTextAlignment="Center"
+               Opacity="{nalu:ScrollValue From=0, To=1}" />
+    </nalu:Scaffold.TitleView>
+
+    <!-- The photo, temperature and icon carry the same TransitionName as the Today hero:
+         pushing this page morphs them between the two layouts (pop and the iOS edge swipe
+         play the flight backwards). Per-edge safe area: None on top/sides (the photo owns the
+         very top edge), Default on the BOTTOM — scrolled content must still clear the system
+         bar at max scroll, or the last rows end up unreachable behind it. -->
+    <ScrollView x:Name="DetailScroll" SafeAreaEdges="None,None,None,Default">
+        <VerticalStackLayout Spacing="16" Padding="0,0,0,32">
+            <Grid HeightRequest="360">
+                <!-- Photo and its darkening layers parallax TOGETHER at half speed
+                     (Extend = speed factor). The backdrop bleeds 120dp above the hero so the
+                     iOS top bounce reveals more photo instead of a gap. -->
+                <Grid Margin="0,-120,0,0"
+                      TranslationY="{nalu:ScrollValue RampStart=0, RampEnd=100, From=0, To=50, Extrapolate=Extend}">
+                    <Image nalu:Scaffold.TransitionName="weather-photo"
+                           Source="{Binding Current.Photo}"
+                           Aspect="AspectFill" />
+                    <BoxView nalu:Scaffold.TransitionName="weather-scrim" Color="Black" Opacity="0.32" InputTransparent="True" />
+                    <!-- Top scrim: keeps the white chevron and status bar legible over bright
+                         photos while the bar is still transparent. -->
+                    <BoxView VerticalOptions="Start" HeightRequest="130" Margin="0,120,0,0" InputTransparent="True">
+                        <BoxView.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#73000000" Offset="0" />
+                                <GradientStop Color="#00000000" Offset="1" />
+                            </LinearGradientBrush>
+                        </BoxView.Background>
+                    </BoxView>
+                </Grid>
+                <VerticalStackLayout Padding="20,0,20,18" Spacing="2" VerticalOptions="End">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Label nalu:Scaffold.TransitionName="weather-temp"
+                               Text="{Binding Current.TemperatureLabel}"
+                               TextColor="White" FontFamily="SemiBold" FontSize="68" />
+                        <Label Grid.Column="2"
+                               nalu:Scaffold.TransitionName="weather-icon"
+                               Text="{Binding Current.Glyph}"
+                               FontFamily="Material" FontSize="56" TextColor="White"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    <Label Text="{Binding Current.Description}" TextColor="White" FontSize="17" />
+                    <Label Text="{Binding Current.MinMaxLabel}" TextColor="White" Opacity="0.85" FontSize="13" />
+                </VerticalStackLayout>
+            </Grid>
+
+            <Grid Padding="16,0" ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="12">
+                <Border Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xf076;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.FeelsLikeLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Feels like" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xe891;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.HumidityLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Humidity" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Row="1" Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xefd8;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.WindLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Wind" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Padding="16,12">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="&#xe91c;" Style="{StaticResource Icon}" FontSize="18" />
+                        <Label Text="{Binding Current.PrecipitationLabel}" FontFamily="SemiBold" FontSize="20" />
+                        <Label Text="Rain today" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+            <Label Text="Next 24 hours" Style="{StaticResource SectionTitle}" Margin="20,4,20,0" />
+
+            <!-- Same control, horizontal layout: a virtualized hourly strip. -->
+            <vs:VirtualScroll HeightRequest="120"
+                              ItemsSource="{Binding NextHoursAdapter}">
+                <vs:VirtualScroll.ItemsLayout>
+                    <vs:HorizontalVirtualScrollLayout EstimatedItemSize="64" />
+                </vs:VirtualScroll.ItemsLayout>
+                <vs:VirtualScroll.ItemTemplate>
+                    <DataTemplate x:DataType="m:HourForecast">
+                        <VerticalStackLayout WidthRequest="64" Spacing="6" Padding="0,10" HorizontalOptions="Center">
+                            <Label Text="{Binding TimeLabel}" Style="{StaticResource Muted}" FontSize="12" HorizontalOptions="Center" />
+                            <Label Text="{Binding Glyph}" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" HorizontalOptions="Center" />
+                            <Label Text="{Binding TemperatureLabel}" FontFamily="SemiBold" FontSize="15" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </DataTemplate>
+                </vs:VirtualScroll.ItemTemplate>
+            </vs:VirtualScroll>
+
+            <Label Text="Coming days" Style="{StaticResource SectionTitle}" Margin="20,4,20,0" />
+
+            <VerticalStackLayout Padding="16,0" BindableLayout.ItemsSource="{Binding Days}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="m:DaySummary">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Padding="4,12">
+                            <Label Text="{Binding DayLabel}" FontSize="15" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="{Binding Glyph}" FontFamily="Material" FontSize="20"
+                                   TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                            <Label Grid.Column="2" Text="{Binding MinMaxLabel}" Style="{StaticResource Muted}"
+                                   WidthRequest="80" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

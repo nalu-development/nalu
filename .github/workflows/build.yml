@@ -142,7 +142,11 @@ jobs:
   deploy-gh-pages:
     name: Deploy GitHub Pages
     needs: build
-    if: github.ref == 'refs/heads/main'
+    # Published docs follow RELEASES, not main: the site should describe the version people can
+    # actually install, so it ships on the same event as the NuGet packages. The docfx build still
+    # runs on every push and PR (see the build job) — that keeps broken docs from reaching a
+    # release, it just no longer publishes.
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: read

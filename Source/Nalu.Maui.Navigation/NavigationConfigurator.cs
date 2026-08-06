@@ -17,6 +17,7 @@ public class NavigationConfigurator : INavigationConfiguration
     private readonly IServiceCollection _services;
     private readonly Type _applicationType;
     private readonly Dictionary<Type, Type> _mapping;
+    private readonly HashSet<Type> _viewOnlyPages = [];
 
     /// <inheritdoc />
     public ImageSource? MenuImage { get; private set; }
@@ -80,6 +81,28 @@ public class NavigationConfigurator : INavigationConfiguration
     public NavigationConfigurator WithNavigationIntentBehavior(NavigationIntentBehavior behavior)
     {
         NavigationIntentBehavior = behavior;
+
+        return this;
+    }
+
+    /// <summary>
+    /// Registers <typeparamref name="TPage" /> as a directly navigable page WITHOUT a page model
+    /// (view-only mode): navigate to it with <c>Navigation.Relative().Push&lt;TPage&gt;()</c>
+    /// (or use it as a root page type). The page itself is the navigation lifecycle target —
+    /// implement <see cref="IEnteringAware" />, <see cref="ILeavingGuard" />, intent interfaces…
+    /// directly on the page. Assigning a <c>BindingContext</c> explicitly hands the lifecycle
+    /// over to it entirely (the standard MVVM contract); an inherited binding context does not.
+    /// Adds <typeparamref name="TPage" /> as a scoped service (a fresh instance per navigation,
+    /// created in the page's own scope — constructor-inject services freely).
+    /// </summary>
+    /// <typeparam name="TPage">Type of the page.</typeparam>
+    public NavigationConfigurator AddPage<[DynamicallyAccessedMembers(DynamicallyAccessedPageModelMembers)] TPage>()
+        where TPage : Page
+    {
+        if (_viewOnlyPages.Add(typeof(TPage)))
+        {
+            _services.AddScoped<TPage>();
+        }
 
         return this;
     }

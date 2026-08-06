@@ -71,6 +71,28 @@ There is an embedded **leak-detector** to help you identify memory leaks in your
 
 ---
 
+### Scaffold [![Nalu.Maui.Scaffold NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Scaffold.svg)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Scaffold)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/)
+
+A complete, Nalu-drawn application shell replacing MAUI `Shell` as the navigation host
+(**preview**): tab bar with automatic overflow, nav bar with a per-property appearance system
+and scroll-driven chrome, drawers, popups and bottom sheets, declarative page transitions with
+shared elements, interactive back gestures, and system bars that automatically contrast with
+your UI — identical on iOS and Android, all engine-routed (guards and lifecycle always fire).
+
+```xml
+<nalu:Scaffold nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}">
+    <nalu:ScaffoldTabBar>
+        <nalu:ScaffoldRoot Title="Home" PageType="{x:Type pages:HomePage}" />
+        <nalu:ScaffoldRoot Title="Settings" PageType="{x:Type pages:SettingsPage}" />
+    </nalu:ScaffoldTabBar>
+</nalu:Scaffold>
+```
+
+**See more on the [Scaffold Wiki](scaffold.md)** — including the
+[NaluShell migration guide](scaffold-migration.md).
+
+---
+
 ### VirtualScroll [![Nalu.Maui.VirtualScroll NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.VirtualScroll.svg)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.VirtualScroll)](https://www.nuget.org/packages/Nalu.Maui.VirtualScroll/)
 
 A **high-performance** virtualized scrolling view designed to replace the traditional `CollectionView` in .NET MAUI applications.

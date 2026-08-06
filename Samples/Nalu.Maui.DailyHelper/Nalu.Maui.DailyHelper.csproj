@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- Mobile-only: the app is hosted by Nalu.Maui.Scaffold (iOS/Android). -->
+        <TargetFrameworks>net10.0;net10.0-android;net10.0-ios</TargetFrameworks>
+
+        <MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+
+        <OutputType Condition="$(TargetFramework) != 'net10.0'">Exe</OutputType>
+        <RootNamespace>Nalu.Maui.DailyHelper</RootNamespace>
+        <SingleProject>true</SingleProject>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <UseMaui>true</UseMaui>
+
+        <!-- Display name -->
+        <ApplicationTitle>Daily Helper</ApplicationTitle>
+
+        <!-- App Identifier -->
+        <ApplicationId>com.nalu.maui.dailyhelper</ApplicationId>
+
+        <!-- Versions -->
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>1</ApplicationVersion>
+
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- App Icon -->
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#4C7DF0"/>
+
+        <!-- Splash Screen -->
+        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#4C7DF0" BaseSize="128,128"/>
+
+        <!-- Images -->
+        <MauiImage Include="Resources\Images\*"/>
+
+        <!-- Custom Fonts -->
+        <MauiFont Include="Resources\Fonts\*"/>
+
+        <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+        <PackageReference Include="DynamicData" Version="9.4.33" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0"/>
+        <PackageReference Include="OpenMeteo.dotnet" Version="2.0.0" />
+        <!-- DevFlow agent: gives AI agents eyes/hands inside the running app (DEBUG only, see MauiProgram). -->
+        <PackageReference Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26358.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Source\Nalu.Maui.Controls\Nalu.Maui.Controls.csproj" />
+        <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
+        <ProjectReference Include="..\..\Source\Nalu.Maui.Scaffold\Nalu.Maui.Scaffold.csproj" />
+        <ProjectReference Include="..\..\Source\Nalu.Maui.VirtualScroll\Nalu.Maui.VirtualScroll.csproj" />
+    </ItemGroup>
+</Project>

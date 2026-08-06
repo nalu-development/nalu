@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
+             xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
+             xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
+             x:Class="Nalu.Maui.DailyHelper.Pages.TasksPage"
+             x:DataType="pm:TasksPageModel"
+             x:Name="Self"
+             Title="Tasks">
+
+    <!-- Title view with an inline "add" action. -->
+    <nalu:Scaffold.TitleView>
+        <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+            <Label Text="Tasks" FontFamily="SemiBold" FontSize="20" VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="&#xe145;"
+                    FontFamily="Material"
+                    FontSize="20"
+                    Padding="0"
+                    WidthRequest="36"
+                    HeightRequest="36"
+                    CornerRadius="18"
+                    VerticalOptions="Center"
+                    Command="{Binding Model.AddTaskCommand, Source={x:Reference Self}, x:DataType=pages:TasksPage}" />
+        </Grid>
+    </nalu:Scaffold.TitleView>
+
+    <!-- The adapter is both the ItemsSource and the DragHandler: long-press drag reorders
+         (or completes/revives) tasks by rewriting the store — the read-only DynamicData
+         projections re-emit the move. -->
+    <vs:VirtualScroll ItemsSource="{Binding SectionsAdapter}"
+                      DragHandler="{Binding SectionsAdapter}">
+
+        <vs:VirtualScroll.SectionHeaderTemplate>
+            <DataTemplate x:DataType="pm:TaskSection">
+                <Grid Padding="20,16,20,6" ColumnDefinitions="Auto,Auto" ColumnSpacing="8"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}">
+                    <Label Text="{Binding Name}" FontFamily="SemiBold" FontSize="15" />
+                    <Border Grid.Column="1"
+                            StrokeThickness="0"
+                            StrokeShape="RoundRectangle 9"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}"
+                            Padding="7,1"
+                            VerticalOptions="Center">
+                        <Label Text="{Binding Items.Count}" TextColor="{StaticResource Accent}" FontSize="11" FontFamily="SemiBold" />
+                    </Border>
+                </Grid>
+            </DataTemplate>
+        </vs:VirtualScroll.SectionHeaderTemplate>
+
+        <vs:VirtualScroll.ItemTemplate>
+            <DataTemplate x:DataType="m:TodoItem">
+                <Grid Padding="20,8" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="14">
+                    <Label Text="{Binding CheckGlyph}"
+                           FontFamily="Material" FontSize="24"
+                           TextColor="{StaticResource Accent}"
+                           VerticalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Model.ToggleCommand, Source={x:Reference Self}, x:DataType=pages:TasksPage}"
+                                                  CommandParameter="{Binding .}" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                        <Label Text="{Binding Title}" FontSize="16" />
+                        <Label Text="{Binding Notes}" Style="{StaticResource Muted}" IsVisible="{Binding HasNotes}" LineBreakMode="TailTruncation" />
+                        <VerticalStackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Model.EditTaskCommand, Source={x:Reference Self}, x:DataType=pages:TasksPage}"
+                                                  CommandParameter="{Binding .}" />
+                        </VerticalStackLayout.GestureRecognizers>
+                    </VerticalStackLayout>
+                    <Label Grid.Column="2"
+                           Text="{Binding DueLabel}"
+                           Style="{StaticResource Muted}"
+                           FontSize="12"
+                           IsVisible="{Binding HasDueLabel}"
+                           VerticalOptions="Center" />
+                    <Label Grid.Column="3"
+                           Text="&#xe25d;"
+                           Style="{StaticResource Icon}"
+                           FontSize="18"
+                           Opacity="0.5"
+                           VerticalOptions="Center" />
+                </Grid>
+            </DataTemplate>
+        </vs:VirtualScroll.ItemTemplate>
+
+        <vs:VirtualScroll.FooterTemplate>
+            <DataTemplate x:DataType="pm:TasksPageModel">
+                <BoxView HeightRequest="24" Color="Transparent" />
+            </DataTemplate>
+        </vs:VirtualScroll.FooterTemplate>
+
+    </vs:VirtualScroll>
+</ContentPage>

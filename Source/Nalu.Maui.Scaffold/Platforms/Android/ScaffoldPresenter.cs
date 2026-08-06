@@ -1,0 +1,1460 @@
+using System.ComponentModel;
+using Android.Views;
+using AndroidX.AppCompat.App;
+using AndroidX.Core.View;
+using AndroidX.Fragment.App;
+using Microsoft.Maui.Platform;
+using Nalu.Internals;
+using AView = Android.Views.View;
+using AViewGroup = Android.Views.ViewGroup;
+using View = Microsoft.Maui.Controls.View;
+
+namespace Nalu;
+
+/// <summary>
+/// Android presenter: hosts the visible page in a fragment (the MAUI Shell hosting model and the
+/// base for predictive-back integration) inside the inset-rewriting page layer (§5.4), owns the
+/// tab bar strip and the §5.6 overlay layer. Single-visible-page policy: one fragment replaced
+/// per sync; the fragment back stack and the full transition engine arrive with P2.
+/// </summary>
+internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter, IDisposable
+{
+    private const int _settleTimeoutMs = 2000;
+    private const int _overlayDurationMs = 250;
+    private const double _overflowGapDp = 8;
+
+    private ScaffoldLayout? _hostPlatformView;
+    private ScaffoldPageLayerLayout? _pageLayer;
+    private FragmentContainerView? _container;
+    private ScaffoldPageFragment? _currentFragment;
+    private Page? _currentPage;
+    private ScaffoldTabBarStripLayout? _tabBarStrip;
+    private View? _currentBarView;
+    private ScaffoldTabBar? _currentTabBarArea;
+    private int _lastStripHeight;
+    private bool _barPresented;
+    private Android.Animation.ObjectAnimator? _stripAnimator;
+    private ScaffoldNavBarStripLayout? _navBarStrip;
+    private ScaffoldNavBarHost? _navBarHost;
+    private ScaffoldArea? _observedNavBarArea;
+    private bool _scaffoldObserved;
+    private int _lastNavStripHeight;
+    private bool _navBarPresented;
+    private Android.Animation.ObjectAnimator? _navStripAnimator;
+
+    /// <summary>One presented §5.6 overlay entry: scrim + content, stacked in open order.</summary>
+    private sealed class OverlayEntry
+    {
+        public required ScaffoldOverlayRequest Request { get; set; }
+        public required View ScrimView { get; init; }
+        public required AView ScrimPlatform { get; init; }
+        public required AView ContentPlatform { get; set; }
+        public double FlyoutOffscreenTranslation { get; init; }
+        public bool Closing { get; set; }
+        public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private readonly List<OverlayEntry> _overlays = [];
+
+    private ScaffoldRoot? _currentRoot;
+    private AView? _backPeekView;
+    private AView? _backTopView;
+    private Page? _backBelowPage;
+    private bool _backPreviewActive;
+    private Page? _predictiveHandoffPage;
+
+    public bool HasOverlay => _overlays.Count > 0;
+
+    public bool IsOverlayPresented(ScaffoldOverlayRequest request) => FindEntry(request) is not null;
+
+    private OverlayEntry? FindEntry(ScaffoldOverlayRequest request)
+        => _overlays.Find(entry => ReferenceEquals(entry.Request, request));
+
+    /// <summary>Whether a predictive-back preview is currently scrubbing.</summary>
+    public bool HasBackPreview => _backPreviewActive;
+
+    public async Task SynchronizeAsync(ScaffoldRoot root, ScaffoldPresentationHint hint)
+    {
+        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext } ||
+            platformView.Context?.GetActivity() is not AppCompatActivity activity)
+        {
+            return;
+        }
+
+        scaffold.EnsureBackCallback(activity);
+
+        // The presented root is the back preview's source of truth for the stack.
+        _currentRoot = root;
+
+        // A navigation arriving while a back gesture is still scrubbing (programmatic push,
+        // tab selection) invalidates the preview; a handoff sync is the preview's OWN commit.
+        if (_backPreviewActive && _predictiveHandoffPage is null)
+        {
+            AbortBackPreview();
+        }
+
+        // Navigation dismisses any open overlay (flyout, overflow panel).
+        await CloseAllOverlaysAsync();
+
+        var container = EnsureContainer(platformView);
+        var stack = root.NavigationStack;
+        var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
+
+        if (targetPage is null)
+        {
+            scaffold.UpdateBackCallbackEnabled();
+
+            return;
+        }
+
+        var tabBarArea = root.Parent as ScaffoldTabBar;
+        var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
+        var navBarView = scaffold.ResolveNavBarView(targetPage);
+        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(targetPage);
+
+        // Overlap mode: the bar still presents, but its footprint is not applied to the page —
+        // content lays out from the top edge and the bar draws over it.
+        var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(targetPage);
+        var animated = hint != ScaffoldPresentationHint.None;
+
+        // The context must carry the target page's state before the bar (or its bindings) mount.
+        scaffold.NavBarContext.Update(root, targetPage);
+
+        // Chrome-LEVEL attached changes (scaffold/area NavBarView) must remap live, exactly
+        // like the page-level ones the current-page subscription already covers.
+        EnsureScaffoldObserver();
+        ObserveNavBarArea(scaffold.CurrentArea);
+
+        // Inset intent BEFORE the fragment commit: the incoming page attaches with its final
+        // insets while the outgoing page keeps its stale layout — no jumps during transitions.
+        platformView.ChromeBottomDesired = barVisible;
+        platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
+        platformView.ChromeTopDesired = navBarInsets;
+        platformView.PageTopInsetPx = navBarInsets ? _lastNavStripHeight : 0;
+
+        // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
+        // page slides in (and back in sync on pop).
+        // Nav bar first: its strip must sit BELOW the tab bar strip in z-order (behind-chrome
+        // overlay scrims dim the nav bar while keeping the tab bar interactive).
+        var navChromeTask = UpdateNavBarChromeAsync(platformView, mauiContext, targetPage, navBarView, navBarVisible, animated);
+        var chromeTask = UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated);
+
+        if (!ReferenceEquals(targetPage, _currentPage))
+        {
+            var previousPage = _currentPage;
+
+            if (previousPage is not null)
+            {
+                previousPage.PropertyChanged -= OnCurrentPagePropertyChanged;
+
+                // BEFORE the fragment commit: Android never dismisses the IME when the focused
+                // hierarchy is torn down — navigating away with the keyboard open would orphan
+                // it over the incoming page.
+                // KNOWN LIMITATION (net10 MAUI): if the commit lands while the IME hide is still
+                // animating, MauiWindowInsetListener swallows insets dispatches until the
+                // animation ends (IsImeAnimating gate) and the incoming page briefly shows with
+                // stale safe-area padding before snapping into place. Deliberately not worked
+                // around here — it would require polling MAUI internals via reflection.
+                HideSoftInputBeforeNavigation(previousPage);
+            }
+
+            // A committed predictive-back preview already settled the visuals (top page
+            // offscreen, below page fully revealed via the peek): adopt without re-animating —
+            // no shared-element transition, no exit animator on the removed fragment.
+            var handoffPage = _predictiveHandoffPage;
+            _predictiveHandoffPage = null;
+            var predictivelySettled = handoffPage is not null
+                && hint == ScaffoldPresentationHint.Pop
+                && ReferenceEquals(handoffPage, targetPage);
+
+            // Shared elements (§8): matching Scaffold.TransitionName pairs between the two
+            // pages fly in OUR overlay engine (ScaffoldSharedElementTransitions) — the native
+            // androidx TransitionSet cannot animate corner radii, text scale or cross-fades
+            // and cannot be extended (managed Transition subclasses lose their peer on clone).
+            var sharedNames = !predictivelySettled && previousPage is not null && animated
+                ? ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage))
+                : [];
+
+            // §8.2 spec resolution: the spec belongs to the PUSHED page — it enters with it
+            // (push) and leaves with it reversed (pop reveals with its Behind reversed).
+            // Shared-element navigations keep the standard slide (the SET choreography
+            // assumes it), so they run with the Default spec.
+            var pageTransition = sharedNames.Count > 0
+                ? ScaffoldPageTransition.Default
+                : hint switch
+                {
+                    ScaffoldPresentationHint.Push => scaffold.ResolvePageTransition(targetPage),
+                    ScaffoldPresentationHint.Pop when previousPage is not null => scaffold.ResolvePageTransition(previousPage),
+                    _ => ScaffoldPageTransition.Default
+                };
+
+            var previousFragment = _currentFragment;
+            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, pageTransition);
+            _currentFragment = fragment;
+            _currentPage = targetPage;
+            targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
+
+            // MAUI page lifecycle: Disappearing on the covered page, Appearing on the incoming one —
+            // raised BEFORE the navigation events, matching the order MAUI's own hosts use.
+            ScaffoldPageNavigationEvents.SendAppearanceChange(previousPage, targetPage);
+
+            // MAUI page navigation events: features like HideSoftInputOnTapped are gated on
+            // Page.HasNavigatedTo, which only these raise.
+            ScaffoldPageNavigationEvents.SendNavigated(previousPage, targetPage, hint.ToNavigationType());
+
+            // Async commit only: a synchronous commit can run while MAUI's own ScopedFragment
+            // transaction is still executing on the same FragmentManager ("already executing").
+            var transaction = activity.SupportFragmentManager
+                                      .BeginTransaction()
+                                      .SetReorderingAllowed(true);
+
+            if (sharedNames.Count > 0)
+            {
+                // Source side captured NOW (the outgoing page is still at rest); the flights
+                // start at the incoming fragment's first pre-draw — the destination geometry
+                // exists exactly then, and it is the same frame that page becomes visible.
+                var flightSession = ScaffoldSharedElementTransitions.Prepare(
+                    mauiContext,
+                    container,
+                    previousPage!,
+                    targetPage,
+                    sharedNames,
+                    ScaffoldTransitions.Collect(previousPage!),
+                    pageTransition.DurationSeconds);
+
+                if (flightSession is not null)
+                {
+                    fragment.OnFirstPreDraw = flightSession.Start;
+                }
+            }
+
+            // The CURRENT navigation decides how the outgoing page leaves (a pop replays the
+            // spec's Enter motion reversed; a push plays the incoming spec's Behind motion). A
+            // settled predictive-back preview already moved it offscreen — no exit animation.
+            previousFragment?.PrepareRemoval(predictivelySettled ? ScaffoldPresentationHint.None : hint, pageTransition);
+
+            transaction
+                .Replace(container.Id, fragment)
+                .CommitAllowingStateLoss();
+
+
+            // Deterministic completion: presentation of the new page plus dismissal animation of
+            // the previous one, with a settle timeout as a safety net.
+            var settled = Task.WhenAll(fragment.PresentedTask, previousFragment?.DismissedTask ?? Task.CompletedTask);
+            await Task.WhenAny(settled, Task.Delay(_settleTimeoutMs)).ConfigureAwait(true);
+        }
+
+        await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
+
+        scaffold.UpdateBackCallbackEnabled();
+
+        // Presentation at rest: the pixels under the status bar are final — read fresh.
+        scaffold.SystemBars.OnPresentationSettled();
+    }
+
+    private const float _backPreviewMaxShift = 0.4f;
+
+    /// <summary>
+    /// Predictive back, gesture started: peek-mounts the page below (presentation-only, no
+    /// lifecycle — the engine still owns the stack) beneath the fragment container so the
+    /// scrubbed page reveals it. Guarded pages (<see cref="ILeavingGuard"/>) get NO preview —
+    /// the committed back still routes through the engine, which runs the guard.
+    /// </summary>
+    public void StartBackPreview()
+    {
+        if (_backPreviewActive
+            || HasOverlay
+            || _pageLayer is not { } pageLayer
+            || _container is not { } container
+            || scaffold.Handler is not IPlatformViewHandler { MauiContext: { } mauiContext }
+            || _currentRoot?.NavigationStack is not { PushedPages.Count: > 0 } stack
+            || stack.PushedPages[^1].Page is not { } topPage
+            || NavigationHelper.GetLifecycleTarget(topPage) is ILeavingGuard
+            || Scaffold.GetPageMode(topPage) != ScaffoldPageMode.Default
+            || !ReferenceEquals(topPage, _currentPage)
+            || _currentFragment?.View is not { } topView)
+        {
+            return;
+        }
+
+        var belowPage = stack.PushedPages.Count > 1 ? stack.PushedPages[^2].Page : stack.RootPage;
+
+        if (belowPage is null)
+        {
+            return;
+        }
+
+        var belowView = belowPage.ToPlatform(mauiContext);
+        (belowView.Parent as AViewGroup)?.RemoveView(belowView);
+        belowView.TranslationX = 0f;
+        belowView.TranslationZ = 0f;
+        pageLayer.AddView(belowView, 0, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+
+        // If the peeked page's shared elements took off in the push SET, they are still hidden
+        // via transitionAlpha — repair before the page becomes visible under the scrubbed one.
+        ScaffoldPageRestore.Repair(belowPage);
+
+        _ = container;
+        _backPeekView = belowView;
+        _backTopView = topView;
+        _backBelowPage = belowPage;
+        _backPreviewActive = true;
+    }
+
+    /// <summary>Predictive back, gesture progressing: page-motion-only scrub (v1).</summary>
+    public void UpdateBackPreview(float progress)
+    {
+        if (_backPreviewActive && _backTopView is { } topView)
+        {
+            topView.TranslationX = progress * _backPreviewMaxShift * (topView.Width > 0 ? topView.Width : 0);
+        }
+    }
+
+    /// <summary>Predictive back, gesture cancelled: the top page slides home, peek unmounts.</summary>
+    public void CancelBackPreview()
+    {
+        if (!_backPreviewActive)
+        {
+            return;
+        }
+
+        _backPreviewActive = false;
+        var topView = _backTopView;
+        var peekView = _backPeekView;
+        _backTopView = null;
+        _backPeekView = null;
+        _backBelowPage = null;
+
+        if (topView is null)
+        {
+            RemovePeek(peekView);
+
+            return;
+        }
+
+        var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
+        animator.SetDuration(150);
+        animator.AnimationEnd += (_, _) => RemovePeek(peekView);
+        animator.Start();
+    }
+
+    /// <summary>
+    /// Predictive back, gesture committed: the top page settles fully offscreen FIRST (the
+    /// gesture's motion completes uninterrupted), then the pop is dispatched through the
+    /// engine; the sync it triggers adopts the settled state via the handoff (no exit animator,
+    /// no shared-element transition). If the engine refuses (busy, or a guard surfaced), the
+    /// preview reverses.
+    /// </summary>
+    public async Task CommitBackPreviewAsync()
+    {
+        if (!_backPreviewActive)
+        {
+            return;
+        }
+
+        _backPreviewActive = false;
+        var topView = _backTopView;
+        var peekView = _backPeekView;
+        var belowPage = _backBelowPage;
+        _backTopView = null;
+        _backPeekView = null;
+        _backBelowPage = null;
+
+        if (topView is null || belowPage is null)
+        {
+            RemovePeek(peekView);
+
+            return;
+        }
+
+        var width = topView.Width > 0 ? topView.Width : 1;
+        var settle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, width)!;
+        animator.SetDuration((long)(_overlayDurationMs * (1 - (topView.TranslationX / width))));
+        animator.AnimationEnd += (_, _) => settle.TrySetResult();
+        animator.Start();
+        await settle.Task.ConfigureAwait(true);
+
+        _predictiveHandoffPage = belowPage;
+
+        var popped = scaffold.NavigationService is { } navigationService
+            && await navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).ConfigureAwait(true);
+
+        if (!popped && ReferenceEquals(_predictiveHandoffPage, belowPage))
+        {
+            // Engine refused: restore the pre-gesture presentation.
+            _predictiveHandoffPage = null;
+            var restore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var restoreAnimator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
+            restoreAnimator.SetDuration(_overlayDurationMs);
+            restoreAnimator.AnimationEnd += (_, _) => restore.TrySetResult();
+            restoreAnimator.Start();
+            await restore.Task.ConfigureAwait(true);
+            RemovePeek(peekView);
+        }
+    }
+
+    /// <summary>Instant teardown for a preview invalidated by an unrelated navigation.</summary>
+    private void AbortBackPreview()
+    {
+        _backPreviewActive = false;
+
+        if (_backTopView is { } topView)
+        {
+            topView.TranslationX = 0f;
+        }
+
+        RemovePeek(_backPeekView);
+        _backTopView = null;
+        _backPeekView = null;
+        _backBelowPage = null;
+    }
+
+    private void RemovePeek(AView? peekView)
+    {
+        // The commit sync re-parents this exact platform view into the new fragment — never
+        // detach it once it is no longer OUR peek (it may already be the presented page).
+        if (peekView is not null && ReferenceEquals(peekView.Parent, _pageLayer))
+        {
+            _pageLayer?.RemoveView(peekView);
+        }
+    }
+
+    private FragmentContainerView EnsureContainer(ScaffoldLayout platformView)
+    {
+        // The host platform view changes when the activity is recreated (system back at root,
+        // configuration change): the old layers and mounted fragment died with it.
+        if (_container is not null && ReferenceEquals(_hostPlatformView, platformView))
+        {
+            return _container;
+        }
+
+        _hostPlatformView = platformView;
+        _currentFragment = null;
+        _currentPage = null;
+        _tabBarStrip = null;
+        _currentBarView = null;
+        _currentTabBarArea = null;
+        _barPresented = false;
+        _stripAnimator = null;
+        _navBarStrip = null;
+        _navBarHost?.Dispose();
+        _navBarHost = null;
+        _navBarPresented = false;
+        _navStripAnimator = null;
+        _backPreviewActive = false;
+        _backPeekView = null;
+        _backTopView = null;
+        _backBelowPage = null;
+        _predictiveHandoffPage = null;
+
+        var context = platformView.Context!;
+
+        // Page layer: participates in the insets chain and rewrites the bottom system-bars
+        // inset to the chrome footprint (§5.4) before insets reach the hosted page views.
+        var pageLayer = new ScaffoldPageLayerLayout(context);
+        _pageLayer = pageLayer;
+        platformView.PageLayer = pageLayer;
+        platformView.AddView(pageLayer, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+
+        var container = new FragmentContainerView(context) { Id = AView.GenerateViewId() };
+        _container = container;
+        pageLayer.AddView(container, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+
+        return container;
+    }
+
+    /// <summary>
+    /// Brings the chrome to the desired state. Visibility changes RETARGET any in-flight
+    /// slide from its current position (the previous animator is canceled — no queue, no
+    /// teardown): the strip stays mounted while its area is a tab bar — hidden just means
+    /// translated offscreen — so rapid toggles reverse smoothly and re-showing is instant.
+    /// The bar view's logical attachment still tracks presented state (the element tree
+    /// reflects presented chrome).
+    /// </summary>
+    private Task UpdateTabBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, ScaffoldTabBar? tabBarArea, bool barVisible, bool animated)
+    {
+        if (tabBarArea is null)
+        {
+            // Area without a tab bar: tear the strip down entirely (animated slide-out first).
+            if (_currentBarView is null || _tabBarStrip is not { } strip)
+            {
+                return Task.CompletedTask;
+            }
+
+            var previousArea = _currentTabBarArea;
+            _currentBarView = null;
+            _currentTabBarArea = null;
+            _barPresented = false;
+
+            return UnmountAsync(strip, previousArea);
+        }
+
+        if (barVisible)
+        {
+            var barView = tabBarArea.GetOrCreateBarView();
+
+            if (_tabBarStrip is null)
+            {
+                _tabBarStrip = new ScaffoldTabBarStripLayout(platformView.Context!);
+                platformView.TabBarLayer = _tabBarStrip;
+
+                platformView.AddView(
+                    _tabBarStrip,
+                    new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.WrapContent)
+                    {
+                        Gravity = GravityFlags.Bottom
+                    }
+                );
+            }
+
+            var freshMount = false;
+
+            if (!ReferenceEquals(barView, _currentBarView))
+            {
+                var previousArea = _currentTabBarArea;
+                var previousBarView = _currentBarView;
+                _currentBarView = barView;
+                _currentTabBarArea = tabBarArea;
+                _tabBarStrip.SetBar(barView.ToPlatform(mauiContext));
+                freshMount = true;
+
+                if (previousArea is not null && !ReferenceEquals(previousArea, tabBarArea))
+                {
+                    // Area switch: the outgoing area's bar stays alive for the return.
+                    previousArea.OnBarViewUnmounted();
+                }
+                else if (previousBarView is not null && ReferenceEquals(previousArea, tabBarArea))
+                {
+                    // Same-area live swap (runtime replacement / XAML hot reload): the old bar
+                    // is gone for good.
+                    tabBarArea.OnBarViewReplaced(previousBarView);
+                }
+            }
+
+            _tabBarStrip.Visibility = ViewStates.Visible;
+
+            if (freshMount && !_barPresented && animated && _lastStripHeight > 0)
+            {
+                // A freshly appearing bar starts below the edge and slides in with the pop.
+                _tabBarStrip.TranslationY = _lastStripHeight;
+            }
+
+            _barPresented = true;
+
+            if (_tabBarStrip.Height > 0)
+            {
+                _lastStripHeight = _tabBarStrip.Height;
+            }
+
+            return ShowAsync(_tabBarStrip);
+
+            async Task ShowAsync(ScaffoldTabBarStripLayout strip)
+            {
+                // The slide-in starts away from rest: keep the insets frozen (see FreezeInsets)
+                // for the whole flight so the bar keeps its resting padding while it crosses
+                // the system-bars region, then recompute once settled.
+                if (strip.TranslationY != 0)
+                {
+                    strip.FreezeInsets();
+                }
+
+                await AnimateStripToAsync(strip, 0, animated).ConfigureAwait(true);
+
+                if (strip.TranslationY == 0)
+                {
+                    strip.UnfreezeInsets();
+                }
+            }
+        }
+
+        // Hidden: keep the strip alive offscreen; only the logical attachment reflects it.
+        _currentTabBarArea?.OnBarViewUnmounted();
+        _barPresented = false;
+
+        if (_tabBarStrip is not { } hiddenStrip)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (hiddenStrip.Height > 0)
+        {
+            _lastStripHeight = hiddenStrip.Height;
+        }
+
+        if (_lastStripHeight <= 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Freeze the insets at their resting values BEFORE leaving rest (see FreezeInsets):
+        // the bar must not be re-padded while translated through the system-bars region.
+        hiddenStrip.FreezeInsets();
+
+        return AnimateStripToAsync(hiddenStrip, _lastStripHeight, animated);
+
+        async Task UnmountAsync(ScaffoldTabBarStripLayout stripToRemove, ScaffoldTabBar? previousArea)
+        {
+            if (stripToRemove.Height > 0)
+            {
+                _lastStripHeight = stripToRemove.Height;
+                stripToRemove.FreezeInsets();
+                await AnimateStripToAsync(stripToRemove, stripToRemove.Height, animated).ConfigureAwait(true);
+            }
+
+            stripToRemove.Visibility = ViewStates.Gone;
+            stripToRemove.TranslationY = 0;
+            stripToRemove.SetBar(null);
+            stripToRemove.UnfreezeInsets(requestApply: false);
+            previousArea?.OnBarViewUnmounted();
+        }
+    }
+
+    /// <summary>
+    /// Retargets the strip's slide: the previous animator is canceled and the new one starts
+    /// from the CURRENT translation — rapid toggles reverse smoothly mid-flight.
+    /// </summary>
+    private Task AnimateStripToAsync(AView strip, float target, bool animated)
+    {
+        _stripAnimator?.Cancel();
+        _stripAnimator = AnimateTranslationCore(strip, target, animated, out var task);
+
+        return task;
+    }
+
+    private Task AnimateNavStripToAsync(AView strip, float target, bool animated)
+    {
+        _navStripAnimator?.Cancel();
+        _navStripAnimator = AnimateTranslationCore(strip, target, animated, out var task);
+
+        return task;
+    }
+
+    private static Android.Animation.ObjectAnimator? AnimateTranslationCore(AView strip, float target, bool animated, out Task task)
+    {
+        if (!animated)
+        {
+            strip.TranslationY = target;
+            task = Task.CompletedTask;
+
+            return null;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var animator = Android.Animation.ObjectAnimator.OfFloat(strip, "translationY", strip.TranslationY, target)!;
+        animator.SetDuration(_overlayDurationMs);
+        animator.AnimationEnd += (_, _) => completion.TrySetResult();
+        animator.Start();
+        task = completion.Task;
+
+        return animator;
+    }
+
+    /// <summary>
+    /// Brings the nav bar chrome to the desired state — same model as the tab bar strip:
+    /// mounted while a bar view resolves (hidden = translated above the screen edge) and
+    /// retargeting slides. The strip hosts the library-owned <see cref="ScaffoldNavBarHost"/>
+    /// (mounted once): bar-view resolution changes swap the bar VIRTUALLY inside it (instant,
+    /// no strip re-mount), and the effective <see cref="ScaffoldNavBarAppearance"/> lands on
+    /// the host — never on the bar view.
+    /// </summary>
+    private Task UpdateNavBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, Page targetPage, View? navBarView, bool navBarVisible, bool animated)
+    {
+        EnsureSystemBarApplier(platformView);
+        scaffold.SystemBars.NavBarVisible = navBarView is not null && navBarVisible;
+
+        if (navBarView is null)
+        {
+            if (_navBarHost is { } clearedHost)
+            {
+                if (clearedHost.Bar is not null)
+                {
+                    _navBarPresented = false;
+                    _navBarStrip?.SetBar(null);
+
+                    if (_navBarStrip is not null)
+                    {
+                        _navBarStrip.Visibility = ViewStates.Gone;
+                    }
+
+                    DetachNavBarHost(clearedHost);
+                    clearedHost.SetBar(null);
+                }
+
+                // The host keeps tracking the CURRENT page even bar-less: the previous page's
+                // scroll observation (KVO / listeners) must not outlive its page.
+                clearedHost.UpdateSources(targetPage);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        if (_navBarStrip is null)
+        {
+            _navBarStrip = new ScaffoldNavBarStripLayout(platformView.Context!);
+            platformView.NavBarLayer = _navBarStrip;
+
+            var layoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.WrapContent)
+            {
+                Gravity = GravityFlags.Top
+            };
+
+            // Below the tab bar strip in z-order: behind-chrome overlay scrims dim the nav bar
+            // while keeping the tab bar interactive.
+            if (_tabBarStrip is { } tabBarStrip && platformView.IndexOfChild(tabBarStrip) is >= 0 and var tabIndex)
+            {
+                platformView.AddView(_navBarStrip, tabIndex, layoutParams);
+            }
+            else
+            {
+                platformView.AddView(_navBarStrip, layoutParams);
+            }
+        }
+
+        var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
+        var freshMount = host.Bar is null;
+        host.SetBar(navBarView);
+        host.UpdateSources(targetPage);
+
+        if (freshMount)
+        {
+            _navBarStrip.SetBar(host.ToPlatform(mauiContext));
+
+            if (animated && _lastNavStripHeight > 0)
+            {
+                // A freshly appearing strip starts above the edge and slides in.
+                _navBarStrip.TranslationY = -_lastNavStripHeight;
+            }
+        }
+
+        // The element tree reflects presented chrome: attached while visible, detached while
+        // hidden (the strip and platform view stay alive offscreen either way).
+        if (navBarVisible)
+        {
+            if (host.Parent is null)
+            {
+                scaffold.AddLogicalChild(host);
+            }
+        }
+        else
+        {
+            DetachNavBarHost(host);
+        }
+
+        _navBarStrip.Visibility = ViewStates.Visible;
+        _navBarPresented = navBarVisible;
+
+        if (_navBarStrip.Height > 0)
+        {
+            _lastNavStripHeight = _navBarStrip.Height;
+        }
+
+        if (navBarVisible)
+        {
+            return ShowNavAsync(_navBarStrip);
+        }
+
+        if (_lastNavStripHeight <= 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        // Same contract as the tab bar strip: freeze the insets at their resting values
+        // before leaving rest so the translated bar is never re-padded mid-flight.
+        _navBarStrip.FreezeInsets();
+
+        return AnimateNavStripToAsync(_navBarStrip, -_lastNavStripHeight, animated);
+
+        async Task ShowNavAsync(ScaffoldNavBarStripLayout strip)
+        {
+            if (strip.TranslationY != 0)
+            {
+                strip.FreezeInsets();
+            }
+
+            await AnimateNavStripToAsync(strip, 0, animated).ConfigureAwait(true);
+
+            if (strip.TranslationY == 0)
+            {
+                strip.UnfreezeInsets();
+            }
+        }
+    }
+
+    private void DetachNavBarHost(ScaffoldNavBarHost host)
+    {
+        if (ReferenceEquals(host.Parent, scaffold))
+        {
+            scaffold.RemoveLogicalChild(host);
+        }
+    }
+
+    /// <summary>Lazily observes the scaffold itself: chrome-level attached changes remap live.</summary>
+    private void EnsureScaffoldObserver()
+    {
+        if (!_scaffoldObserved)
+        {
+            _scaffoldObserved = true;
+            scaffold.PropertyChanged += OnChromeSourcePropertyChanged;
+        }
+    }
+
+    /// <summary>Follows the current area (chrome-level NavBarView changes on it remap live).</summary>
+    private void ObserveNavBarArea(ScaffoldArea? area)
+    {
+        if (ReferenceEquals(_observedNavBarArea, area))
+        {
+            return;
+        }
+
+        if (_observedNavBarArea is not null)
+        {
+            _observedNavBarArea.PropertyChanged -= OnChromeSourcePropertyChanged;
+        }
+
+        _observedNavBarArea = area;
+
+        if (area is not null)
+        {
+            area.PropertyChanged += OnChromeSourcePropertyChanged;
+        }
+    }
+
+    private void OnChromeSourcePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Appearance changes are observed by the host itself; only the mounted-bar resolution
+        // needs the presenter.
+        if (e.PropertyName == "NavBarView")
+        {
+            RefreshNavBarChrome();
+        }
+        else if (e.PropertyName == "TabBarView")
+        {
+            RefreshTabBarChrome();
+        }
+    }
+
+    /// <summary>Re-mounts the tab bar chrome after a live <c>TabBarView</c> swap (runtime replacement or XAML hot reload).</summary>
+    private void RefreshTabBarChrome()
+    {
+        if (_currentPage is not { } page
+            || _currentRoot is not { } root
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
+        {
+            return;
+        }
+
+        var tabBarArea = root.Parent as ScaffoldTabBar;
+        var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, page);
+        UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated: false).FireAndForget(scaffold.Handler);
+    }
+
+    /// <summary>Re-resolves and re-presents the nav bar chrome for the current page.</summary>
+    private void RefreshNavBarChrome()
+    {
+        if (_currentPage is not { } page
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
+        {
+            return;
+        }
+
+        var navBarView = scaffold.ResolveNavBarView(page);
+        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
+        var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(page);
+
+        // Same-page toggle: the page itself must relayout to the new insets.
+        platformView.ChromeTopDesired = navBarInsets;
+        platformView.PageTopInsetPx = navBarInsets ? _lastNavStripHeight : 0;
+        RequestPageInsets();
+
+        UpdateNavBarChromeAsync(platformView, mauiContext, page, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+    }
+
+    /// <summary>Hides the soft keyboard when an input on the outgoing page holds focus.</summary>
+    private static void HideSoftInputBeforeNavigation(Page previousPage)
+    {
+        if (previousPage.Handler?.PlatformView is not AView previousPlatformView
+            || previousPlatformView.FindFocus() is not { } focusedView)
+        {
+            return;
+        }
+
+        if (previousPlatformView.Context?.GetSystemService(Android.Content.Context.InputMethodService) is Android.Views.InputMethods.InputMethodManager inputMethodManager)
+        {
+            inputMethodManager.HideSoftInputFromWindow(previousPlatformView.WindowToken, Android.Views.InputMethods.HideSoftInputFlags.None);
+        }
+
+        focusedView.ClearFocus();
+    }
+
+    /// <summary>
+    /// Routes the resolved system-bar icon style to the window (SystemUI fades the change) and
+    /// installs the PixelCopy sampler — the ground-truth read of the app pixels rendered under
+    /// the status bar (the status bar itself is a SystemUI window, never part of the copy).
+    /// Covers theme toggles too: MAUI raises RequestedThemeChanged on uiMode configuration
+    /// changes (the activity is NOT recreated — ConfigChanges.UiMode — so the theme's
+    /// windowLightStatusBar attribute, resolved only at creation, would otherwise go stale).
+    /// </summary>
+    private void EnsureSystemBarApplier(ScaffoldLayout platformView)
+    {
+        if (_systemBarApplierAttached)
+        {
+            return;
+        }
+
+        _systemBarApplierAttached = true;
+
+        scaffold.SystemBars.SetApplier(lightIcons =>
+        {
+            if (WindowOf(platformView) is { } window)
+            {
+                // AppearanceLight* = true means DARK icons over a light bar.
+                var controller = new WindowInsetsControllerCompat(window, platformView);
+                controller.AppearanceLightStatusBars = !lightIcons;
+                controller.AppearanceLightNavigationBars = !lightIcons;
+            }
+        });
+
+        scaffold.SystemBars.SetSampler(() => OperatingSystem.IsAndroidVersionAtLeast(26)
+            ? SampleStatusBarStripAsync(platformView)
+            : Task.FromResult<double?>(null));
+
+        scaffold.SystemBars.SetThemeRefresher(() => RefreshNavigationBarColor(platformView));
+    }
+
+    private bool _systemBarApplierAttached;
+
+    /// <summary>
+    /// Re-resolves the theme's <c>android:navigationBarColor</c> and re-applies it: the window
+    /// only reads the attribute at activity creation, so on a theme toggle without recreation
+    /// (ConfigChanges.UiMode) the bottom system bar keeps the previous theme's color — most
+    /// visible with 3-button navigation, which honors an opaque color even on Android 15+
+    /// (only gesture navigation ignores it under enforced edge-to-edge). The activity
+    /// resources are night-aware without a recreation, so resolving the attribute NOW yields
+    /// the new theme's value.
+    /// </summary>
+    private static void RefreshNavigationBarColor(ScaffoldLayout platformView)
+    {
+        if (WindowOf(platformView) is not { } window
+            || window.Context?.Theme is not { } theme)
+        {
+            return;
+        }
+
+        var value = new Android.Util.TypedValue();
+
+#pragma warning disable CA1422 // Obsolete FROM 35, but 3-button navigation still honors an opaque color there.
+        if (theme.ResolveAttribute(Android.Resource.Attribute.NavigationBarColor, value, resolveRefs: true)
+            && value.Type is >= Android.Util.DataType.FirstColorInt and <= Android.Util.DataType.LastColorInt)
+        {
+            window.SetNavigationBarColor(new Android.Graphics.Color(value.Data));
+        }
+#pragma warning restore CA1422
+    }
+
+    private static Android.Views.Window? WindowOf(AView view)
+    {
+        var context = view.Context;
+
+        while (context is Android.Content.ContextWrapper wrapper and not Android.App.Activity)
+        {
+            context = wrapper.BaseContext;
+        }
+
+        return context is Android.App.Activity { Window: { } window } ? window : null;
+    }
+
+    /// <summary>
+    /// Average luminance [0, 1] of the app content under the status bar: PixelCopy of the strip
+    /// downsampled into a tiny bitmap (the copy scales, so the cost is microseconds) — null when
+    /// the window is not ready or the copy fails.
+    /// </summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("android26.0")]
+    private static Task<double?> SampleStatusBarStripAsync(ScaffoldLayout platformView)
+    {
+        if (WindowOf(platformView) is not { } window
+            || window.DecorView is not { Width: > 0, IsAttachedToWindow: true } decor)
+        {
+            return Task.FromResult<double?>(null);
+        }
+
+        var inset = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.StatusBars()) is { } insets ? insets.Top : 0;
+
+        if (inset < 1)
+        {
+            return Task.FromResult<double?>(null);
+        }
+
+        const int sampleWidth = 32;
+        const int sampleHeight = 4;
+        var bitmap = Android.Graphics.Bitmap.CreateBitmap(sampleWidth, sampleHeight, Android.Graphics.Bitmap.Config.Argb8888!);
+        var completion = new TaskCompletionSource<double?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        PixelCopy.Request(
+            window,
+            new Android.Graphics.Rect(0, 0, decor.Width, inset),
+            bitmap,
+            new PixelCopyListener(status =>
+            {
+                if (status == (int)PixelCopyResult.Success)
+                {
+                    var pixels = new int[sampleWidth * sampleHeight];
+                    bitmap.GetPixels(pixels, 0, sampleWidth, 0, 0, sampleWidth, sampleHeight);
+                    double total = 0;
+
+                    foreach (var pixel in pixels)
+                    {
+                        var r = (pixel >> 16) & 0xFF;
+                        var g = (pixel >> 8) & 0xFF;
+                        var b = pixel & 0xFF;
+                        total += ((0.2126 * r) + (0.7152 * g) + (0.0722 * b)) / 255.0;
+                    }
+
+                    completion.TrySetResult(total / pixels.Length);
+                }
+                else
+                {
+                    completion.TrySetResult(null);
+                }
+
+                bitmap.Recycle();
+            }),
+            new Android.OS.Handler(Android.OS.Looper.MainLooper!));
+
+        return completion.Task;
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("android26.0")]
+    private sealed class PixelCopyListener(Action<int> onFinished) : Java.Lang.Object, PixelCopy.IOnPixelCopyFinishedListener
+    {
+        public void OnPixelCopyFinished(int copyResult) => onFinished(copyResult);
+    }
+
+    /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
+    public void Dispose()
+    {
+        if (_scaffoldObserved)
+        {
+            _scaffoldObserved = false;
+            scaffold.PropertyChanged -= OnChromeSourcePropertyChanged;
+        }
+
+        if (_systemBarApplierAttached)
+        {
+            _systemBarApplierAttached = false;
+            scaffold.SystemBars.SetSampler(null);
+            scaffold.SystemBars.SetThemeRefresher(null);
+            scaffold.SystemBars.SetApplier(null);
+        }
+
+        ObserveNavBarArea(null);
+        _navBarHost?.Dispose();
+        _navBarHost = null;
+    }
+
+    private void OnCurrentPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not Page page
+            || !ReferenceEquals(page, _currentPage)
+            || scaffold.Proxy?.CurrentItem.CurrentSection is not ScaffoldRootProxy rootProxy
+            || scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext })
+        {
+            return;
+        }
+
+        switch (e.PropertyName)
+        {
+            // Bar visibility is an animated inset change, not a page relayout (§5.4).
+            case "TabBarVisibility":
+            {
+                var tabBarArea = rootProxy.Root.Parent as ScaffoldTabBar;
+                var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(rootProxy.Root, page);
+
+                // Same-page toggle: the page itself must relayout to the new insets.
+                platformView.ChromeBottomDesired = barVisible;
+                platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
+                RequestPageInsets();
+
+                UpdateTabBarChromeAsync(platformView, mauiContext, tabBarArea, barVisible, animated: true).FireAndForget(scaffold.Handler);
+
+                break;
+            }
+
+            case "IsNavBarVisible":
+            case "NavBarView":
+            case "NavBarOverlapsContent":
+                RefreshNavBarChrome();
+
+                break;
+        }
+    }
+
+    private void RequestPageInsets()
+    {
+        if (_pageLayer is { } pageLayer)
+        {
+            ViewCompat.RequestApplyInsets(pageLayer);
+        }
+    }
+
+    /// <summary>
+    /// Maps a logical drawer side to the physical LEFT edge (false = right): Start is left
+    /// in LTR — the single spot the RTL mapping lives in (placement and slide direction).
+    /// </summary>
+    private bool IsFlyoutOnLeft(ScaffoldFlyoutSide side)
+        => side == ScaffoldFlyoutSide.Start != scaffold.IsRightToLeft;
+
+    /// <summary>
+    /// The scrim tap rides a MAUI recognizer (uniform hit-testing on both platforms, visible to
+    /// automation); it always consumes the touch — closing only when the entry allows it.
+    /// </summary>
+    private void AttachScrimTap(View scrimView, ScaffoldOverlayRequest request)
+    {
+        var tap = new TapGestureRecognizer();
+
+        tap.Tapped += (_, _) =>
+        {
+            if (request.CloseOnScrimTap)
+            {
+                _ = CloseOverlayAsync(request);
+            }
+        };
+
+        scrimView.GestureRecognizers.Add(tap);
+    }
+
+    public async Task<bool> ShowOverlayAsync(ScaffoldOverlayRequest request)
+    {
+        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext }
+            || platformView.Context is not { } context)
+        {
+            request.Cleanup?.Invoke();
+
+            return false;
+        }
+
+        // The tab bar panel slot sits BELOW the bottom chrome strip in z-order — the bar
+        // renders above the scrim, undimmed and interactive. Everything else stacks on top.
+        var chromeLayer = request.Kind == ScaffoldOverlayKind.TabBarPanel && _tabBarStrip is { Visibility: ViewStates.Visible } strip ? strip : null;
+        var chromeLayerIndex = chromeLayer is null ? -1 : platformView.IndexOfChild(chromeLayer);
+
+        var scrimView = request.CreateScrimView();
+
+        // The element tree reflects presented chrome: the scrim participates while mounted
+        // (tooling and UI tests can see and tap it).
+        scaffold.AddLogicalChild(scrimView);
+        AttachScrimTap(scrimView, request);
+        var scrim = scrimView.ToPlatform(mauiContext);
+        scrim.Clickable = true;
+
+        var scrimLayoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent);
+
+        if (chromeLayerIndex >= 0)
+        {
+            platformView.AddView(scrim, chromeLayerIndex++, scrimLayoutParams);
+        }
+        else
+        {
+            platformView.AddView(scrim, scrimLayoutParams);
+        }
+
+        double flyoutOffscreen = 0;
+        AView panel;
+
+        switch (request.Kind)
+        {
+            case ScaffoldOverlayKind.Flyout:
+            {
+                var options = scaffold.GetEffectiveFlyoutOptions(request.FlyoutSide);
+                var containerWidthDp = context.FromPixels(platformView.Width);
+                var widthDp = options.ComputeWidth(containerWidthDp);
+                var widthPx = (int)context.ToPixels(widthDp);
+                var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
+
+                panel = request.Content.ToPlatform(mauiContext);
+                (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+                panel.LayoutParameters = new Android.Widget.FrameLayout.LayoutParams(widthPx, AViewGroup.LayoutParams.MatchParent)
+                {
+                    Gravity = onLeft ? GravityFlags.Left : GravityFlags.Right
+                };
+
+                // Entrance offset rides the MAUI translation (dp), applied after mounting.
+                flyoutOffscreen = onLeft ? -widthDp : widthDp;
+                platformView.AddView(panel);
+
+                // The flyout covers the status-bar region: its surface drives the icon style
+                // while open (SystemUI fades the flip alongside the slide).
+                scaffold.SystemBars.OverlaySurface = ScaffoldSystemBars.SurfaceColorOf(request.Content);
+
+                break;
+            }
+
+            case ScaffoldOverlayKind.Popup:
+            {
+                var systemInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+
+                var presentation = request.PopupPresentation!;
+                var margin = presentation.Margin;
+
+                var area = new Rect(
+                    context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
+                    context.FromPixels(systemInsets?.Top ?? 0) + margin.Top,
+                    Math.Max(0, context.FromPixels(platformView.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)) - margin.HorizontalThickness),
+                    Math.Max(0, context.FromPixels(platformView.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0)) - margin.VerticalThickness)
+                );
+
+                panel = request.Content.ToPlatform(mauiContext);
+                (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+                panel.Measure(
+                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Width), MeasureSpecMode.AtMost),
+                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Height), MeasureSpecMode.AtMost)
+                );
+
+                var contentSize = new Size(
+                    Math.Min(context.FromPixels(panel.MeasuredWidth), area.Width),
+                    Math.Min(context.FromPixels(panel.MeasuredHeight), area.Height)
+                );
+
+                Rect? anchorBounds = null;
+
+                if (presentation.Anchor is { Handler.PlatformView: AView anchorView })
+                {
+                    var anchorLocation = new int[2];
+                    var containerLocation = new int[2];
+                    anchorView.GetLocationInWindow(anchorLocation);
+                    platformView.GetLocationInWindow(containerLocation);
+
+                    anchorBounds = new Rect(
+                        context.FromPixels(anchorLocation[0] - containerLocation[0]),
+                        context.FromPixels(anchorLocation[1] - containerLocation[1]),
+                        context.FromPixels(anchorView.Width),
+                        context.FromPixels(anchorView.Height)
+                    );
+                }
+
+                var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+
+                var popupLayoutParams = new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(rect.Width), (int)context.ToPixels(rect.Height))
+                {
+                    Gravity = GravityFlags.Left | GravityFlags.Top,
+                    LeftMargin = (int)context.ToPixels(rect.X),
+                    TopMargin = (int)context.ToPixels(rect.Y)
+                };
+
+                platformView.AddView(panel, popupLayoutParams);
+
+                break;
+            }
+
+            case ScaffoldOverlayKind.BottomSheet:
+            {
+                var sheet = (ScaffoldBottomSheetView)request.Content;
+                var sheetInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+                var availableHeight = context.FromPixels(platformView.Height - (sheetInsets?.Top ?? 0));
+
+                // Padding first (it affects the natural height), then measure, then geometry.
+                sheet.PrepareForMeasure(context.FromPixels(sheetInsets?.Bottom ?? 0));
+                panel = request.Content.ToPlatform(mauiContext);
+                (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+                var sheetWidthPx = (int)Math.Min(platformView.Width, context.ToPixels(sheet.MaxWidth));
+
+                panel.Measure(
+                    AView.MeasureSpec.MakeMeasureSpec(sheetWidthPx, MeasureSpecMode.Exactly),
+                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(availableHeight), MeasureSpecMode.AtMost)
+                );
+
+                var natural = Math.Min(context.FromPixels(panel.MeasuredHeight), availableHeight);
+                var sheetHeight = sheet.InitializeGeometry(availableHeight, natural);
+
+                // Bottom-anchored, centered at the (possibly capped) width; the sheet's own
+                // TranslationY does the rest. The nested host between the container and the
+                // sheet provides the drag/scroll cooperative hand-off (expand-then-scroll,
+                // pull-down at scroll top) — see ScaffoldBottomSheetNestedHost.
+                var sheetLayoutParams = new Android.Widget.FrameLayout.LayoutParams(sheetWidthPx, (int)context.ToPixels(sheetHeight))
+                {
+                    Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal
+                };
+
+                var nestedHost = new ScaffoldBottomSheetNestedHost(context, sheet);
+                nestedHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+                panel = nestedHost;
+
+                platformView.AddView(panel, sheetLayoutParams);
+
+                break;
+            }
+
+            default:
+            {
+                panel = MountTabBarPanelContent(request.Content, platformView, context, mauiContext, chromeLayerIndex);
+
+                break;
+            }
+        }
+
+        var entry = new OverlayEntry
+        {
+            Request = request,
+            ScrimView = scrimView,
+            ScrimPlatform = scrim,
+            ContentPlatform = panel,
+            FlyoutOffscreenTranslation = flyoutOffscreen
+        };
+
+        _overlays.Add(entry);
+        scaffold.UpdateBackCallbackEnabled();
+
+        // MAUI's net10 safe-area pass evaluates each layout at its FIRST traversal with an
+        // off-screen heuristic: a view laid out while translated off the screen receives FULL
+        // system-bar padding ("it will settle at origin"), permanently displacing overlay
+        // content. Let the subtree settle a traversal at its REAL position — hidden — before
+        // the entrance translation applies.
+        panel.Alpha = 0;
+        await Task.Delay(32);
+        panel.Alpha = 1;
+
+        ScaffoldOverlayAnimations.PrepareEnter(request, flyoutOffscreen);
+        await ScaffoldOverlayAnimations.EnterAsync(request, scrimView);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Mounts a tab bar panel at its resting position: hugging its content, centered, above the
+    /// bottom chrome footprint (inserted below the strip when present).
+    /// </summary>
+    private AView MountTabBarPanelContent(View content, ScaffoldLayout platformView, Android.Content.Context context, IMauiContext mauiContext, int chromeLayerIndex)
+    {
+        var gapPx = (int)context.ToPixels(_overflowGapDp);
+        var excludedBottom = chromeLayerIndex >= 0 ? platformView.ChromeBottomFootprint : 0;
+        var margin = content.Margin;
+
+        var panel = content.ToPlatform(mauiContext);
+        (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+        // The panel hugs its content and centers, mirroring the bar pill's own sizing.
+        var panelLayoutParams = new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.WrapContent, AViewGroup.LayoutParams.WrapContent)
+        {
+            Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal,
+            LeftMargin = (int)context.ToPixels(margin.Left),
+            RightMargin = (int)context.ToPixels(margin.Right),
+            BottomMargin = excludedBottom + gapPx
+        };
+
+        if (chromeLayerIndex >= 0)
+        {
+            platformView.AddView(panel, chromeLayerIndex, panelLayoutParams);
+        }
+        else
+        {
+            platformView.AddView(panel, panelLayoutParams);
+        }
+
+        return panel;
+    }
+
+    public async Task ReplaceTabBarPanelAsync(ScaffoldOverlayRequest replacement)
+    {
+        var entry = _overlays.Find(static candidate => candidate.Request.Kind == ScaffoldOverlayKind.TabBarPanel && !candidate.Closing);
+
+        if (entry is null)
+        {
+            await ShowOverlayAsync(replacement);
+
+            return;
+        }
+
+        if (scaffold.Handler is not IPlatformViewHandler { PlatformView: ScaffoldLayout platformView, MauiContext: { } mauiContext }
+            || platformView.Context is not { } context)
+        {
+            replacement.Cleanup?.Invoke();
+
+            return;
+        }
+
+        var previous = entry.Request;
+        entry.Request = replacement;
+
+        // Scrim: brush update only, no re-animation.
+        entry.ScrimView.Background = replacement.Scrim;
+
+        await previous.Content.FadeTo(0, 100);
+        (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
+        ScaffoldOverlayAnimations.ResetContent(previous.Content);
+        previous.Cleanup?.Invoke();
+
+        if (previous.DisconnectContentOnClose)
+        {
+            previous.Content.DisconnectHandlers();
+        }
+
+        var chromeLayer = _tabBarStrip is { Visibility: ViewStates.Visible } strip ? strip : null;
+        var chromeLayerIndex = chromeLayer is null ? -1 : platformView.IndexOfChild(chromeLayer);
+        var panel = MountTabBarPanelContent(replacement.Content, platformView, context, mauiContext, chromeLayerIndex);
+        entry.ContentPlatform = panel;
+
+        replacement.Content.Opacity = 0;
+        await replacement.Content.FadeTo(1, 100);
+    }
+
+    public Task CloseOverlayAsync(ScaffoldOverlayRequest request)
+        => FindEntry(request) is { } entry ? CloseEntryAsync(entry) : Task.CompletedTask;
+
+    public Task CloseTopOverlayAsync()
+        => _overlays.Count > 0 && _overlays[^1] is { Request.CloseOnBack: true } top
+            ? CloseEntryAsync(top)
+            : Task.CompletedTask;
+
+    public Task CloseAllOverlaysAsync()
+        => _overlays.Count == 0
+            ? Task.CompletedTask
+            : Task.WhenAll(_overlays.ToArray().Select(CloseEntryAsync));
+
+    private async Task CloseEntryAsync(OverlayEntry entry)
+    {
+        if (entry.Closing)
+        {
+            // Concurrent close: ride the in-flight one (same UI context; RunContinuationsAsynchronously).
+#pragma warning disable VSTHRD003
+            await entry.ClosedTcs.Task;
+#pragma warning restore VSTHRD003
+
+            return;
+        }
+
+        entry.Closing = true;
+        var request = entry.Request;
+
+        // Owner cleanup runs BEFORE the exit animation (matching the original primitive):
+        // state clears immediately, so a rapid re-open is never blocked by the animation tail.
+        request.Cleanup?.Invoke();
+
+        if (request.Kind == ScaffoldOverlayKind.Flyout)
+        {
+            // The icons return to the underlying resolution as the flyout starts sliding away.
+            scaffold.SystemBars.OverlaySurface = null;
+        }
+
+        await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
+
+        (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
+        (entry.ScrimPlatform.Parent as AViewGroup)?.RemoveView(entry.ScrimPlatform);
+        _overlays.Remove(entry);
+
+        ScaffoldOverlayAnimations.ResetContent(request.Content);
+        entry.ScrimView.DisconnectHandlers();
+        scaffold.RemoveLogicalChild(entry.ScrimView);
+
+        if (request.DisconnectContentOnClose)
+        {
+            request.Content.DisconnectHandlers();
+        }
+
+        entry.ClosedTcs.TrySetResult();
+        scaffold.UpdateBackCallbackEnabled();
+    }
+}

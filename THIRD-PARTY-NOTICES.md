@@ -12,10 +12,6 @@ notices apply only to the corresponding third-party material.
   - Copyright (c) Microsoft Corporation. All rights reserved.
   - Source: https://github.com/dotnet/maui
   - Licensed under the MIT license.
-- `Samples/Nalu.Maui.Weather/ViewModels/ObservableRangeCollection.cs`
-  - Copyright (c) 2017 James Montemagno
-  - Source: https://github.com/jamesmontemagno/mvvm-helpers
-  - Licensed under the MIT license.
 
 ## MIT License Text
 

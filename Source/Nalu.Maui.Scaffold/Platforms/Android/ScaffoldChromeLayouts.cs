@@ -1,0 +1,335 @@
+using System.Diagnostics.CodeAnalysis;
+using Android.Content;
+using Android.Runtime;
+using Android.Views;
+using Android.Widget;
+using AndroidX.Core.View;
+using Microsoft.Maui.Platform;
+using AView = Android.Views.View;
+using Insets = AndroidX.Core.Graphics.Insets;
+
+namespace Nalu;
+
+/// <summary>Shared helpers for the chrome strip layouts.</summary>
+internal static class ScaffoldChromeLayoutHelpers
+{
+    /// <summary>
+    /// Disables child-clipping through the mounted bar subtree: MAUI shadows draw OUTSIDE
+    /// their wrapper's bounds, and Android's ViewGroup default (<c>clipChildren=true</c>)
+    /// truncates them at the first layout boundary (visible as a hard seam around the tab bar
+    /// pill's shadow). MAUI's own clipping uses view-level ClipBounds and is unaffected.
+    /// </summary>
+    public static void DisableChildClipping(AView view)
+    {
+        if (view is not ViewGroup group)
+        {
+            return;
+        }
+
+        group.SetClipChildren(false);
+        group.SetClipToPadding(false);
+
+        for (var i = 0; i < group.ChildCount; i++)
+        {
+            if (group.GetChildAt(i) is { } child)
+            {
+                DisableChildClipping(child);
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Hosts the page content (the presenter's fragment container) and rewrites the system-bars
+/// insets before they propagate down (§5.4): while the tab bar strip is visible, the bottom
+/// inset becomes the strip height (which already covers the system inset) — the page treats the
+/// bar exactly like a system bar. Mirrors NaluShellItemRendererNavigationLayout.
+/// </summary>
+internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.IOnApplyWindowInsetsListener
+{
+    private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
+
+    public ScaffoldPageLayerLayout(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+    }
+
+    public ScaffoldPageLayerLayout(Context context)
+        : base(context)
+    {
+        ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (disposing)
+        {
+            ViewCompat.SetOnApplyWindowInsetsListener(this, null);
+        }
+    }
+
+    WindowInsetsCompat? AndroidX.Core.View.IOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
+    {
+        ArgumentNullException.ThrowIfNull(insets);
+
+        if (view?.Parent is ScaffoldLayout { } scaffoldLayout
+            && (scaffoldLayout.PageBottomInsetPx > 0 || scaffoldLayout.PageTopInsetPx > 0))
+        {
+            var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
+
+            var modifiedSystemBarInsets = Insets.Of(
+                systemBarInsets.Left,
+                scaffoldLayout.PageTopInsetPx > 0 ? scaffoldLayout.PageTopInsetPx : systemBarInsets.Top,
+                systemBarInsets.Right,
+                scaffoldLayout.PageBottomInsetPx > 0 ? scaffoldLayout.PageBottomInsetPx : systemBarInsets.Bottom
+            )!;
+
+            using var builder = new WindowInsetsCompat.Builder(insets);
+
+            insets = builder
+                     .SetInsets(_systemBarsInsetsType, modifiedSystemBarInsets)!
+                     .Build();
+        }
+
+        return insets;
+    }
+}
+
+/// <summary>
+/// Bottom chrome strip hosting the MAUI tab bar platform view: the bar FILLS the strip flush
+/// to the screen's bottom edge and OWNS the bottom system inset (SafeAreaEdges semantics,
+/// symmetric with the nav strip) — a consuming bar measures inset-included, an edge-to-edge
+/// bar measures content-only. Stays touch-transparent outside the bar content. Includes the
+/// MauiWindowInsetListener registration required on .NET 10 so hosted MAUI views participate
+/// in the insets chain.
+/// </summary>
+internal sealed class ScaffoldTabBarStripLayout : FrameLayout
+{
+    private AView? _bar;
+    private int _barMeasuredHeight;
+    private bool _insetsFrozen;
+
+    public AView? Bar => _bar;
+
+    /// <summary>
+    /// Freezes the insets seen by the hosted bar while the strip is translated for a
+    /// hide/show slide: the net10 MauiWindowInsetListener recomputes child safe-area padding
+    /// from ON-SCREEN bounds on every insets dispatch, so a strip sliding through the
+    /// system-bars region would inflate the bar by the overlap (and the stale padding
+    /// survived back at rest). While frozen, dispatches are swallowed and the bar keeps its
+    /// resting padding.
+    /// </summary>
+    internal void FreezeInsets() => _insetsFrozen = true;
+
+    /// <summary>Unfreezes insets; when requested, re-dispatches so children recompute at rest.</summary>
+    internal void UnfreezeInsets(bool requestApply = true)
+    {
+        if (!_insetsFrozen)
+        {
+            return;
+        }
+
+        _insetsFrozen = false;
+
+        if (requestApply)
+        {
+            ViewCompat.RequestApplyInsets(this);
+        }
+    }
+
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+        => _insetsFrozen ? insets : base.DispatchApplyWindowInsets(insets);
+
+    public ScaffoldTabBarStripLayout(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+    }
+
+    [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicMethods, "Microsoft.Maui.Platform.MauiWindowInsetListener", "Microsoft.Maui")]
+    public ScaffoldTabBarStripLayout(Context context)
+        : base(context)
+    {
+        SetClipChildren(false);
+
+        var type = Type.GetType("Microsoft.Maui.Platform.MauiWindowInsetListener, Microsoft.Maui")
+                   ?? throw new NotSupportedException("The MAUI version you are using is not supported because MauiWindowInsetListener is missing.");
+
+        type
+            .GetMethod("RegisterParentForChildViews", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .Invoke(null, [this, null]);
+    }
+
+    public void SetBar(AView? bar)
+    {
+        if (_bar?.Parent?.Handle == Handle)
+        {
+            RemoveView(_bar);
+        }
+
+        _bar = bar;
+
+        if (bar is not null)
+        {
+            (bar.Parent as ViewGroup)?.RemoveView(bar);
+            AddView(bar);
+
+            // The bar's shadow (e.g. the default pill) must not truncate at layout bounds.
+            ScaffoldChromeLayoutHelpers.DisableChildClipping(bar);
+        }
+    }
+
+    private static readonly int _unspecifiedHeightSpec = MeasureSpec.MakeMeasureSpec(0, MeasureSpecMode.Unspecified);
+
+    protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        if (_bar is null)
+        {
+            SetMeasuredDimension(0, 0);
+
+            return;
+        }
+
+        // Height UNSPECIFIED: stretchy custom roots (star rows) would fill any finite spec
+        // newer ConstraintLayout/Android versions hand down. The BAR owns the bottom system
+        // inset (SafeAreaEdges semantics, nav-strip parity): a consuming bar measures with its
+        // self-applied inset padding included, an edge-to-edge bar measures content only — the
+        // strip is exactly the bar's measured height, nothing added.
+        _bar.Measure(widthMeasureSpec, _unspecifiedHeightSpec);
+        _barMeasuredHeight = _bar.MeasuredHeight;
+
+        SetMeasuredDimension(_bar.MeasuredWidth, _barMeasuredHeight);
+    }
+
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        // The bar FILLS the strip, system-inset region included: custom bars can paint under
+        // the system navigation area (their SafeAreaEdges decides any inner padding), while
+        // the default template's Auto-row root keeps its pill above the inset (Auto rows
+        // top-align at their measured height).
+        var width = right - left;
+        var height = bottom - top;
+
+        if (_bar is LayoutViewGroup layoutViewGroup)
+        {
+            // MAUI layout roots need the explicit cross-platform arrange call (net10 behavior,
+            // mirrored from NaluShellItemRendererNavigationLayout).
+            layoutViewGroup.Layout(0, 0, width, height);
+        }
+        else
+        {
+            _bar?.Layout(0, 0, width, height);
+        }
+    }
+
+    public override bool OnTouchEvent(MotionEvent? e)
+        // Touch-transparent glass: only the bar's own children consume touches — taps on the
+        // pill's side margins must reach the page below.
+        => false;
+}
+
+/// <summary>
+/// Top chrome strip hosting the MAUI nav bar platform view. Unlike the tab bar strip, the bar
+/// view FILLS the strip (its background extends under the status bar) and consumes the
+/// safe-area padding itself (SafeAreaEdges via the MauiWindowInsetListener registration) —
+/// the measured height therefore already includes the status inset.
+/// </summary>
+internal sealed class ScaffoldNavBarStripLayout : FrameLayout
+{
+    private AView? _bar;
+    private int _barMeasuredHeight;
+    private bool _insetsFrozen;
+
+    public AView? Bar => _bar;
+
+    /// <summary>Same freeze contract as <see cref="ScaffoldTabBarStripLayout.FreezeInsets"/> for the top strip.</summary>
+    internal void FreezeInsets() => _insetsFrozen = true;
+
+    /// <summary>Unfreezes insets; when requested, re-dispatches so children recompute at rest.</summary>
+    internal void UnfreezeInsets(bool requestApply = true)
+    {
+        if (!_insetsFrozen)
+        {
+            return;
+        }
+
+        _insetsFrozen = false;
+
+        if (requestApply)
+        {
+            ViewCompat.RequestApplyInsets(this);
+        }
+    }
+
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+        => _insetsFrozen ? insets : base.DispatchApplyWindowInsets(insets);
+
+    public ScaffoldNavBarStripLayout(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+    }
+
+    [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicMethods, "Microsoft.Maui.Platform.MauiWindowInsetListener", "Microsoft.Maui")]
+    public ScaffoldNavBarStripLayout(Context context)
+        : base(context)
+    {
+        SetClipChildren(false);
+
+        var type = Type.GetType("Microsoft.Maui.Platform.MauiWindowInsetListener, Microsoft.Maui")
+                   ?? throw new NotSupportedException("The MAUI version you are using is not supported because MauiWindowInsetListener is missing.");
+
+        type
+            .GetMethod("RegisterParentForChildViews", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .Invoke(null, [this, null]);
+    }
+
+    public void SetBar(AView? bar)
+    {
+        if (_bar?.Parent?.Handle == Handle)
+        {
+            RemoveView(_bar);
+        }
+
+        _bar = bar;
+
+        if (bar is not null)
+        {
+            (bar.Parent as ViewGroup)?.RemoveView(bar);
+            AddView(bar);
+
+            // The bar's shadow (e.g. the default pill) must not truncate at layout bounds.
+            ScaffoldChromeLayoutHelpers.DisableChildClipping(bar);
+        }
+    }
+
+    protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        if (_bar is null)
+        {
+            SetMeasuredDimension(0, 0);
+
+            return;
+        }
+
+        MeasureChild(_bar, widthMeasureSpec, heightMeasureSpec);
+        _barMeasuredHeight = _bar.MeasuredHeight;
+        SetMeasuredDimension(_bar.MeasuredWidth, _barMeasuredHeight);
+    }
+
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        if (_bar is LayoutViewGroup layoutViewGroup)
+        {
+            layoutViewGroup.Layout(0, 0, right - left, _barMeasuredHeight);
+        }
+        else
+        {
+            _bar?.Layout(0, 0, right - left, _barMeasuredHeight);
+        }
+    }
+
+    public override bool OnTouchEvent(MotionEvent? e)
+        // Touch-transparent glass outside the bar content.
+        => false;
+}

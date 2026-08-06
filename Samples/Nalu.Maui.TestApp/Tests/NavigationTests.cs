@@ -96,7 +96,7 @@ public partial class NavHomePageModel(INavigationService navigationService) : Na
     protected override string Name => "Home";
 
     [ObservableProperty]
-    private string _resolvedValue = "-";
+    public partial string ResolvedValue { get; set; } = "-";
 
     public Task PushDetail() => NavigationService.GoToAsync(Navigation.Relative().Push<NavDetailPageModel>());
 
@@ -124,7 +124,7 @@ public partial class NavDetailPageModel(INavigationService navigationService) : 
     protected override string Name => "Detail";
 
     [ObservableProperty]
-    private string _receivedIntent = "-";
+    public partial string ReceivedIntent { get; set; } = "-";
 
     public ValueTask OnEnteringAsync(ProductIntent intent)
     {
@@ -174,7 +174,7 @@ public partial class NavEditorPageModel(INavigationService navigationService) : 
     protected override string Name => "Editor";
 
     [ObservableProperty]
-    private bool _canLeave;
+    public partial bool CanLeave { get; set; }
 
     public ValueTask<bool> CanLeaveAsync()
     {
@@ -208,6 +208,19 @@ public partial class NavSettingsPageModel(INavigationService navigationService) 
 
 internal static class NavPageFactory
 {
+    /// <summary>Opens the scaffold's start flyout when the page is hosted by one (no-op under Shell).</summary>
+    public static Task OpenScaffoldFlyoutAsync(Page page)
+    {
+        Element? element = page;
+
+        while (element is not null and not Scaffold)
+        {
+            element = element.Parent;
+        }
+
+        return element is Scaffold scaffold ? scaffold.OpenFlyoutAsync(ScaffoldFlyoutSide.Start) : Task.CompletedTask;
+    }
+
     public static Button MakeButton(string text, string automationId, Func<Task> action)
     {
         var button = new Button { Text = text, AutomationId = automationId, FontSize = 11 };
@@ -261,15 +274,28 @@ public class NavHomePage : ContentPage
         var resolvedLabel = new Label { AutomationId = "ResolvedLabel", FontSize = 14 };
         resolvedLabel.SetBinding(Label.TextProperty, nameof(NavHomePageModel.ResolvedValue));
 
+        // State-preservation fixtures: transient platform state (entry text, scroll offset)
+        // must survive being covered by a push and restored by a pop.
+        var stateEntry = new Entry { AutomationId = "HomeStateEntry", Placeholder = "state", FontSize = 11 };
+
+        var fillers = Enumerable.Range(0, 40)
+                                .Select(i => (View) new Label { Text = $"Filler {i}", AutomationId = $"HomeFiller{i}", FontSize = 11 })
+                                .ToArray();
+
         var inner = NavPageFactory.BuildContent(
             "Home",
-            resolvedLabel,
-            NavPageFactory.MakeButton("Push Detail", "PushDetailButton", model.PushDetail),
-            NavPageFactory.MakeButton("Push Detail + intent", "PushDetailIntentButton", model.PushDetailWithIntent),
-            NavPageFactory.MakeButton("Resolve pick", "ResolvePickButton", model.ResolvePick),
-            NavPageFactory.MakeButton("Go Search root", "GoSearchRootButton", model.GoSearchRoot),
-            NavPageFactory.MakeButton("Go Settings root", "GoSettingsRootButton", model.GoSettingsRoot),
-            NavPageFactory.MakeButton("Go Search + Editor", "GoSearchAddEditorButton", model.GoSearchRootAddEditor)
+            [
+                resolvedLabel,
+                stateEntry,
+                NavPageFactory.MakeButton("Open flyout", "OpenFlyoutHomeButton", () => NavPageFactory.OpenScaffoldFlyoutAsync(this)),
+                NavPageFactory.MakeButton("Push Detail", "PushDetailButton", model.PushDetail),
+                NavPageFactory.MakeButton("Push Detail + intent", "PushDetailIntentButton", model.PushDetailWithIntent),
+                NavPageFactory.MakeButton("Resolve pick", "ResolvePickButton", model.ResolvePick),
+                NavPageFactory.MakeButton("Go Search root", "GoSearchRootButton", model.GoSearchRoot),
+                NavPageFactory.MakeButton("Go Settings root", "GoSettingsRootButton", model.GoSettingsRoot),
+                NavPageFactory.MakeButton("Go Search + Editor", "GoSearchAddEditorButton", model.GoSearchRootAddEditor),
+                .. fillers
+            ]
         );
 
         Title = "Home";
@@ -354,6 +380,7 @@ public class NavSettingsPage : ContentPage
     {
         var inner = NavPageFactory.BuildContent(
             "Settings",
+            NavPageFactory.MakeButton("Open flyout", "OpenFlyoutSettingsButton", () => NavPageFactory.OpenScaffoldFlyoutAsync(this)),
             NavPageFactory.MakeButton("Go Home root", "GoHomeFromSettingsButton", model.GoHomeRoot),
             NavPageFactory.MakeButton("Go Home + Detail", "GoHomeAddDetailButton", model.GoHomeRootAddDetail)
         );
@@ -361,6 +388,21 @@ public class NavSettingsPage : ContentPage
         Title = "Settings";
         BindingContext = model;
         Content = inner;
+
+        // Page-level flyout override (most specific level of the Page → Area → Scaffold chain).
+        Scaffold.SetFlyoutStart(
+            this,
+            new VerticalStackLayout
+            {
+                AutomationId = "SettingsFlyout",
+                BackgroundColor = Colors.White,
+                Padding = 16,
+                Children =
+                {
+                    new Label { Text = "Settings flyout", AutomationId = "SettingsFlyoutLabel", FontSize = 18, FontAttributes = FontAttributes.Bold }
+                }
+            }
+        );
     }
 }
 
@@ -406,5 +448,53 @@ public class NavShell : NaluShell
         Items.Add(settingsItem);
 
         FlyoutBehavior = FlyoutBehavior.Disabled;
+    }
+}
+
+/// <summary>
+/// Scaffold harness mirroring <see cref="NavShell"/>: the same pages and models, hosted by the
+/// Nalu Scaffold instead of MAUI Shell. P0: no chrome yet — tab/area switching happens through
+/// the pages' own navigation buttons (absolute navigations).
+/// </summary>
+[UsedImplicitly]
+[TestPage("Scaffold Navigation Tests")]
+public class NavScaffold : Scaffold
+{
+    public NavScaffold(INavigationService navigationService)
+    {
+        NavLog.Clear();
+
+        Areas.Add(
+            new ScaffoldTabBar
+            {
+                Roots =
+                {
+                    new ScaffoldRoot { Title = "HomeTab", PageType = typeof(NavHomePage) },
+                    new ScaffoldRoot { Title = "SearchTab", PageType = typeof(NavSearchPage) }
+                }
+            }
+        );
+
+        Areas.Add(new ScaffoldRoot { Title = "SettingsItem", PageType = typeof(NavSettingsPage) });
+
+        // Global start flyout (scaffold level — the fallback of the Page → Area → Scaffold chain).
+        // Mode Flyout: available on every page (the drawer requires content + an enabling mode).
+        Scaffold.SetFlyoutStartMode(this, ScaffoldFlyoutMode.Flyout);
+        FlyoutStart = new VerticalStackLayout
+        {
+            AutomationId = "GlobalFlyout",
+            BackgroundColor = Colors.White,
+            Padding = 16,
+            Spacing = 8,
+            Children =
+            {
+                new Label { Text = "Global flyout", AutomationId = "GlobalFlyoutLabel", FontSize = 18, FontAttributes = FontAttributes.Bold },
+                NavPageFactory.MakeButton(
+                    "Go Settings",
+                    "FlyoutGoSettingsButton",
+                    () => navigationService.GoToAsync(Nalu.Navigation.Absolute().Root<NavSettingsPageModel>())
+                )
+            }
+        };
     }
 }

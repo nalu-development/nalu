@@ -79,17 +79,19 @@ public class AbsoluteNavigation : Navigation, IAbsoluteNavigationBuilder, IAbsol
         : base(true, behavior) { }
 
     /// <inheritdoc />
+    [Obsolete("Use Root<TPage>() instead.")]
     public IAbsoluteNavigationBuilder ShellContent<TPage>()
         where TPage : class
         => Root<TPage>();
 
     /// <inheritdoc />
+    [Obsolete("Use Root<TPage>() instead.")]
     public IAbsoluteNavigationBuilder ShellContent<TPage>(string customRoute)
         where TPage : class
         => Root<TPage>(customRoute);
 
     /// <inheritdoc />
-    public IAbsoluteNavigationBuilder Root<TPage>()
+    public new IAbsoluteNavigationBuilder Root<TPage>()
         where TPage : class
     {
         if (Count != 0)
