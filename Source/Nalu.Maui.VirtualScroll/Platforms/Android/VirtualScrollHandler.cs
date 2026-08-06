@@ -36,6 +36,7 @@ public partial class VirtualScrollHandler
         var context = Context;
 
         var recyclerView = new VirtualScrollRecyclerView(context);
+        recyclerView.OnLayoutCallback = OnRecyclerViewLaidOut;
         _recyclerView = recyclerView;
         _animator = _recyclerView.GetItemAnimator();
 
@@ -452,6 +453,161 @@ public partial class VirtualScrollHandler
     /// Maps the fading edge length property from the virtual scroll to the platform recycler view.
     /// </summary>
     public static void MapFadingEdgeLength(VirtualScrollHandler handler, IVirtualScroll virtualScroll) => handler.UpdateFadingEdge(virtualScroll);
+
+    #region SizeToContent
+
+    /// <summary>The clamped extent last handed to the cross-platform layout.</summary>
+    private double? _lastDesiredExtent;
+
+    /// <summary>The scroll-axis constraint of the last measure pass (the room the parent offered).</summary>
+    private double _lastMeasureConstraint = double.PositiveInfinity;
+
+    /// <summary>Resets the sizing state and re-measures when the strategy changes.</summary>
+    public static void MapSizeToContent(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        handler._lastDesiredExtent = null;
+
+        if (!handler.IsConnecting)
+        {
+            virtualScroll.InvalidateMeasure();
+        }
+    }
+
+    /// <inheritdoc />
+    public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
+    {
+        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+            || _recyclerView is not { } recyclerView
+            || Context is not { } context)
+        {
+            // Fill measures nothing: the untouched pre-SizeToContent path.
+            return base.GetDesiredSize(widthConstraint, heightConstraint);
+        }
+
+#if DEBUG
+        WarnIfUnboundedIsExpensive(virtualScroll);
+#endif
+
+        var strategy = virtualScroll.SizeToContent;
+        var horizontal = virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
+        var scrollConstraint = horizontal ? widthConstraint : heightConstraint;
+        var crossConstraint = horizontal ? heightConstraint : widthConstraint;
+
+        _lastMeasureConstraint = scrollConstraint;
+
+        // The RecyclerView is measured DIRECTLY, not the root: SwipeRefreshLayout forces EXACTLY
+        // on its child and reports the full spec size for AT_MOST, so wrap-content cannot travel
+        // through it. RecyclerView's auto-measure (LinearLayoutManager) lays out children only
+        // until the spec is satisfied, which is what bounds the cost of the capped mode.
+        var limit = strategy.Mode == VirtualScrollSizingMode.Max
+            ? Math.Min(strategy.MaxExtent, scrollConstraint)
+            : scrollConstraint;
+
+        var scrollSpec = MakeSpec(context, limit, Android.Views.MeasureSpecMode.AtMost);
+        var crossSpec = MakeSpec(context, crossConstraint, Android.Views.MeasureSpecMode.Exactly);
+
+        recyclerView.Measure(
+            horizontal ? scrollSpec : crossSpec,
+            horizontal ? crossSpec : scrollSpec
+        );
+
+        var contentExtent = context.FromPixels(horizontal ? recyclerView.MeasuredWidth : recyclerView.MeasuredHeight);
+        var extent = ClampExtent(contentExtent, strategy, scrollConstraint);
+        _lastDesiredExtent = extent;
+
+        var cross = double.IsInfinity(crossConstraint)
+            ? context.FromPixels(horizontal ? recyclerView.MeasuredHeight : recyclerView.MeasuredWidth)
+            : crossConstraint;
+
+        return horizontal ? new Size(extent, cross) : new Size(cross, extent);
+
+        static int MakeSpec(Android.Content.Context context, double constraint, Android.Views.MeasureSpecMode boundedMode)
+            => double.IsInfinity(constraint) || double.IsNaN(constraint)
+                ? AView.MeasureSpec.MakeMeasureSpec(0, Android.Views.MeasureSpecMode.Unspecified)
+                : AView.MeasureSpec.MakeMeasureSpec((int) Math.Ceiling(context.ToPixels(constraint)), boundedMode);
+    }
+
+    /// <summary>
+    /// Asks for a cross-platform re-measure ONLY when the clamped extent actually moved — invoked
+    /// after every RecyclerView layout pass.
+    /// </summary>
+    /// <remarks>
+    /// The capped mode never measures anything here: content that scrolls is by definition at
+    /// least as tall as the viewport, so the clamped result is the cap and nothing can change.
+    /// That is what keeps a long list from re-measuring its container on every push. Only the
+    /// unbounded mode (or content that fits) needs a real extent, read from the laid-out children.
+    /// </remarks>
+    private void OnRecyclerViewLaidOut()
+    {
+        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+            || _recyclerView is not { } recyclerView
+            || Context is not { } context)
+        {
+            return;
+        }
+
+        var strategy = virtualScroll.SizeToContent;
+        var horizontal = virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
+
+        var scrolls = horizontal
+            ? recyclerView.CanScrollHorizontally(1) || recyclerView.CanScrollHorizontally(-1)
+            : recyclerView.CanScrollVertically(1) || recyclerView.CanScrollVertically(-1);
+
+        double contentExtent;
+
+        if (scrolls)
+        {
+            // At or beyond the viewport. For the capped mode that is all we need to know (it
+            // clamps to the cap); the unbounded mode needs a number, and the scroll range is the
+            // cheap one — the authoritative value comes from the GetDesiredSize pass that follows.
+            contentExtent = strategy.Mode == VirtualScrollSizingMode.Max
+                ? double.PositiveInfinity
+                : context.FromPixels(horizontal ? recyclerView.ComputeHorizontalScrollRange() : recyclerView.ComputeVerticalScrollRange());
+        }
+        else
+        {
+            // Everything fits: the far edge of the last child is the exact content extent.
+            contentExtent = context.FromPixels(GetLaidOutContentExtentInPixels(recyclerView, horizontal));
+        }
+
+        var extent = ClampExtent(contentExtent, strategy, _lastMeasureConstraint);
+
+        if (_lastDesiredExtent is { } last && Math.Abs(last - extent) <= _sizeToContentEpsilon)
+        {
+            return;
+        }
+
+        _lastDesiredExtent = extent;
+
+        // Never invalidate from inside the layout pass we are being called from.
+        recyclerView.Post(() =>
+            {
+                if (VirtualView is { } view)
+                {
+                    view.InvalidateMeasure();
+                }
+            }
+        );
+    }
+
+    private static int GetLaidOutContentExtentInPixels(VirtualScrollRecyclerView recyclerView, bool horizontal)
+    {
+        var extent = 0;
+
+        for (var i = 0; i < recyclerView.ChildCount; i++)
+        {
+            if (recyclerView.GetChildAt(i) is not { } child)
+            {
+                continue;
+            }
+
+            extent = Math.Max(extent, horizontal ? child.Right : child.Bottom);
+        }
+
+        return extent + (horizontal ? recyclerView.PaddingRight : recyclerView.PaddingBottom);
+    }
+
+    #endregion
 
     private void UpdateFadingEdge(IVirtualScroll virtualScroll)
     {

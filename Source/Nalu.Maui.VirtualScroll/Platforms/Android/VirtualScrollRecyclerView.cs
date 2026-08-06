@@ -46,6 +46,9 @@ public class VirtualScrollRecyclerView : VirtualScrollNativeRecyclerView
         // (Deliberately checking the private member here rather than the property accessor; the accessor will
         // create a new ScrollHelper if needed, and there's no reason to do that until a Scroll is requested.)
         _scrollHelper?.AdjustScroll();
+
+        // Content geometry is settled: the handler uses this to re-evaluate SizeToContent.
+        OnLayoutCallback?.Invoke();
     }
 
     protected override void Dispose(bool disposing)

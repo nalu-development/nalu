@@ -42,6 +42,34 @@ This **45% performance improvement** on iOS results in noticeably smoother scrol
 
 5. **Platform-Specific Guidance Adherence**: `VirtualScroll` implementation follows platform-specific best practices and guidelines, making it less prone to glitches and rendering issues compared to MAUI CollectionView abstractions that may not fully align with native platform guidance.
 
+## Sizing to content
+
+[`SizeToContent`](virtualscroll.md#sizing-to-content) is the one property that can make
+`VirtualScroll` measure its content, so its cost is worth stating plainly:
+
+| Mode | Measure cost | Re-measure churn |
+|------|--------------|------------------|
+| `Fill` (default) | **None.** The content size is never consulted — identical to the code path that existed before the property | None |
+| `Max(n)` | Bounded by the items that fit within `n`, no matter how many the collection holds | **None once clamped**: at or past the cap the measured size cannot change, so pushes, item resizes and scrolling never reach the layout system |
+| `Unbounded` | The whole collection is laid out — O(items) | Every content change re-measures the container |
+
+The default costs nothing, so an app that never sets the property pays nothing.
+
+The capped mode is the one to reach for: it is bounded on both axes of cost, and the clamp makes a
+long list *cheaper* than a short one — once the content passes the cap the container stops being
+invalidated entirely. On Android the cap is handed to `RecyclerView` as an `AT_MOST` measure spec,
+so its auto-measure lays out children only until the cap is satisfied; on iOS the content size is
+read from the collection view, which UIKit maintains during layout anyway.
+
+Use `Unbounded` only for small, bounded collections — a dozen rows, not a feed. It defeats the point
+of virtualization for measurement purposes (though rendering stays virtualized), and every insert
+re-measures the whole container chain.
+
+> [!NOTE]
+> On iOS, item sizes are estimates until a cell is realized (`EstimatedItemSize` on the layout), so
+> content shorter than the cap settles once as cells materialize. Content *longer* than the cap is
+> unaffected — it clamps immediately. Keep `EstimatedItemSize` close to reality either way.
+
 ## Performance Tips
 
 1. **Use `ViewBox`**: Wrap your item content in `nalu:ViewBox` instead of `ContentView` for better performance
@@ -50,4 +78,5 @@ This **45% performance improvement** on iOS results in noticeably smoother scrol
 4. **Prefer [`ObservableRangeCollection<T>`](https://github.com/jamesmontemagno/mvvm-helpers/blob/master/MvvmHelpers/ObservableRangeCollection.cs)**: It provides the best change notification support with minimal overhead
 5. **Avoid calling `GetVisibleItemsRange()` in scroll handlers**: Use `ScrollPercentageY` from scroll events instead for infinite scroll scenarios
 6. **Enable scroll events only when needed**: Scroll events are automatically disabled when no listeners are present, ensuring optimal performance
+7. **Leave `SizeToContent` alone unless the list must hug its content**, and prefer the capped form (`SizeToContent="300"`) over `Unbounded` — see [Sizing to content](#sizing-to-content)
 

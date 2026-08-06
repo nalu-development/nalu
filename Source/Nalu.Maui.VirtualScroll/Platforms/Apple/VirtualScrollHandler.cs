@@ -283,7 +283,132 @@ public partial class VirtualScrollHandler
         {
             _delegate?.UpdateFadingEdge(_collectionView);
         }
+
+        RequestSizeToContentMeasureIfNeeded();
     }
+
+    #region SizeToContent
+
+    /// <summary>
+    /// The clamped extent last handed to the cross-platform layout, used to suppress re-measures
+    /// that cannot move the parent (see <see cref="RequestSizeToContentMeasureIfNeeded" />).
+    /// </summary>
+    private double? _lastDesiredExtent;
+
+    /// <summary>The scroll-axis constraint of the last measure pass (the room the parent offered).</summary>
+    private double _lastMeasureConstraint = double.PositiveInfinity;
+
+    /// <summary>Resets the sizing state and re-measures when the strategy changes.</summary>
+    public static void MapSizeToContent(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    {
+        handler._lastDesiredExtent = null;
+
+        if (!handler.IsConnecting)
+        {
+            virtualScroll.InvalidateMeasure();
+        }
+    }
+
+    /// <inheritdoc />
+    public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
+    {
+        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+            || _collectionView is not { } collectionView)
+        {
+            // Fill measures nothing: the untouched pre-SizeToContent path.
+            return base.GetDesiredSize(widthConstraint, heightConstraint);
+        }
+
+#if DEBUG
+        WarnIfUnboundedIsExpensive(virtualScroll);
+#endif
+
+        var horizontal = virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
+        var constraint = horizontal ? widthConstraint : heightConstraint;
+        _lastMeasureConstraint = constraint;
+
+        // ContentSize is maintained by UIKit during layout — a free read. Asking the layout for
+        // CollectionViewContentSize instead would force a full layout solve on every measure.
+        var contentSize = collectionView.ContentSize;
+        var inset = collectionView.ContentInset;
+
+        double contentExtent = horizontal
+            ? contentSize.Width + inset.Left + inset.Right
+            : contentSize.Height + inset.Top + inset.Bottom;
+
+        // Before the first layout pass the content size is still zero while items exist. Returning
+        // zero here would be self-perpetuating (no height → no layout → no content size), so seed
+        // from the layout's own estimate; the ContentSizeChanged settle below corrects it to the
+        // real extent on the next pass.
+        if (contentExtent <= 0 && HasContent(virtualScroll))
+        {
+            contentExtent = EstimateContentExtent(virtualScroll);
+
+            if (contentExtent <= 0)
+            {
+                contentExtent = double.PositiveInfinity;
+            }
+        }
+
+        var extent = ClampExtent(contentExtent, virtualScroll.SizeToContent, constraint);
+        _lastDesiredExtent = extent;
+
+        var crossConstraint = horizontal ? heightConstraint : widthConstraint;
+        var cross = double.IsInfinity(crossConstraint) ? 0 : crossConstraint;
+
+        return horizontal ? new Size(extent, cross) : new Size(cross, extent);
+    }
+
+    /// <summary>
+    /// Asks for a cross-platform re-measure ONLY when the clamped extent actually moved.
+    /// </summary>
+    /// <remarks>
+    /// This is what keeps <see cref="VirtualScrollSizingMode.Max" /> cheap: once the content
+    /// reaches the cap the clamped extent is pinned there, so pushes, item resizes and scrolling
+    /// all resolve to "unchanged" and never reach the layout system. The invalidation is also
+    /// DISPATCHED: this runs at the tail of the collection view's layout pass, and invalidating a
+    /// measure from inside a layout pass is the self-sustaining loop documented in
+    /// <c>VirtualScrollCellContent</c>.
+    /// </remarks>
+    private void RequestSizeToContentMeasureIfNeeded()
+    {
+        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+            || _collectionView is not { } collectionView)
+        {
+            return;
+        }
+
+        var horizontal = virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
+        var contentSize = collectionView.ContentSize;
+        var inset = collectionView.ContentInset;
+
+        double contentExtent = horizontal
+            ? contentSize.Width + inset.Left + inset.Right
+            : contentSize.Height + inset.Top + inset.Bottom;
+
+        // Clamped against the constraint of the last measure — the room the PARENT offered, not
+        // the current bounds: using the bounds would peg the extent to the size we already have
+        // and the unbounded mode could never grow.
+        var extent = ClampExtent(contentExtent, virtualScroll.SizeToContent, _lastMeasureConstraint);
+
+        if (_lastDesiredExtent is { } last && Math.Abs(last - extent) <= _sizeToContentEpsilon)
+        {
+            return;
+        }
+
+        _lastDesiredExtent = extent;
+
+        collectionView.BeginInvokeOnMainThread(() =>
+            {
+                if (VirtualView is { } view)
+                {
+                    view.InvalidateMeasure();
+                }
+            }
+        );
+    }
+
+    #endregion
 
     /// <inheritdoc />
     protected override void ConnectHandler(UIView platformView)

@@ -323,6 +323,63 @@ virtualScroll.OnRefresh += async (sender, args) =>
 };
 ```
 
+### Sizing to content
+
+By default `VirtualScroll` takes the size its parent offers and never measures its content — it is
+meant to fill a star row or a page. `SizeToContent` opts into content-driven sizing along the
+**scrolling axis**, for lists that should hug their content: a handful of comments under a post, a
+short picker, an inline panel.
+
+```xml
+<!-- Default: fill the space the parent offers, content never measured -->
+<nalu:VirtualScroll SizeToContent="Fill" ... />
+
+<!-- Hug the content, but never grow past 300 device-independent units -->
+<nalu:VirtualScroll SizeToContent="300" ... />
+
+<!-- Hug the content with no limit -->
+<nalu:VirtualScroll SizeToContent="Unbounded" ... />
+```
+
+```csharp
+virtualScroll.SizeToContent = VirtualScrollSizingStrategy.Max(300);
+virtualScroll.SizeToContent = VirtualScrollSizingStrategy.Unbounded;
+virtualScroll.SizeToContent = VirtualScrollSizingStrategy.Fill;
+```
+
+A bare number in XAML is the capped form: it is the only mode carrying a value.
+
+The cross axis always follows the parent's constraint — a virtualized list cannot know how wide the
+items it has never realized are.
+
+| Value | Measured extent along the scrolling axis |
+|-------|------------------------------------------|
+| `Fill` (default) | Whatever the parent gives it; the content size is never consulted |
+| `300` (i.e. `Max(300)`) | `min(content, 300)`, and never more than the parent offers |
+| `Unbounded` | The whole content |
+
+**Prefer the capped form.** Measuring virtualized content is not free, and the cap bounds it twice
+over: only the items that fit within it are measured, however many the collection holds, and once
+the content reaches the cap the size is pinned there — so later pushes and item resizes cannot move
+the container and no re-measure is requested at all. `Unbounded` has no such damper: it lays out the
+whole collection and re-measures on every content change, so keep it for small, bounded lists. See
+[Performance](virtualscroll-performance.md#sizing-to-content).
+
+> [!NOTE]
+> `SizeToContent` is **not supported on Windows**: the value is accepted but the control always
+> behaves as `Fill`. Windows builds get a `NALUVS001` diagnostic on the property as a reminder.
+
+> [!WARNING]
+> Do not put a content-sized `VirtualScroll` inside a scrolling parent (a `ScrollView`, or another
+> `VirtualScroll` on the same axis): the two scrollables compete for the same gestures. Give the
+> list a bounded home instead.
+
+#### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SizeToContent` | `VirtualScrollSizingStrategy` | `Fill` | How the control sizes itself along the scrolling axis. XAML accepts `Fill`, `Unbounded`, or a number (the cap). |
+
 ### Fading Edge
 
 `VirtualScroll` supports a fading edge effect that creates a smooth gradient at the scrollable edges, providing visual feedback about scrollable content. The fading edge automatically adapts to the scroll direction based on the `ItemsLayout` orientation.
