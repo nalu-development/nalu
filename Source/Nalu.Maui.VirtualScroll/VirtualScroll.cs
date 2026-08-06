@@ -174,11 +174,15 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// <summary>
     /// Bindable property for <see cref="SizeToContent"/>.
     /// </summary>
+    // NALUVS001 is the diagnostic this library RAISES for Windows consumers (see SizeToContent):
+    // declaring the API must not report it against ourselves — the nameof below is a use site.
+#pragma warning disable NALUVS001
     public static readonly BindableProperty SizeToContentProperty = BindableProperty.Create(
         nameof(SizeToContent),
         typeof(VirtualScrollSizingStrategy),
         typeof(VirtualScroll),
         VirtualScrollSizingStrategy.Fill);
+#pragma warning restore NALUVS001
 
     /// <summary>
     /// Gets or sets the data source for the virtual scroll.
@@ -340,7 +344,13 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// </para>
     /// </remarks>
 #if WINDOWS
+#if NET10_0_OR_GREATER
+    // ExperimentalAttribute.Message only exists from .NET 10 — on net9.0-windows the plain
+    // diagnostic id carries the signal and the docs above carry the explanation.
     [System.Diagnostics.CodeAnalysis.Experimental("NALUVS001", Message = "VirtualScroll.SizeToContent is not implemented on Windows: the value is accepted but the control always fills the size offered by its parent.")]
+#else
+    [System.Diagnostics.CodeAnalysis.Experimental("NALUVS001")]
+#endif
 #endif
     public VirtualScrollSizingStrategy SizeToContent
     {

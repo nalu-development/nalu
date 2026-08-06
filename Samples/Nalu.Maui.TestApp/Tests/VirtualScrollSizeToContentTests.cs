@@ -103,6 +103,9 @@ public class VirtualScrollSizeToContentTests : ContentPage
         Content = grid;
     }
 
+    // SizeToContent is marked experimental on Windows (it is not implemented there); this harness
+    // drives iOS and Android, so the diagnostic is acknowledged rather than avoided.
+#pragma warning disable NALUVS001
     private void SetStrategy(VirtualScrollSizingStrategy strategy)
     {
         _virtualScroll.SizeToContent = strategy;
@@ -122,4 +125,5 @@ public class VirtualScrollSizeToContentTests : ContentPage
     }
 
     private void UpdateStateLabel() => _stateLabel.Text = $"{_virtualScroll.SizeToContent}/{_items.Count}";
+#pragma warning restore NALUVS001
 }
