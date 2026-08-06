@@ -36,7 +36,9 @@ public sealed record ElementBounds(double X, double Y, double Width, double Heig
 /// <para>
 /// The wrapper connects to the DevFlow agent hosted inside the running Nalu.Maui.TestApp
 /// (see <c>MauiProgram.AddMauiDevFlowAgent</c>). Start the app on the target platform before
-/// running the tests. For Android emulators run <c>adb forward tcp:9223 tcp:9223</c> first.
+/// running the tests: the agent listens on a PER-PLATFORM port — Android 9223 (run
+/// <c>adb forward tcp:9223 tcp:9223</c> first), iOS simulator 9224, Mac Catalyst 9225 — so
+/// apps on different platforms can run simultaneously.
 /// Host/port can be overridden with the DEVFLOW_HOST / DEVFLOW_PORT environment variables.
 /// </para>
 /// </remarks>
@@ -556,6 +558,25 @@ public sealed class NaluApp : IAsyncLifetime
         var element = await WaitForElementAsync(automationId, timeout).ConfigureAwait(false);
 
         return await _client.GetPropertyAsync(element.Id, propertyName).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads a NUMERIC property of the underlying MAUI element (e.g. a ScrollView's "ScrollY").
+    /// </summary>
+    /// <remarks>
+    /// The transport formats doubles with the HOST culture ("284,6666" on it-IT), so the raw
+    /// string cannot be parsed invariantly: the decimal separator is normalized first.
+    /// </remarks>
+    public async Task<double> GetDoublePropertyAsync(string automationId, string propertyName, TimeSpan? timeout = null)
+    {
+        var raw = await GetPropertyAsync(automationId, propertyName, timeout).ConfigureAwait(false);
+
+        if (raw is null)
+        {
+            throw new InvalidOperationException($"Property '{propertyName}' of '{automationId}' returned no value.");
+        }
+
+        return double.Parse(raw.Replace(',', '.'), CultureInfo.InvariantCulture);
     }
 
     /// <summary>Scrolls (main scrollable when no AutomationId is provided).</summary>

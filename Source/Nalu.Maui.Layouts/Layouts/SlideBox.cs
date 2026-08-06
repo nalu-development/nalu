@@ -150,7 +150,11 @@ public class SlideBox : Layout
     /// <summary>Raised after the selection changed (before the transition animation completes).</summary>
     public event EventHandler<SlideBoxSelectionChangedEventArgs>? SelectedIndexChanged;
 
+#if !ANDROID
+    // Android drives the drag from the platform view instead (SlideBoxHandler): a cross-platform
+    // pan recognizer never sees a gesture that a scrollable slide child has already consumed.
     private readonly PanGestureRecognizer _pan = new();
+#endif
     private double _dragOffset;
     private bool _dragging;
 
@@ -164,8 +168,10 @@ public class SlideBox : Layout
         items.CollectionChanged += OnItemsChanged;
         Items = items;
 
+#if !ANDROID
         _pan.PanUpdated += OnPanUpdated;
         GestureRecognizers.Add(_pan);
+#endif
     }
 
     /// <summary>
@@ -611,70 +617,115 @@ public class SlideBox : Layout
         }
     }
 
+#if !ANDROID
     private void OnPanUpdated(object? sender, PanUpdatedEventArgs e)
     {
-        if (!IsSwipeEnabled || SelectedIndex < 0 || PageSize <= 0)
+        switch (e.StatusType)
+        {
+            case GestureStatus.Started:
+                BeginDrag();
+
+                break;
+
+            case GestureStatus.Running:
+                UpdateDrag(IsHorizontal ? e.TotalX : e.TotalY);
+
+                break;
+
+            case GestureStatus.Completed:
+            case GestureStatus.Canceled:
+                EndDrag(canceled: e.StatusType == GestureStatus.Canceled);
+
+                break;
+        }
+    }
+#endif
+
+    /// <summary>
+    /// Whether an interactive drag may start right now — the gate every drag source shares
+    /// (the cross-platform pan recognizer and, on Android, the intercepting platform view).
+    /// </summary>
+    internal bool CanInteractivelyDrag => IsSwipeEnabled && SelectedIndex >= 0 && PageSize > 0;
+
+    /// <summary>Whether slides travel along the horizontal axis (see <see cref="Orientation" />).</summary>
+    internal bool IsHorizontalOrientation => IsHorizontal;
+
+    /// <summary>
+    /// Starts an interactive drag: the running transition (if any) is aborted so the gesture
+    /// takes over from the current translations. No-op when <see cref="CanInteractivelyDrag" />
+    /// is false — so <see cref="UpdateDrag" />/<see cref="EndDrag" /> stay inert too.
+    /// </summary>
+    internal void BeginDrag()
+    {
+        if (!CanInteractivelyDrag)
         {
             return;
         }
 
-        switch (e.StatusType)
+        this.AbortAnimation(_transitionAnimationName);
+        _dragging = true;
+        _dragOffset = 0;
+    }
+
+    /// <summary>
+    /// Applies the drag translation, in device-independent units measured from the gesture's
+    /// start along the sliding axis (negative = towards the next slide).
+    /// </summary>
+    internal void UpdateDrag(double total)
+    {
+        if (!_dragging)
         {
-            case GestureStatus.Started:
-                this.AbortAnimation(_transitionAnimationName);
-                _dragging = true;
-                _dragOffset = 0;
+            return;
+        }
 
-                break;
+        // One page per gesture; rubber-band with no target beyond the edge.
+        var direction = total < 0 ? 1 : -1;
+        var logicalDirection = IsRtl ? -direction : direction;
+        var hasTarget = FindEnabled(SelectedIndex, logicalDirection) >= 0;
+        var limit = PageSize;
+        total = Math.Clamp(total, -limit, limit);
 
-            case GestureStatus.Running when _dragging:
+        _dragOffset = hasTarget ? total : total * 0.25;
+
+        Present(animated: false, keepDrag: true);
+    }
+
+    /// <summary>
+    /// Settles the drag: commits the slide change when the gesture completed past a third of a
+    /// page towards an enabled neighbor, otherwise animates back to rest.
+    /// </summary>
+    internal void EndDrag(bool canceled)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+
+        var offset = _dragOffset;
+        _dragging = false;
+        _dragOffset = 0;
+
+        var direction = offset < 0 ? 1 : -1;
+        var logicalDirection = IsRtl ? -direction : direction;
+        var target = FindEnabled(SelectedIndex, logicalDirection);
+
+        var commit = !canceled
+                     && target >= 0
+                     && Math.Abs(offset) > PageSize / 3;
+
+        if (commit)
+        {
+            // Present (from the current dragged translations) animates the landing.
+            SelectedIndex = target;
+
+            if (SelectedIndex != target)
             {
-                var total = IsHorizontal ? e.TotalX : e.TotalY;
-
-                // One page per gesture; rubber-band with no target beyond the edge.
-                var direction = total < 0 ? 1 : -1;
-                var logicalDirection = IsRtl ? -direction : direction;
-                var hasTarget = FindEnabled(SelectedIndex, logicalDirection) >= 0;
-                var limit = PageSize;
-                total = Math.Clamp(total, -limit, limit);
-
-                _dragOffset = hasTarget ? total : total * 0.25;
-
-                Present(animated: false, keepDrag: true);
-
-                break;
+                Present(animated: true);
             }
-
-            case GestureStatus.Completed or GestureStatus.Canceled when _dragging:
-            {
-                var offset = _dragOffset;
-                _dragging = false;
-                _dragOffset = 0;
-
-                var direction = offset < 0 ? 1 : -1;
-                var logicalDirection = IsRtl ? -direction : direction;
-                var target = FindEnabled(SelectedIndex, logicalDirection);
-                var commit = e.StatusType == GestureStatus.Completed
-                             && target >= 0
-                             && Math.Abs(offset) > PageSize / 3;
-
-                if (commit)
-                {
-                    // Present (from the current dragged translations) animates the landing.
-                    SelectedIndex = target;
-
-                    if (SelectedIndex != target)
-                    {
-                        Present(animated: true);
-                    }
-                }
-                else
-                {
-                    Present(animated: true);
-                }
-
-                break;
-            }
+        }
+        else
+        {
+            Present(animated: true);
         }
     }
 
