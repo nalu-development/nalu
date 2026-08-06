@@ -194,6 +194,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
 
+            // MAUI page lifecycle: Disappearing on the covered page, Appearing on the incoming one —
+            // raised BEFORE the navigation events, matching the order MAUI's own hosts use.
+            ScaffoldPageNavigationEvents.SendAppearanceChange(previousPage, targetPage);
+
             // MAUI page navigation events: features like HideSoftInputOnTapped are gated on
             // Page.HasNavigatedTo, which only these raise.
             ScaffoldPageNavigationEvents.SendNavigated(previousPage, targetPage, hint.ToNavigationType());

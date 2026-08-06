@@ -30,6 +30,10 @@ public static class MauiProgram
                                            .AddPage<Tests.ViewOnlyTwoPage>()
                                            .AddPage<Tests.ViewOnlyDetailPage>()
                                            .AddPage<Tests.ViewOnlyGuardPage>()
+                                           // Page-lifecycle harness pages (also view-only).
+                                           .AddPage<Tests.ScaffoldLifecycleOnePage>()
+                                           .AddPage<Tests.ScaffoldLifecycleTwoPage>()
+                                           .AddPage<Tests.ScaffoldLifecycleDetailPage>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )

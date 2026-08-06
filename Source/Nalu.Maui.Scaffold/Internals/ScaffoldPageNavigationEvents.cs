@@ -33,6 +33,33 @@ internal static class ScaffoldPageNavigationEvents
         SendNavigatedTo(to, CreateNavigatedToEventArgs(from, navigationType));
     }
 
+    /// <summary>
+    /// Sends MAUI's <c>Disappearing</c> to the outgoing page and <c>Appearing</c> to the incoming
+    /// one, in that order — the events every MAUI page assumes fire when it is covered or shown.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A custom host must raise these itself. MAUI only propagates them automatically from a
+    /// <see cref="IPageContainer{T}"/>'s own appearing to its <c>CurrentPage</c>, which covers the
+    /// scaffold's FIRST presentation and nothing after it: every push, pop and root switch is ours
+    /// to announce.
+    /// </para>
+    /// <para>
+    /// Both senders are guarded inside MAUI (<c>SendAppearing</c> no-ops when the page already
+    /// appeared, <c>SendDisappearing</c> when it never did), so re-synchronizing an unchanged
+    /// presentation cannot double-fire.
+    /// </para>
+    /// </remarks>
+    public static void SendAppearanceChange(Page? from, Page to)
+    {
+        if (from is not null && !ReferenceEquals(from, to))
+        {
+            ((IPageController) from).SendDisappearing();
+        }
+
+        ((IPageController) to).SendAppearing();
+    }
+
     /// <summary>Maps a presentation hint onto MAUI's constrained <see cref="NavigationType"/> (no tab-switch value exists: slides read as pushes).</summary>
     public static NavigationType ToNavigationType(this ScaffoldPresentationHint hint)
         => hint == ScaffoldPresentationHint.Pop ? NavigationType.Pop : NavigationType.Push;
