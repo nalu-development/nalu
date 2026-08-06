@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Maui.DevFlow.Driver;
 using SkiaSharp;
@@ -547,6 +548,25 @@ public sealed class NaluApp : IAsyncLifetime
         var element = await WaitForElementAsync(automationId, timeout).ConfigureAwait(false);
 
         return await _client.GetPropertyAsync(element.Id, propertyName).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads a NUMERIC property of the underlying MAUI element (e.g. a ScrollView's "ScrollY").
+    /// </summary>
+    /// <remarks>
+    /// The transport formats doubles with the HOST culture ("284,6666" on it-IT), so the raw
+    /// string cannot be parsed invariantly: the decimal separator is normalized first.
+    /// </remarks>
+    public async Task<double> GetDoublePropertyAsync(string automationId, string propertyName, TimeSpan? timeout = null)
+    {
+        var raw = await GetPropertyAsync(automationId, propertyName, timeout).ConfigureAwait(false);
+
+        if (raw is null)
+        {
+            throw new InvalidOperationException($"Property '{propertyName}' of '{automationId}' returned no value.");
+        }
+
+        return double.Parse(raw.Replace(',', '.'), CultureInfo.InvariantCulture);
     }
 
     /// <summary>Scrolls (main scrollable when no AutomationId is provided).</summary>
