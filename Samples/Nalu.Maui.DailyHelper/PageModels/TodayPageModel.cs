@@ -77,14 +77,14 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IDisposa
     private void Toggle(TodoItem item) => _todos.Toggle(item.Id);
 
     [RelayCommand]
-    private Task OpenWeatherAsync() => _navigation.GoToAsync(Nalu.Navigation.Relative().Push<WeatherDetailPageModel>());
+    private Task OpenWeatherAsync() => _navigation.GoToAsync(Nav.Push<WeatherDetailPageModel>());
 
     [RelayCommand]
-    private Task AddTaskAsync() => _navigation.GoToAsync(Nalu.Navigation.Relative().Push<TaskEditorPageModel>());
+    private Task AddTaskAsync() => _navigation.GoToAsync(Nav.Push<TaskEditorPageModel>());
 
     [RelayCommand]
     private Task EditTaskAsync(TodoItem item)
-        => _navigation.GoToAsync(Nalu.Navigation.Relative().Push<TaskEditorPageModel>().WithIntent(new TaskEditorIntent(item.Id)));
+        => _navigation.GoToAsync(Nav.Push<TaskEditorPageModel>(new TaskEditorIntent(item.Id)));
 
     private async Task SafeRefreshAsync()
     {

@@ -104,7 +104,7 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
             );
         }
 
-        return navigation.GoToAsync(Nalu.Navigation.Relative().Pop());
+        return navigation.GoToAsync(Nav.Pop());
     }
 
     [RelayCommand]
@@ -115,6 +115,6 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
             todos.Delete(original.Id);
         }
 
-        return navigation.GoToAsync(Nalu.Navigation.Relative().Pop());
+        return navigation.GoToAsync(Nav.Pop());
     }
 }
