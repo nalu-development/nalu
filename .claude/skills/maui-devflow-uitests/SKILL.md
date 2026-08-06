@@ -19,8 +19,12 @@ DevFlow is the experimental testing/automation toolkit for .NET MAUI 10, born as
 Three pieces cooperate:
 
 1. **In-app agent** (`Microsoft.Maui.DevFlow.Agent`) — an HTTP server *inside* the app process
-   (default port **9223**) exposing the real MAUI visual tree, screenshots, interactions, logs.
-   Activated in DEBUG only, in `Samples/Nalu.Maui.TestApp/MauiProgram.cs`.
+   exposing the real MAUI visual tree, screenshots, interactions, logs. Activated in DEBUG only,
+   in `Samples/Nalu.Maui.TestApp/MauiProgram.cs`, with **per-platform ports**:
+   **Android 9223** (reached via `adb forward tcp:9223 tcp:9223`), **iOS simulator 9224**,
+   **Mac Catalyst 9225**. The simulator and Catalyst bind the HOST loopback directly, so
+   distinct ports let emulator + simulator sessions run SIMULTANEOUSLY with no
+   forward/terminate dance.
 2. **Driver** (`Microsoft.Maui.DevFlow.Driver`, class `AgentClient`) — .NET client used by our
    xUnit tests in `UITests/UITests.DevFlow`.
 3. **CLI + MCP** (`Microsoft.Maui.Cli`, command `maui`) — `maui devflow …` commands and
@@ -45,8 +49,10 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
 4. **Write the test** in `UITests/UITests.DevFlow/Tests/` using the `NaluApp` wrapper —
    never call `AgentClient` from a test; extend the wrapper instead.
 5. **Run** `dotnet test UITests/UITests.DevFlow` (app must be running; `NaluApp` self-discovers
-   the agent on 9223 → 10223, `DEVFLOW_HOST`/`DEVFLOW_PORT` override). After a relaunch, wait
-   for readiness with a no-op MCP call (e.g. `maui_query`) retried until it responds —
+   the agent on 9223/9224/9225 then the +1000 fallbacks). With BOTH platforms running, target
+   deterministically: `DEVFLOW_PORT=9223 dotnet test …` (Android) / `DEVFLOW_PORT=9224 …` (iOS)
+   — back-to-back cross-platform runs need no relaunching. After a relaunch, wait for
+   readiness with a no-op MCP call (e.g. `maui_query`) retried until it responds —
    never curl-probe ports.
 6. **On failure**: screenshot + visual tree via MCP, read the wrapper's TimeoutException (it lists
    the AutomationIds actually present), fix test/page/library, repeat.
@@ -69,4 +75,9 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
   loop; Windows is postponed — DevFlow support there is still partial).
 - MAUI 10 only (DevFlow requires it); the TestApp uses MAUI 10.0.80. Never raise the *library*
   MAUI floor versions in the root `Directory.Build.props` for this.
-- One app instance per port: fixed 9223 assumes a single running TestApp at a time.
+- One app instance per PLATFORM at a time (Android 9223 / iOS 9224 / Catalyst 9225); different
+  platforms can run simultaneously thanks to the per-platform ports.
+- **Multiple agents / MCP targeting**: with apps on several platforms running at once, MCP tools
+  error with "Multiple MAUI DevFlow agents are connected" and list the ports — pass `agentPort`
+  (or terminate the apps you are not driving). The MCP broker also latches onto whatever app is
+  up: force-stop other agent-enabled apps when it grabs the wrong one.

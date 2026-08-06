@@ -58,7 +58,20 @@ public static class MauiProgram
 
         // DevFlow in-app agent: exposes visual tree, screenshots, interactions and logs
         // to the `maui devflow` CLI / MCP server and to the UITests.DevFlow test project.
-        builder.AddMauiDevFlowAgent();
+        // Deterministic per-platform ports: the iOS simulator and Mac Catalyst bind the HOST
+        // loopback directly, so they must not share a port with each other nor with the
+        // Android `adb forward` (which claims the host side of its port). With this split,
+        // emulator and simulator sessions coexist and tests/MCP can target deterministically.
+        builder.AddMauiDevFlowAgent(options =>
+        {
+#if ANDROID
+            options.Port = 9223; // reached via `adb forward tcp:9223 tcp:9223`
+#elif IOS
+            options.Port = 9224;
+#elif MACCATALYST
+            options.Port = 9225;
+#endif
+        });
 #endif
 
         return builder.Build();

@@ -80,9 +80,14 @@ The `maui` CLI also offers environment/device management: `dotnet tool run maui 
 
 - **API churn**: previews break source compatibility; that's why every Driver usage is confined
   to `NaluApp.cs` and versions are pinned.
-- **Port model**: agent defaults to 9223; a broker daemon coordinates ports when multiple
-  agent-enabled apps run at once. Our tests assume a single TestApp on 9223
-  (`DEVFLOW_HOST` / `DEVFLOW_PORT` env vars override).
+- **Port model**: this repo pins PER-PLATFORM ports via `AddMauiDevFlowAgent(o => o.Port = …)`
+  in the TestApp — Android **9223** (host side reached through `adb forward tcp:9223 tcp:9223`),
+  iOS simulator **9224**, Mac Catalyst **9225**. The simulator and Catalyst bind the Mac's
+  loopback directly, so per-platform ports let the emulator and simulator apps run at the same
+  time (and `DEVFLOW_PORT` selects the target). When a port lingers in TIME_WAIT after a
+  relaunch the broker assigns **port+1000** (10223/10224/10225); `NaluApp` probes all six.
+  One app instance per platform at a time — two iOS apps still contend for 9224 (the loser
+  lands on 10224).
 - **CI**: not officially documented for DevFlow yet. This repo runs UI tests locally only
   (deliberate choice, July 2026). The agent is plain HTTP, so CI is feasible later
   (macOS runner + simulator, or Linux runner + Android emulator + adb reverse).
