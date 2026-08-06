@@ -172,6 +172,15 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         0.0);
 
     /// <summary>
+    /// Bindable property for <see cref="SizeToContent"/>.
+    /// </summary>
+    public static readonly BindableProperty SizeToContentProperty = BindableProperty.Create(
+        nameof(SizeToContent),
+        typeof(VirtualScrollSizingStrategy),
+        typeof(VirtualScroll),
+        VirtualScrollSizingStrategy.Fill);
+
+    /// <summary>
     /// Gets or sets the data source for the virtual scroll.
     /// </summary>
     /// <remarks>
@@ -307,6 +316,36 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     {
         get => (double)GetValue(FadingEdgeLengthProperty);
         set => SetValue(FadingEdgeLengthProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how the virtual scroll sizes itself along its scrolling axis
+    /// (<see cref="VirtualScrollSizingStrategy.Fill"/> by default — the size offered by the
+    /// parent, with the content never measured).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The cross axis always follows the parent's constraint. In XAML: <c>SizeToContent="Fill"</c>,
+    /// <c>SizeToContent="Unbounded"</c>, or a bare number for a capped size —
+    /// <c>SizeToContent="300"</c> is <see cref="VirtualScrollSizingStrategy.Max(double)"/>.
+    /// </para>
+    /// <para>
+    /// Measuring virtualized content is not free: prefer the capped form, whose cost is bounded by
+    /// the items that fit within the cap and which stops requesting re-measures once the content
+    /// reaches it. See <see cref="VirtualScrollSizingStrategy"/>.
+    /// </para>
+    /// <para>
+    /// <b>Not supported on Windows</b>, where the value is accepted but always behaves as
+    /// <see cref="VirtualScrollSizingStrategy.Fill"/>.
+    /// </para>
+    /// </remarks>
+#if WINDOWS
+    [System.Diagnostics.CodeAnalysis.Experimental("NALUVS001", Message = "VirtualScroll.SizeToContent is not implemented on Windows: the value is accepted but the control always fills the size offered by its parent.")]
+#endif
+    public VirtualScrollSizingStrategy SizeToContent
+    {
+        get => (VirtualScrollSizingStrategy)GetValue(SizeToContentProperty);
+        set => SetValue(SizeToContentProperty, value);
     }
 
     /// <summary>
