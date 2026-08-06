@@ -172,13 +172,13 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
         0.0);
 
     /// <summary>
-    /// Bindable property for <see cref="SizeToContent"/>.
+    /// Bindable property for <see cref="SizingStrategy"/>.
     /// </summary>
-    // NALUVS001 is the diagnostic this library RAISES for Windows consumers (see SizeToContent):
+    // NALUVS001 is the diagnostic this library RAISES for Windows consumers (see SizingStrategy):
     // declaring the API must not report it against ourselves — the nameof below is a use site.
 #pragma warning disable NALUVS001
-    public static readonly BindableProperty SizeToContentProperty = BindableProperty.Create(
-        nameof(SizeToContent),
+    public static readonly BindableProperty SizingStrategyProperty = BindableProperty.Create(
+        nameof(SizingStrategy),
         typeof(VirtualScrollSizingStrategy),
         typeof(VirtualScroll),
         VirtualScrollSizingStrategy.Fill);
@@ -329,9 +329,9 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The cross axis always follows the parent's constraint. In XAML: <c>SizeToContent="Fill"</c>,
-    /// <c>SizeToContent="Unbounded"</c>, or a bare number for a capped size —
-    /// <c>SizeToContent="300"</c> is <see cref="VirtualScrollSizingStrategy.Max(double)"/>.
+    /// The cross axis always follows the parent's constraint. In XAML: <c>SizingStrategy="Fill"</c>,
+    /// <c>SizingStrategy="Unbounded"</c>, or a bare number for a capped size —
+    /// <c>SizingStrategy="300"</c> is <see cref="VirtualScrollSizingStrategy.Max(double)"/>.
     /// </para>
     /// <para>
     /// Measuring virtualized content is not free: prefer the capped form, whose cost is bounded by
@@ -347,15 +347,15 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
 #if NET10_0_OR_GREATER
     // ExperimentalAttribute.Message only exists from .NET 10 — on net9.0-windows the plain
     // diagnostic id carries the signal and the docs above carry the explanation.
-    [System.Diagnostics.CodeAnalysis.Experimental("NALUVS001", Message = "VirtualScroll.SizeToContent is not implemented on Windows: the value is accepted but the control always fills the size offered by its parent.")]
+    [System.Diagnostics.CodeAnalysis.Experimental("NALUVS001", Message = "VirtualScroll.SizingStrategy is not implemented on Windows: the value is accepted but the control always fills the size offered by its parent.")]
 #else
     [System.Diagnostics.CodeAnalysis.Experimental("NALUVS001")]
 #endif
 #endif
-    public VirtualScrollSizingStrategy SizeToContent
+    public VirtualScrollSizingStrategy SizingStrategy
     {
-        get => (VirtualScrollSizingStrategy)GetValue(SizeToContentProperty);
-        set => SetValue(SizeToContentProperty, value);
+        get => (VirtualScrollSizingStrategy)GetValue(SizingStrategyProperty);
+        set => SetValue(SizingStrategyProperty, value);
     }
 
     /// <summary>

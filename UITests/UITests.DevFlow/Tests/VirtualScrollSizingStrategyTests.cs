@@ -5,13 +5,13 @@ using Xunit;
 namespace Nalu.Maui.UITests.Tests;
 
 /// <summary>
-/// Covers <c>VirtualScroll.SizeToContent</c> against the "Virtual Scroll SizeToContent Tests"
+/// Covers <c>VirtualScroll.SizingStrategy</c> against the "Virtual Scroll SizingStrategy Tests"
 /// harness: a vertical list of fixed 40dp items inside an AUTO row, so the measured height IS the
 /// observable contract (n items ⇒ n*40 of content).
 /// </summary>
-public class VirtualScrollSizeToContentTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
+public class VirtualScrollSizingStrategyTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Virtual Scroll SizeToContent Tests";
+    private const string PageName = "Virtual Scroll SizingStrategy Tests";
     private const double _itemExtent = 40;
     private const double _cap = 300;
 
@@ -29,7 +29,7 @@ public class VirtualScrollSizeToContentTests(NaluApp app) : BaseUiTest(app), IAs
     public async Task FillMeasuresNothingAndCollapsesInAnAutoRow()
     {
         // The default: the content size is never consulted, so an Auto row gives it nothing.
-        // This is the behavior SizeToContent exists to opt out of — and the one existing apps rely
+        // This is the behavior SizingStrategy exists to opt out of — and the one existing apps rely
         // on everywhere else (star rows / Fill).
         await App.WaitForElementAsync("SizingFillButton");
         await WaitForHeightAsync(0);

@@ -36,7 +36,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             [nameof(IVirtualScroll.DragHandler)] = MapDragHandler,
             [nameof(VirtualScroll.FadingEdgeLength)] = MapFadingEdgeLength,
 #if IOS || MACCATALYST || ANDROID
-            [nameof(IVirtualScroll.SizeToContent)] = MapSizeToContent,
+            [nameof(IVirtualScroll.SizingStrategy)] = MapSizingStrategy,
 #endif
 #if IOS || MACCATALYST
             [nameof(IVirtualScroll.Background)] = MapBackground,
@@ -114,7 +114,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
         const int itemThreshold = 200;
 
         if (_unboundedWarningIssued
-            || virtualScroll.SizeToContent.Mode != VirtualScrollSizingMode.Unbounded
+            || virtualScroll.SizingStrategy.Mode != VirtualScrollSizingMode.Unbounded
             || virtualScroll.Adapter is not { } adapter)
         {
             return;
@@ -134,7 +134,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
             _unboundedWarningIssued = true;
 
             Console.WriteLine(
-                $"[Nalu.VirtualScroll] SizeToContent=Unbounded with more than {itemThreshold} items: the whole collection is laid out and re-measured on every content change. " +
+                $"[Nalu.VirtualScroll] SizingStrategy=Unbounded with more than {itemThreshold} items: the whole collection is laid out and re-measured on every content change. " +
                 "Prefer VirtualScrollSizingStrategy.Max(extent), whose cost is bounded by the items that fit within the cap."
             );
         }

@@ -284,14 +284,14 @@ public partial class VirtualScrollHandler
             _delegate?.UpdateFadingEdge(_collectionView);
         }
 
-        RequestSizeToContentMeasureIfNeeded();
+        RequestSizingMeasureIfNeeded();
     }
 
-    #region SizeToContent
+    #region SizingStrategy
 
     /// <summary>
     /// The clamped extent last handed to the cross-platform layout, used to suppress re-measures
-    /// that cannot move the parent (see <see cref="RequestSizeToContentMeasureIfNeeded" />).
+    /// that cannot move the parent (see <see cref="RequestSizingMeasureIfNeeded" />).
     /// </summary>
     private double? _lastDesiredExtent;
 
@@ -299,7 +299,7 @@ public partial class VirtualScrollHandler
     private double _lastMeasureConstraint = double.PositiveInfinity;
 
     /// <summary>Resets the sizing state and re-measures when the strategy changes.</summary>
-    public static void MapSizeToContent(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    public static void MapSizingStrategy(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         handler._lastDesiredExtent = null;
 
@@ -312,10 +312,10 @@ public partial class VirtualScrollHandler
     /// <inheritdoc />
     public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
     {
-        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+        if (VirtualView is not { SizingStrategy.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
             || _collectionView is not { } collectionView)
         {
-            // Fill measures nothing: the untouched pre-SizeToContent path.
+            // Fill measures nothing: the untouched pre-SizingStrategy path.
             return base.GetDesiredSize(widthConstraint, heightConstraint);
         }
 
@@ -350,7 +350,7 @@ public partial class VirtualScrollHandler
             }
         }
 
-        var extent = ClampExtent(contentExtent, virtualScroll.SizeToContent, constraint);
+        var extent = ClampExtent(contentExtent, virtualScroll.SizingStrategy, constraint);
         _lastDesiredExtent = extent;
 
         var crossConstraint = horizontal ? heightConstraint : widthConstraint;
@@ -370,9 +370,9 @@ public partial class VirtualScrollHandler
     /// measure from inside a layout pass is the self-sustaining loop documented in
     /// <c>VirtualScrollCellContent</c>.
     /// </remarks>
-    private void RequestSizeToContentMeasureIfNeeded()
+    private void RequestSizingMeasureIfNeeded()
     {
-        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+        if (VirtualView is not { SizingStrategy.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
             || _collectionView is not { } collectionView)
         {
             return;
@@ -389,7 +389,7 @@ public partial class VirtualScrollHandler
         // Clamped against the constraint of the last measure — the room the PARENT offered, not
         // the current bounds: using the bounds would peg the extent to the size we already have
         // and the unbounded mode could never grow.
-        var extent = ClampExtent(contentExtent, virtualScroll.SizeToContent, _lastMeasureConstraint);
+        var extent = ClampExtent(contentExtent, virtualScroll.SizingStrategy, _lastMeasureConstraint);
 
         if (_lastDesiredExtent is { } last && Math.Abs(last - extent) <= _sizeToContentEpsilon)
         {

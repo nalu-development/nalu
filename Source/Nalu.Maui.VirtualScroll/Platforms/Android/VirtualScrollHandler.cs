@@ -454,7 +454,7 @@ public partial class VirtualScrollHandler
     /// </summary>
     public static void MapFadingEdgeLength(VirtualScrollHandler handler, IVirtualScroll virtualScroll) => handler.UpdateFadingEdge(virtualScroll);
 
-    #region SizeToContent
+    #region SizingStrategy
 
     /// <summary>The clamped extent last handed to the cross-platform layout.</summary>
     private double? _lastDesiredExtent;
@@ -463,7 +463,7 @@ public partial class VirtualScrollHandler
     private double _lastMeasureConstraint = double.PositiveInfinity;
 
     /// <summary>Resets the sizing state and re-measures when the strategy changes.</summary>
-    public static void MapSizeToContent(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
+    public static void MapSizingStrategy(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         handler._lastDesiredExtent = null;
 
@@ -476,11 +476,11 @@ public partial class VirtualScrollHandler
     /// <inheritdoc />
     public override Size GetDesiredSize(double widthConstraint, double heightConstraint)
     {
-        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+        if (VirtualView is not { SizingStrategy.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
             || _recyclerView is not { } recyclerView
             || Context is not { } context)
         {
-            // Fill measures nothing: the untouched pre-SizeToContent path.
+            // Fill measures nothing: the untouched pre-SizingStrategy path.
             return base.GetDesiredSize(widthConstraint, heightConstraint);
         }
 
@@ -488,7 +488,7 @@ public partial class VirtualScrollHandler
         WarnIfUnboundedIsExpensive(virtualScroll);
 #endif
 
-        var strategy = virtualScroll.SizeToContent;
+        var strategy = virtualScroll.SizingStrategy;
         var horizontal = virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
         var scrollConstraint = horizontal ? widthConstraint : heightConstraint;
         var crossConstraint = horizontal ? heightConstraint : widthConstraint;
@@ -539,14 +539,14 @@ public partial class VirtualScrollHandler
     /// </remarks>
     private void OnRecyclerViewLaidOut()
     {
-        if (VirtualView is not { SizeToContent.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
+        if (VirtualView is not { SizingStrategy.Mode: not VirtualScrollSizingMode.Fill } virtualScroll
             || _recyclerView is not { } recyclerView
             || Context is not { } context)
         {
             return;
         }
 
-        var strategy = virtualScroll.SizeToContent;
+        var strategy = virtualScroll.SizingStrategy;
         var horizontal = virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Horizontal;
 
         var scrolls = horizontal

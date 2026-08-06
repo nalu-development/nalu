@@ -323,28 +323,28 @@ virtualScroll.OnRefresh += async (sender, args) =>
 };
 ```
 
-### Sizing to content
+### Sizing strategy
 
 By default `VirtualScroll` takes the size its parent offers and never measures its content — it is
-meant to fill a star row or a page. `SizeToContent` opts into content-driven sizing along the
+meant to fill a star row or a page. `SizingStrategy` opts into content-driven sizing along the
 **scrolling axis**, for lists that should hug their content: a handful of comments under a post, a
 short picker, an inline panel.
 
 ```xml
 <!-- Default: fill the space the parent offers, content never measured -->
-<nalu:VirtualScroll SizeToContent="Fill" ... />
+<nalu:VirtualScroll SizingStrategy="Fill" ... />
 
 <!-- Hug the content, but never grow past 300 device-independent units -->
-<nalu:VirtualScroll SizeToContent="300" ... />
+<nalu:VirtualScroll SizingStrategy="300" ... />
 
 <!-- Hug the content with no limit -->
-<nalu:VirtualScroll SizeToContent="Unbounded" ... />
+<nalu:VirtualScroll SizingStrategy="Unbounded" ... />
 ```
 
 ```csharp
-virtualScroll.SizeToContent = VirtualScrollSizingStrategy.Max(300);
-virtualScroll.SizeToContent = VirtualScrollSizingStrategy.Unbounded;
-virtualScroll.SizeToContent = VirtualScrollSizingStrategy.Fill;
+virtualScroll.SizingStrategy = VirtualScrollSizingStrategy.Max(300);
+virtualScroll.SizingStrategy = VirtualScrollSizingStrategy.Unbounded;
+virtualScroll.SizingStrategy = VirtualScrollSizingStrategy.Fill;
 ```
 
 A bare number in XAML is the capped form: it is the only mode carrying a value.
@@ -363,10 +363,10 @@ over: only the items that fit within it are measured, however many the collectio
 the content reaches the cap the size is pinned there — so later pushes and item resizes cannot move
 the container and no re-measure is requested at all. `Unbounded` has no such damper: it lays out the
 whole collection and re-measures on every content change, so keep it for small, bounded lists. See
-[Performance](virtualscroll-performance.md#sizing-to-content).
+[Performance](virtualscroll-performance.md#sizing-strategy).
 
 > [!NOTE]
-> `SizeToContent` is **not supported on Windows**: the value is accepted but the control always
+> `SizingStrategy` is **not supported on Windows**: the value is accepted but the control always
 > behaves as `Fill`. Windows builds get a `NALUVS001` diagnostic on the property as a reminder.
 
 > [!WARNING]
@@ -378,7 +378,7 @@ whole collection and re-measures on every content change, so keep it for small, 
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `SizeToContent` | `VirtualScrollSizingStrategy` | `Fill` | How the control sizes itself along the scrolling axis. XAML accepts `Fill`, `Unbounded`, or a number (the cap). |
+| `SizingStrategy` | `VirtualScrollSizingStrategy` | `Fill` | How the control sizes itself along the scrolling axis. XAML accepts `Fill`, `Unbounded`, or a number (the cap). |
 
 ### Fading Edge
 
