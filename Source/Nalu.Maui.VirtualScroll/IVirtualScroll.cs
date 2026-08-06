@@ -25,6 +25,12 @@ public interface IVirtualScroll : IView
     /// Gets or sets the layout for the virtual scroll.
     /// </summary>
     IVirtualScrollLayout ItemsLayout { get; }
+
+    /// <summary>
+    /// Gets how the virtual scroll sizes itself along its scrolling axis
+    /// (<see cref="VirtualScrollSizingStrategy.Fill" /> by default). Not supported on Windows.
+    /// </summary>
+    VirtualScrollSizingStrategy SizeToContent { get; }
     
     /// <summary>
     /// Gets or sets the template used to display each item.
