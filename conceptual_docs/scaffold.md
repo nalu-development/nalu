@@ -43,6 +43,7 @@ title, parallax — and the status-bar icons flipping to match. All declarative.
 | Popups, bottom sheets, tab bar panels, MVVM overlays | [Popups & Sheets](scaffold-overlays.md) |
 | Page transitions, shared elements, modal pages, predictive back | [Transitions](scaffold-transitions.md) |
 | Status-bar icon styles that follow your UI | [System Bars](scaffold-systembars.md) |
+| Using the Scaffold without page models | [View-Only Navigation](navigation-view-only.md) |
 | Moving from `NaluShell` | [Migration Guide](scaffold-migration.md) |
 
 ## Quick Start
@@ -69,6 +70,13 @@ builder
 `UseNaluScaffold()` is **required** (it registers the scaffold handler). Page registration,
 view models, intents and lifecycle are standard Nalu navigation — see the
 [Navigation docs](navigation.md).
+
+> **No MVVM? No problem.** Page models are optional: register plain pages with
+> `AddPage<TodayPage>()`, navigate with `Push<DetailPage>()`, and implement lifecycle
+> interfaces (`IEnteringAware`, `ILeavingGuard`, intents…) directly on the page — or bring
+> your own MVVM abstraction as a thin facade over `INavigationService`. Guards, transitions,
+> gestures and tab-stack preservation all work identically.
+> See [View-Only Navigation](navigation-view-only.md).
 
 ### 3. Define your application structure
 

@@ -68,6 +68,74 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     public static IAbsoluteNavigationInitialBuilder Absolute(NavigationBehavior? behavior = null)
         => new AbsoluteNavigation(behavior);
 
+    // Shorthand entry points: `Navigation.Push<TPage>()` ≡ `Navigation.Relative().Push<TPage>()`,
+    // still chainable through the standard builder interfaces. They deliberately share the
+    // builders' vocabulary (Push/Pop/Root), so the derived builders declare their same-named
+    // instance members with `new` — the hiding is intentional and harmless: these statics are
+    // reached through the `Navigation` type, the instance members through a builder value.
+    // Inside a Page subclass the inherited Page.Navigation property hides this class — alias it
+    // once with `global using Nav = Nalu.Navigation;` and write `Nav.Push<TPage>()`.
+
+    /// <summary>
+    /// Creates a relative navigation pushing <typeparamref name="TPage" /> — shorthand for
+    /// <c>Navigation.Relative().Push&lt;TPage&gt;()</c>. Chainable:
+    /// <c>Navigation.Push&lt;A&gt;().Push&lt;B&gt;()</c>.
+    /// </summary>
+    /// <typeparam name="TPage">The page (or page model) type to be pushed.</typeparam>
+    public static IRelativeNavigationPushOnlyBuilder Push<TPage>()
+        where TPage : class
+        => Relative().Push<TPage>();
+
+    /// <summary>
+    /// Creates a relative navigation pushing <typeparamref name="TPage" /> with an intent —
+    /// shorthand for <c>Navigation.Relative().Push&lt;TPage&gt;().WithIntent(intent)</c>.
+    /// Like <c>WithIntent</c>, this ends the chain.
+    /// </summary>
+    /// <typeparam name="TPage">The page (or page model) type to be pushed.</typeparam>
+    /// <param name="intent">The intent delivered to the pushed page's lifecycle target.</param>
+    public static INavigationInfo Push<TPage>(object intent)
+        where TPage : class
+        => Relative().Push<TPage>().WithIntent(intent);
+
+    /// <summary>
+    /// Creates a relative navigation popping the current page — shorthand for
+    /// <c>Navigation.Relative().Pop()</c>. Chainable: <c>Navigation.Pop().Pop()</c> pops two
+    /// pages in a single transition.
+    /// </summary>
+    public static IRelativeNavigationBuilder Pop()
+        => Relative().Pop();
+
+    /// <summary>
+    /// Creates a relative navigation popping the current page with an intent delivered to the
+    /// REVEALED page's lifecycle target (the "pop with result" pattern) — shorthand for
+    /// <c>Navigation.Relative().Pop().WithIntent(intent)</c>. Like <c>WithIntent</c>, this
+    /// ends the chain.
+    /// </summary>
+    /// <param name="intent">The intent delivered to the revealed page's lifecycle target.</param>
+    public static INavigationInfo Pop(object intent)
+        => Relative().Pop().WithIntent(intent);
+
+    /// <summary>
+    /// Creates an absolute navigation to the <typeparamref name="TPage" /> root — shorthand for
+    /// <c>Navigation.Absolute().Root&lt;TPage&gt;()</c>. Chainable:
+    /// <c>Navigation.Root&lt;Home&gt;().Add&lt;Detail&gt;()</c>.
+    /// </summary>
+    /// <typeparam name="TPage">The page (or page model) type rooting the target stack.</typeparam>
+    public static IAbsoluteNavigationBuilder Root<TPage>()
+        where TPage : class
+        => Absolute().Root<TPage>();
+
+    /// <summary>
+    /// Creates an absolute navigation to the <typeparamref name="TPage" /> root with an intent —
+    /// shorthand for <c>Navigation.Absolute().Root&lt;TPage&gt;().WithIntent(intent)</c>.
+    /// Like <c>WithIntent</c>, this ends the chain.
+    /// </summary>
+    /// <typeparam name="TPage">The page (or page model) type rooting the target stack.</typeparam>
+    /// <param name="intent">The intent delivered to the target's lifecycle target.</param>
+    public static INavigationInfo Root<TPage>(object intent)
+        where TPage : class
+        => Absolute().Root<TPage>().WithIntent(intent);
+
     private readonly List<INavigationSegment> _list = new(4);
 
     /// <inheritdoc />

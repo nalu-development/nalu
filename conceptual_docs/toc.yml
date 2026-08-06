@@ -26,6 +26,8 @@
       href: navigation-lifecycle.md
     - name: Intents
       href: navigation-intents.md
+    - name: View-Only (No MVVM)
+      href: navigation-view-only.md
     - name: Advanced Features
       href: navigation-advanced.md
     - name: Custom Tab Bar

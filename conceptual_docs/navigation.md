@@ -49,8 +49,9 @@ public static class MauiProgram
 - `.AddPages(pageType => ...)` - Custom naming convention ⚠️ **Not AOT/trim-compatible** - use `AddPage` for each page instead
 - `.AddPage<MainPageModel, MainPage>()` - Manual registration ✅ **AOT-compatible**
 - `.AddPage<IMainPageModel, MainPageModel, MainPage>()` - With interface (better for testing) ✅ **AOT-compatible**
+- `.AddPage<MainPage>()` - **View-only** registration: no page model, lifecycle interfaces go directly on the page ✅ **AOT-compatible** — see [View-Only Navigation](navigation-view-only.md)
 
-> **Without MVVM?** You can use Nalu without ViewModels - just register pages as `Scoped` services and use page types in navigation.
+> **Without MVVM?** You can use Nalu without ViewModels — register pages with `AddPage<TPage>()` and use page types in navigation; lifecycle interfaces, guards and intents go directly on the page. See [View-Only Navigation](navigation-view-only.md).
 
 ### 3. Create your Page and ViewModel
 
@@ -185,32 +186,53 @@ Navigation behavior varies by hierarchy:
 
 ## Basic Navigation
 
+> 💡 **Shorthands**: `Navigation.Push<T>()`, `Navigation.Pop()` and `Navigation.Root<T>()` are
+> shorthand for `Relative().Push<T>()`, `Relative().Pop()` and `Absolute().Root<T>()` — still
+> chainable, plus intent overloads that end the chain: `Navigation.Push<T>(intent)`,
+> `Navigation.Pop(resultIntent)`, `Navigation.Root<T>(intent)`.
+> Use the long `Relative(behavior)` / `Absolute(behavior)` form when you need a custom
+> [`NavigationBehavior`](#shell-structure-and-navigation-behavior) — the shorthands always use
+> the default one.
+>
+> 💡 **Inside a `Page` subclass** the inherited `Page.Navigation` property hides the
+> `Navigation` class — alias it once per app: `global using Nav = Nalu.Navigation;` and write
+> `Nav.Push<T>()`.
+
 ### Relative Navigation
 
 ```csharp
 // Push
-Navigation.Relative().Push<DetailPageModel>()
+Navigation.Push<DetailPageModel>()
+
+// Push with intent (ends the chain, like WithIntent)
+Navigation.Push<DetailPageModel>(new DetailIntent(42))
 
 // Pop
-Navigation.Relative().Pop()
+Navigation.Pop()
+
+// Pop delivering a result intent to the revealed page
+Navigation.Pop(new EditResult(saved: true))
 
 // Replace (pop and push)
-Navigation.Relative().Pop().Push<NewPageModel>()
+Navigation.Pop().Push<NewPageModel>()
 
 // Pop multiple
-Navigation.Relative().Pop().Pop().Push<PageModel>()
+Navigation.Pop().Pop().Push<PageModel>()
+
+// Custom behavior: long form
+Navigation.Relative(NavigationBehavior.PopAllPagesOnItemChange).Push<DetailPageModel>()
 ```
 
 ### Absolute Navigation
 
 ```csharp
 // Navigate to shell content
-Navigation.Absolute().Root<MainPageModel>()
+Navigation.Root<MainPageModel>()
 
 // Navigate and push
-Navigation.Absolute().Root<SettingsPageModel>().Add<DetailPageModel>()
+Navigation.Root<SettingsPageModel>().Add<DetailPageModel>()
 
-// Custom route
+// Custom route (long form only: a string argument to Root<T> means a route, not an intent)
 Navigation.Absolute().Root<MainPageModel>("custom-route")
 ```
 

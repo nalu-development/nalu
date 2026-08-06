@@ -205,7 +205,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
         
         if (_currentRoot?.NavigationStack is { PushedPages.Count: > 0 } stack &&
-            stack.PushedPages[^1].Page is { BindingContext: not ILeavingGuard } topPage &&
+            stack.PushedPages[^1].Page is { } topPage &&
+            NavigationHelper.GetLifecycleTarget(topPage) is not ILeavingGuard &&
             Scaffold.GetPageMode(topPage) == ScaffoldPageMode.Default)
         {
             var topPageMatches = ReferenceEquals(topPage, _currentPage);
@@ -303,7 +304,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Guard re-check at release: a guard that appeared mid-gesture cancels the commit.
         var commit = allowCommit
             && (progress > 0.35 || velocity > 500)
-            && state.TopPage.BindingContext is not ILeavingGuard;
+            && NavigationHelper.GetLifecycleTarget(state.TopPage) is not ILeavingGuard;
 
         SettleAsync().FireAndForget(scaffold.Handler);
 

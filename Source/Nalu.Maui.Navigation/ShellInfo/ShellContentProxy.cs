@@ -10,7 +10,7 @@ internal class ShellContentProxy(ShellContent content, IShellSectionProxy parent
 
     public ShellContent Content => content;
     public string SegmentName => content.Route;
-    public bool HasGuard => Page?.BindingContext is ILeavingGuard;
+    public bool HasGuard => Page is { } page && NavigationHelper.GetLifecycleTarget(page) is ILeavingGuard;
     public IShellSectionProxy Parent { get; } = parent;
     public Page? Page => ((IShellContentController) content).Page;
     public Page GetOrCreateContent() => ((IShellContentController) content).GetOrCreateContent();

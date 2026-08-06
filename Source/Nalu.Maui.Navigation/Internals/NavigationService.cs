@@ -274,7 +274,7 @@ internal class NavigationService : INavigationService, IDisposable
 
             if (isPop)
             {
-                var isGuarded = !ignoreGuards && stackPage.Page.BindingContext is ILeavingGuard;
+                var isGuarded = !ignoreGuards && NavigationHelper.GetLifecycleTarget(stackPage.Page) is ILeavingGuard;
 
                 if (isGuarded)
                 {

@@ -24,6 +24,12 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .UseNaluNavigation<App>(nav => nav
                                            .AddPages()
+                                           // View-only pages (no page models) exercised by "Scaffold View Only Tests":
+                                           // AddPages() skips them (no matching model), the view-only overload registers them.
+                                           .AddPage<Tests.ViewOnlyOnePage>()
+                                           .AddPage<Tests.ViewOnlyTwoPage>()
+                                           .AddPage<Tests.ViewOnlyDetailPage>()
+                                           .AddPage<Tests.ViewOnlyGuardPage>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )

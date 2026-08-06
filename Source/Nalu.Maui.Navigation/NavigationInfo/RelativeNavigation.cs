@@ -83,7 +83,7 @@ public class RelativeNavigation : Navigation, IRelativeNavigationInitialBuilder,
         : base(false, behavior) { }
 
     /// <inheritdoc cref="IRelativeNavigationBuilder.Pop" />
-    public IRelativeNavigationBuilder Pop()
+    public new IRelativeNavigationBuilder Pop()
     {
         Add(new NavigationPop());
 
@@ -92,7 +92,7 @@ public class RelativeNavigation : Navigation, IRelativeNavigationInitialBuilder,
 
     /// <inheritdoc cref="IRelativeNavigationBuilder.Push{TPage}" />
     /// />
-    public IRelativeNavigationPushOnlyBuilder Push<TPage>()
+    public new IRelativeNavigationPushOnlyBuilder Push<TPage>()
         where TPage : class
     {
         Add(

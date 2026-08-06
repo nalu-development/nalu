@@ -6,6 +6,25 @@ namespace Nalu;
 
 internal static partial class NavigationHelper
 {
+    /// <summary>
+    /// Resolves the page's lifecycle target: the ONE object receiving navigation lifecycle
+    /// callbacks (<see cref="IEnteringAware"/>, <see cref="IAppearingAware"/>,
+    /// <see cref="ILeavingGuard"/>, intent methods…). An EXPLICITLY assigned
+    /// <see cref="BindableObject.BindingContext"/> (the page model) wins entirely — when both
+    /// the page and its binding context implement lifecycle interfaces, only the binding
+    /// context is called. Without one, the page itself is the target (view-only pages
+    /// implement the interfaces directly). An INHERITED binding context (MAUI parent
+    /// propagation — hosted pages inherit from their Shell/Scaffold) is stored outside the
+    /// property store and never counts: it is application state, not the page's model.
+    /// </summary>
+    /// <remarks>
+    /// O(1), allocation-free (a property-context lookup). Deliberately NOT cached: the
+    /// binding context may legally be assigned after creation (e.g. inside
+    /// <c>OnEnteringAsync</c>), which must flip the target on the next dispatch.
+    /// </remarks>
+    public static object GetLifecycleTarget(Page page)
+        => page.IsSet(BindableObject.BindingContextProperty) ? page.BindingContext ?? page : page;
+
     private static MethodInfo? GetImplementedLifecycleMethod(
         Regex methodRegex, 
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] Type targetType,
@@ -33,7 +52,7 @@ internal static partial class NavigationHelper
         }
 
         context.Entered = true;
-        var target = page.BindingContext;
+        var target = GetLifecycleTarget(page);
 
         if (intent is not null)
         {
@@ -89,7 +108,7 @@ internal static partial class NavigationHelper
 
         context.Entered = false;
 
-        var target = page.BindingContext;
+        var target = GetLifecycleTarget(page);
 
         if (target is ILeavingAware enteringAware)
         {
@@ -118,7 +137,7 @@ internal static partial class NavigationHelper
 
         context.Appeared = true;
 
-        var target = page.BindingContext;
+        var target = GetLifecycleTarget(page);
 
         if (intent is not null)
         {
@@ -175,7 +194,7 @@ internal static partial class NavigationHelper
 
         context.Appeared = false;
 
-        var target = page.BindingContext;
+        var target = GetLifecycleTarget(page);
 
         if (target is IDisappearingAware enteringAware)
         {
@@ -195,7 +214,7 @@ internal static partial class NavigationHelper
 
     public static ValueTask<bool> CanLeaveAsync(IShellProxy shell, Page page)
     {
-        var target = page.BindingContext;
+        var target = GetLifecycleTarget(page);
 
         if (target is ILeavingGuard leavingGuard)
         {
@@ -217,13 +236,7 @@ internal static partial class NavigationHelper
             return;
         }
 
-        var pageModelType = page.BindingContext?.GetType();
-
-        if (pageModelType is null)
-        {
-            return;
-        }
-
+        var pageModelType = GetLifecycleTarget(page).GetType();
         var intentType = intent.GetType();
 
 #pragma warning disable IL2072 // All page models have been registered with NavigationConfigurator.DynamicallyAccessedPageModelMembers

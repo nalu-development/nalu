@@ -35,7 +35,7 @@ internal sealed class ScaffoldRootProxy : IShellSectionProxy, IShellContentProxy
         _contents = [this];
     }
 
-    public bool HasGuard => Page?.BindingContext is ILeavingGuard;
+    public bool HasGuard => Page is { } page && NavigationHelper.GetLifecycleTarget(page) is ILeavingGuard;
 
     public Page? Page => Root.NavigationStack.RootPage;
 
