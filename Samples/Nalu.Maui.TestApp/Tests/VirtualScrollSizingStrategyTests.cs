@@ -4,14 +4,14 @@ using JetBrains.Annotations;
 namespace Nalu.Maui.TestApp.Tests;
 
 /// <summary>
-/// Harness for <see cref="VirtualScroll.SizeToContent" />: a vertical list inside an AUTO row —
+/// Harness for <see cref="VirtualScroll.SizingStrategy" />: a vertical list inside an AUTO row —
 /// so the row height is whatever the VirtualScroll asks for — with buttons to switch strategy and
 /// to grow/shrink the collection. A fixed 40dp item height makes the expected extent arithmetic
 /// exact for the tests (n items ⇒ n*40 content).
 /// </summary>
 [UsedImplicitly]
-[TestPage("Virtual Scroll SizeToContent Tests")]
-public class VirtualScrollSizeToContentTests : ContentPage
+[TestPage("Virtual Scroll SizingStrategy Tests")]
+public class VirtualScrollSizingStrategyTests : ContentPage
 {
     private const double _itemExtent = 40;
 
@@ -19,7 +19,7 @@ public class VirtualScrollSizeToContentTests : ContentPage
     private readonly VirtualScroll _virtualScroll;
     private readonly Label _stateLabel;
 
-    public VirtualScrollSizeToContentTests()
+    public VirtualScrollSizingStrategyTests()
     {
         _virtualScroll = new VirtualScroll
                          {
@@ -103,12 +103,12 @@ public class VirtualScrollSizeToContentTests : ContentPage
         Content = grid;
     }
 
-    // SizeToContent is marked experimental on Windows (it is not implemented there); this harness
+    // SizingStrategy is marked experimental on Windows (it is not implemented there); this harness
     // drives iOS and Android, so the diagnostic is acknowledged rather than avoided.
 #pragma warning disable NALUVS001
     private void SetStrategy(VirtualScrollSizingStrategy strategy)
     {
-        _virtualScroll.SizeToContent = strategy;
+        _virtualScroll.SizingStrategy = strategy;
         UpdateStateLabel();
     }
 
@@ -124,6 +124,6 @@ public class VirtualScrollSizeToContentTests : ContentPage
         UpdateStateLabel();
     }
 
-    private void UpdateStateLabel() => _stateLabel.Text = $"{_virtualScroll.SizeToContent}/{_items.Count}";
+    private void UpdateStateLabel() => _stateLabel.Text = $"{_virtualScroll.SizingStrategy}/{_items.Count}";
 #pragma warning restore NALUVS001
 }

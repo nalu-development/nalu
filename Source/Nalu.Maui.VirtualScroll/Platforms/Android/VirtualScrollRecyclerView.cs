@@ -47,7 +47,7 @@ public class VirtualScrollRecyclerView : VirtualScrollNativeRecyclerView
         // create a new ScrollHelper if needed, and there's no reason to do that until a Scroll is requested.)
         _scrollHelper?.AdjustScroll();
 
-        // Content geometry is settled: the handler uses this to re-evaluate SizeToContent.
+        // Content geometry is settled: the handler uses this to re-evaluate SizingStrategy.
         OnLayoutCallback?.Invoke();
     }
 

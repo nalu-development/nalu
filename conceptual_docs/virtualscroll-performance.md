@@ -42,9 +42,9 @@ This **45% performance improvement** on iOS results in noticeably smoother scrol
 
 5. **Platform-Specific Guidance Adherence**: `VirtualScroll` implementation follows platform-specific best practices and guidelines, making it less prone to glitches and rendering issues compared to MAUI CollectionView abstractions that may not fully align with native platform guidance.
 
-## Sizing to content
+## Sizing strategy
 
-[`SizeToContent`](virtualscroll.md#sizing-to-content) is the one property that can make
+[`SizingStrategy`](virtualscroll.md#sizing-strategy) is the one property that can make
 `VirtualScroll` measure its content, so its cost is worth stating plainly:
 
 | Mode | Measure cost | Re-measure churn |
@@ -78,5 +78,5 @@ re-measures the whole container chain.
 4. **Prefer [`ObservableRangeCollection<T>`](https://github.com/jamesmontemagno/mvvm-helpers/blob/master/MvvmHelpers/ObservableRangeCollection.cs)**: It provides the best change notification support with minimal overhead
 5. **Avoid calling `GetVisibleItemsRange()` in scroll handlers**: Use `ScrollPercentageY` from scroll events instead for infinite scroll scenarios
 6. **Enable scroll events only when needed**: Scroll events are automatically disabled when no listeners are present, ensuring optimal performance
-7. **Leave `SizeToContent` alone unless the list must hug its content**, and prefer the capped form (`SizeToContent="300"`) over `Unbounded` — see [Sizing to content](#sizing-to-content)
+7. **Leave `SizingStrategy` alone unless the list must hug its content**, and prefer the capped form (`SizingStrategy="300"`) over `Unbounded` — see [Sizing strategy](#sizing-strategy)
 
