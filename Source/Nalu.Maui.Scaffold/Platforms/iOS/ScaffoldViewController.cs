@@ -1,3 +1,4 @@
+using CoreFoundation;
 using CoreGraphics;
 using UIKit;
 
@@ -262,17 +263,25 @@ internal sealed class ScaffoldViewController : UIViewController
 
         try
         {
-            await UIView.AnimateNotifyAsync(
-                _barAnimationDurationSeconds,
-                0,
-                UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
-                () =>
-                {
-                    strip.Transform = targetTransform;
-                    ApplyCurrentPageInsets();
-                    View!.LayoutIfNeeded();
-                }
-            );
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Don't use AnimateNotifyAsync (under some conditions it blocks and never returns).
+            // So use DispatchQueue to run a synchronous animation on the next loop and then complete the tcs.
+            DispatchQueue.MainQueue.DispatchAsync(() =>
+            {
+                UIView.AnimateNotify(
+                    _barAnimationDurationSeconds,
+                    0,
+                    UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
+                    () =>
+                    {
+                        strip.Transform = targetTransform;
+                        ApplyCurrentPageInsets();
+                        View!.LayoutIfNeeded();
+                    },
+                    _ => tcs.SetResult()
+                );
+            });
+            await tcs.Task;
         }
         finally
         {
