@@ -32,6 +32,7 @@ public sealed class TaskSection : IDisposable
                              .Subscribe();
     }
 
+
     public void Dispose() => _subscription.Dispose();
 }
 
@@ -82,7 +83,7 @@ public sealed class TaskSectionsAdapter
     protected override bool ShouldIgnoreCollectionChanges() => _applyingDragMove;
 }
 
-public partial class TasksPageModel : ObservableObject, IDisposable
+public partial class TasksPageModel : ObservableObject, IIntentHydrator<TaskEditorIntent>, IDisposable
 {
     private readonly INavigationService _navigation;
     private readonly TodoStore _todos;
@@ -114,7 +115,19 @@ public partial class TasksPageModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private Task EditTaskAsync(TodoItem item)
-        => _navigation.GoToAsync(Nav.Push<TaskEditorPageModel>(new TaskEditorIntent(item.Id)));
+        => _navigation.GoToAsync(Nav.Push<TaskEditorPageModel>(new TaskEditorIntent(item.Id) { Item = item }));
+
+    /// <summary>
+    /// Restore hydration: the snapshot persisted only the task id — reload the item from the
+    /// store before the replay recreates the editor (this page is already alive, sitting
+    /// below the editor in the restoring stack).
+    /// </summary>
+    public ValueTask HydrateAsync(TaskEditorIntent intent)
+    {
+        intent.Item = _todos.Get(intent.Id);
+
+        return ValueTask.CompletedTask;
+    }
 
     public void Dispose()
     {

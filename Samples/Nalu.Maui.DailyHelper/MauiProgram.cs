@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.DevFlow.Agent;
 using Nalu.Maui.DailyHelper.Overlays;
+using Nalu.Maui.DailyHelper.PageModels;
 using Nalu.Maui.DailyHelper.Services;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
@@ -14,7 +15,21 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
-            .UseNaluNavigation<App>(nav => nav.AddPages())
+            .UseNaluNavigation<App>(nav => nav
+                .AddPages()
+
+                // Navigation-state restoration: relaunch the app and land exactly where you
+                // were — including inside the task editor, whose intent is rehydrated (see
+                // TaskEditorIntent / IIntentHydrator on the Today & Tasks page models).
+                // Enabled unconditionally here (it IS the demo); real apps usually gate it:
+                //   restore.Enabled = isDebugBuild;
+                .WithRestore(restore =>
+                    {
+                        restore.MaxAge = TimeSpan.FromDays(1);
+                        restore.AddIntent<TaskEditorIntent>();
+                    }
+                )
+            )
 
             // Model-first overlays (§7.2): the duration sheet is shown via IOverlayService
             // from the task editor's page model — no view references in the model.

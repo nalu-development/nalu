@@ -9,7 +9,7 @@ using System.Reactive.Disposables;
 
 namespace Nalu.Maui.DailyHelper.PageModels;
 
-public partial class TodayPageModel : ObservableObject, IEnteringAware, IDisposable
+public partial class TodayPageModel : ObservableObject, IEnteringAware, IIntentHydrator<TaskEditorIntent>, IDisposable
 {
     private readonly INavigationService _navigation;
     private readonly WeatherStore _weather;
@@ -84,7 +84,7 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IDisposa
 
     [RelayCommand]
     private Task EditTaskAsync(TodoItem item)
-        => _navigation.GoToAsync(Nav.Push<TaskEditorPageModel>(new TaskEditorIntent(item.Id)));
+        => _navigation.GoToAsync(Nav.Push<TaskEditorPageModel>(new TaskEditorIntent(item.Id) { Item = item }));
 
     private async Task SafeRefreshAsync()
     {
@@ -96,6 +96,19 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IDisposa
         {
             // Offline: keep whatever data we have.
         }
+    }
+
+
+    /// <summary>
+    /// Restore hydration: the snapshot persisted only the task id — reload the item from the
+    /// store before the replay recreates the editor (this page is already alive, sitting
+    /// below the editor in the restoring stack).
+    /// </summary>
+    public ValueTask HydrateAsync(TaskEditorIntent intent)
+    {
+        intent.Item = _todos.Get(intent.Id);
+
+        return ValueTask.CompletedTask;
     }
 
     public void Dispose() => _subscriptions.Dispose();
