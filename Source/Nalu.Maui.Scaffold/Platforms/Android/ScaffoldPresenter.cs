@@ -185,7 +185,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 {
                     ScaffoldPresentationHint.Push => scaffold.ResolvePageTransition(targetPage),
                     ScaffoldPresentationHint.Pop when previousPage is not null => scaffold.ResolvePageTransition(previousPage),
-                    _ => ScaffoldPageTransition.Default
+                    _ => scaffold.ResolveRootSwitchTransition()
                 };
 
             var previousFragment = _currentFragment;
@@ -303,9 +303,28 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             try
             {
-                var leavingTask = leavingMotion is null
-                    ? Task.CompletedTask
-                    : StartLeavingPageAsync(activity, previousFragment!, previousPage!, previousView!, leavingMotion, leavingLeads, pageTransition);
+                var leaving = leavingMotion is null
+                    ? null
+                    : PrepareLeavingPage(activity, previousFragment!, previousPage!, previousView!, leavingMotion, leavingLeads, pageTransition);
+
+                // Started at the INCOMING page's first pre-draw — the frame it is laid out and
+                // about to render — not here. The incoming half is started by the fragment
+                // machinery when the transaction executes, a frame after this commit, so starting
+                // the outgoing half now runs it a frame ahead: with matched easing the error
+                // tracks velocity, which peaks mid-transition, and the window shows through the
+                // seam between the pages (measured at ~115px of a 1080px slide). Waiting for the
+                // pre-draw also means a page that is slow to lay out delays BOTH halves.
+                var startFlights = fragment.OnFirstPreDraw;
+
+                fragment.OnFirstPreDraw = () =>
+                {
+                    startFlights?.Invoke();
+                    leaving?.Animator.Start();
+                };
+
+#pragma warning disable VSTHRD003
+                var leavingTask = leaving?.Completion.Task ?? Task.CompletedTask;
+#pragma warning restore VSTHRD003
 
                 // Deterministic completion: presentation of the new page plus the outgoing page's
                 // motion, with a settle timeout as a safety net.
@@ -500,7 +519,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
-    /// Plays the OUTGOING page's motion IN PLACE — its fragment is still added, so its view is
+    /// Prepares the OUTGOING page's motion, played IN PLACE — its fragment is still added, so its view is
     /// still a plain child of the container — and unmounts it when the motion ends.
     /// The fragment's own exit animations cannot serve here:
     /// <see cref="FragmentContainerView"/> deliberately draws exiting fragment views BELOW the
@@ -513,7 +532,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// play on top (pop, cross-area fade): translationZ rather than child order, because the
     /// incoming view is appended to the container a frame from now.
     /// </summary>
-    private Task StartLeavingPageAsync(
+    private LeavingPage PrepareLeavingPage(
         AppCompatActivity activity,
         ScaffoldPageFragment leavingFragment,
         Page leavingPage,
@@ -567,13 +586,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             }
         };
 
-        animator.Start();
-
-        // Completed by the animator end (or by the next navigation settling it), both on this
-        // same UI context; RunContinuationsAsynchronously.
-#pragma warning disable VSTHRD003
-        return session.Completion.Task;
-#pragma warning restore VSTHRD003
+        // NOT started here — the caller starts it in the same frame as the incoming page's own
+        // animator, so the two halves of a transition stay locked together.
+        return session;
     }
 
     /// <summary>

@@ -500,7 +500,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 {
                     container.BringSubviewToFront(fadingView);
 
-                    await UIView.AnimateAsync(_transitionDurationSeconds, () => fadingView.Alpha = 0);
+                    await UIView.AnimateAsync(scaffold.ResolveRootSwitchTransition().DurationSeconds, () => fadingView.Alpha = 0);
                 }
 
                 break;
@@ -518,7 +518,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 var previousView = previousController?.View;
 
-                await UIView.AnimateAsync(_transitionDurationSeconds, () =>
+                await UIView.AnimateAsync(scaffold.ResolveRootSwitchTransition().DurationSeconds, () =>
                 {
                     newView.Transform = CGAffineTransform.MakeIdentity();
 

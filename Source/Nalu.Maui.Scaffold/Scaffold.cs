@@ -1072,6 +1072,18 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
             ?? GetPageTransition(this)
             ?? ScaffoldPageTransition.Default;
 
+    /// <summary>
+    /// The transition a ROOT switch travels with. Its choreography is fixed — the presenters
+    /// slide neighbouring roots and cross-fade roots in different areas — but the DURATION comes
+    /// from the scaffold-level spec, so an app tunes all of its page motion in one place.
+    /// A page-attached spec deliberately never applies here: how a pushed page enters says
+    /// nothing about how tabs travel.
+    /// </summary>
+    internal ScaffoldPageTransition ResolveRootSwitchTransition()
+        => GetPageTransition(this) is { DurationSeconds: var duration }
+            ? ScaffoldPageTransition.Default with { DurationSeconds = duration }
+            : ScaffoldPageTransition.Default;
+
     /// <summary>Gets the shared-element transition name attached to a view.</summary>
     public static string? GetTransitionName(BindableObject bindable) => (string?)bindable.GetValue(TransitionNameProperty);
 

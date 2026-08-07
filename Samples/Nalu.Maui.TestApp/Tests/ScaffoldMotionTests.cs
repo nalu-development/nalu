@@ -11,6 +11,19 @@ public partial class MoRootPageModel(INavigationService navigationService) : Obs
     public Task PushCustom() => navigationService.GoToAsync(Navigation.Relative().Push<MoCustomPageModel>());
 
     public Task PushShared() => navigationService.GoToAsync(Navigation.Relative().Push<MoSharedPageModel>());
+
+    /// <summary>Selects a root in ANOTHER area — the switch that cross-fades.</summary>
+    public Task GoFar() => navigationService.GoToAsync(Navigation.Absolute().Root<MoFarPageModel>());
+}
+
+/// <summary>Model-less pages are not registered by AddPages(): the second tab root needs one.</summary>
+[UsedImplicitly]
+public partial class MoSecondPageModel : ObservableObject;
+
+[UsedImplicitly]
+public partial class MoFarPageModel(INavigationService navigationService) : ObservableObject
+{
+    public Task Back() => navigationService.GoToAsync(Navigation.Absolute().Root<MoRootPageModel>());
 }
 
 [UsedImplicitly]
@@ -56,6 +69,12 @@ public abstract class MoPageBase : ContentPage
             stack.Add(control);
         }
 
+        // Every page of the harness, not just the root: a test left on any of them (a tab root,
+        // the cross-area root) must still be able to reset the app.
+        var exitButton = new Button { Text = "Exit", AutomationId = $"Exit{label}", FontSize = 11, BackgroundColor = Colors.IndianRed };
+        exitButton.Clicked += (_, _) => ((App) Application.Current!).ResetToMainPage();
+        stack.Add(exitButton);
+
         // Controls stay at the TOP: tests sample the lower half, where nothing but the page's
         // own background is ever drawn.
         Content = new Grid { Children = { stack } };
@@ -82,6 +101,30 @@ public abstract class MoPageBase : ContentPage
     }
 }
 
+/// <summary>Second root of the SAME area: switching to it slides, both pages travelling together.</summary>
+[UsedImplicitly]
+public class MoSecondPage : MoPageBase
+{
+    /// <summary>The colour a UI test looks for when this root is on screen.</summary>
+    public static readonly Color SecondColor = Color.FromRgb(200, 120, 0);
+
+    public MoSecondPage(MoSecondPageModel model)
+        : base(SecondColor, "MoSecondPage")
+        => BindingContext = model;
+}
+
+/// <summary>Root of ANOTHER area: switching to it cross-fades instead of sliding.</summary>
+[UsedImplicitly]
+public class MoFarPage : MoPageBase
+{
+    /// <summary>The colour a UI test looks for when this root is on screen.</summary>
+    public static readonly Color FarColor = Color.FromRgb(0, 90, 160);
+
+    public MoFarPage(MoFarPageModel model)
+        : base(FarColor, "MoFarPage", NavPageFactory.MakeButton("Back", "MoAreaBackSelector", model.Back))
+        => BindingContext = model;
+}
+
 /// <summary>Root of the motion harness.</summary>
 [UsedImplicitly]
 public class MoRootPage : MoPageBase
@@ -93,19 +136,10 @@ public class MoRootPage : MoPageBase
             NavPageFactory.MakeButton("Push detail", "PushMoDetail", model.PushDetail),
             NavPageFactory.MakeButton("Push custom", "PushMoCustom", model.PushCustom),
             NavPageFactory.MakeButton("Push shared", "PushMoShared", model.PushShared),
-            MakeHero("MoRootHero", Colors.Orange, 80),
-            MakeExitButton()
+            NavPageFactory.MakeButton("Go far", "MoAreaFarSelector", model.GoFar),
+            MakeHero("MoRootHero", Colors.Orange, 80)
         )
         => BindingContext = model;
-
-
-    private static Button MakeExitButton()
-    {
-        var exitButton = new Button { Text = "Exit", AutomationId = "ExitMoRoot", FontSize = 11, BackgroundColor = Colors.IndianRed };
-        exitButton.Clicked += (_, _) => ((App) Application.Current!).ResetToMainPage();
-
-        return exitButton;
-    }
 }
 
 /// <summary>
@@ -208,6 +242,30 @@ public class MotionScaffold : Scaffold
     {
         _ = navigationService;
 
-        Areas.Add(new ScaffoldRoot { Title = "Motion", PageType = typeof(MoRootPage) });
+        // Root switches take their duration from the SCAFFOLD-level spec: stretched here like the
+        // page transitions, so a test can sample what is on screen while the two roots travel.
+        SetPageTransition(
+            this,
+            new ScaffoldPageTransition(
+                new ScaffoldTransitionMotion(FractionX: 1),
+                new ScaffoldTransitionMotion(),
+                MoDetailPage.TransitionSeconds
+            )
+        );
+
+        // Two roots in ONE area (their switch slides) plus a root in ANOTHER area (its switch
+        // cross-fades): the two root-switch choreographies, over flat colours a test can sample.
+        Areas.Add(
+            new ScaffoldTabBar
+            {
+                Roots =
+                {
+                    new ScaffoldRoot { Title = "One", PageType = typeof(MoRootPage), AutomationId = "MoTabOne" },
+                    new ScaffoldRoot { Title = "Two", PageType = typeof(MoSecondPage), AutomationId = "MoTabTwo" }
+                }
+            }
+        );
+
+        Areas.Add(new ScaffoldRoot { Title = "Far", PageType = typeof(MoFarPage), AutomationId = "MoAreaFar" });
     }
 }

@@ -178,7 +178,12 @@ internal sealed class ScaffoldPageFragment : Fragment
         // Presented = first draw when no enter animation runs; the animator end wins otherwise.
         OneShotPreDrawListener.Add(view, new Java.Lang.Runnable(() =>
         {
-            OnFirstPreDraw?.Invoke();
+            // One-shot, and CLEARED once it fires: the callback closes over the transition it
+            // starts, which holds the page on its way OUT. A mounted fragment that keeps the
+            // closure keeps that page — and its model — alive for as long as it is displayed.
+            var onFirstPreDraw = OnFirstPreDraw;
+            OnFirstPreDraw = null;
+            onFirstPreDraw?.Invoke();
 
             if (!HasAnimatedEnter)
             {

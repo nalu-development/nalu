@@ -270,6 +270,92 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (await App.WaitForElementAsync("MoRootHero")).IsVisible.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Samples a whole ROW across the window, in one frame — the shape a root switch needs: the
+    /// two roots travel side by side, so a seam between them shows up as a band of window
+    /// background somewhere in the middle, which two edge samples would step right over.
+    /// </summary>
+    private async Task<List<Color[]>> CaptureRowsAsync(double seconds)
+    {
+        // Same band as the frame samples: low enough that only page background is ever drawn
+        // there (the harness keeps every control in the top stack), above the tab bar strip.
+        var points = Enumerable.Range(0, 17).Select(i => (X: 0.02 + (i * 0.06), Y: 0.75)).ToArray();
+        var rows = new List<Color[]>();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var samples = await App.SampleWindowPixelsAsync(points);
+            rows.Add(samples.Select(s => new Color(s.R, s.G, s.B)).ToArray());
+        }
+
+        return rows;
+    }
+
+    private static string Describe(IEnumerable<Color[]> rows) => string.Join(" | ", rows.Select(r => string.Join(",", r.Select(c => c.ToString()))));
+
+    [Fact]
+    public async Task RootSwitchTravelsWithoutSeparatingThePages()
+    {
+        await App.WaitForElementAsync("MoRootPage");
+        var one = await MeasureSettledPageAsync();
+
+        // Neighbouring roots of the same area: both travel, one leaving as the other arrives.
+        await App.TapAsync("TabTwo");
+        var rows = await CaptureRowsAsync(MotionSeconds * 1.6);
+
+        await App.WaitForElementAsync("MoSecondPage");
+        var two = await MeasureSettledPageAsync(replacing: one);
+
+        // THE REGRESSION: the two halves must travel locked together. Started a frame apart they
+        // drift by their velocity — which peaks mid-transition — and the window shows through the
+        // seam between them. Sampling a whole row is what catches a band anywhere across it.
+        rows.Should()
+            .OnlyContain(
+                row => row.All(sample => Is(sample, one) || Is(sample, two)),
+                "no frame of a root switch may show the window background between the two roots — rows: " + Describe(rows)
+            );
+
+        rows.Should()
+            .Contain(
+                row => row.Any(sample => Is(sample, one)) && row.Any(sample => Is(sample, two)),
+                "both roots are on screen together while they travel — rows: " + Describe(rows)
+            );
+
+        await App.TapAsync("TabOne");
+        await WaitForPageColorAsync(one, "the switch back lands on the first root");
+    }
+
+    [Fact]
+    public async Task CrossAreaSwitchFadesWithoutShowingTheWindow()
+    {
+        await App.WaitForElementAsync("MoRootPage");
+        var one = await MeasureSettledPageAsync();
+
+        // A root in ANOTHER area: no shared strip to travel along, so it cross-fades. The
+        // outgoing root fades out ON TOP of the new one, which means every frame is a blend of
+        // the two pages — never the window.
+        await App.TapAsync("MoAreaFarSelector");
+        var rows = await CaptureRowsAsync(MotionSeconds * 1.6);
+
+        await App.WaitForElementAsync("MoFarPage");
+        var far = await MeasureSettledPageAsync(replacing: one);
+
+        rows.Should()
+            .OnlyContain(
+                row => row.All(sample => IsBlendOf(sample, one, far)),
+                "a cross-fade blends the two roots; the window must never show through — rows: " + Describe(rows)
+            );
+    }
+
+    /// <summary>Whether a sample lies on the line between two colours (what a cross-fade produces).</summary>
+    private static bool IsBlendOf(Color sample, Color first, Color second)
+    {
+        static bool Between(byte value, byte a, byte b) => value >= Math.Min(a, b) - 14 && value <= Math.Max(a, b) + 14;
+
+        return Between(sample.R, first.R, second.R) && Between(sample.G, first.G, second.G) && Between(sample.B, first.B, second.B);
+    }
+
     [Fact]
     public async Task PushAndPopSettleAtTheirNaturalGeometry()
     {
