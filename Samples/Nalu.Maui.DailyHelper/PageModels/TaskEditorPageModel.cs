@@ -3,13 +3,24 @@ using CommunityToolkit.Mvvm.Input;
 using Nalu.Maui.DailyHelper.Models;
 using Nalu.Maui.DailyHelper.Overlays;
 using Nalu.Maui.DailyHelper.Services;
+using System.Text.Json.Serialization;
 
 namespace Nalu.Maui.DailyHelper.PageModels;
 
-/// <summary>Navigation intent opening the editor on an existing task.</summary>
-public sealed record TaskEditorIntent(Guid Id);
+/// <summary>
+/// Navigation intent opening the editor on an existing task. Only the id is persisted by the
+/// navigation-state snapshot; the loaded item is <c>[JsonIgnore]</c>d and REHYDRATED on
+/// restore by the pushing page's <see cref="IIntentHydrator{TIntent}"/> — the store stays the
+/// single source of truth, and the editor never has to look the task up itself.
+/// </summary>
+public sealed record TaskEditorIntent(Guid Id)
+{
+    /// <summary>The materialized task; supplied by the push site, or by hydration on restore.</summary>
+    [JsonIgnore]
+    public TodoItem? Item { get; set; }
+}
 
-public partial class TaskEditorPageModel(INavigationService navigation, TodoStore todos, IOverlayService overlays)
+public partial class TaskEditorPageModel(INavigationService navigation, INavigationRestore restore, TodoStore todos, IOverlayService overlays)
     : ObservableObject, IEnteringAware, IEnteringAware<TaskEditorIntent>
 {
     private TodoItem? _original;
@@ -60,17 +71,19 @@ public partial class TaskEditorPageModel(INavigationService navigation, TodoStor
         }
     }
 
-    public ValueTask OnEnteringAsync()
+    public async ValueTask OnEnteringAsync()
     {
         _original = todos.CreateDraft();
         HasDueDate = true;
 
-        return ValueTask.CompletedTask;
+        // Entity-creation flow: an empty draft must never resurrect after a restart — the
+        // restorable stack ends here (a restore lands on the page below).
+        await restore.ForgetAsync();
     }
 
     public ValueTask OnEnteringAsync(TaskEditorIntent intent)
     {
-        _original = todos.Get(intent.Id);
+        _original = intent.Item ?? todos.Get(intent.Id);
 
         if (_original is not null)
         {

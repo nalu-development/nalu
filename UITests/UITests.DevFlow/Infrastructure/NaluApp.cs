@@ -966,6 +966,110 @@ public sealed class NaluApp : IAsyncLifetime
         return output;
     }
 
+    #region App restart (host-side process control, restore tests)
+
+    private const string TestAppId = "com.nalu.maui.testapp";
+
+    /// <summary>
+    /// KILLS and relaunches the TestApp — the §9 snapshot-restore flow needs a real process
+    /// death (the in-app ResetButton keeps the process alive). Android: adb force-stop +
+    /// launcher intent; iOS simulator: simctl terminate + launch. The agent connection is then
+    /// re-established on the same platform's port pair (base / +1000 broker fallback), so the
+    /// discovery can never latch onto another platform's app mid-restart.
+    /// </summary>
+    public async Task RestartAppAsync()
+    {
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        if (platform.Contains("android", StringComparison.OrdinalIgnoreCase))
+        {
+            await RunAdbAsync("shell", "am", "force-stop", TestAppId).ConfigureAwait(false);
+            await RunAdbAsync("shell", "monkey", "-p", TestAppId, "-c", "android.intent.category.LAUNCHER", "1").ConfigureAwait(false);
+        }
+        else if (platform.Contains("ios", StringComparison.OrdinalIgnoreCase))
+        {
+            await RunSimctlAsync("terminate", "booted", TestAppId).ConfigureAwait(false);
+            await RunSimctlAsync("launch", "booted", TestAppId).ConfigureAwait(false);
+        }
+        else
+        {
+            throw new NotSupportedException($"RestartAppAsync supports the Android emulator and the iOS simulator only (platform: {platform}).");
+        }
+
+        await ReconnectSamePlatformAsync().ConfigureAwait(false);
+    }
+
+    private static async Task RunSimctlAsync(params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("xcrun")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        startInfo.ArgumentList.Add("simctl");
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo)
+                            ?? throw new InvalidOperationException("Could not start 'xcrun simctl'.");
+
+        // Failures tolerated on purpose: 'terminate' errors when the app is already dead.
+        await process.WaitForExitAsync().ConfigureAwait(false);
+    }
+
+    private async Task ReconnectSamePlatformAsync()
+    {
+        var host = Environment.GetEnvironmentVariable("DEVFLOW_HOST") ?? "localhost";
+        var currentPort = int.Parse(_client.BaseUrl[(_client.BaseUrl.LastIndexOf(':') + 1)..], CultureInfo.InvariantCulture);
+
+        // The platform's port pair: base and the +1000 broker fallback (TIME_WAIT lingering).
+        var basePort = currentPort >= 10000 ? currentPort - 1000 : currentPort;
+        int[] candidatePorts = [basePort, basePort + 1000];
+
+        var stopwatch = Stopwatch.StartNew();
+        var timeout = TimeSpan.FromSeconds(60);
+
+        while (true)
+        {
+            foreach (var port in candidatePorts)
+            {
+                var client = new AgentClient(host, port);
+
+                try
+                {
+                    if (await client.GetStatusAsync().ConfigureAwait(false) is not null)
+                    {
+                        _client.Dispose();
+                        _client = client;
+
+                        return;
+                    }
+                }
+                catch (Exception)
+                {
+                    // The relaunched app is not up yet: keep polling.
+                }
+
+                client.Dispose();
+            }
+
+            if (stopwatch.Elapsed >= timeout)
+            {
+                throw new InvalidOperationException(
+                    $"The TestApp did not come back after the restart (ports {string.Join(", ", candidatePorts)})."
+                );
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// Brings the app back to the test-selection page.
     /// Uses the "ResetButton" overlay added by the TestApp to every test page.

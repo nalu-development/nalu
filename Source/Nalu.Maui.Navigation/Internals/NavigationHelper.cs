@@ -25,6 +25,27 @@ internal static partial class NavigationHelper
     public static object GetLifecycleTarget(Page page)
         => page.IsSet(BindableObject.BindingContextProperty) ? page.BindingContext ?? page : page;
 
+    private static readonly AsyncLocal<Page?> _lifecyclePage = new();
+
+    /// <summary>
+    /// The page whose lifecycle callback is currently executing, flowed via
+    /// <see cref="AsyncLocal{T}"/> so it is visible INSIDE the callback's async flow even when
+    /// the page is not on the committed stack yet (multi-push batches commit at the end) —
+    /// the seam <see cref="NavigationRestoreService"/> uses to deduce the current page.
+    /// </summary>
+    internal static Page? AmbientLifecyclePage => _lifecyclePage.Value;
+
+    /// <summary>
+    /// Invokes a lifecycle callback with <see cref="AmbientLifecyclePage"/> set: the async
+    /// wrapper's execution context is a copy, so the value flows into the callback (and
+    /// anything it awaits) without leaking to the engine's context.
+    /// </summary>
+    private static async ValueTask WithLifecyclePageAsync(Page page, Func<ValueTask> invoke)
+    {
+        _lifecyclePage.Value = page;
+        await invoke().ConfigureAwait(true);
+    }
+
     private static MethodInfo? GetImplementedLifecycleMethod(
         Regex methodRegex, 
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] Type targetType,
@@ -71,7 +92,7 @@ internal static partial class NavigationHelper
                     new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.HandledWithIntent, intent)
                 );
 
-                return (ValueTask) enteringWithIntentMethod.Invoke(target, [intent])!;
+                return WithLifecyclePageAsync(page, () => (ValueTask) enteringWithIntentMethod.Invoke(target, [intent])!);
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
@@ -89,7 +110,7 @@ internal static partial class NavigationHelper
 #endif
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.Handled, intent));
 
-            return enteringAware.OnEnteringAsync();
+            return WithLifecyclePageAsync(page, enteringAware.OnEnteringAsync);
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Entering, target, NavigationLifecycleHandling.NotHandled, intent));
@@ -118,7 +139,7 @@ internal static partial class NavigationHelper
             // ReSharper disable once RedundantArgumentDefaultValue
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Leaving, target, NavigationLifecycleHandling.Handled));
 
-            return enteringAware.OnLeavingAsync();
+            return WithLifecyclePageAsync(page, enteringAware.OnLeavingAsync);
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Leaving, target, NavigationLifecycleHandling.NotHandled));
@@ -155,7 +176,7 @@ internal static partial class NavigationHelper
                     new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.HandledWithIntent, intent)
                 );
 
-                return (ValueTask) appearingWithIntentMethod.Invoke(target, [intent])!;
+                return WithLifecyclePageAsync(page, () => (ValueTask) appearingWithIntentMethod.Invoke(target, [intent])!);
             }
 
             if (configuration.NavigationIntentBehavior == NavigationIntentBehavior.Strict)
@@ -175,7 +196,7 @@ internal static partial class NavigationHelper
 #endif
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.Handled, intent));
 
-            return appearingAware.OnAppearingAsync();
+            return WithLifecyclePageAsync(page, appearingAware.OnAppearingAsync);
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Appearing, target, NavigationLifecycleHandling.NotHandled, intent));
@@ -204,7 +225,7 @@ internal static partial class NavigationHelper
             // ReSharper disable once RedundantArgumentDefaultValue
             shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Disappearing, target, NavigationLifecycleHandling.Handled));
 
-            return enteringAware.OnDisappearingAsync();
+            return WithLifecyclePageAsync(page, enteringAware.OnDisappearingAsync);
         }
 
         shell.SendNavigationLifecycleEvent(new NavigationLifecycleEventArgs(NavigationLifecycleEventType.Disappearing, target, NavigationLifecycleHandling.NotHandled));

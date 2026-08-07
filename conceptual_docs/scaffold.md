@@ -138,6 +138,11 @@ Tab taps, the Android back gesture/button, the iOS edge-swipe pop and flyout sel
 route through the same engine — `ILeavingGuard` and lifecycle events fire exactly as for
 programmatic navigations.
 
+That also means engine-level features light up unchanged — including
+[navigation state restoration](navigation-restore.md): opt in with
+`UseNaluNavigation(nav => nav.WithRestore(...))` and the app lands exactly where it was after
+a restart (the Scaffold is the verified host).
+
 ## Sample app
 
 The repository contains **Daily Helper** (`Samples/Nalu.Maui.DailyHelper`), a complete

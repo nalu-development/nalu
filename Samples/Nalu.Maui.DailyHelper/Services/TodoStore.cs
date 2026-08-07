@@ -18,7 +18,8 @@ public sealed class TodoStore : IDisposable
 
     public TodoStore()
     {
-        _todos.AddOrUpdate(Load());
+        var (items, seeded) = Load();
+        _todos.AddOrUpdate(items);
 
         // Skip AFTER ToCollection: ToCollection builds its state from the changesets it
         // observes, so skipping the initial changeset before it would lose the loaded items.
@@ -27,6 +28,15 @@ public sealed class TodoStore : IDisposable
                              .Skip(1)
                              .Throttle(TimeSpan.FromMilliseconds(500))
                              .Subscribe(Save);
+
+        if (seeded)
+        {
+            // The Skip(1) above deliberately ignores the initial changeset — but a FRESH seed
+            // must become durable right away: stable task ids are what id-carrying snapshots
+            // (e.g. navigation restore's TaskEditorIntent) key on across launches. Without
+            // this, every cold start re-seeded with new GUIDs until the first user mutation.
+            Save(items);
+        }
     }
 
     /// <summary>To-do changesets: filter, group and sort them in the page models.</summary>
@@ -91,14 +101,14 @@ public sealed class TodoStore : IDisposable
         };
     }
 
-    private static IReadOnlyList<TodoItem> Load()
+    private static (IReadOnlyList<TodoItem> Items, bool Seeded) Load()
     {
         try
         {
             if (File.Exists(_filePath)
                 && JsonSerializer.Deserialize<List<TodoItem>>(File.ReadAllText(_filePath)) is { Count: > 0 } items)
             {
-                return items;
+                return (items, false);
             }
         }
         catch (Exception e) when (e is IOException or JsonException)
@@ -106,7 +116,7 @@ public sealed class TodoStore : IDisposable
             // Corrupted or unreadable snapshot: fall back to the seed data.
         }
 
-        return Seed();
+        return (Seed(), true);
     }
 
     private static void Save(IReadOnlyCollection<TodoItem> items)

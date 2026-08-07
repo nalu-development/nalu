@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Nalu;
 
 // ReSharper disable once CheckNamespace
@@ -21,6 +22,13 @@ public static class NaluMauiAppBuilderExtensions
         builder.Services.AddSingleton<INavigationService, NavigationService>();
         builder.Services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         builder.Services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
+
+        // Navigation-state snapshot & restore: ALWAYS registered and inert unless the
+        // configurator's WithRestore enabled it — shared/library pages inject it unconditionally.
+        builder.Services.AddSingleton<NavigationRestoreService>();
+        builder.Services.AddSingleton<INavigationRestore>(static provider => provider.GetRequiredService<NavigationRestoreService>());
+        builder.Services.TryAddSingleton<IIntentSerializer, NavigationDefaultIntentSerializer>();
+        builder.Services.TryAddSingleton<INavigationRestoreStore, NavigationRestoreFileStore>();
 
         var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
         configure(configurator);

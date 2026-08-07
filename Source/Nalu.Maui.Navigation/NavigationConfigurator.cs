@@ -19,6 +19,34 @@ public class NavigationConfigurator : INavigationConfiguration
     private readonly Dictionary<Type, Type> _mapping;
     private readonly HashSet<Type> _viewOnlyPages = [];
 
+    /// <summary>
+    /// Pages registered WITHOUT a page model via <see cref="AddPage{TPage}()"/>: they never
+    /// enter <see cref="Mapping"/> (that dictionary is keyed by page-model type), but the
+    /// snapshot restore still needs them to map persisted segment names back to page types
+    /// across every registration style.
+    /// </summary>
+    internal IReadOnlyCollection<Type> ViewOnlyPages => _viewOnlyPages;
+
+    /// <summary>The navigation-state restore configuration; null when <see cref="WithRestore"/> was never called.</summary>
+    internal NavigationRestoreOptions? RestoreOptions { get; private set; }
+
+    /// <summary>
+    /// Enables navigation-state snapshot &amp; restore: after an app restart the engine replays
+    /// the last captured navigation (root selection, pushed stack, entering intents) once the
+    /// configured initial page's first appearing completes — see <see cref="INavigationRestore"/>.
+    /// The library cannot see the app's build configuration: a DEBUG-only policy (the
+    /// recommended developer-experience default) is expressed app-side via
+    /// <see cref="NavigationRestoreOptions.Enabled"/> or an <c>#if DEBUG</c> guard around this call.
+    /// </summary>
+    /// <param name="configure">Configures intents, expiry and serialization.</param>
+    public NavigationConfigurator WithRestore(Action<NavigationRestoreOptions>? configure = null)
+    {
+        RestoreOptions ??= new NavigationRestoreOptions();
+        configure?.Invoke(RestoreOptions);
+
+        return this;
+    }
+
     /// <inheritdoc />
     public ImageSource? MenuImage { get; private set; }
 
