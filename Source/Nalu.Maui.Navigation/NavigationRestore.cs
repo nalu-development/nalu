@@ -15,11 +15,11 @@ namespace Nalu;
 public interface IIntentSerializer
 {
     /// <summary>Serializes the intent to its wire payload.</summary>
-    /// <param name="intent">The intent instance (any plain object).</param>
+    /// <param name="intent">The intent instance; its runtime type is registered via <see cref="NavigationRestoreOptions.AddIntent{T}"/>.</param>
     string Serialize(object intent);
 
-    /// <summary>Deserializes a wire payload back into the given intent type.</summary>
-    /// <param name="intentType">The intent type resolved from the snapshot's stored type name.</param>
+    /// <summary>Deserializes a wire payload back into the given registered intent type.</summary>
+    /// <param name="intentType">The registered intent type resolved from the snapshot's stable type id.</param>
     /// <param name="payload">The wire payload produced by <see cref="Serialize"/>.</param>
     object Deserialize(Type intentType, string payload);
 }
@@ -72,11 +72,11 @@ public interface INavigationRestoreStore
 /// <remarks>
 /// <para>
 /// Capture is automatic: every successful navigation records the current stack, and each
-/// page's <b>entering intent</b> is serialized at navigation time (the type's full name is
-/// the wire identifier — no registration needed). A page is restorable when it was navigated
-/// to without an intent, or with an intent that serializes; a page reached with an intent
-/// that cannot serialize (or whose type no longer resolves at restore time) ends the
-/// restorable stack at that page, and nothing above it restores.
+/// page's <b>entering intent</b> is serialized at navigation time. A page is restorable when
+/// it was navigated to without an intent, or with an intent whose type is registered via
+/// <see cref="NavigationRestoreOptions.AddIntent{T}"/>; a page reached with an unregistered
+/// intent (or one that fails to serialize) ends the restorable stack at that page, and
+/// nothing above it restores.
 /// Non-serializable intent properties are excluded with
 /// <see cref="System.Text.Json.Serialization.JsonIgnoreAttribute"/> and rehydrated on
 /// restore via <see cref="IIntentHydrator{TIntent}"/>.
@@ -112,9 +112,10 @@ public interface INavigationRestore
     /// <summary>
     /// Sets or replaces the intent replayed for the current page on restore — e.g. swapping a
     /// "create draft" intent for a "saved entity id" intent once state materializes, or
-    /// re-opting-in a page whose original intent could not serialize. The intent is
-    /// serialized immediately (failures throw at this call site), and the snapshot is
-    /// re-captured and persisted before the returned task completes.
+    /// re-opting-in a page whose original intent was not restorable. The intent type must be
+    /// registered via <see cref="NavigationRestoreOptions.AddIntent{T}"/>; it is serialized
+    /// immediately (failures throw at this call site), and the snapshot is re-captured and
+    /// persisted before the returned task completes.
     /// </summary>
     /// <param name="intent">The intent to deliver to this page when it is restored.</param>
     Task RestoreWithIntentAsync(object intent);
@@ -135,6 +136,9 @@ public interface INavigationRestore
 /// </summary>
 public sealed class NavigationRestoreOptions
 {
+    private readonly Dictionary<string, Type> _intentTypesById = new(StringComparer.Ordinal);
+    private readonly Dictionary<Type, string> _intentIdsByType = [];
+
     /// <summary>
     /// Whether restore is active. Defaults to true (calling <c>WithRestore</c> is the opt-in);
     /// the library cannot see the app's build configuration, so a DEBUG-only policy is
@@ -151,8 +155,46 @@ public sealed class NavigationRestoreOptions
 
     /// <summary>
     /// Optional source-generated <see cref="JsonSerializerContext"/> used by the default
-    /// <see cref="IIntentSerializer"/> instead of reflection — required for trimming/NativeAOT.
-    /// Every intent type the app navigates with must be included in the context.
+    /// <see cref="IIntentSerializer"/> instead of reflection — required for NativeAOT.
+    /// Every type registered via <see cref="AddIntent{T}"/> must be included in the context.
     /// </summary>
     public JsonSerializerContext? IntentSerializerContext { get; set; }
+
+    /// <summary>
+    /// Registers an intent type under a stable snapshot type id (never an assembly-qualified
+    /// type name: renames only invalidate, they never deserialize the wrong thing). Only
+    /// registered intent types are restorable — the registration also preserves the type's
+    /// constructors, properties and fields under trimming, so the default JSON serializer
+    /// round-trips it reliably. Exclude non-serializable properties with
+    /// <see cref="System.Text.Json.Serialization.JsonIgnoreAttribute"/> and rehydrate them on
+    /// restore via <see cref="IIntentHydrator{TIntent}"/>.
+    /// </summary>
+    /// <typeparam name="T">The intent type.</typeparam>
+    /// <param name="typeId">The stable id; defaults to the type's short name. Collision-checked.</param>
+    public NavigationRestoreOptions AddIntent<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicConstructors
+            | DynamicallyAccessedMemberTypes.NonPublicConstructors
+            | DynamicallyAccessedMemberTypes.PublicProperties
+            | DynamicallyAccessedMemberTypes.PublicFields
+        )] T>(string? typeId = null)
+    {
+        var type = typeof(T);
+        typeId ??= type.Name;
+
+        if (_intentTypesById.TryGetValue(typeId, out var existing) && existing != type)
+        {
+            throw new InvalidOperationException(
+                $"Intent type id '{typeId}' is already registered for {existing.FullName}; pass an explicit typeId for {type.FullName}."
+            );
+        }
+
+        _intentTypesById[typeId] = type;
+        _intentIdsByType[type] = typeId;
+
+        return this;
+    }
+
+    internal IReadOnlyDictionary<string, Type> IntentTypesById => _intentTypesById;
+    internal IReadOnlyDictionary<Type, string> IntentIdsByType => _intentIdsByType;
 }

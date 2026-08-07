@@ -17,11 +17,8 @@ public class NavigationRestoreTests
 
     public sealed record DeepDetailIntent(string Value);
 
-    /// <summary>Genuinely unserializable (STJ throws on delegates): ends the restorable prefix.</summary>
-    public sealed class OpaqueIntent
-    {
-        public Action? Callback { get; set; }
-    }
+    /// <summary>NOT registered via AddIntent: ends the restorable prefix.</summary>
+    public sealed record OpaqueIntent(string Value);
 
     /// <summary>An intent whose heavy state is excluded from the snapshot and rehydrated at replay.</summary>
     public sealed class HydratableIntent
@@ -153,7 +150,15 @@ public class NavigationRestoreTests
 
             if (withRestore)
             {
-                configurator.WithRestore(options => configureRestore?.Invoke(options));
+                configurator.WithRestore(options =>
+                    {
+                        options.AddIntent<SearchIntent>();
+                        options.AddIntent<DetailIntent>();
+                        options.AddIntent<DeepDetailIntent>();
+                        options.AddIntent<HydratableIntent>();
+                        configureRestore?.Invoke(options);
+                    }
+                );
             }
 
             services.AddScoped(_ => Substitute.For<IHomePageModel>());
@@ -232,7 +237,7 @@ public class NavigationRestoreTests
         snapshot.RootSegment.Should().Be("HomePage");
         snapshot.Frames.Should().HaveCount(2);
         snapshot.Frames[0].Segment.Should().Be("DetailPage");
-        snapshot.Frames[0].Intent!.TypeId.Should().Be(typeof(DetailIntent).FullName);
+        snapshot.Frames[0].Intent!.TypeId.Should().Be("DetailIntent");
         snapshot.Frames[0].Intent!.Payload.Should().Contain("ctx");
 
         // No intent ⇒ restorable without one.
@@ -240,15 +245,15 @@ public class NavigationRestoreTests
         snapshot.Frames[1].Intent.Should().BeNull();
     }
 
-    [Fact(DisplayName = "An unserializable intent ends the restorable prefix at that page")]
-    public async Task UnserializableIntentEndsThePrefix()
+    [Fact(DisplayName = "An unregistered intent ends the restorable prefix at that page")]
+    public async Task UnregisteredIntentEndsThePrefix()
     {
         var store = new InMemoryStore();
         using var harness = new Harness(store);
         await harness.BootAsync();
 
         await harness.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().WithIntent(new DetailIntent("ok")));
-        await harness.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>().WithIntent(new OpaqueIntent { Callback = static () => { } }));
+        await harness.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>().WithIntent(new OpaqueIntent("live-only")));
         await harness.Restore.FlushAsync();
 
         var snapshot = ParseSnapshot(store.Stored!);
@@ -362,7 +367,7 @@ public class NavigationRestoreTests
         using var harness = new Harness(store);
         await harness.BootAsync();
 
-        await harness.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>().WithIntent(new OpaqueIntent { Callback = static () => { } }));
+        await harness.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>().WithIntent(new OpaqueIntent("live-only")));
         await harness.Restore.FlushAsync();
         ParseSnapshot(store.Stored!).Frames.Should().BeEmpty();
 
@@ -370,7 +375,7 @@ public class NavigationRestoreTests
         await harness.RestoreApi.RestoreWithIntentAsync(new DeepDetailIntent("serializable-equivalent"));
 
         var snapshot = ParseSnapshot(store.Stored!);
-        snapshot.Frames.Should().ContainSingle().Which.Intent!.TypeId.Should().Be(typeof(DeepDetailIntent).FullName);
+        snapshot.Frames.Should().ContainSingle().Which.Intent!.TypeId.Should().Be("DeepDetailIntent");
     }
 
     [Fact(DisplayName = "Restore round-trip lands on the captured stack and replays intents (chunked)")]
@@ -794,16 +799,27 @@ public class NavigationRestoreTests
         store.Stored.Should().BeNull();
     }
 
-    [Fact(DisplayName = "RestoreWithIntentAsync with an unserializable intent throws at the call site")]
-    public async Task RestoreWithUnserializableIntentThrows()
+    [Fact(DisplayName = "RestoreWithIntentAsync with an unregistered intent type throws at the call site")]
+    public async Task RestoreWithUnregisteredIntentThrows()
     {
         var store = new InMemoryStore();
         using var harness = new Harness(store);
         await harness.BootAsync();
 
-        var act = () => harness.RestoreApi.RestoreWithIntentAsync(new OpaqueIntent { Callback = static () => { } });
+        var act = () => harness.RestoreApi.RestoreWithIntentAsync(new OpaqueIntent("nope"));
 
-        await act.Should().ThrowAsync<NotSupportedException>();
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*not registered*");
+    }
+
+    [Fact(DisplayName = "Intent type id collisions are rejected at registration")]
+    public void IntentTypeIdCollisionsAreRejected()
+    {
+        var options = new NavigationRestoreOptions();
+        options.AddIntent<DetailIntent>("same-id");
+
+        var act = () => options.AddIntent<DeepDetailIntent>("same-id");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*already registered*");
     }
 
     [Fact(DisplayName = "Snapshot frame whose intent type no longer resolves truncates the restored prefix")]

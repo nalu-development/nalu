@@ -97,6 +97,16 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
             return Task.CompletedTask;
         }
 
+        var intentType = intent.GetType();
+
+        if (!_options!.IntentIdsByType.TryGetValue(intentType, out var typeId))
+        {
+            // A deterministic misconfiguration, not a transient failure: always throw.
+            throw new InvalidOperationException(
+                $"Intent type {intentType.FullName} is not registered for restore; register it via WithRestore(r => r.AddIntent<{intentType.Name}>())."
+            );
+        }
+
         // Serialized NOW: no live-object retention, failures throw at the call site.
         var payload = IntentSerializer.Serialize(intent);
 
@@ -107,7 +117,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
         var state = GetState(page);
         state.NonRestorable = false;
-        state.Intent = new NavigationRestoreIntentData { TypeId = intent.GetType().FullName, Payload = payload };
+        state.Intent = new NavigationRestoreIntentData { TypeId = typeId, Payload = payload };
 
         return CaptureAndFlushAsync();
     }
@@ -509,11 +519,12 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     private PageRestoreState GetState(Page page) => _pageStates.GetOrCreateValue(page);
 
     /// <summary>
-    /// Records the intent a page was entered with. Every intent is serialized as-is (the
-    /// type's FULL NAME is the wire identifier — no registration): no intent ⇒ restorable;
-    /// serializable intent ⇒ restorable with intent (<c>[JsonIgnore]</c> properties are
-    /// rehydrated at replay via <see cref="IIntentHydrator{TIntent}"/>); a serialization
-    /// failure ⇒ the restorable stack ends at this page (its context cannot be reproduced).
+    /// Records the intent a page was entered with. Restorability derives from it: no intent ⇒
+    /// restorable; a REGISTERED intent type ⇒ restorable with intent (serialized as-is —
+    /// <c>[JsonIgnore]</c> properties are rehydrated at replay via
+    /// <see cref="IIntentHydrator{TIntent}"/>); an unregistered type (or a serialization
+    /// failure) ⇒ the restorable stack ends at this page (its context cannot be reproduced;
+    /// registration is also what keeps the type's members trim-safe for the serializer).
     /// </summary>
     private void RecordIntent(Page page, object? intent)
     {
@@ -524,16 +535,19 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
         var state = GetState(page);
 
-        try
+        if (_options!.IntentIdsByType.TryGetValue(intent.GetType(), out var typeId))
         {
-            state.Intent = new NavigationRestoreIntentData { TypeId = intent.GetType().FullName, Payload = IntentSerializer.Serialize(intent) };
-            state.NonRestorable = false;
+            try
+            {
+                state.Intent = new NavigationRestoreIntentData { TypeId = typeId, Payload = IntentSerializer.Serialize(intent) };
+                state.NonRestorable = false;
 
-            return;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to serialize restore intent {IntentType}; the page will not restore.", intent.GetType().FullName);
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to serialize restore intent {IntentType}; the page will not restore.", intent.GetType().FullName);
+            }
         }
 
         state.NonRestorable = true;
@@ -711,12 +725,10 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
     #region Validation helpers
 
-    private static readonly Dictionary<string, Type?> _resolvedIntentTypes = new(StringComparer.Ordinal);
-
-    /// <summary>Returns the deserialized intent, or null when the type name no longer resolves (renamed/removed).</summary>
+    /// <summary>Returns the deserialized intent, or null when the type id is not registered (renamed/removed).</summary>
     private object? DeserializeIntent(NavigationRestoreIntentData data)
     {
-        if (data.TypeId is null || data.Payload is null || ResolveIntentType(data.TypeId) is not { } intentType)
+        if (data.TypeId is null || data.Payload is null || !_options!.IntentTypesById.TryGetValue(data.TypeId, out var intentType))
         {
             return null;
         }
@@ -724,52 +736,11 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
         return IntentSerializer.Deserialize(intentType, data.Payload);
     }
 
-    /// <summary>
-    /// Resolves an intent type from its namespace-qualified FULL NAME (the wire identifier —
-    /// deliberately not assembly-qualified) by scanning the loaded assemblies, cached. A type
-    /// that no longer resolves — renamed, removed — truncates the restored stack fail-open.
-    /// </summary>
-    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2026",
-        Justification = "Intent types are referenced by the app's intent-aware lifecycle implementations and therefore preserved; an unresolvable type is handled fail-open."
-    )]
-    private static Type? ResolveIntentType(string fullName)
-    {
-        lock (_resolvedIntentTypes)
-        {
-            if (_resolvedIntentTypes.TryGetValue(fullName, out var cached))
-            {
-                return cached;
-            }
-
-            Type? resolved = null;
-
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (assembly.IsDynamic)
-                {
-                    continue;
-                }
-
-                resolved = assembly.GetType(fullName, throwOnError: false);
-
-                if (resolved is not null)
-                {
-                    break;
-                }
-            }
-
-            _resolvedIntentTypes[fullName] = resolved;
-
-            return resolved;
-        }
-    }
-
     internal string ComputeRouteHash(IShellProxy proxy)
         => NavigationRestoreRouteHash.Compute(
             GetOrderedRootSegments(proxy),
-            GetRegisteredPageTypes().Select(NavigationSegmentAttribute.GetSegmentName)
+            GetRegisteredPageTypes().Select(NavigationSegmentAttribute.GetSegmentName),
+            _options!.IntentTypesById.Keys
         );
 
     private static List<string> GetOrderedRootSegments(IShellProxy proxy)

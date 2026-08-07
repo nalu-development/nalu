@@ -15,8 +15,9 @@ internal sealed class NavigationRestoreSnapshot
     public string? AppVersion { get; set; }
 
     /// <summary>
-    /// Hash of the restorable route table (ordered root segments + registered page segments):
-    /// renames/removals invalidate the snapshot instead of replaying into a renamed world.
+    /// Hash of the restorable route table (ordered root segments + registered page segments +
+    /// intent type ids): renames/removals invalidate the snapshot instead of replaying into a
+    /// renamed world.
     /// </summary>
     public string? RouteHash { get; set; }
 
@@ -39,10 +40,7 @@ internal sealed class NavigationRestoreFrameData
     public NavigationRestoreIntentData? Intent { get; set; }
 }
 
-/// <summary>
-/// A serialized intent: the type's namespace-qualified FULL NAME (deliberately not
-/// assembly-qualified — a rename simply fails resolution and truncates fail-open) + payload.
-/// </summary>
+/// <summary>A serialized intent: registered stable type id + wire payload.</summary>
 internal sealed class NavigationRestoreIntentData
 {
     public string? TypeId { get; set; }
@@ -78,7 +76,7 @@ internal sealed class NavigationDefaultIntentSerializer(INavigationConfiguration
     [UnconditionalSuppressMessage(
         "Trimming",
         "IL2026",
-        Justification = "Intent types are referenced by the app intent-aware lifecycle implementations (preserved); trimmed/AOT apps must supply IntentSerializerContext (documented on IIntentSerializer)."
+        Justification = "Intent types are registered via NavigationRestoreOptions.AddIntent<T> whose type parameter preserves constructors, properties and fields; NativeAOT apps must supply IntentSerializerContext (documented on IIntentSerializer)."
     )]
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Same as IL2026: reflection fallback is bypassed when IntentSerializerContext is supplied.")]
     public string Serialize(object intent)
@@ -93,7 +91,7 @@ internal sealed class NavigationDefaultIntentSerializer(INavigationConfiguration
     [UnconditionalSuppressMessage(
         "Trimming",
         "IL2026",
-        Justification = "Intent types are referenced by the app intent-aware lifecycle implementations (preserved); trimmed/AOT apps must supply IntentSerializerContext (documented on IIntentSerializer)."
+        Justification = "Intent types are registered via NavigationRestoreOptions.AddIntent<T> whose type parameter preserves constructors, properties and fields; NativeAOT apps must supply IntentSerializerContext (documented on IIntentSerializer)."
     )]
     [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Same as IL2026: reflection fallback is bypassed when IntentSerializerContext is supplied.")]
     public object Deserialize(Type intentType, string payload)
@@ -152,7 +150,7 @@ internal sealed class NavigationRestoreFileStore : INavigationRestoreStore
 /// <summary>Computes the snapshot invalidation hash from everything a replay resolves by name.</summary>
 internal static class NavigationRestoreRouteHash
 {
-    public static string Compute(IEnumerable<string> orderedRootSegments, IEnumerable<string> pageSegments)
+    public static string Compute(IEnumerable<string> orderedRootSegments, IEnumerable<string> pageSegments, IEnumerable<string> intentTypeIds)
     {
         var builder = new StringBuilder();
 
@@ -160,6 +158,7 @@ internal static class NavigationRestoreRouteHash
         // types by position, so reordering roots changes what a segment restores to.
         builder.Append("roots:").AppendJoin(',', orderedRootSegments);
         builder.Append("|pages:").AppendJoin(',', pageSegments.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
+        builder.Append("|intents:").AppendJoin(',', intentTypeIds.Order(StringComparer.Ordinal));
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
 

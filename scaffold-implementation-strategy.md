@@ -1063,11 +1063,12 @@ recording (`maui_recording_start`) for side-by-side comparison.
 
 - **Automatic capture**: every successful `GoToAsync` re-captures the current stack; the
   TARGET page's entering intent is recorded (serialized immediately) at navigation time.
-  Per-frame restorability: no intent ⇒ restorable; serializable intent ⇒ restorable with
-  intent (plain objects, JSON as-is — NO marker interface and NO AddIntent registry, both
-  dropped in review; the type FULL NAME is the wire id, resolved by assembly scan at restore
-  and truncating fail-open on rename); a serialization failure ⇒ the restorable stack ENDS
-  at that page. Non-serializable intent
+  Per-frame restorability: no intent ⇒ restorable; REGISTERED intent type ⇒ restorable with
+  intent (plain objects, JSON as-is — NO marker interface; the `AddIntent<T>` registry was
+  briefly dropped for full-name wire ids, then RESTORED for trim/AOT safety: its DAM
+  annotations preserve the type members the reflection serializer needs); an unregistered
+  intent (or serialization failure) ⇒ the restorable stack ENDS at that page.
+  Non-serializable intent
   state is excluded with `[JsonIgnore]` and REHYDRATED at replay: before navigating with a
   restored intent the engine walks the already-restored stack TOP→ROOT and awaits the first
   lifecycle target implementing `IIntentHydrator<TIntent>` (`HydrateAsync(intent)` fills the
@@ -1116,7 +1117,8 @@ recording (`maui_recording_start`) for side-by-side comparison.
   restoring nothing must not resurrect an OLDER state.
 - **Registration**: `UseNaluNavigation(nav => nav.WithRestore(r => ...))` —
   `NavigationRestoreOptions` { `Enabled` (default true; DEBUG-only policy is app-side — the
-  library cannot see the app's build configuration), `MaxAge`, `IntentSerializerContext` }.
+  library cannot see the app's build configuration), `MaxAge`, `AddIntent<T>(stableId)`
+  (collision-checked; never assembly-qualified names), `IntentSerializerContext` }.
   Services always registered (inert): `INavigationRestore`, `IIntentSerializer` (default:
   STJ reflection, source-gen context override for trimming/AOT), `INavigationRestoreStore`.
 
@@ -1125,9 +1127,11 @@ recording (`maui_recording_start`) for side-by-side comparison.
 - `Track`/`Untrack`, `IsRestoring`, `RestoreCompleted`, `SetRestorePoint`, boot-destination
   override (snapshot never overrides the startup destination anymore), `HasPendingRestore` +
   `DiscardAsync` (merged into `TryStopRestoreAsync`), whole-stack drop-and-stop-listening
-  (not needed for now), the `ISerializableIntent` marker AND the `AddIntent<T>` registry
-  (serialize everything; full-name wire ids; `[JsonIgnore]` + `IIntentHydrator<T>` for
-  non-serializable intent state).
+  (not needed for now), and the `ISerializableIntent` marker (plain objects serialize as-is;
+  `[JsonIgnore]` + `IIntentHydrator<T>` for non-serializable intent state). The `AddIntent<T>`
+  registry was dropped too (full-name wire ids) and then RESTORED: under trimming an
+  unregistered intent's members can be stripped (silent empty deserialization) and NativeAOT
+  needs the DAM annotations + `IntentSerializerContext` story.
 
 ---
 

@@ -50,6 +50,7 @@ public static class MauiProgram
                                                {
                                                    Tests.ScaffoldRestoreTestSupport.Options = restore;
                                                    restore.Enabled = false;
+                                                   restore.AddIntent<Tests.RestoreDetailIntent>();
                                                }
                                            )
             )
