@@ -34,8 +34,24 @@ public static class MauiProgram
                                            .AddPage<Tests.ScaffoldLifecycleOnePage>()
                                            .AddPage<Tests.ScaffoldLifecycleTwoPage>()
                                            .AddPage<Tests.ScaffoldLifecycleDetailPage>()
+                                           // Restore harness pages (view-only) — "Scaffold Restore Tests".
+                                           .AddPage<Tests.RestoreHomePage>()
+                                           .AddPage<Tests.RestoreOtherPage>()
+                                           .AddPage<Tests.RestoreDetailPage>()
+                                           .AddPage<Tests.RestoreForgottenPage>()
+                                           .AddPage<Tests.RestoreDeepPage>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
+                                           // Navigation-state snapshot & restore, exercised by the "Scaffold Restore
+                                           // Tests" harness. DISABLED at launch: the harness scaffold toggles Enabled
+                                           // around its own lifetime (ctor on / Dispose off), so other suites never
+                                           // capture or restore.
+                                           .WithRestore(restore =>
+                                               {
+                                                   Tests.ScaffoldRestoreTestSupport.Options = restore;
+                                                   restore.Enabled = false;
+                                               }
+                                           )
             )
             .UseNaluTabBar()
             .UseNaluScaffold(scaffold => scaffold

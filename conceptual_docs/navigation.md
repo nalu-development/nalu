@@ -486,6 +486,7 @@ Each tab maintains its own navigation stack independently.
 - 📘 [Navigation Lifecycle](navigation-lifecycle.md) - Deep dive into lifecycle events and timing
 - 📘 [Navigation Intents](navigation-intents.md) - Passing data and returning results
 - 📘 [Advanced Navigation](navigation-advanced.md) - Guards, behaviors, scoped services, and leak detection
+- 📘 [State Restoration](navigation-restore.md) - Land exactly where you were after an app restart
 - 📘 [Custom Tab Bar](navigation-tabbar.md) - Customizable tab bar for iOS/Android/MacCatalyst (works with standard Shell too)
 - 📘 [Testing & Troubleshooting](navigation-testing.md) - Unit testing and common issues
 

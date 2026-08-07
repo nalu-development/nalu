@@ -30,6 +30,8 @@
       href: navigation-view-only.md
     - name: Advanced Features
       href: navigation-advanced.md
+    - name: State Restoration
+      href: navigation-restore.md
     - name: Custom Tab Bar
       href: navigation-tabbar.md
     - name: Testing & Troubleshooting

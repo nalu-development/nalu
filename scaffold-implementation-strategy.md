@@ -96,16 +96,25 @@
   there — the first scaffold-hosted window's scaffold is returned; no conflicting overloads).
 - **Conceptual docs + migration guide SHIPPED (August 2026)**: eight docfx pages
   (`conceptual_docs/scaffold*.md`) incl. the NaluShell → Scaffold migration guide.
+- **Navigation-state snapshot & restore (§9) IMPLEMENTED (August 2026), verified on both
+  platforms** — landed ENGINE-LEVEL in `Nalu.Maui.Navigation` (Scaffold is the verified
+  host) after two design pivots in review: automatic capture with intent-serializability-
+  derived restorability, replay after the initial root's first appearing (init flows always
+  run), pending-restore navigation suppression, `INavigationRestore`
+  (`ForgetAsync`/`RestoreWithIntentAsync`/`TryStopRestoreAsync`). 24 unit tests + 3 DevFlow
+  kill-and-relaunch tests (real process death via `NaluApp.RestartAppAsync`) green on iOS +
+  Android; docfx page `conceptual_docs/navigation-restore.md`. Branch:
+  `feature/navigation-restore`.
 
 **Next steps, in recommended order:**
 
-1. **P3**: snapshot/restore (§9 — design DECIDED, see below; implementation next), deep-link
-   mapping (URI → `INavigationInfo`).
+1. **P3 remainder**: deep-link mapping (URI → `INavigationInfo`).
 2. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
    object-level effects only).
 3. Housekeeping when releasable: `Nalu.Maui` meta-package inclusion decision, docfx pages.
 4. Optional/parked: flyout edge-swipe open; predictive-back shared-element flights — newly
-   FEASIBLE since the Android engine replacement (see §8.1 addendum).
+   FEASIBLE since the Android engine replacement (see §8.1 addendum); Shell-host restore
+   verification (engine-level design should work there — untested, unadvertised).
 
 **Resolved (August 2026):** the NaluTabBar full-height issue on Android API 37 (Shell host) is
 fixed on `fix/nalutabbar-api37` (`RowDefinitions="Auto"` root + height-only Unspecified measure
@@ -1028,89 +1037,92 @@ recording (`maui_recording_start`) for side-by-side comparison.
 
 ## 9. Navigation-state snapshot & restore
 
-> **DESIGN DECIDED (August 2026, design review with Alberto): developer-driven tracking.**
-> Automatic capture was rejected — the edge-case space (which pages/intents are restorable,
-> conditional redirects during replay, wizard flows that must NOT resurrect) cannot be decided
-> framework-side. Restorability is an explicit, per-page developer decision.
+> **IMPLEMENTED (August 2026) — ENGINE-LEVEL, final design after two review pivots.**
+> Restore lives in **Nalu.Maui.Navigation** (zero Scaffold coupling; the Scaffold is the
+> VERIFIED host — Shell "should work" but is untested/unadvertised). Suites:
+> `NavigationRestoreTests` (24 unit tests against the real engine + ScaffoldProxy) and
+> `ScaffoldRestoreChromeTests` (3 DevFlow tests with REAL kill-and-relaunch via
+> `NaluApp.RestartAppAsync` — adb force-stop / simctl terminate + relaunch), green on iOS
+> simulator AND Android emulator. Conceptual doc: `conceptual_docs/navigation-restore.md`.
 
-### 9.1 The `IScaffoldRestore` service (decided)
+### 9.1 Design evolution (August 2026 review, recorded for posterity)
 
-```csharp
-public interface IScaffoldRestore
-{
-    bool IsRestoring { get; }
-    void Track(object pageModel);                              // restorable, no intent
-    void Track(object pageModel, ISerializableIntent intent);  // restorable with intent
-    void Untrack(object pageModel);
-    event EventHandler<ScaffoldRestoreCompletedEventArgs>? RestoreCompleted;
-}
-```
+1. **v1 — developer-driven tracking** (`Track`/`Untrack` on a scoped service, contiguous
+   tracked prefix): fully implemented and verified on iOS before being SUPERSEDED — the
+   tracking rulebook (last-write-wins, untracked semantics, prefix rules) existed only
+   because capture was implicit-but-gated.
+2. **v2 — explicit `SetRestorePoint(builder)` + app-driven `TryRestoreAsync()`**: rejected
+   because checkpoint pages would have to declare their FULL path (position coupling), and
+   the decisive scenario — an app that must run an INITIALIZATION root before any
+   destination — pointed at a better replay seam instead.
+3. **v3 — FINAL: automatic capture + replay after the initial root's first appearing.**
+   Restorability derives mechanically from intent serializability; the init flow always runs;
+   explicit control shrinks to three methods on one singleton.
 
-- **Only tracked pages restore.** Pages opt in from anywhere (typically `OnEnteringAsync` /
-  `OnAppearingAsync`) — untracked pages (checkout wizards, entity-creation flows) simply never
-  enter the snapshot.
-- **`Track` is last-write-wins per page model** (no separate `Replace`): re-tracking overrides
-  any previously tracked intent — including *removing* it (`Track(this)` after
-  `Track(this, x)`), or swapping the "create draft" intent for a "saved entity id" intent once
-  state materializes. `Untrack` removes the entry. Entries die automatically when their page
-  pops ("tracked and not popped"), enforced by construction: capture reads the LIVE stack and
-  looks tracked entries up by each frame's page model.
-- **Restore = the contiguous tracked prefix** of the last-used stack: A(tracked) →
-  B(untracked) → C(tracked) restores A only — resurrecting A/C would fabricate a stack that
-  never existed and C's context came from B.
-- **Root selection is captured automatically** (structural — the root exists either way);
-  `Track` on the root model additionally carries its intent. **Current root/stack only** (v1
-  decision, Alberto-confirmed); the schema field covers a later multi-root format.
-- **The tracked intent is delivered through the normal pipeline** on restore
-  (`IEnteringAware<TIntent>` — the engine's boot `InitializeAsync(proxy, segment, intent)`
-  already takes the root intent): a page's restore path IS its deep-entry path.
-- **`IsRestoring`** is true from replay start through the replay commit (restored pages see it
-  in their lifecycle) — this is how the redirect edge cases are DELEGATED to the developer
-  (`if (!restore.IsRestoring) redirect(...)`), replacing an earlier idea of auto-re-dispatching
-  `NavigationIgnored` requests (dropped: too much magic). Background: a navigation fired from
-  inside a lifecycle callback throws `InvalidNavigationException` by engine design (AsyncLocal
-  re-entrancy guard; fire-and-forget discards swallow it, Nalu's `.FireAndForget()` rethrows in
-  DEBUG); the prescribed `IDispatcher.DispatchDelayed` pattern lands after the commit — or gets
-  `NavigationIgnored` when a mid-replay dispatch interleaves — hence the explicit flag.
-- **Self-healing**: restored pages call `Track` again in their own entering, so the snapshot
-  converges to the restored state with no special handling.
-- The service is always injectable and INERT when restore is not enabled (`Track` no-ops,
-  `IsRestoring` false) — shared/library pages can call it unconditionally.
+### 9.2 The final design (as implemented)
 
-### 9.2 Mechanism (decided)
+- **Automatic capture**: every successful `GoToAsync` re-captures the current stack; the
+  TARGET page's entering intent is recorded (serialized immediately) at navigation time.
+  Per-frame restorability: no intent ⇒ restorable; serializable intent ⇒ restorable with
+  intent (plain objects, JSON as-is — NO marker interface and NO AddIntent registry, both
+  dropped in review; the type FULL NAME is the wire id, resolved by assembly scan at restore
+  and truncating fail-open on rename); a serialization failure ⇒ the restorable stack ENDS
+  at that page. Non-serializable intent
+  state is excluded with `[JsonIgnore]` and REHYDRATED at replay: before navigating with a
+  restored intent the engine walks the already-restored stack TOP→ROOT and awaits the first
+  lifecycle target implementing `IIntentHydrator<TIntent>` (`HydrateAsync(intent)` fills the
+  missing properties; the initialization root qualifies — it is alive during the replay).
+  Pop-ending navigations never record (pop intents are appearing context). Root selection +
+  root intent captured the same way (boot intent via an `OnRootEntered` hook).
+- **`INavigationRestore`** (singleton, always injectable, inert when not enabled):
+  - `ForgetAsync()` — removes the CURRENT page from the restoration stack (restore lands on
+    the page below; pages above cannot restore). Wizard pages call it in `OnEnteringAsync`.
+  - `RestoreWithIntentAsync(ISerializableIntent)` — sets/replaces the current page's replay
+    intent (draft → saved-id swap; also re-opts-in a page reached with an opaque intent).
+  - `TryStopRestoreAsync()` — discards the pending/in-flight restore and lifts the
+    suppression window (the auth-redirect escape hatch); returns whether one existed.
+  - The CURRENT page is deduced via `NavigationHelper.AmbientLifecyclePage` — an
+    `AsyncLocal<Page?>` set by an async wrapper around every lifecycle invocation (visible
+    inside the callback even mid multi-push, where the page is not on the committed stack
+    yet; no leak into the engine context) — falling back to the stack top (command context).
+  - Both per-page methods persist the re-captured snapshot before completing.
+- **Boot & replay** (inside `NavigationService.InitializeAsync`): read-and-DELETE + validate
+  the snapshot BEFORE booting; the engine still boots the CONFIGURED initial destination (an
+  app's initialization root always runs); after the initial page's first `OnAppearingAsync`
+  completes, the replay executes — absolute navigation to the captured root (count==1
+  delivers the root intent), then chunked pushes (each chunk ends at an intent-carrying
+  frame). Once per app launch; re-persists immediately after (the snapshot was deleted at
+  boot). Known edge (documented): a captured root intent is NOT redelivered when the
+  captured root IS the configured initial root (already entered with the app's own intent).
+- **Suppression window** (validated-snapshot → replay end): non-replay `GoToAsync` calls are
+  IGNORED — `false` + `NavigationIgnored` lifecycle event — so an init root's habitual
+  "navigate onward" cannot race the replay (replay navigations bypass via an AsyncLocal
+  flag). `TryStopRestoreAsync` is the deliberate way out (auth flows).
+- **Validation header**: schema version + app version/build (AppInfo, test-hookable) + SHA256
+  route hash (ordered root segments from the proxy tree + registered page segments — Mapping
+  values AND view-only registrations via `NavigationConfigurator.ViewOnlyPages`, a gap found
+  on-device: view-only pages never enter `Mapping`) + `MaxAge` option.
+  Fail-open everywhere: unknown segment/intent id truncates the prefix at that frame; any
+  exception discards the snapshot; restore never bricks startup.
+- **Persistence**: capture on successful commits, debounced (500ms) background writes,
+  immediate flush on window Deactivated/Stopped (best-effort `Application.Current` hook) and
+  after the per-page methods/replay. Store: `INavigationRestoreStore` (default: atomic JSON
+  file in the app cache). A non-restorable ROOT writes an intentionally invalid snapshot —
+  restoring nothing must not resurrect an OLDER state.
+- **Registration**: `UseNaluNavigation(nav => nav.WithRestore(r => ...))` —
+  `NavigationRestoreOptions` { `Enabled` (default true; DEBUG-only policy is app-side — the
+  library cannot see the app's build configuration), `MaxAge`, `IntentSerializerContext` }.
+  Services always registered (inert): `INavigationRestore`, `IIntentSerializer` (default:
+  STJ reflection, source-gen context override for trimming/AOT), `INavigationRestoreStore`.
 
-- **Capture**: tracked entries serialize their intent AT `Track` TIME (no live-object
-  retention; failures surface immediately — throw in DEBUG, log-and-drop in RELEASE).
-  Snapshot writes are debounced and fire-and-forget-swallowed (capture must never affect
-  navigation), triggered by Track/Untrack, successful commits (pops prune), and app
-  backgrounding. Store behind `IScaffoldRestoreStore` (default: JSON file in the app cache).
-- **Invalidation header**: schema version + app version/build + a hash of the registered route
-  table — renames/removals invalidate the snapshot instead of replaying into a renamed world.
-- **Restore at boot** (the `Scaffold.InitializeAsync` seam): read-and-DELETE the snapshot,
-  boot the engine on the snapshot's root segment (+ root intent), then replay the tracked
-  pushes as immediate (non-animated) navigations; re-persist after success. Delete-before-replay
-  is the crash-loop containment: a replay that crashes the app yields a clean next boot.
-  No guard bypass needed: at boot there is nothing to leave, so `ILeavingGuard` cannot fire.
-- **Fail-open, always**: unknown segment/typeId truncates the prefix at that frame; any
-  exception discards the snapshot and boots the default destination. Restore must never brick
-  startup.
-- **Startup destination precedence**: valid snapshot → `Scaffold.InitialRootPageType` (with
-  `Scaffold.InitialIntent`) → first root of the first area.
-- **Policy**: opt-in via `UseNaluScaffold(s => s.WithRestore(...))`; DEBUG-only by default
-  (DevEx: restart and land where you were); production use (Android process death) is a
-  deliberate policy switch on the same mechanism.
+### 9.3 Dropped along the way (deliberate)
 
-### 9.3 Intent serializability (decided)
-
-- `ISerializableIntent` is an **empty marker**; `Track(this, intent)` requires it at compile
-  time. The wire mechanism is an injectable `IIntentSerializer` (default: System.Text.Json
-  reflection; overridable with a source-gen `JsonSerializerContext` for trimming/NativeAOT).
-- Snapshot stores `{ typeId, payload }`; `typeId` is a **registered stable name**
-  (`WithRestore(r => r.AddIntent<T>("name"))`, name defaulting to the type's short name,
-  collision-checked) — never an assembly-qualified type name: renames only invalidate, never
-  deserialize the wrong thing.
-- The earlier `ICustomSerializableIntent` static-abstract escape hatch is DEFERRED (YAGNI):
-  replacing `IIntentSerializer` covers custom wire formats without a second interface.
+- `Track`/`Untrack`, `IsRestoring`, `RestoreCompleted`, `SetRestorePoint`, boot-destination
+  override (snapshot never overrides the startup destination anymore), `HasPendingRestore` +
+  `DiscardAsync` (merged into `TryStopRestoreAsync`), whole-stack drop-and-stop-listening
+  (not needed for now), the `ISerializableIntent` marker AND the `AddIntent<T>` registry
+  (serialize everything; full-name wire ids; `[JsonIgnore]` + `IIntentHydrator<T>` for
+  non-serializable intent state).
 
 ---
 
@@ -1216,7 +1228,12 @@ The Scaffold must own, with exact ordering:
 - **Exit (met)**: photo-grid→detail scenario shipping quality on both platforms, interruptible.
 
 ### P3 — restore, deep links, polish
-- Snapshot/restore per §9 (DEBUG DevEx first).
+
+> **Status (August 2026): snapshot/restore DONE** (§9 — engine-level, both platforms,
+> kill-and-relaunch verified). Remaining: deep links, iOS 18 zoom opportunism.
+
+- ✅ Snapshot/restore per §9 (DEBUG DevEx first; production is the same mechanism behind
+  `Enabled`/`MaxAge` policy).
 - Deep-link mapping layer (URI → `INavigationInfo`).
 - iOS 18 zoom-transition opportunism (optional), docs (docfx conceptual), migration guide from NaluShell.
 - **Exit**: docs published; TestApp/UITest coverage for every §5–§9 behavior.

@@ -16,6 +16,23 @@ internal class NavigationService : INavigationService, IDisposable
     private readonly TimeProvider _timeProvider;
     private readonly ICommand _backCommand;
     private IShellProxy? _shellProxy;
+    private NavigationRestoreService? _restoreService;
+    private bool _restoreServiceResolved;
+
+    /// <summary>The restore service, when registered (lazy — the two services reference each other).</summary>
+    private NavigationRestoreService? RestoreService
+    {
+        get
+        {
+            if (!_restoreServiceResolved)
+            {
+                _restoreServiceResolved = true;
+                _restoreService = ServiceProvider.GetService<NavigationRestoreService>();
+            }
+
+            return _restoreService;
+        }
+    }
 
     public IShellProxy ShellProxy => _shellProxy ?? throw new InvalidOperationException("You must use NaluShell to navigate with INavigationService.");
 
@@ -69,6 +86,14 @@ internal class NavigationService : INavigationService, IDisposable
     public async Task InitializeAsync(IShellProxy shellProxy, string contentSegmentName, object? intent)
     {
         _shellProxy = shellProxy;
+
+        // Navigation-state restore (when enabled): read-validate-delete the snapshot BEFORE
+        // booting — a valid one arms the pending replay and the suppression window. The boot
+        // still lands on the CONFIGURED initial destination (an app's initialization root
+        // always runs); the replay executes after its first appearing completes.
+        var restore = RestoreService;
+        restore?.OnEngineInitializing(shellProxy);
+
         _shellProxy.InitializeWithContent(contentSegmentName);
 
         var content = _shellProxy.GetContent(contentSegmentName);
@@ -88,7 +113,14 @@ internal class NavigationService : INavigationService, IDisposable
         await enteringTask.ConfigureAwait(true);
 #pragma warning restore VSTHRD002
 
+        restore?.OnRootEntered(page, intent);
+
         await NavigationHelper.SendAppearingAsync(ShellProxy, page, intent, Configuration).ConfigureAwait(true);
+
+        if (restore is not null)
+        {
+            await restore.ReplayPendingAsync().ConfigureAwait(true);
+        }
     }
 
     public async Task<bool> GoToAsync(INavigationInfo navigation)
@@ -100,8 +132,26 @@ internal class NavigationService : INavigationService, IDisposable
 
         var disposeBag = new HashSet<object>();
         var shellProxy = ShellProxy;
+        var restore = RestoreService;
 
-        return await ExecuteNavigationAsync(
+        if (restore is { ShouldIgnoreNavigation: true })
+        {
+            // A restore is pending or replaying: navigations not issued by the replay are
+            // ignored (deterministic replay). An initialization flow that must redirect
+            // elsewhere calls INavigationRestore.TryStopRestoreAsync() first.
+            var (requestedNavigation, targetState) = ComputeNavigationState(Configuration, navigation, shellProxy.State);
+
+            shellProxy.SendNavigationLifecycleEvent(
+                new NavigationLifecycleEventArgs(
+                    NavigationLifecycleEventType.NavigationIgnored,
+                    new NavigationLifecycleInfo(navigation, requestedNavigation, targetState, shellProxy.State)
+                )
+            );
+
+            return false;
+        }
+
+        var result = await ExecuteNavigationAsync(
                 navigation,
                 async initialState =>
                 {
@@ -182,6 +232,15 @@ internal class NavigationService : INavigationService, IDisposable
                 }
             )
             .ConfigureAwait(true);
+
+        if (result)
+        {
+            // Navigation-state restore capture: record the target's entering intent and
+            // re-snapshot the (now committed) stack.
+            restore?.OnNavigationCompleted(navigation);
+        }
+
+        return result;
     }
 
     internal Page CreatePage(Type pageType, Page? parentPage)
