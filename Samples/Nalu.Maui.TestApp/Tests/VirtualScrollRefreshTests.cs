@@ -81,19 +81,30 @@ public class VirtualScrollRefreshTests : ContentPage
                                  MakeButton("Read native", "ReadNativeStateButton", ReadNativeState),
                                  _commandCountLabel,
                                  _eventCountLabel,
-                                 isRefreshingLabel,
-                                 _nativeStateLabel
+                                 isRefreshingLabel
                              };
         controlsLayout.HorizontalSpacing = 8;
         controlsLayout.VerticalSpacing = 8;
         controlsLayout.Padding = new Thickness(16, 8);
 
+        // The native-state label lives in a row of its OWN, at a fixed height: inside the wrap
+        // layout its text ("-" → "attached:True refreshing:True") re-flows onto another line and
+        // pushes the list down by a line — which the geometry assertions read as the refresh
+        // control failing to retract.
+        var nativeStateRow = new ContentView { Content = _nativeStateLabel, HeightRequest = 22, Padding = new Thickness(16, 0) };
+
         var grid = new Grid
                    {
-                       RowDefinitions = [new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Star)],
+                       RowDefinitions =
+                       [
+                           new RowDefinition(GridLength.Auto),
+                           new RowDefinition(GridLength.Auto),
+                           new RowDefinition(GridLength.Star)
+                       ]
                    };
         grid.Add(controlsLayout);
-        grid.Add(_virtualScroll, 0, 1);
+        grid.Add(nativeStateRow, 0, 1);
+        grid.Add(_virtualScroll, 0, 2);
 
         Content = grid;
     }
