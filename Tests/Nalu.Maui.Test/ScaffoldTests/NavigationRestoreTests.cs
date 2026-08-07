@@ -565,6 +565,54 @@ public class NavigationRestoreTests
         second.TabBar.CurrentRoot.Should().Be(second.SearchRoot);
     }
 
+    [Fact(DisplayName = "Suppression stays armed through intermediate replay steps and lifts before the final one")]
+    public async Task SuppressionLiftsBeforeTheFinalReplayNavigation()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store))
+        {
+            await first.BootAsync();
+
+            // Two chunks: [Detail(intent)] then [DeepDetail] — Detail is an INTERMEDIATE
+            // replay step, DeepDetail is the FINAL restored destination.
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().WithIntent(new DetailIntent("ctx")));
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>());
+            await first.Restore.FlushAsync();
+        }
+
+        using var second = new Harness(store);
+        bool? suppressedDuringIntermediate = null;
+        bool? suppressedDuringFinal = null;
+
+        second.Scaffold.NavigationEvent += (_, e) =>
+        {
+            if (e.EventType != NavigationLifecycleEventType.Entering)
+            {
+                return;
+            }
+
+            switch (e.Target)
+            {
+                case IDetailPageModel:
+                    suppressedDuringIntermediate = second.Restore.IsSuppressionActive;
+
+                    break;
+
+                case IDeepDetailPageModel:
+                    suppressedDuringFinal = second.Restore.IsSuppressionActive;
+
+                    break;
+            }
+        };
+
+        await second.BootAsync();
+
+        second.HomeStack.Should().HaveCount(2);
+        suppressedDuringIntermediate.Should().BeTrue("intermediate restored pages' dispatched auto-navigations must drain inside the window");
+        suppressedDuringFinal.Should().BeFalse("the LAST restored destination keeps its right to auto-navigate");
+    }
+
     [Fact(DisplayName = "TryStopRestoreAsync returns false when nothing is pending")]
     public async Task TryStopRestoreReturnsFalseWhenNothingIsPending()
     {

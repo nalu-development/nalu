@@ -57,6 +57,9 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     /// <summary>A validated snapshot is pending or replaying: non-replay navigations are ignored.</summary>
     internal bool ShouldIgnoreNavigation => _suppressNavigations && !_isReplayNavigation.Value;
 
+    /// <summary>Test seam: whether the suppression window is currently armed (regardless of the replay flow).</summary>
+    internal bool IsSuppressionActive => _suppressNavigations;
+
     private NavigationService NavigationService => _navigationService ??= (NavigationService) _serviceProvider.GetRequiredService<INavigationService>();
 
     private IIntentSerializer IntentSerializer => _intentSerializer ??= _serviceProvider.GetRequiredService<IIntentSerializer>();
@@ -301,6 +304,16 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     /// pipeline. Runs through the regular navigation service: animations and lifecycle are
     /// the live ones.
     /// </summary>
+    /// <remarks>
+    /// Every replay navigation is enqueued through the DISPATCHER: an auto-navigation a
+    /// restored page fires from its lifecycle (the prescribed <c>DispatchAsync</c> pattern)
+    /// is enqueued while our navigation is still executing, so it always drains BEFORE our
+    /// next replay step — deterministically inside the suppression window, deterministically
+    /// ignored. The suppression window is lifted just before the LAST replay navigation (the
+    /// only way to beat the queue: that page's dispatched auto-navigation is already ahead of
+    /// any continuation of ours), so the page the user actually was on keeps its right to
+    /// auto-navigate.
+    /// </remarks>
     internal async Task ReplayPendingAsync()
     {
         if (_pendingBoot is not { } boot)
@@ -312,30 +325,22 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
         try
         {
-            _isReplayNavigation.Value = true;
-
             // Root selection first: count==1 delivers the root intent to the root content.
             var rootNavigation = new AbsoluteNavigation();
             ((IList<INavigationSegment>) rootNavigation).Add(new NavigationSegment { SegmentName = boot.RootSegment, Type = boot.RootPageType });
 
             if (boot.RootIntent is not null)
             {
-                await HydrateIntentAsync(boot.RootIntent).ConfigureAwait(true);
                 ((IAbsoluteNavigationBuilder) rootNavigation).WithIntent(boot.RootIntent);
             }
 
-            if (!await NavigationService.GoToAsync(rootNavigation).ConfigureAwait(true))
+            var navigations = new List<(INavigationInfo Navigation, object? Intent)>
             {
-                return;
-            }
+                (rootNavigation, boot.RootIntent)
+            };
 
             foreach (var (chunkFrames, chunkIntent) in ChunkFrames(boot.Frames))
             {
-                if (_stopRequested)
-                {
-                    return;
-                }
-
                 var navigation = new RelativeNavigation();
                 IList<INavigationSegment> segments = navigation;
 
@@ -352,11 +357,35 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
                 if (chunkIntent is not null)
                 {
-                    await HydrateIntentAsync(chunkIntent).ConfigureAwait(true);
                     navigation.WithIntent(chunkIntent);
                 }
 
-                if (!await NavigationService.GoToAsync(navigation).ConfigureAwait(true))
+                navigations.Add((navigation, chunkIntent));
+            }
+
+            if (GetCurrentStack() is not { Count: > 0 } bootStack)
+            {
+                return;
+            }
+
+            var dispatcher = bootStack[0].Page.Dispatcher;
+
+            for (var i = 0; i < navigations.Count; i++)
+            {
+                if (_stopRequested)
+                {
+                    return;
+                }
+
+                if (i == navigations.Count - 1)
+                {
+                    // The LAST restored destination may auto-navigate: lift the window BEFORE
+                    // its navigation so its dispatched redirect (already ahead of any
+                    // continuation of ours in the queue) finds it open.
+                    _suppressNavigations = false;
+                }
+
+                if (!await DispatchReplayNavigationAsync(dispatcher, navigations[i].Navigation, navigations[i].Intent).ConfigureAwait(true))
                 {
                     // Canceled/failed guard-free push should not happen; keep what landed.
                     return;
@@ -369,7 +398,6 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
         }
         finally
         {
-            _isReplayNavigation.Value = false;
             _suppressNavigations = false;
 
             // Re-persist immediately (not debounced): the snapshot was DELETED at boot, so
@@ -377,6 +405,32 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
             await SwallowedFlushAsync().ConfigureAwait(true);
         }
     }
+
+    /// <summary>
+    /// Enqueues one replay navigation behind whatever the previously-restored pages already
+    /// dispatched; the replay-bypass flag is set INSIDE the dispatched flow (AsyncLocal — it
+    /// must not leak onto interleaving auto-navigations).
+    /// </summary>
+    private Task<bool> DispatchReplayNavigationAsync(IDispatcher dispatcher, INavigationInfo navigation, object? intent)
+        => dispatcher.DispatchAsync(async () =>
+            {
+                _isReplayNavigation.Value = true;
+
+                try
+                {
+                    if (intent is not null)
+                    {
+                        await HydrateIntentAsync(intent).ConfigureAwait(true);
+                    }
+
+                    return await NavigationService.GoToAsync(navigation).ConfigureAwait(true);
+                }
+                finally
+                {
+                    _isReplayNavigation.Value = false;
+                }
+            }
+        );
 
     /// <summary>
     /// Rehydrates a restored intent's <c>[JsonIgnore]</c> state before navigating with it:

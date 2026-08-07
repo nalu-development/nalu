@@ -1095,9 +1095,14 @@ recording (`maui_recording_start`) for side-by-side comparison.
   boot). Known edge (documented): a captured root intent is NOT redelivered when the
   captured root IS the configured initial root (already entered with the app's own intent).
 - **Suppression window** (validated-snapshot → replay end): non-replay `GoToAsync` calls are
-  IGNORED — `false` + `NavigationIgnored` lifecycle event — so an init root's habitual
-  "navigate onward" cannot race the replay (replay navigations bypass via an AsyncLocal
-  flag). `TryStopRestoreAsync` is the deliberate way out (auth flows).
+  IGNORED — `false` + `NavigationIgnored` lifecycle event (replay navigations bypass via an
+  AsyncLocal flag set INSIDE the dispatched flow). Each replay step is enqueued via
+  `DispatchAsync`, so auto-navigations dispatched by restored pages' lifecycles drain BEFORE
+  the next replay step — deterministically suppressed, not raced; the window lifts just
+  BEFORE the LAST replay navigation, so the final restored destination keeps its right to
+  auto-navigate (queue order makes lifting after impossible: its dispatched redirect is
+  already ahead of any continuation of ours). `TryStopRestoreAsync` is the deliberate way
+  out (auth flows).
 - **Validation header**: schema version + app version/build (AppInfo, test-hookable) + SHA256
   route hash (ordered root segments from the proxy tree + registered page segments — Mapping
   values AND view-only registrations via `NavigationConfigurator.ViewOnlyPages`, a gap found

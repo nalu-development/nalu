@@ -84,10 +84,13 @@ public interface INavigationRestoreStore
 /// <para>
 /// Replay happens at engine startup, AFTER the configured initial page's first
 /// <c>OnAppearingAsync</c> completes — an app's initialization root always runs first. While
-/// a restore is pending (from validation at boot until the replay completes), navigations not
-/// issued by the replay are ignored (returning <c>false</c> and raising the
-/// <c>NavigationIgnored</c> lifecycle event); an initialization flow that must redirect
-/// elsewhere (e.g. authentication) calls <see cref="TryStopRestoreAsync"/> first.
+/// a restore is pending, navigations not issued by the replay are ignored (returning
+/// <c>false</c> and raising the <c>NavigationIgnored</c> lifecycle event): each replay step
+/// is enqueued through the dispatcher, so auto-navigations dispatched by intermediate
+/// restored pages deterministically drain inside the suppression window. The window lifts
+/// just before the LAST restored destination — the page the user actually was on keeps its
+/// right to auto-navigate. An initialization flow that must redirect elsewhere
+/// (e.g. authentication) calls <see cref="TryStopRestoreAsync"/> first.
 /// </para>
 /// <para>
 /// The service is always injectable and INERT when restore is not enabled — shared and

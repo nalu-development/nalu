@@ -130,10 +130,12 @@ brick startup. It also runs **once per app launch** — a host created later in 
 
 ### The suppression window and `TryStopRestoreAsync`
 
-From "snapshot validated at boot" until "replay completed", navigations **not issued by the
-replay are ignored** (they return `false` and raise the `NavigationIgnored` lifecycle event):
-the replay is deterministic, and an initialization root's habitual "navigate onward" does not
-race it.
+While a restore is pending, navigations **not issued by the replay are ignored** (they
+return `false` and raise the `NavigationIgnored` lifecycle event). This is deterministic, not
+a race: each replay step is enqueued through the dispatcher, so an auto-navigation a restored
+page fires from its lifecycle (the usual `DispatchAsync` pattern) always drains *before* the
+next replay step — inside the window. The window lifts just before the **last** restored
+destination, so the page the user actually was on keeps its right to auto-navigate.
 
 The escape hatch is for flows that must legitimately win — authentication above all:
 
