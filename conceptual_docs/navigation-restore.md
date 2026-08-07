@@ -114,7 +114,7 @@ Both per-page methods persist the updated snapshot before their task completes.
 
 1. The snapshot is read **and deleted** (a replay that crashes yields a clean next boot),
    then validated: schema version, app version/build, a hash of the restorable route table
-   (roots, registered pages, intent ids), and `MaxAge`. Any mismatch discards it.
+   (roots and registered pages), and `MaxAge`. Any mismatch discards it.
 2. The engine boots **your configured initial destination as normal** — an app's
    initialization root always runs first, doing whatever essential work it does.
 3. When the initial page's first `OnAppearingAsync` completes, the replay executes: one
@@ -123,8 +123,9 @@ Both per-page methods persist the updated snapshot before their task completes.
    pipeline. Animations, lifecycle and intent delivery are exactly the live ones.
 4. The snapshot is re-persisted (capture is automatic, so the replay itself re-recorded it).
 
-Everything is **fail-open**: an unknown page or intent id truncates the restored stack at that
-frame; any error discards the snapshot and boots the default destination. Restore can never
+Everything is **fail-open**: an unknown page segment or an unresolvable intent type truncates
+the restored stack at that frame; any error discards the snapshot and boots the default
+destination. Restore can never
 brick startup. It also runs **once per app launch** — a host created later in the same process
 (logout/login swap) boots normally.
 
