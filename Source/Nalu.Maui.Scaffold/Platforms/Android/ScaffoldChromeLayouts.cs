@@ -103,14 +103,70 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
             return base.DispatchApplyWindowInsets(insets);
         }
 
-        // Frozen: keep the raw insets for the replay (ApplyInsetsTo) but let nothing reach the
-        // pages while they are in motion.
-        if (insets is not null)
+        // Mid-transition the pages are TRANSFORMED, and MAUI derives a page's safe-area padding
+        // from its on-screen position: a dispatch landing now would pad each page for where it
+        // momentarily sits, and that padding survives at rest. Rather than swallow the dispatch —
+        // which leaves a page mounted mid-transition laid out against stale insets until the
+        // transition ends, so its content visibly JUMPS into place — the transforms are parked at
+        // rest for the length of the dispatch. It is synchronous, so no frame is drawn in
+        // between: the pages keep moving, and they are padded for where they will LAND.
+        var parked = ParkTransforms();
+
+        try
         {
-            _lastRawInsets = WindowInsetsCompat.ToWindowInsetsCompat(insets, this);
+            return base.DispatchApplyWindowInsets(insets);
+        }
+        finally
+        {
+            foreach (var (view, translationX, translationY, scaleX, scaleY, alpha) in parked)
+            {
+                view.TranslationX = translationX;
+                view.TranslationY = translationY;
+                view.ScaleX = scaleX;
+                view.ScaleY = scaleY;
+                view.Alpha = alpha;
+            }
+        }
+    }
+
+    /// <summary>Resets every hosted page to its resting geometry, returning what to restore.</summary>
+    private List<(AView View, float TranslationX, float TranslationY, float ScaleX, float ScaleY, float Alpha)> ParkTransforms()
+    {
+        var parked = new List<(AView, float, float, float, float, float)>();
+
+        void Park(AView? view)
+        {
+            if (view is null)
+            {
+                return;
+            }
+
+            parked.Add((view, view.TranslationX, view.TranslationY, view.ScaleX, view.ScaleY, view.Alpha));
+            view.TranslationX = 0f;
+            view.TranslationY = 0f;
+            view.ScaleX = 1f;
+            view.ScaleY = 1f;
+            view.Alpha = 1f;
         }
 
-        return insets;
+        for (var i = 0; i < ChildCount; i++)
+        {
+            var layerChild = GetChildAt(i);
+
+            // A peek (predictive back) is a page view directly in the layer; pages otherwise sit
+            // one level down, inside the fragment container.
+            Park(layerChild);
+
+            if (layerChild is ViewGroup hosts)
+            {
+                for (var j = 0; j < hosts.ChildCount; j++)
+                {
+                    Park(hosts.GetChildAt(j));
+                }
+            }
+        }
+
+        return parked;
     }
 
     // Intercepting mid-gesture cancels whatever a page had started (children get ACTION_CANCEL);

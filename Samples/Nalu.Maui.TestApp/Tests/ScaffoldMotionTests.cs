@@ -14,11 +14,20 @@ public partial class MoRootPageModel(INavigationService navigationService) : Obs
 
     /// <summary>Selects a root in ANOTHER area — the switch that cross-fades.</summary>
     public Task GoFar() => navigationService.GoToAsync(Navigation.Absolute().Root<MoFarPageModel>());
+
+    /// <summary>Pushes a page that keeps its nav bar — the one whose INSETS are under test.</summary>
+    public Task PushInset() => navigationService.GoToAsync(Navigation.Relative().Push<MoInsetPageModel>());
 }
 
 /// <summary>Model-less pages are not registered by AddPages(): the second tab root needs one.</summary>
 [UsedImplicitly]
 public partial class MoSecondPageModel : ObservableObject;
+
+[UsedImplicitly]
+public partial class MoInsetPageModel(INavigationService navigationService) : ObservableObject
+{
+    public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
+}
 
 [UsedImplicitly]
 public partial class MoFarPageModel(INavigationService navigationService) : ObservableObject
@@ -54,12 +63,18 @@ public abstract class MoPageBase : ContentPage
     public static readonly Color DetailColor = Color.FromRgb(0, 0, 200);
 
     protected MoPageBase(Color background, string label, params View[] controls)
+        : this(background, label, navBar: false, controls)
+    {
+    }
+
+    protected MoPageBase(Color background, string label, bool navBar, params View[] controls)
     {
         BackgroundColor = background;
 
-        // No chrome: the whole window belongs to the page, so window-relative sampling needs no
-        // correction for a nav bar strip.
-        Scaffold.SetIsNavBarVisible(this, false);
+        // No chrome by default: the whole window belongs to the page, so window-relative sampling
+        // needs no correction for a nav bar strip. MoInsetPage opts back in — its whole point is
+        // that a page mounted DURING a transition is padded for the chrome from its first frame.
+        Scaffold.SetIsNavBarVisible(this, navBar);
 
         var stack = new VerticalStackLayout { Spacing = 12, Padding = 16 };
         stack.Add(new Label { Text = label, AutomationId = label, FontSize = 22, TextColor = Colors.White });
@@ -137,6 +152,7 @@ public class MoRootPage : MoPageBase
             NavPageFactory.MakeButton("Push custom", "PushMoCustom", model.PushCustom),
             NavPageFactory.MakeButton("Push shared", "PushMoShared", model.PushShared),
             NavPageFactory.MakeButton("Go far", "MoAreaFarSelector", model.GoFar),
+            NavPageFactory.MakeButton("Push inset", "PushMoInset", model.PushInset),
             MakeHero("MoRootHero", Colors.Orange, 80)
         )
         => BindingContext = model;
@@ -214,6 +230,30 @@ public class MoSharedPage : MoPageBase
             NavPageFactory.MakeButton("Pop", "PopMoShared", model.Pop),
             MakeHero("MoSharedHero", Colors.Orange, 200)
         )
+    {
+        BindingContext = model;
+
+        Scaffold.SetPageTransition(
+            this,
+            new ScaffoldPageTransition(
+                new ScaffoldTransitionMotion(FractionX: 1),
+                new ScaffoldTransitionMotion(),
+                MoDetailPage.TransitionSeconds
+            )
+        );
+    }
+}
+
+/// <summary>
+/// Pushed page that KEEPS its nav bar, on the same slow spec. A page mounted while a transition
+/// plays must be laid out for the chrome it will land under from its very first frame: laid out
+/// against stale insets it sits too high and snaps down when the transition ends.
+/// </summary>
+[UsedImplicitly]
+public class MoInsetPage : MoPageBase
+{
+    public MoInsetPage(MoInsetPageModel model)
+        : base(Color.FromRgb(60, 60, 60), "MoInsetPage", navBar: true, NavPageFactory.MakeButton("Pop", "PopMoInset", model.Pop))
     {
         BindingContext = model;
 

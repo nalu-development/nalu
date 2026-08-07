@@ -357,6 +357,42 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     }
 
     [Fact]
+    public async Task PageMountedDuringATransitionIsPaddedForItsChromeFromTheFirstFrame()
+    {
+        await App.WaitForElementAsync("MoRootPage");
+
+        // This page keeps its nav bar, so its content sits BELOW the strip once settled.
+        await App.TapAsync("PushMoInset");
+        await App.WaitForElementAsync("MoInsetPage");
+
+        // Sampled WHILE it travels: the label's window position must already be the one it will
+        // hold at rest. Laid out against stale insets it starts higher and snaps down when the
+        // transition ends — a jump the end-state suites cannot see (MAUI derives a page's
+        // safe-area padding from its ON-SCREEN position, which a page mid-slide has not reached).
+        var during = new List<double>();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(MotionSeconds * 0.8);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            during.Add((await App.GetBoundsAsync("MoInsetPage")).Y);
+        }
+
+        await WaitForPageColorAsync(new Color(60, 60, 60), "the pushed page settles");
+        var settled = (await App.WaitForStableBoundsAsync("MoInsetPage")).Y;
+
+        settled.Should().BeGreaterThan(0, "the page is laid out under its nav bar");
+
+        during.Should()
+              .OnlyContain(
+                  y => Math.Abs(y - settled) <= 1,
+                  $"the page is padded for where it LANDS from its first frame (settled at {settled}, sampled {string.Join(",", during)})"
+              );
+
+        await App.TapAsync("PopMoInset");
+        await App.WaitForElementGoneAsync("MoInsetPage");
+    }
+
+    [Fact]
     public async Task PushAndPopSettleAtTheirNaturalGeometry()
     {
         await App.WaitForElementAsync("MoRootPage");
