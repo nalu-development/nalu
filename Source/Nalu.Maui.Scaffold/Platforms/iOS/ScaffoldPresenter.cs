@@ -488,10 +488,28 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 break;
             }
 
+            case ScaffoldPresentationHint.Fade:
+            {
+                // Cross-area root switch: no strip to travel along, so the outgoing content
+                // fades out ON TOP of the new one (a symmetric double fade would show the
+                // window through both of them at the midpoint).
+                container.AddSubview(newView);
+                newController.DidMoveToParentViewController(parentController);
+
+                if (previousController?.View is { } fadingView)
+                {
+                    container.BringSubviewToFront(fadingView);
+
+                    await UIView.AnimateAsync(_transitionDurationSeconds, () => fadingView.Alpha = 0);
+                }
+
+                break;
+            }
+
             case ScaffoldPresentationHint.SlideStart or ScaffoldPresentationHint.SlideEnd:
             {
-                // Tab/root switch: both pages slide together in the direction of travel.
-                // Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
+                // Tab/root switch within an area: both pages slide together in the direction of
+                // travel. Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
                 var fromX = hint == ScaffoldPresentationHint.SlideEnd ? width : -width;
 
                 container.AddSubview(newView);

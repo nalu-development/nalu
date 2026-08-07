@@ -279,9 +279,9 @@ public class ScaffoldProxyTests
         _presenter.Syncs.Should().NotBeEmpty();
         _presenter.Syncs[^1].Root.Should().Be(settingsArea.CurrentRoot);
 
-        // Root switches slide in the direction of travel: Settings sits AFTER the tab bar's
-        // roots in the structure, so the new content enters from the end edge.
-        _presenter.Syncs[^1].Hint.Should().Be(ScaffoldPresentationHint.SlideEnd);
+        // Settings lives in ANOTHER area: the two roots share no strip to travel along, so the
+        // switch cross-fades instead of sliding.
+        _presenter.Syncs[^1].Hint.Should().Be(ScaffoldPresentationHint.Fade);
         _scaffold.Proxy!.Location.Should().Be("//area1/SettingsPage");
     }
 

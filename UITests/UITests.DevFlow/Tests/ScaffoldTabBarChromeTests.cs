@@ -37,7 +37,10 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
             try
             {
-                await App.WaitForBoundsAsync(pageMarkerAutomationId, b => b.Y > 0, TimeSpan.FromSeconds(2));
+                // Settled display, not a single sample: the page being switched AWAY from is
+                // still on screen for the length of its motion, so an ignored selection would
+                // otherwise read as a successful one and never be retried.
+                await App.WaitForSettledDisplayAsync(pageMarkerAutomationId, TimeSpan.FromSeconds(2));
 
                 return;
             }

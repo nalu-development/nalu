@@ -443,7 +443,7 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
 
         _location = model.PushedPages.Count > 0 ? model.PushedPages[^1].Route : targetRoot.BaseRoute;
 
-        var hint = rootChanged ? ComputeSlideHint(previousRoot, targetRoot)
+        var hint = rootChanged ? ComputeRootSwitchHint(previousRoot, targetRoot)
             : pendingPushes.Count > 0 ? ScaffoldPresentationHint.Push
             : popCount > 0 ? ScaffoldPresentationHint.Pop
             : ScaffoldPresentationHint.None;
@@ -565,14 +565,21 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
             : throw new KeyNotFoundException($"No ScaffoldRoot found for segment '{segmentName}'.");
 
     /// <summary>
-    /// Direction of a root/area switch: toward a higher structure ordinal ⇒ the new content
-    /// slides in from the end edge, toward a lower one ⇒ from the start edge.
+    /// Motion of a root switch: WITHIN an area the roots are neighbours on the same strip, so
+    /// the switch travels — toward a higher structure ordinal ⇒ the new content slides in from
+    /// the end edge, toward a lower one ⇒ from the start edge. ACROSS areas there is no shared
+    /// strip to travel along: the switch cross-fades instead.
     /// </summary>
-    private ScaffoldPresentationHint ComputeSlideHint(ScaffoldRootProxy previousRoot, ScaffoldRootProxy targetRoot)
+    private ScaffoldPresentationHint ComputeRootSwitchHint(ScaffoldRootProxy previousRoot, ScaffoldRootProxy targetRoot)
     {
         if (ReferenceEquals(previousRoot, targetRoot))
         {
             return ScaffoldPresentationHint.None;
+        }
+
+        if (!ReferenceEquals(previousRoot.Area, targetRoot.Area))
+        {
+            return ScaffoldPresentationHint.Fade;
         }
 
         var previousOrdinal = GetStructureOrdinal(previousRoot);

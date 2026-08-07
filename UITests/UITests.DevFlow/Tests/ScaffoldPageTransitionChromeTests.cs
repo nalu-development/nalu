@@ -34,6 +34,13 @@ public class ScaffoldPageTransitionChromeTests(NaluApp app) : BaseUiTest(app), I
         var pushed = await App.WaitForStableBoundsAsync("PtSlideUpPage");
         pushed.X.Should().BeApproximately(rootLabel.X, 1, "the entered page settles unscaled at its natural position");
 
+        // ...INCLUDING its safe area. A page whose enter motion translates it VERTICALLY used to
+        // land short: an insets dispatch arriving mid-slide (the nav bar strip re-dispatches at
+        // the end of its own animation) had MAUI recompute the page's safe-area padding from
+        // where the page momentarily sat, and the shortfall survived at rest — the heading ended
+        // up under the nav bar. Same content at the same offset as the root page ⇒ same Y.
+        pushed.Y.Should().BeApproximately(rootLabel.Y, 1, "the entered page is padded for where it LANDS, not for where it was mid-flight");
+
         await App.TapAsync("PopPtSlideUp");
         await WaitDisplayedAsync("PtRootPage");
 

@@ -626,6 +626,53 @@ public sealed class NaluApp : IAsyncLifetime
     /// <summary>Captures a PNG screenshot (useful when diagnosing failing tests).</summary>
     public Task<byte[]?> ScreenshotAsync() => _client.ScreenshotAsync();
 
+    /// <summary>
+    /// Samples several points of ONE screenshot, addressed as fractions (0..1) of the window —
+    /// the only way to observe a page while it MOVES: the visual tree reports layout geometry,
+    /// which a platform transform (a sliding page) never changes.
+    /// One capture per call on purpose: points sampled from the same frame are comparable, points
+    /// sampled from separate captures are not (the animation advances between them).
+    /// </summary>
+    public async Task<IReadOnlyList<(byte R, byte G, byte B)>> SampleWindowPixelsAsync(params (double X, double Y)[] points)
+    {
+        var png = await _client.ScreenshotAsync().ConfigureAwait(false)
+                  ?? throw new InvalidOperationException("Screenshot capture failed.");
+
+        using var bitmap = SKBitmap.Decode(png)
+                           ?? throw new InvalidOperationException("Could not decode the screenshot PNG.");
+
+        var samples = new (byte R, byte G, byte B)[points.Length];
+
+        for (var i = 0; i < points.Length; i++)
+        {
+            var pixelX = Math.Clamp((int) Math.Round(points[i].X * (bitmap.Width - 1)), 0, bitmap.Width - 1);
+            var pixelY = Math.Clamp((int) Math.Round(points[i].Y * (bitmap.Height - 1)), 0, bitmap.Height - 1);
+            var color = bitmap.GetPixel(pixelX, pixelY);
+            samples[i] = (color.Red, color.Green, color.Blue);
+        }
+
+        return samples;
+    }
+
+    /// <summary>
+    /// Waits until the element is DISPLAYED and still is once a page transition would have
+    /// finished — the honest question to ask after a navigation tap.
+    /// A page that is LEAVING stays on screen for the whole of its motion (both platforms hold it
+    /// there; Android used to tear it down at commit, which is what made a single sample look
+    /// reliable), so "is the target displayed?" asked immediately can be answered by the page
+    /// being navigated AWAY from — and a navigation that was silently dropped for arriving mid
+    /// transition then reads as successful.
+    /// </summary>
+    public async Task WaitForSettledDisplayAsync(string automationId, TimeSpan? timeout = null)
+    {
+        await WaitForBoundsAsync(automationId, b => b.Y > 0, timeout).ConfigureAwait(false);
+
+        // Longer than any stock transition: what is still displayed after this is presented.
+        await Task.Delay(400).ConfigureAwait(false);
+
+        await WaitForBoundsAsync(automationId, b => b.Y > 0, TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+    }
+
     /// <summary>Gets the window-space bounds of an element (device-independent units).</summary>
     public async Task<ElementBounds> GetBoundsAsync(string automationId, TimeSpan? timeout = null)
     {

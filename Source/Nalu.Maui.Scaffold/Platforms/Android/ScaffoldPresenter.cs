@@ -39,7 +39,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private ScaffoldArea? _observedNavBarArea;
     private bool _scaffoldObserved;
     private int _lastNavStripHeight;
-    private bool _navBarPresented;
     private Android.Animation.ObjectAnimator? _navStripAnimator;
 
     /// <summary>One presented §5.6 overlay entry: scrim + content, stacked in open order.</summary>
@@ -62,6 +61,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private Page? _backBelowPage;
     private bool _backPreviewActive;
     private Page? _predictiveHandoffPage;
+    private LeavingPage? _leavingPage;
 
     public bool HasOverlay => _overlays.Count > 0;
 
@@ -189,7 +189,49 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 };
 
             var previousFragment = _currentFragment;
-            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, pageTransition);
+            var previousView = previousFragment?.View;
+
+            // What the OUTGOING page does while the incoming one arrives — null when it simply
+            // goes away (no previous page, an unanimated swap, or a predictive-back preview that
+            // already moved it offscreen). Note that an IDENTITY motion is not nothing: a push
+            // leaves the covered page exactly where it is, and it must stay VISIBLE there.
+            var leavingMotion = previousView is null || predictivelySettled || !pageTransition.IsAnimated
+                ? null
+                : hint switch
+                {
+                    // The covered page plays the incoming spec's Behind motion (identity by
+                    // default: it stays at rest under the page sliding over it).
+                    ScaffoldPresentationHint.Push => (ScaffoldTransitionMotion?)pageTransition.Behind,
+
+                    // The popped page replays its OWN Enter motion in reverse.
+                    ScaffoldPresentationHint.Pop => pageTransition.Enter,
+
+                    // Root switch within an area: both pages travel together, same direction.
+                    ScaffoldPresentationHint.SlideStart => new ScaffoldTransitionMotion(FractionX: 1),
+                    ScaffoldPresentationHint.SlideEnd => new ScaffoldTransitionMotion(FractionX: -1),
+
+                    // Cross-area switch: the outgoing root fades out over the new one (a
+                    // symmetric double fade would show the window through both at the midpoint).
+                    ScaffoldPresentationHint.Fade => new ScaffoldTransitionMotion(Opacity: 0),
+                    _ => null
+                };
+
+            // Motions that play ABOVE the incoming page. Safe even with shared elements: their
+            // flights live in the container's OVERLAY, which the framework draws after every
+            // child (View.draw runs it past dispatchDraw, outside the enableZ/disableZ span),
+            // so an elevated page cannot cover them.
+            var leavingLeads = hint is ScaffoldPresentationHint.Pop or ScaffoldPresentationHint.Fade;
+
+            // A settled predictive-back preview already placed the revealed page at rest: the
+            // incoming fragment must not replay the reveal motion on top of it.
+            var enterTransition = predictivelySettled ? ScaffoldPageTransition.None : pageTransition;
+            var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, enterTransition);
+
+            // The page must see the chrome-rewritten insets (nav bar / tab bar footprints) before
+            // its first layout: the window dispatches insets only when they CHANGE, so a page
+            // mounted in between lays out against the raw system bars and slides its content
+            // under the nav bar strip.
+            fragment.OnViewMounted = _pageLayer!.ApplyInsetsTo;
             _currentFragment = fragment;
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
@@ -228,20 +270,55 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 }
             }
 
-            // The CURRENT navigation decides how the outgoing page leaves (a pop replays the
-            // spec's Enter motion reversed; a push plays the incoming spec's Behind motion). A
-            // settled predictive-back preview already moved it offscreen — no exit animation.
-            previousFragment?.PrepareRemoval(predictivelySettled ? ScaffoldPresentationHint.None : hint, pageTransition);
+            // At most one page leaves at a time: a navigation landing mid-motion unmounts the
+            // previous one instantly (its page is already out of the model).
+            FinishLeavingPage();
 
-            transaction
-                .Replace(container.Id, fragment)
-                .CommitAllowingStateLoss();
+            // A page that has to stay on screen while it leaves keeps its fragment ADDED: a
+            // Replace destroys the outgoing view the instant the transaction executes — the
+            // fragment machinery removes a REMOVED operation's view from whatever parent it
+            // has (SpecialEffectsController.Operation.State), so neither a fragment exit
+            // animation (drawn UNDER the entering page by FragmentContainerView) nor hoisting
+            // the view elsewhere can hold it. It is removed by StartLeavingPageAsync instead,
+            // once its motion ends.
+            if (leavingMotion is not null)
+            {
+                transaction.Add(container.Id, fragment);
+            }
+            else
+            {
+                transaction.Replace(container.Id, fragment);
+            }
 
+            transaction.CommitAllowingStateLoss();
 
-            // Deterministic completion: presentation of the new page plus dismissal animation of
-            // the previous one, with a settle timeout as a safety net.
-            var settled = Task.WhenAll(fragment.PresentedTask, previousFragment?.DismissedTask ?? Task.CompletedTask);
-            await Task.WhenAny(settled, Task.Delay(_settleTimeoutMs)).ConfigureAwait(true);
+            // Pages in motion take no input (restored in the finally even if the settle times
+            // out — a layer stuck deaf would be far worse than a stray tap).
+            var pageLayer = _pageLayer;
+
+            if (pageLayer is not null)
+            {
+                pageLayer.TransitionInFlight = animated;
+            }
+
+            try
+            {
+                var leavingTask = leavingMotion is null
+                    ? Task.CompletedTask
+                    : StartLeavingPageAsync(activity, previousFragment!, previousPage!, previousView!, leavingMotion, leavingLeads, pageTransition);
+
+                // Deterministic completion: presentation of the new page plus the outgoing page's
+                // motion, with a settle timeout as a safety net.
+                var settled = Task.WhenAll(fragment.PresentedTask, leavingTask);
+                await Task.WhenAny(settled, Task.Delay(_settleTimeoutMs)).ConfigureAwait(true);
+            }
+            finally
+            {
+                if (pageLayer is not null)
+                {
+                    pageLayer.TransitionInFlight = false;
+                }
+            }
         }
 
         await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
@@ -410,6 +487,149 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         _backBelowPage = null;
     }
 
+    /// <summary>A page still mounted in the fragment container while it plays its leaving motion.</summary>
+    private sealed class LeavingPage
+    {
+        public required ScaffoldPageFragment Fragment { get; init; }
+        public required Page Page { get; init; }
+        public required FragmentManager FragmentManager { get; init; }
+        public required AView View { get; init; }
+        public required ImportantForAccessibility Accessibility { get; init; }
+        public required Android.Animation.ObjectAnimator Animator { get; init; }
+        public TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <summary>
+    /// Plays the OUTGOING page's motion IN PLACE — its fragment is still added, so its view is
+    /// still a plain child of the container — and unmounts it when the motion ends.
+    /// The fragment's own exit animations cannot serve here:
+    /// <see cref="FragmentContainerView"/> deliberately draws exiting fragment views BELOW the
+    /// entering one (a popped page would slide away hidden underneath the very page it reveals),
+    /// and the fragment machinery removes a REMOVED operation's view from whatever parent it has
+    /// — so a page with no exit animation blanks out the instant the transaction executes
+    /// (flashing the window background through a push) and hoisting the view into another layer
+    /// does not save it either.
+    /// <paramref name="leads"/> raises the page above the incoming one for the motions that must
+    /// play on top (pop, cross-area fade): translationZ rather than child order, because the
+    /// incoming view is appended to the container a frame from now.
+    /// </summary>
+    private Task StartLeavingPageAsync(
+        AppCompatActivity activity,
+        ScaffoldPageFragment leavingFragment,
+        Page leavingPage,
+        AView leavingView,
+        ScaffoldTransitionMotion motion,
+        bool leads,
+        ScaffoldPageTransition transition)
+    {
+        if (leads)
+        {
+            leavingView.TranslationZ = 1f;
+        }
+
+        // A page in flight is no longer a destination: screen readers must land on the incoming
+        // one, not on the content sliding away (input is blocked for everyone meanwhile —
+        // ScaffoldPageLayerLayout.TransitionInFlight).
+        var accessibility = leavingView.ImportantForAccessibility;
+        leavingView.ImportantForAccessibility = ImportantForAccessibility.NoHideDescendants;
+
+        var width = leavingView.Width;
+        var height = leavingView.Height;
+
+        var animator = Android.Animation.ObjectAnimator.OfPropertyValuesHolder(
+            leavingView,
+            Android.Animation.PropertyValuesHolder.OfFloat("translationX", 0f, (float) (motion.FractionX * width))!,
+            Android.Animation.PropertyValuesHolder.OfFloat("translationY", 0f, (float) (motion.FractionY * height))!,
+            Android.Animation.PropertyValuesHolder.OfFloat("scaleX", 1f, (float) motion.Scale)!,
+            Android.Animation.PropertyValuesHolder.OfFloat("scaleY", 1f, (float) motion.Scale)!,
+            Android.Animation.PropertyValuesHolder.OfFloat("alpha", 1f, (float) motion.Opacity)!
+        );
+
+        animator.SetDuration((long) (transition.DurationSeconds * 1000));
+
+        var session = new LeavingPage
+                      {
+                          Fragment = leavingFragment,
+                          Page = leavingPage,
+                          FragmentManager = activity.SupportFragmentManager,
+                          View = leavingView,
+                          Accessibility = accessibility,
+                          Animator = animator
+                      };
+
+        _leavingPage = session;
+
+        animator.AnimationEnd += (_, _) =>
+        {
+            if (ReferenceEquals(_leavingPage, session))
+            {
+                FinishLeavingPage();
+            }
+        };
+
+        animator.Start();
+
+        // Completed by the animator end (or by the next navigation settling it), both on this
+        // same UI context; RunContinuationsAsynchronously.
+#pragma warning disable VSTHRD003
+        return session.Completion.Task;
+#pragma warning restore VSTHRD003
+    }
+
+    /// <summary>
+    /// Settles any in-flight leaving motion NOW and unmounts the page that was playing it.
+    /// The view's motion state is deliberately NOT reset here: the removal transaction only
+    /// executes on the next looper pass, and snapping the page back to its resting place first
+    /// would flash it. Every mount clears it (<see cref="ScaffoldPageFragment.OnCreateView"/>).
+    /// </summary>
+    private void FinishLeavingPage()
+    {
+        if (_leavingPage is not { } leaving)
+        {
+            return;
+        }
+
+        // Cleared FIRST: Cancel() raises AnimationEnd, which must find nothing left to do.
+        _leavingPage = null;
+        leaving.Animator.Cancel();
+        leaving.Completion.TrySetResult();
+
+        // Restoring accessibility costs nothing visually (unlike the motion state, left alone
+        // above) and the page keeps the flag across mounts otherwise.
+        leaving.View.ImportantForAccessibility = leaving.Accessibility;
+
+        // A teardown path (handler disconnect during activity destruction) reaches this with a
+        // dead FragmentManager, which throws on ANY commit — state-loss variants included.
+        if (!leaving.Fragment.IsAdded || leaving.FragmentManager.IsDestroyed)
+        {
+            return;
+        }
+
+        // Unmounted HERE, host AND page. A page that has left must end up exactly as a Replace
+        // used to leave it — its platform view PARENTLESS — because that is what "not presented"
+        // means to everything that walks the tree: a page still hosted inside a detached host
+        // keeps reporting geometry, so it reads as displayed while it is nowhere on screen.
+        // Detaching the page view first also hands it over safely: the FragmentManager executes
+        // the removal below on a later pass, and it takes a REMOVED operation's view out of
+        // "whatever parent it has" — which by then may be the host of a page just re-mounted by
+        // a navigation that landed mid-transition.
+        if (leaving.Page.Handler?.PlatformView is AView pageView && pageView.Parent is AViewGroup pageHost)
+        {
+            pageHost.RemoveView(pageView);
+        }
+
+        if (leaving.View.Parent is AViewGroup parent)
+        {
+            parent.RemoveView(leaving.View);
+        }
+
+        leaving.FragmentManager
+               .BeginTransaction()
+               .SetReorderingAllowed(true)
+               .Remove(leaving.Fragment)
+               .CommitAllowingStateLoss();
+    }
+
     private void RemovePeek(AView? peekView)
     {
         // The commit sync re-parents this exact platform view into the new fragment — never
@@ -440,13 +660,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         _navBarStrip = null;
         _navBarHost?.Dispose();
         _navBarHost = null;
-        _navBarPresented = false;
         _navStripAnimator = null;
         _backPreviewActive = false;
         _backPeekView = null;
         _backTopView = null;
         _backBelowPage = null;
         _predictiveHandoffPage = null;
+        _leavingPage = null;
 
         var context = platformView.Context!;
 
@@ -670,7 +890,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             {
                 if (clearedHost.Bar is not null)
                 {
-                    _navBarPresented = false;
                     _navBarStrip?.SetBar(null);
 
                     if (_navBarStrip is not null)
@@ -742,9 +961,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             DetachNavBarHost(host);
         }
 
-        _navBarStrip.Visibility = ViewStates.Visible;
-        _navBarPresented = navBarVisible;
-
         if (_navBarStrip.Height > 0)
         {
             _lastNavStripHeight = _navBarStrip.Height;
@@ -752,13 +968,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         if (navBarVisible)
         {
+            _navBarStrip.Visibility = ViewStates.Visible;
+
             return ShowNavAsync(_navBarStrip);
         }
 
         if (_lastNavStripHeight <= 0)
         {
+            // Hidden and never measured — a page that starts bar-less. There is no height to
+            // translate the strip by, so it must be taken OUT of the layout: left merely
+            // "visible at rest" it bands the top of the page with chrome that does not belong to
+            // it (until some later navigation finally measures it and slides it away).
+            _navBarStrip.Visibility = ViewStates.Gone;
+
             return Task.CompletedTask;
         }
+
+        _navBarStrip.Visibility = ViewStates.Visible;
 
         // Same contract as the tab bar strip: freeze the insets at their resting values
         // before leaving rest so the translated bar is never re-padded mid-flight.
@@ -1049,6 +1275,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         ObserveNavBarArea(null);
+        FinishLeavingPage();
         _navBarHost?.Dispose();
         _navBarHost = null;
     }

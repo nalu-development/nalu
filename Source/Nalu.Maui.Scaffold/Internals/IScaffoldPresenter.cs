@@ -90,5 +90,12 @@ internal enum ScaffoldPresentationHint
     /// Root/area switch toward a HIGHER ordinal (a later tab): the new content enters from
     /// the end edge.
     /// </summary>
-    SlideEnd
+    SlideEnd,
+
+    /// <summary>
+    /// Root switch ACROSS areas (a different tab bar, a flyout destination): the two roots are
+    /// not neighbours on a strip, so there is no direction to travel in — the outgoing content
+    /// fades out over the new one.
+    /// </summary>
+    Fade
 }

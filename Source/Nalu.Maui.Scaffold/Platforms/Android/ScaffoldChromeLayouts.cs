@@ -49,6 +49,9 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
 
+    /// <summary>The last insets the window dispatched, BEFORE the chrome rewrite (see <see cref="ApplyInsetsTo"/>).</summary>
+    private WindowInsetsCompat? _lastRawInsets;
+
     public ScaffoldPageLayerLayout(IntPtr javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
     {
@@ -60,6 +63,62 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
     }
 
+    /// <summary>
+    /// Set by the presenter for the span of a page transition. It silences two things until the
+    /// pages are back at rest.
+    /// INPUT: both pages are mounted and hit-testable at their ANIMATED positions during those
+    /// few hundred milliseconds, so a tap would otherwise reach a control on the page that is on
+    /// its way out (visible beside the incoming one through a push, above it through a pop) or on
+    /// one that has not landed yet.
+    /// INSETS: MAUI recomputes a page's safe-area padding from its ON-SCREEN position, so a
+    /// dispatch landing while a page is translated pads it for where it momentarily sits — and
+    /// that padding survives at rest (a slide-up entry ends with its content under the nav bar).
+    /// The chrome strips freeze against the same hazard; their own show/hide slides end with a
+    /// re-dispatch, which is exactly what lands mid-page-transition.
+    /// Clearing the flag re-dispatches, so the pages recompute where they finally are.
+    /// </summary>
+    public bool TransitionInFlight
+    {
+        get;
+        set
+        {
+            if (field == value)
+            {
+                return;
+            }
+
+            field = value;
+
+            if (!value)
+            {
+                ViewCompat.RequestApplyInsets(this);
+            }
+        }
+    }
+
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+    {
+        if (!TransitionInFlight)
+        {
+            return base.DispatchApplyWindowInsets(insets);
+        }
+
+        // Frozen: keep the raw insets for the replay (ApplyInsetsTo) but let nothing reach the
+        // pages while they are in motion.
+        if (insets is not null)
+        {
+            _lastRawInsets = WindowInsetsCompat.ToWindowInsetsCompat(insets, this);
+        }
+
+        return insets;
+    }
+
+    // Intercepting mid-gesture cancels whatever a page had started (children get ACTION_CANCEL);
+    // consuming the event keeps it from falling through to anything behind the layer.
+    public override bool OnInterceptTouchEvent(MotionEvent? ev) => TransitionInFlight || base.OnInterceptTouchEvent(ev);
+
+    public override bool OnTouchEvent(MotionEvent? e) => TransitionInFlight || base.OnTouchEvent(e);
+
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
@@ -70,11 +129,40 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
         }
     }
 
+    /// <summary>
+    /// Replays the CURRENT rewrite to a page mounted between two window dispatches.
+    /// A freshly added view gets no dispatch of its own — the window only re-dispatches when the
+    /// insets themselves change — so a pushed page would lay out against the raw system bars and
+    /// slide its content under the nav bar strip. Rewriting from the last raw insets (rather than
+    /// replaying the last rewritten ones) picks up the chrome intent the presenter set for THIS
+    /// page, and dispatching to that view alone leaves the outgoing page's layout untouched
+    /// mid-transition.
+    /// </summary>
+    public void ApplyInsetsTo(AView pageView)
+    {
+        if (_lastRawInsets is { } raw)
+        {
+            ViewCompat.DispatchApplyWindowInsets(pageView, Rewrite(raw));
+        }
+
+        // ...and ask the window for a real pass too: MAUI computes a hosted view's safe-area
+        // padding in its OWN listener (registered for whole subtrees, not per view), which a
+        // hand-rolled dispatch to a single child does not run.
+        ViewCompat.RequestApplyInsets(pageView);
+    }
+
     WindowInsetsCompat? AndroidX.Core.View.IOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
     {
         ArgumentNullException.ThrowIfNull(insets);
 
-        if (view?.Parent is ScaffoldLayout { } scaffoldLayout
+        _lastRawInsets = insets;
+
+        return Rewrite(insets);
+    }
+
+    private WindowInsetsCompat Rewrite(WindowInsetsCompat insets)
+    {
+        if (Parent is ScaffoldLayout { } scaffoldLayout
             && (scaffoldLayout.PageBottomInsetPx > 0 || scaffoldLayout.PageTopInsetPx > 0))
         {
             var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
@@ -88,9 +176,10 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 
             using var builder = new WindowInsetsCompat.Builder(insets);
 
-            insets = builder
-                     .SetInsets(_systemBarsInsetsType, modifiedSystemBarInsets)!
-                     .Build();
+            return builder
+                   .SetInsets(_systemBarsInsetsType, modifiedSystemBarInsets)!
+                   .Build()
+                   ?? insets;
         }
 
         return insets;
