@@ -137,6 +137,34 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
     }
 
     [Fact]
+    public async Task AutoNavigationsDuringReplayAreSuppressedExceptOnTheFinalDestination()
+    {
+        // Arm the auto-nav scenario (it fires only in a process started AFTER arming), then
+        // build the restorable stack: Home → Detail(intent ctx-42).
+        await App.TapAsync("RestoreArmAutoNavButton");
+        await App.TapAsync("RestorePushDetailButton");
+        await App.WaitForSettledDisplayAsync("RestoreDetailPage");
+        await App.WaitForTextAsync("RestoreDetailIntentLabel", "ctx-42");
+
+        await Task.Delay(_snapshotSettle);
+        await App.RestartAppAsync();
+        await App.OpenTestPageAsync(PageName);
+
+        // The LAST restored destination (Detail) dispatched an auto-navigation from its
+        // appearing: the suppression window lifted before its replay step, so it EXECUTES.
+        await App.WaitForSettledDisplayAsync("RestoreDeepPage");
+        await App.WaitForTextAsync("RestoreDetailRedirectLabel", "redirect:True");
+
+        // The INITIALIZATION root's dispatched redirect (fired from its boot appearing, the
+        // classic init-flow pattern) drained inside the window: deterministically ignored.
+        await App.WaitForTextAsync("RestoreHomeRedirectLabel", "redirect:False");
+        (await App.FindElementAsync("RestoreOtherPage")).Should().BeNull("the initialization root's redirect must be suppressed during the replay");
+
+        await App.TapAsync("RestoreGoHomeRootDeepButton");
+        await App.WaitForSettledDisplayAsync("RestoreHomePage");
+    }
+
+    [Fact]
     public async Task InProcessResetDoesNotRestoreOnReopen()
     {
         // Navigate somewhere restorable, persist, then leave through the EXIT path (in-process

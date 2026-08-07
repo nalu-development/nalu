@@ -40,6 +40,34 @@ public static class ScaffoldRestoreTestSupport
     }
 }
 
+/// <summary>
+/// One-shot arming for the auto-navigation-during-replay scenario, PERSISTED so it survives
+/// the kill: pages fire their auto-navigations only in a process STARTED AFTER arming (the
+/// live navigations of the arming session must not be affected), and only within a short TTL
+/// so an aborted test run cannot leak the behavior into other suites.
+/// </summary>
+public static class RestoreAutoNavSupport
+{
+    private const string ArmedAtKey = "RestoreAutoNavArmedAt";
+    private static readonly DateTime _processStartUtc = DateTime.UtcNow;
+
+    public static void Arm() => Preferences.Default.Set(ArmedAtKey, DateTime.UtcNow);
+
+    public static void Disarm() => Preferences.Default.Remove(ArmedAtKey);
+
+    public static bool ShouldFire
+    {
+        get
+        {
+            var armedAt = Preferences.Default.Get(ArmedAtKey, DateTime.MinValue);
+
+            return armedAt != DateTime.MinValue
+                   && armedAt < _processStartUtc
+                   && DateTime.UtcNow - armedAt < TimeSpan.FromSeconds(90);
+        }
+    }
+}
+
 [UsedImplicitly]
 [TestPage("Scaffold Restore Tests")]
 public class RestoreScaffold : Scaffold
@@ -125,17 +153,30 @@ internal static class RestorePageFactory
     }
 }
 
-/// <summary>Root of the first tab: the startup destination — the replay runs after its first appearing.</summary>
+/// <summary>
+/// Root of the first tab: the startup destination — the replay runs after its first
+/// appearing. When the auto-nav scenario is armed, this INITIALIZATION root dispatches a
+/// redirect from its appearing (the classic init-flow pattern): with a restore pending it
+/// must be deterministically IGNORED (the dispatched redirect drains before the next replay
+/// step, inside the suppression window).
+/// </summary>
 [UsedImplicitly]
-public class RestoreHomePage : ContentPage
+public class RestoreHomePage : ContentPage, IAppearingAware
 {
+    private readonly INavigationService _navigationService;
+    private readonly Label _redirectLabel;
+
     public RestoreHomePage(INavigationService navigationService)
     {
+        _navigationService = navigationService;
         Title = "Restore Home";
+
+        _redirectLabel = new Label { Text = "redirect:none", AutomationId = "RestoreHomeRedirectLabel", FontSize = 11 };
 
         Content = RestorePageFactory.BuildContent(
             "Home",
             navigationService,
+            _redirectLabel,
             RestorePageFactory.MakeButton(
                 "Push Detail (intent ctx-42)",
                 "RestorePushDetailButton",
@@ -145,8 +186,41 @@ public class RestoreHomePage : ContentPage
                 "Go Other root",
                 "RestoreGoOtherButton",
                 () => navigationService.GoToAsync(Nav.Absolute().Root<RestoreOtherPage>())
+            ),
+            RestorePageFactory.MakeButton(
+                "Arm auto-nav",
+                "RestoreArmAutoNavButton",
+                () =>
+                {
+                    RestoreAutoNavSupport.Arm();
+
+                    return Task.CompletedTask;
+                }
             )
         );
+    }
+
+    public ValueTask OnAppearingAsync()
+    {
+        if (RestoreAutoNavSupport.ShouldFire)
+        {
+            // The prescribed navigate-from-lifecycle pattern: dispatched, not inline.
+            _ = Dispatcher.DispatchAsync(async () =>
+                {
+                    try
+                    {
+                        var executed = await _navigationService.GoToAsync(Nav.Absolute().Root<RestoreOtherPage>());
+                        _redirectLabel.Text = $"redirect:{executed}";
+                    }
+                    catch (Exception ex)
+                    {
+                        _redirectLabel.Text = $"redirect:{ex.GetType().Name}";
+                    }
+                }
+            );
+        }
+
+        return ValueTask.CompletedTask;
     }
 }
 
@@ -163,24 +237,31 @@ public class RestoreOtherPage : ContentPage
 }
 
 /// <summary>
-/// Captured automatically WITH its intent (a registered intent type):
-/// nothing to do — restore delivers the same intent through the normal pipeline.
+/// Captured automatically WITH its intent: nothing to do — restore delivers the same intent
+/// through the normal pipeline. When the auto-nav scenario is armed, this page — the LAST
+/// restored destination — dispatches an auto-navigation from its appearing: the suppression
+/// window lifted just before its replay navigation, so this one must EXECUTE.
 /// </summary>
 [UsedImplicitly]
-public class RestoreDetailPage : ContentPage, IEnteringAware<RestoreDetailIntent>
+public class RestoreDetailPage : ContentPage, IEnteringAware<RestoreDetailIntent>, IAppearingAware
 {
+    private readonly INavigationService _navigationService;
     private readonly Label _intentLabel;
+    private readonly Label _redirectLabel;
 
     public RestoreDetailPage(INavigationService navigationService)
     {
+        _navigationService = navigationService;
         Title = "Restore Detail";
 
         _intentLabel = new Label { Text = "(none)", AutomationId = "RestoreDetailIntentLabel", FontSize = 11 };
+        _redirectLabel = new Label { Text = "redirect:none", AutomationId = "RestoreDetailRedirectLabel", FontSize = 11 };
 
         Content = RestorePageFactory.BuildContent(
             "Detail",
             navigationService,
             _intentLabel,
+            _redirectLabel,
             RestorePageFactory.MakeButton(
                 "Push Forgotten",
                 "RestorePushForgottenButton",
@@ -192,6 +273,31 @@ public class RestoreDetailPage : ContentPage, IEnteringAware<RestoreDetailIntent
     public ValueTask OnEnteringAsync(RestoreDetailIntent intent)
     {
         _intentLabel.Text = intent.Value;
+
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask OnAppearingAsync()
+    {
+        if (RestoreAutoNavSupport.ShouldFire)
+        {
+            // One-shot: this is the scenario's last consumer.
+            RestoreAutoNavSupport.Disarm();
+
+            _ = Dispatcher.DispatchAsync(async () =>
+                {
+                    try
+                    {
+                        var executed = await _navigationService.GoToAsync(Nav.Push<RestoreDeepPage>());
+                        _redirectLabel.Text = $"redirect:{executed}";
+                    }
+                    catch (Exception ex)
+                    {
+                        _redirectLabel.Text = $"redirect:{ex.GetType().Name}";
+                    }
+                }
+            );
+        }
 
         return ValueTask.CompletedTask;
     }
