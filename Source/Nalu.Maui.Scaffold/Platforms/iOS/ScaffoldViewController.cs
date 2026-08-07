@@ -263,30 +263,44 @@ internal sealed class ScaffoldViewController : UIViewController
 
         try
         {
-            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            // Don't use AnimateNotifyAsync (under some conditions it blocks and never returns).
-            // So use DispatchQueue to run a synchronous animation on the next loop and then complete the tcs.
-            DispatchQueue.MainQueue.DispatchAsync(() =>
-            {
-                UIView.AnimateNotify(
-                    _barAnimationDurationSeconds,
-                    0,
-                    UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
-                    () =>
-                    {
-                        strip.Transform = targetTransform;
-                        ApplyCurrentPageInsets();
-                        View!.LayoutIfNeeded();
-                    },
-                    _ => tcs.SetResult()
-                );
-            });
-            await tcs.Task;
+            await AnimateChromeAsync(
+                () =>
+                {
+                    strip.Transform = targetTransform;
+                    ApplyCurrentPageInsets();
+                    View!.LayoutIfNeeded();
+                }
+            );
         }
         finally
         {
             _navBarAnimating--;
         }
+    }
+
+    /// <summary>
+    /// Runs a chrome slide, completing when UIKit reports it finished.
+    /// Deliberately NOT <c>UIView.AnimateNotifyAsync</c>: starting the animation inline can block
+    /// and never return (iOS 18.x, observed while a cross-area switch mounted a strip), and a
+    /// NAVIGATION awaits this — a call that never returns wedges navigation for good, leaving the
+    /// incoming page unpresented and its Appearing unraised. Posting to the main queue starts the
+    /// animation on the NEXT turn instead, and its completion handler resolves the task.
+    /// </summary>
+    private static Task AnimateChromeAsync(Action animation)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        DispatchQueue.MainQueue.DispatchAsync(
+            () => UIView.AnimateNotify(
+                _barAnimationDurationSeconds,
+                0,
+                UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
+                animation,
+                _ => completion.TrySetResult()
+            )
+        );
+
+        return completion.Task;
     }
 
     /// <summary>
@@ -334,10 +348,7 @@ internal sealed class ScaffoldViewController : UIViewController
 
         try
         {
-            await UIView.AnimateNotifyAsync(
-                _barAnimationDurationSeconds,
-                0,
-                UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
+            await AnimateChromeAsync(
                 () =>
                 {
                     strip.Transform = targetTransform;
