@@ -230,11 +230,31 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             var enterTransition = predictivelySettled ? ScaffoldPageTransition.None : pageTransition;
             var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, enterTransition);
 
+            // Depth cues for STACKED motions only (side-by-side root switches get neither):
+            // a push slides the incoming page ABOVE with a shadow while the covered page dims;
+            // a pop reveals the incoming page dimmed, brightening as the leaving page departs
+            // with its own shadow (see PrepareLeavingPage).
+            var depthPush = hint == ScaffoldPresentationHint.Push && enterTransition.IsAnimated;
+            var depthPop = hint == ScaffoldPresentationHint.Pop && !predictivelySettled && animated;
+
             // The page must see the chrome-rewritten insets (nav bar / tab bar footprints) before
             // its first layout: the window dispatches insets only when they CHANGE, so a page
             // mounted in between lays out against the raw system bars and slides its content
             // under the nav bar strip.
-            fragment.OnViewMounted = _pageLayer!.ApplyInsetsTo;
+            fragment.OnViewMounted = view =>
+            {
+                _pageLayer!.ApplyInsetsTo(view);
+
+                if (depthPush)
+                {
+                    ScaffoldPageDepth.ApplyShadow(view);
+                }
+
+                if (depthPop)
+                {
+                    ScaffoldPageDepth.SetDim(view, 1f);
+                }
+            };
             _currentFragment = fragment;
             _currentPage = targetPage;
             targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
@@ -317,6 +337,28 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     ? null
                     : PrepareLeavingPage(activity, previousFragment!, previousPage!, previousView!, leavingMotion, leavingLeads, pageTransition);
 
+                if (leaving is not null)
+                {
+                    if (depthPop)
+                    {
+                        // The popped page departs with a shadow; the revealed one brightens as it goes.
+                        ScaffoldPageDepth.ApplyShadow(previousView!);
+
+                        leaving.Animator.Update += (_, args) =>
+                        {
+                            if (fragment.View is { } revealedView)
+                            {
+                                ScaffoldPageDepth.SetDim(revealedView, 1f - (float) args.Animation.AnimatedFraction);
+                            }
+                        };
+                    }
+                    else if (depthPush)
+                    {
+                        // The covered page dims under the incoming one.
+                        leaving.Animator.Update += (_, args) => ScaffoldPageDepth.SetDim(previousView!, (float) args.Animation.AnimatedFraction);
+                    }
+                }
+
                 // Started at the INCOMING page's first pre-draw — the frame it is laid out and
                 // about to render — not here. The incoming half is started by the fragment
                 // machinery when the transaction executes, a frame after this commit, so starting
@@ -346,6 +388,19 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 if (pageLayer is not null)
                 {
                     pageLayer.TransitionInFlight = false;
+                }
+
+                // Depth cues end with the transition: the presented page keeps no shadow and no
+                // dim; the covered/departed page (about to unmount, kept alive) no residual dim.
+                if (fragment.View is { } presentedView)
+                {
+                    ScaffoldPageDepth.ClearShadow(presentedView);
+                    ScaffoldPageDepth.SetDim(presentedView, 0f);
+                }
+
+                if (previousView is not null)
+                {
+                    ScaffoldPageDepth.SetDim(previousView, 0f);
                 }
             }
         }
@@ -396,10 +451,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         belowView.TranslationZ = 0f;
         pageLayer.AddView(belowView, 0, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
 
-        // If the peeked page's shared elements took off in the push SET, they are still hidden
-        // via transitionAlpha — repair before the page becomes visible under the scrubbed one.
-        ScaffoldPageRestore.Repair(belowPage);
-
         // The preview spans a transition for the inset machinery too: the flag parks the
         // scrubbed transforms for the span of any insets dispatch (so nothing gets padded for
         // where it momentarily sits) and blocks input on pages in motion. The commit's sync
@@ -427,6 +478,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // edge-to-edge — content under the status bar — and jumps into place when the pop
         // commits and a real dispatch finally lands.
         pageLayer.ApplyInsetsTo(belowView);
+
+        // Depth cues: the scrubbed page casts a shadow so its boundary reads against the peek,
+        // which starts fully dimmed and brightens as the page departs.
+        ScaffoldPageDepth.ApplyShadow(topView);
+        ScaffoldPageDepth.SetDim(belowView, 1f);
 
         _backPeekView = belowView;
         _backTopView = topView;
@@ -487,6 +543,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             _backProgress = progress;
             topView.TranslationX = progress * _backPreviewMaxShift * (topView.Width > 0 ? topView.Width : 0);
             _backFlightSession?.Seek(progress, topView.TranslationX);
+
+            if (_backPeekView is { } peekView)
+            {
+                ScaffoldPageDepth.SetDim(peekView, 1f - progress);
+            }
         }
     }
 
@@ -510,6 +571,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         if (topView is null)
         {
             flightSession?.Finish();
+            TearDownPeekDepth(topView: null, peekView);
             RemovePeek(peekView);
             ClearPreviewTransitionFlag();
 
@@ -520,12 +582,22 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
         animator.SetDuration(150);
 
-        // The flights ride home with the page.
-        animator.Update += (_, args) => flightSession?.Seek(startProgress * (1 - (float)args.Animation.AnimatedFraction), topView.TranslationX);
+        // The flights ride home with the page; the peek dims back toward covered.
+        animator.Update += (_, args) =>
+        {
+            var flightProgress = startProgress * (1 - (float)args.Animation.AnimatedFraction);
+            flightSession?.Seek(flightProgress, topView.TranslationX);
+
+            if (peekView is not null)
+            {
+                ScaffoldPageDepth.SetDim(peekView, 1f - flightProgress);
+            }
+        };
 
         animator.AnimationEnd += (_, _) =>
         {
             flightSession?.Finish();
+            TearDownPeekDepth(topView, peekView);
             RemovePeek(peekView);
 
             // Clearing re-dispatches: the pages recompute their padding at rest.
@@ -533,6 +605,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         };
 
         animator.Start();
+    }
+
+    /// <summary>Ends the preview's depth cues: the staying page loses its shadow, the peek its dim.</summary>
+    private static void TearDownPeekDepth(AView? topView, AView? peekView)
+    {
+        if (topView is not null)
+        {
+            ScaffoldPageDepth.ClearShadow(topView);
+        }
+
+        if (peekView is not null)
+        {
+            ScaffoldPageDepth.SetDim(peekView, 0f);
+        }
     }
 
     /// <summary>
@@ -580,6 +666,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         if (topView is null || belowPage is null)
         {
             flightSession?.Finish();
+            TearDownPeekDepth(topView, peekView);
             RemovePeek(peekView);
 
             return;
@@ -591,8 +678,18 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, width)!;
         animator.SetDuration((long)(_overlayDurationMs * (1 - (topView.TranslationX / width))));
 
-        // The flights complete their remaining path while the page settles offscreen.
-        animator.Update += (_, args) => flightSession?.Seek(startProgress + ((1 - startProgress) * (float)args.Animation.AnimatedFraction), topView.TranslationX);
+        // The flights complete their remaining path while the page settles offscreen and the
+        // peek finishes brightening.
+        animator.Update += (_, args) =>
+        {
+            var flightProgress = startProgress + ((1 - startProgress) * (float)args.Animation.AnimatedFraction);
+            flightSession?.Seek(flightProgress, topView.TranslationX);
+
+            if (peekView is not null)
+            {
+                ScaffoldPageDepth.SetDim(peekView, 1f - flightProgress);
+            }
+        };
 
         animator.AnimationEnd += (_, _) => settle.TrySetResult();
         animator.Start();
@@ -600,6 +697,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // Flights are AT their destination — the live views they hand back to sit exactly there.
         flightSession?.Finish();
+
+        // The peek is about to become the presented page: no residual dim (the departed page's
+        // shadow leaves with it; remounts reset elevation).
+        TearDownPeekDepth(topView, peekView);
 
         _predictiveHandoffPage = belowPage;
 
@@ -610,12 +711,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             // Engine refused: restore the pre-gesture presentation.
             _predictiveHandoffPage = null;
+
+            // The staying page needs its shadow back for the return slide.
+            ScaffoldPageDepth.ApplyShadow(topView);
+
             var restore = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var restoreAnimator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
             restoreAnimator.SetDuration(_overlayDurationMs);
             restoreAnimator.AnimationEnd += (_, _) => restore.TrySetResult();
             restoreAnimator.Start();
             await restore.Task.ConfigureAwait(true);
+            TearDownPeekDepth(topView, peekView);
             RemovePeek(peekView);
             ClearPreviewTransitionFlag();
         }
@@ -633,6 +739,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         _backFlightSession?.Finish();
         _backFlightSession = null;
+        TearDownPeekDepth(_backTopView, _backPeekView);
         RemovePeek(_backPeekView);
         _backTopView = null;
         _backPeekView = null;
@@ -679,7 +786,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     {
         if (leads)
         {
-            leavingView.TranslationZ = 1f;
+            // Above the incoming page; a POP's elevation is the real depth-cue shadow (the
+            // caller adds it via ScaffoldPageDepth), this is just the stacking floor.
+            leavingView.TranslationZ = Math.Max(leavingView.TranslationZ, 1f);
         }
 
         // A page in flight is no longer a destination: screen readers must land on the incoming

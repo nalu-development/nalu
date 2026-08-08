@@ -47,9 +47,24 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 
     // Wide enough for compression and anti-aliasing noise, far narrower than the gap between the
-    // harness colours.
+    // harness colours. A page under a stacked transition additionally carries the depth-cue dim
+    // (≤15% black — see ScaffoldPageDepth): the page colour scaled by one uniform factor is
+    // still that page, while the window background (grey: all channels alike) matches a
+    // single-channel harness colour at NO factor.
     private static bool Is(Color sample, Color expected)
-        => Math.Abs(sample.R - expected.R) <= 12 && Math.Abs(sample.G - expected.G) <= 12 && Math.Abs(sample.B - expected.B) <= 12;
+    {
+        for (var dim = 1.0; dim >= 0.82; dim -= 0.02)
+        {
+            if (Math.Abs(sample.R - (expected.R * dim)) <= 12
+                && Math.Abs(sample.G - (expected.G * dim)) <= 12
+                && Math.Abs(sample.B - (expected.B * dim)) <= 12)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private static string Describe(IEnumerable<Frame> frames) => string.Join(" ", frames);
 
@@ -310,9 +325,11 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         // THE REGRESSION: the two halves must travel locked together. Started a frame apart they
         // drift by their velocity — which peaks mid-transition — and the window shows through the
         // seam between them. Sampling a whole row is what catches a band anywhere across it.
+        // A sample ON the seam legitimately anti-aliases to a blend of the two page colours
+        // (proof they are adjacent) — only non-blend colours are the window showing through.
         rows.Should()
             .OnlyContain(
-                row => row.All(sample => Is(sample, one) || Is(sample, two)),
+                row => row.All(sample => Is(sample, one) || Is(sample, two) || IsBlendOf(sample, one, two)),
                 "no frame of a root switch may show the window background between the two roots — rows: " + Describe(rows)
             );
 
