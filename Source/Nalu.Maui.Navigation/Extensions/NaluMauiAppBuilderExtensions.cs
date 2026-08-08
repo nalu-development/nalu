@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Nalu;
 
@@ -23,31 +22,65 @@ public static class NaluMauiAppBuilderExtensions
         builder.Services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         builder.Services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
 
-        // Navigation-state snapshot & restore: ALWAYS registered and inert unless the
-        // configurator's WithRestore enabled it — shared/library pages inject it unconditionally.
+        // Navigation-state snapshot & restore: ALWAYS registered and inert unless
+        // UseNaluNavigationRestore enabled it — shared/library pages inject it unconditionally.
         builder.Services.AddSingleton<NavigationRestoreService>();
         builder.Services.AddSingleton<INavigationRestore>(static provider => provider.GetRequiredService<NavigationRestoreService>());
-        builder.Services.TryAddSingleton<IIntentSerializer, NavigationDefaultIntentSerializer>();
+        builder.Services.TryAddSingleton<IIntentSerializer>(static provider => new NavigationDefaultIntentSerializer(provider.GetService<NavigationRestoreOptions>()));
         builder.Services.TryAddSingleton<INavigationRestoreStore, NavigationRestoreFileStore>();
 
-        var configurator = new NavigationConfigurator(builder.Services, typeof(TApplication));
+        var configurator = new NavigationConfigurator(builder.Services);
         configure(configurator);
 
         return builder;
     }
 
     /// <summary>
-    /// Adds Nalu navigation to the application using the default naming convention: MyPage -> MyPageModel.
+    /// Enables navigation-state snapshot &amp; restore: after an app restart the engine replays
+    /// the last captured navigation (root selection, pushed stack, entering intents) once the
+    /// configured initial page's first appearing completes — see <see cref="INavigationRestore"/>.
+    /// Requires <see cref="UseNaluNavigation{TApplication}(MauiAppBuilder, Action{NavigationConfigurator})"/>
+    /// (call order between the two does not matter). The library cannot see the app's build
+    /// configuration: a DEBUG-only policy (the recommended developer-experience default) is
+    /// expressed app-side via <see cref="NavigationRestoreOptions.Enabled"/> or an
+    /// <c>#if DEBUG</c> guard around this call.
     /// </summary>
-    /// <remarks>
-    /// Looks for pages and page models in the application assembly.
-    /// </remarks>
-    /// <typeparam name="TApplication">Application type.</typeparam>
     /// <param name="builder">Maui app builder.</param>
-    [RequiresUnreferencedCode("This method uses reflection to scan page types in assemblies, which is not trim-compatible. Use the configuration builder with AddPage method for each page instead.")]
-    public static MauiAppBuilder UseNaluNavigation<TApplication>(this MauiAppBuilder builder)
-        where TApplication : IApplication
-        => builder.UseNaluNavigation<TApplication>(configurator => configurator.AddPages());
+    /// <param name="configure">Configures intents, expiry and serialization.</param>
+    public static MauiAppBuilder UseNaluNavigationRestore(this MauiAppBuilder builder, Action<NavigationRestoreOptions>? configure = null)
+    {
+        // Idempotent accumulation: a second call configures the same options instance.
+        var options = builder.Services
+                             .FirstOrDefault(static d => d.ServiceType == typeof(NavigationRestoreOptions))
+                             ?.ImplementationInstance as NavigationRestoreOptions;
+
+        if (options is null)
+        {
+            options = new NavigationRestoreOptions();
+            builder.Services.AddSingleton(options);
+
+            // Fail fast (order-independently) when navigation itself was never configured:
+            // without this the restore options would sit in DI silently unused.
+            builder.Services.AddSingleton<IMauiInitializeService>(new NavigationRestoreStartupGuard());
+        }
+
+        configure?.Invoke(options);
+
+        return builder;
+    }
+
+    private sealed class NavigationRestoreStartupGuard : IMauiInitializeService
+    {
+        public void Initialize(IServiceProvider services)
+        {
+            if (services.GetService<INavigationService>() is null)
+            {
+                throw new InvalidOperationException(
+                    "UseNaluNavigationRestore requires Nalu navigation: call builder.UseNaluNavigation<TApplication>(...) as well."
+                );
+            }
+        }
+    }
 
     /// <summary>
     /// Configures a custom <see cref="Shell"/> handler that allows rendering a custom tab bar view via <see cref="NaluShell.TabBarViewProperty"/> when using <see cref="TabBar"/> or <see cref="FlyoutItem"/> with tabs.

@@ -53,6 +53,7 @@
     <Project Path="Source/Nalu.Maui.Core/Nalu.Maui.Core.csproj" />
     <Project Path="Source/Nalu.Maui.Layouts/Nalu.Maui.Layouts.csproj" />
     <Project Path="Source/Nalu.Maui.Navigation/Nalu.Maui.Navigation.csproj" />
+    <Project Path="Source/Nalu.Maui.Navigation.SourceGenerators/Nalu.Maui.Navigation.SourceGenerators.csproj" />
     <Project Path="Source/Nalu.Maui.Scaffold/Nalu.Maui.Scaffold.csproj" />
     <Project Path="Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj" />
   </Folder>
@@ -61,6 +62,7 @@
     <File Path="Tests/Directory.Build.props" />
     <Project Path="Tests/Nalu.Maui.Benchmarks/Nalu.Maui.Benchmarks.csproj" />
     <Project Path="Tests/Nalu.Maui.Test/Nalu.Maui.Test.csproj" />
+    <Project Path="Tests/Nalu.Maui.Navigation.SourceGenerators.Test/Nalu.Maui.Navigation.SourceGenerators.Test.csproj" />
   </Folder>
   <Folder Name="/UITests/">
     <File Path="UITests/.editorconfig" />

@@ -69,9 +69,9 @@ internal sealed record NavigationRestoreFrame(string Segment, Type PageType, obj
 /// source-generated context when <see cref="NavigationRestoreOptions.IntentSerializerContext"/>
 /// is set (trim/NativeAOT-safe); falls back to reflection otherwise.
 /// </summary>
-internal sealed class NavigationDefaultIntentSerializer(INavigationConfiguration configuration) : IIntentSerializer
+internal sealed class NavigationDefaultIntentSerializer(NavigationRestoreOptions? options) : IIntentSerializer
 {
-    private JsonSerializerContext? Context => (configuration as NavigationConfigurator)?.RestoreOptions?.IntentSerializerContext;
+    private JsonSerializerContext? Context => options?.IntentSerializerContext;
 
     [UnconditionalSuppressMessage(
         "Trimming",

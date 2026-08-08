@@ -1,0 +1,360 @@
+using FluentAssertions;
+using Microsoft.CodeAnalysis;
+
+namespace Nalu.Maui.Test.SourceGenerators;
+
+public class NavigationRegistrationGeneratorTests
+{
+    [Fact(DisplayName = "Page assigning a ctor parameter to BindingContext registers with that model")]
+    public void BindingContextAssignmentInfersModel()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public class DetailViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            public class DetailPage : ContentPage
+            {
+                public DetailPage(DetailViewModel model)
+                {
+                    BindingContext = model;
+                }
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.DetailViewModel, global::MyApp.DetailPage>();");
+    }
+
+    [Fact(DisplayName = "Interface-typed BindingContext parameter resolves its single implementation")]
+    public void InterfaceModelResolvesImplementation()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public interface IDetailPageModel : INotifyPropertyChanged;
+
+            public class DetailPageModel : IDetailPageModel
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            public class DetailPage : ContentPage
+            {
+                public DetailPage(IDetailPageModel model)
+                {
+                    this.BindingContext = model;
+                }
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.IDetailPageModel, global::MyApp.DetailPageModel, global::MyApp.DetailPage>();");
+    }
+
+    [Fact(DisplayName = "Single INotifyPropertyChanged ctor parameter is used when BindingContext is not assigned in source")]
+    public void SingleInpcParameterFallback()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public class SomeViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            public class SomeService;
+
+            public class SomePage : ContentPage
+            {
+                public SomePage(SomeService service, SomeViewModel model)
+                {
+                }
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SomeViewModel, global::MyApp.SomePage>();");
+    }
+
+    [Fact(DisplayName = "Naming convention MyPage -> MyPageModel applies when the ctor gives no signal")]
+    public void NamingConventionFallback()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public class HomePageModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            public class HomePage : ContentPage;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.HomePageModel, global::MyApp.HomePage>();");
+    }
+
+    [Fact(DisplayName = "Naming convention prefers the IMyPageModel interface when implemented")]
+    public void NamingConventionPrefersInterface()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public interface IHomePageModel : INotifyPropertyChanged;
+
+            public class HomePageModel : IHomePageModel
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            public class HomePage : ContentPage;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.IHomePageModel, global::MyApp.HomePageModel, global::MyApp.HomePage>();");
+    }
+
+    [Fact(DisplayName = "Page without any model registers view-only with an info diagnostic")]
+    public void ViewOnlyFallback()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+
+            namespace MyApp;
+
+            public class AboutPage : ContentPage;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.AboutPage>();");
+        result.GeneratorDiagnostics.Should().ContainSingle(static d => d.Id == "NALU0001");
+    }
+
+    [Fact(DisplayName = "AutoNavigationPage(Enabled = false), abstract and generic pages are skipped")]
+    public void ExcludedPagesAreSkipped()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using Nalu;
+
+            namespace MyApp;
+
+            [AutoNavigationPage(Enabled = false)]
+            public class HiddenPage : ContentPage;
+
+            public abstract class BasePage : ContentPage;
+
+            public class GenericPage<T> : ContentPage;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().NotContain("HiddenPage").And.NotContain("BasePage").And.NotContain("GenericPage");
+    }
+
+    [Fact(DisplayName = "Intents from IEnteringAware/IAppearingAware on page and model are registered")]
+    public void IntentsAreDiscovered()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+            using System.Threading.Tasks;
+            using Nalu;
+
+            namespace MyApp;
+
+            public record EditIntent(int Id);
+            public record ShowIntent(string Name);
+
+            public class EditorPageModel : INotifyPropertyChanged, IEnteringAware<EditIntent>
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+                public ValueTask OnEnteringAsync(EditIntent intent) => default;
+            }
+
+            public class EditorPage : ContentPage, IAppearingAware<ShowIntent>
+            {
+                public EditorPage(EditorPageModel model)
+                {
+                    BindingContext = model;
+                }
+
+                public ValueTask OnAppearingAsync(ShowIntent intent) => default;
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("options.AddIntent<global::MyApp.EditIntent>(\"EditIntent\");");
+        result.GeneratedText.Should().Contain("options.AddIntent<global::MyApp.ShowIntent>(\"ShowIntent\");");
+    }
+
+    [Fact(DisplayName = "AutoNavigationIntent controls restorability and the type id")]
+    public void IntentOptionsAttributeIsHonored()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.Threading.Tasks;
+            using Nalu;
+
+            namespace MyApp;
+
+            [AutoNavigationIntent(Enabled = false)]
+            public record EphemeralIntent;
+
+            [AutoNavigationIntent("stable-id")]
+            public record RenamedIntent;
+
+            public class SomePage : ContentPage, IEnteringAware<EphemeralIntent>, IEnteringAware<RenamedIntent>
+            {
+                public ValueTask OnEnteringAsync(EphemeralIntent intent) => default;
+                public ValueTask OnEnteringAsync(RenamedIntent intent) => default;
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().NotContain("EphemeralIntent");
+        result.GeneratedText.Should().Contain("options.AddIntent<global::MyApp.RenamedIntent>(\"stable-id\");");
+    }
+
+    [Fact(DisplayName = "Awaitable intents are never registered for restore")]
+    public void AwaitableIntentsAreSkipped()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.Threading.Tasks;
+            using Nalu;
+
+            namespace MyApp;
+
+            public class PickIntent : AwaitableIntent<int>;
+
+            public class PickerPage : ContentPage, IEnteringAware<PickIntent>
+            {
+                public ValueTask OnEnteringAsync(PickIntent intent) => default;
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().NotContain("AddIntent<global::MyApp.PickIntent>");
+    }
+
+    [Fact(DisplayName = "Two restorable intents with the same short name produce an error diagnostic")]
+    public void IntentIdCollisionIsReported()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.Threading.Tasks;
+            using Nalu;
+
+            namespace MyApp.A { public record EditIntent; }
+            namespace MyApp.B { public record EditIntent; }
+
+            namespace MyApp;
+
+            public class SomePage : ContentPage, IEnteringAware<A.EditIntent>, IEnteringAware<B.EditIntent>
+            {
+                public ValueTask OnEnteringAsync(A.EditIntent intent) => default;
+                public ValueTask OnEnteringAsync(B.EditIntent intent) => default;
+            }
+            """
+        );
+
+        result.GeneratorDiagnostics.Should().ContainSingle(static d => d.Id == "NALU0005" && d.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact(DisplayName = "BindingContext assigned from multiple parameters skips the page with a warning")]
+    public void AmbiguousBindingContextIsReported()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public class ModelA : INotifyPropertyChanged { public event PropertyChangedEventHandler? PropertyChanged; }
+            public class ModelB : INotifyPropertyChanged { public event PropertyChangedEventHandler? PropertyChanged; }
+
+            public class WeirdPage : ContentPage
+            {
+                public WeirdPage(ModelA a, ModelB b, bool flag)
+                {
+                    if (flag) { BindingContext = a; } else { BindingContext = b; }
+                }
+            }
+            """
+        );
+
+        result.GeneratorDiagnostics.Should().ContainSingle(static d => d.Id == "NALU0002" && d.Severity == DiagnosticSeverity.Warning);
+        result.GeneratedText.Should().NotContain("WeirdPage");
+    }
+
+    [Fact(DisplayName = "Without a Nalu reference nothing is generated")]
+    public void NoNaluReferenceNoOutput()
+    {
+        var result = GeneratorTestHarness.Run("public class Nothing;", includeStubs: false);
+
+        result.GeneratedText.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Generated methods exist and compile even with zero pages")]
+    public void EmptyAssemblyStillGeneratesCallableMethods()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            namespace MyApp;
+
+            public static class Usage
+            {
+                public static void Use(Nalu.NavigationConfigurator nav, Nalu.NavigationRestoreOptions options)
+                {
+                    nav.AddPages();
+                    options.AddIntents();
+                }
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("AddPages").And.Contain("AddIntents");
+    }
+}

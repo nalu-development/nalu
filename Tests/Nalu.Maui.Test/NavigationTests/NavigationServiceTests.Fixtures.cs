@@ -257,7 +257,7 @@ public partial class NavigationServiceTests
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         serviceCollection.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
-        _navigationConfiguration = new NavigationConfigurator(serviceCollection, typeof(NavigationServiceTests));
+        _navigationConfiguration = new NavigationConfigurator(serviceCollection);
         var mapping = (IDictionary<Type, Type>) _navigationConfiguration.Mapping;
 
         mapping.Add(typeof(IPage1Model), typeof(Page1));

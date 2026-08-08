@@ -8,7 +8,7 @@ namespace Nalu;
 /// The <see cref="INavigationRestore"/> implementation: automatic capture of the navigation
 /// state (with per-page entering intents recorded at navigation time), boot-time replay after
 /// the initial page's first appearing, and the pending-restore navigation-suppression window.
-/// Always registered; INERT unless <c>WithRestore(...)</c> enabled it.
+/// Always registered; INERT unless <c>UseNaluNavigationRestore(...)</c> enabled it.
 /// </summary>
 /// <remarks>
 /// Threading: every capture trigger (engine hooks, the per-page methods) runs on the UI
@@ -66,10 +66,10 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
     private INavigationRestoreStore Store => _store ??= _serviceProvider.GetRequiredService<INavigationRestoreStore>();
 
-    public NavigationRestoreService(INavigationConfiguration configuration, IServiceProvider serviceProvider)
+    public NavigationRestoreService(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
-        _options = (configuration as NavigationConfigurator)?.RestoreOptions;
+        _options = serviceProvider.GetService<NavigationRestoreOptions>();
         _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
         _logger = serviceProvider.GetService<ILogger<NavigationRestoreService>>();
     }
@@ -103,7 +103,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
         {
             // A deterministic misconfiguration, not a transient failure: always throw.
             throw new InvalidOperationException(
-                $"Intent type {intentType.FullName} is not registered for restore; register it via WithRestore(r => r.AddIntent<{intentType.Name}>())."
+                $"Intent type {intentType.FullName} is not registered for restore; register it via UseNaluNavigationRestore(r => r.AddIntent<{intentType.Name}>())."
             );
         }
 

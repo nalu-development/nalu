@@ -429,7 +429,7 @@ Nalu can automatically detect memory leaks during development.
 
 ```csharp
 .UseNaluNavigation<App>(nav => nav
-    .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
+    .AddPage<MainPageModel, MainPage>()
     .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
 )
 ```
@@ -594,7 +594,7 @@ Globally customize navigation icons:
 
 ```csharp
 .UseNaluNavigation<App>(nav => nav
-    .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
+    .AddPage<MainPageModel, MainPage>()
     .WithMenuIcon(ImageSource.FromFile("menu.png"))
     .WithBackIcon(ImageSource.FromFile("back.png"))
 )

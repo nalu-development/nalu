@@ -140,7 +140,7 @@ public class NavigationRestoreTests
             services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
             services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
 
-            var configurator = new NavigationConfigurator(services, typeof(NavigationRestoreTests));
+            var configurator = new NavigationConfigurator(services);
             var mapping = (IDictionary<Type, Type>) configurator.Mapping;
             mapping.Add(typeof(IHomePageModel), typeof(HomePage));
             mapping.Add(typeof(ISearchPageModel), typeof(SearchPage));
@@ -150,15 +150,14 @@ public class NavigationRestoreTests
 
             if (withRestore)
             {
-                configurator.WithRestore(options =>
-                    {
-                        options.AddIntent<SearchIntent>();
-                        options.AddIntent<DetailIntent>();
-                        options.AddIntent<DeepDetailIntent>();
-                        options.AddIntent<HydratableIntent>();
-                        configureRestore?.Invoke(options);
-                    }
-                );
+                // Mirrors UseNaluNavigationRestore: the options live in DI, not on the configurator.
+                var options = new NavigationRestoreOptions();
+                options.AddIntent<SearchIntent>();
+                options.AddIntent<DetailIntent>();
+                options.AddIntent<DeepDetailIntent>();
+                options.AddIntent<HydratableIntent>();
+                configureRestore?.Invoke(options);
+                services.AddSingleton(options);
             }
 
             services.AddScoped(_ => Substitute.For<IHomePageModel>());
@@ -176,7 +175,7 @@ public class NavigationRestoreTests
             services.AddSingleton<TimeProvider>(TimeProvider);
             services.AddSingleton<NavigationRestoreService>();
             services.AddSingleton<INavigationRestore>(sp => sp.GetRequiredService<NavigationRestoreService>());
-            services.AddSingleton<IIntentSerializer, NavigationDefaultIntentSerializer>();
+            services.AddSingleton<IIntentSerializer>(sp => new NavigationDefaultIntentSerializer(sp.GetService<NavigationRestoreOptions>()));
             services.AddSingleton<INavigationRestoreStore>(store);
 
             configureServices?.Invoke(services);
@@ -782,7 +781,7 @@ public class NavigationRestoreTests
         harness.HomeRoot.NavigationStack.RootPage.Should().BeOfType<HomePage>();
     }
 
-    [Fact(DisplayName = "Restore service is inert when WithRestore was not called")]
+    [Fact(DisplayName = "Restore service is inert when UseNaluNavigationRestore was not called")]
     public async Task RestoreServiceIsInertWhenNotEnabled()
     {
         var store = new InMemoryStore();

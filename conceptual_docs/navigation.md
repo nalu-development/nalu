@@ -35,7 +35,7 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .UseNaluNavigation<App>(nav => nav
-                .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
+                .AddPages() // source-generated: registers every page in this assembly, AOT/trim-safe
                 .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             );
         
@@ -44,9 +44,24 @@ public static class MauiProgram
 }
 ```
 
-**Configuration options:**
-- `.AddPages()` - Auto-discover pages with naming convention ⚠️ **Not AOT/trim-compatible** - use `AddPage` for each page instead
-- `.AddPages(pageType => ...)` - Custom naming convention ⚠️ **Not AOT/trim-compatible** - use `AddPage` for each page instead
+**`AddPages()` is source-generated** (the generator ships inside the NuGet package): at build
+time it discovers every non-abstract `ContentPage` in your assembly and emits plain
+`AddPage<...>` calls — fully AOT/trim-compatible, no reflection. For each page the page model
+is inferred, in order:
+
+1. the constructor parameter assigned to `BindingContext` in the page constructor (an
+   interface-typed parameter is registered together with its single implementation);
+2. otherwise, a single `INotifyPropertyChanged` constructor parameter;
+3. otherwise, the `MyPage` → `MyPageModel` naming convention (preferring `IMyPageModel` when
+   the model implements it);
+4. otherwise the page is registered **view-only** (see [View-Only Navigation](navigation-view-only.md)).
+
+Exclude a page from the generated registration with `[AutoNavigationPage(Enabled = false)]`. The generator
+reports diagnostics (`NALU0001`–`NALU0006`) for view-only fallbacks, ambiguous models and
+intent id collisions.
+
+**Manual configuration options** (usable alongside `AddPages()` — e.g. for pages living in
+**other assemblies**, which the generator does not scan):
 - `.AddPage<MainPageModel, MainPage>()` - Manual registration ✅ **AOT-compatible**
 - `.AddPage<IMainPageModel, MainPageModel, MainPage>()` - With interface (better for testing) ✅ **AOT-compatible**
 - `.AddPage<MainPage>()` - **View-only** registration: no page model, lifecycle interfaces go directly on the page ✅ **AOT-compatible** — see [View-Only Navigation](navigation-view-only.md)

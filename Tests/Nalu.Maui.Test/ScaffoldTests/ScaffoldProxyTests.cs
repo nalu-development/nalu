@@ -104,7 +104,7 @@ public class ScaffoldProxyTests
         services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
 
-        var configurator = new NavigationConfigurator(services, typeof(ScaffoldProxyTests));
+        var configurator = new NavigationConfigurator(services);
         var mapping = (IDictionary<Type, Type>) configurator.Mapping;
         mapping.Add(typeof(IHomePageModel), typeof(HomePage));
         mapping.Add(typeof(ISearchPageModel), typeof(SearchPage));
