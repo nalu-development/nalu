@@ -12,7 +12,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.Insets;
 import androidx.core.view.OnApplyWindowInsetsListener;
-import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -39,7 +38,6 @@ public abstract class VirtualScrollNativeRecyclerView extends RecyclerView
         super(context);
         setClipToPadding(false);
         setClipChildren(true);
-        ViewCompat.setOnApplyWindowInsetsListener(this, this);
     }
 
     public VirtualScrollNativeRecyclerView(@NonNull Context context, @Nullable AttributeSet attrs) {
@@ -192,8 +190,44 @@ public abstract class VirtualScrollNativeRecyclerView extends RecyclerView
         lastInsets = insets.getInsets(ALL_INSETS_TYPE);
         applySelfPadding();
 
-        // Insets are always consumed: cells must never see them.
-        return new WindowInsetsCompat.Builder(insets).setInsets(ALL_INSETS_TYPE, Insets.NONE).build();
+        // Return value unused: dispatchApplyWindowInsets below invokes this directly and
+        // never forwards anything to children.
+        return insets;
+    }
+
+    // --- Insets isolation: the recycler is a hard window-insets BOUNDARY ---
+    //
+    // Cells never need window insets (the safe area belongs to this scroller via the
+    // positional self-padding above — MAUI's own CollectionView exempts cell subtrees the
+    // same way), yet MAUI attaches a managed insets listener to every layout of every cell,
+    // and each recycle re-attach requests a WHOLE-window insets dispatch on its first
+    // layout pass. During a fling that is O(cells) full-tree dispatches, each crossing JNI
+    // once per MAUI view — profiled at ~24% of CPU time. Both overrides below keep all of
+    // that out, entirely in Java.
+
+    /**
+     * Swallows {@code requestApplyInsets()} bubbles from cells. Deprecated for CALLERS
+     * since API 20, but this is the {@link ViewParent} ABI channel the framework itself
+     * still routes {@code View.requestApplyInsets()} through (verified through API 36) —
+     * removing it would break every custom ViewGroup ever compiled against it.
+     */
+    @Override
+    @SuppressWarnings("deprecation")
+    public void requestFitSystemWindows() {
+        // Deliberately empty: a cell (re-)attached by recycling must not trigger a
+        // whole-window insets dispatch.
+    }
+
+    /**
+     * Self-handling only: applies the positional self-padding and returns the insets
+     * UNCONSUMED so later siblings keep receiving them — but never traverses into the
+     * cells, so their managed listeners are never invoked.
+     */
+    @NonNull
+    @Override
+    public android.view.WindowInsets dispatchApplyWindowInsets(@NonNull android.view.WindowInsets insets) {
+        onApplyWindowInsets(this, WindowInsetsCompat.toWindowInsetsCompat(insets, this));
+        return insets;
     }
 
     @Override
