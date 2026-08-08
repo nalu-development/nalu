@@ -70,9 +70,10 @@ public partial class Scaffold
     }
 
     /// <summary>
-    /// Predictive-back integration (§ predictive back design): the system back gesture scrubs a
-    /// page-motion preview of the pop (v1 — shared-element seeking is a follow-up). Guarded
-    /// pages (<see cref="ILeavingGuard"/>) get NO preview, but the committed back still routes
+    /// Predictive-back integration (§ predictive back design): the system back gesture scrubs
+    /// the pop under the finger — page motion AND shared-element flights (the same seekable
+    /// session a committed pop plays, driven by gesture progress). Guarded pages
+    /// (<see cref="ILeavingGuard"/>) get NO preview, but the committed back still routes
     /// through the engine, which runs the guard. Root pages keep the callback disabled — the
     /// native back-to-home preview applies.
     /// </summary>

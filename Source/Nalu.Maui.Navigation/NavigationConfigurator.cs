@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 
 namespace Nalu;
 
@@ -15,7 +14,6 @@ public class NavigationConfigurator : INavigationConfiguration
         DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods;
 
     private readonly IServiceCollection _services;
-    private readonly Type _applicationType;
     private readonly Dictionary<Type, Type> _mapping;
     private readonly HashSet<Type> _viewOnlyPages = [];
 
@@ -26,26 +24,6 @@ public class NavigationConfigurator : INavigationConfiguration
     /// across every registration style.
     /// </summary>
     internal IReadOnlyCollection<Type> ViewOnlyPages => _viewOnlyPages;
-
-    /// <summary>The navigation-state restore configuration; null when <see cref="WithRestore"/> was never called.</summary>
-    internal NavigationRestoreOptions? RestoreOptions { get; private set; }
-
-    /// <summary>
-    /// Enables navigation-state snapshot &amp; restore: after an app restart the engine replays
-    /// the last captured navigation (root selection, pushed stack, entering intents) once the
-    /// configured initial page's first appearing completes — see <see cref="INavigationRestore"/>.
-    /// The library cannot see the app's build configuration: a DEBUG-only policy (the
-    /// recommended developer-experience default) is expressed app-side via
-    /// <see cref="NavigationRestoreOptions.Enabled"/> or an <c>#if DEBUG</c> guard around this call.
-    /// </summary>
-    /// <param name="configure">Configures intents, expiry and serialization.</param>
-    public NavigationConfigurator WithRestore(Action<NavigationRestoreOptions>? configure = null)
-    {
-        RestoreOptions ??= new NavigationRestoreOptions();
-        configure?.Invoke(RestoreOptions);
-
-        return this;
-    }
 
     /// <inheritdoc />
     public ImageSource? MenuImage { get; private set; }
@@ -62,10 +40,9 @@ public class NavigationConfigurator : INavigationConfiguration
     /// <inheritdoc />
     public NavigationLeakDetectorState LeakDetectorState { get; private set; } = NavigationLeakDetectorState.EnabledWithDebugger;
 
-    internal NavigationConfigurator(IServiceCollection services, Type applicationType)
+    internal NavigationConfigurator(IServiceCollection services)
     {
         _mapping = [];
-        _applicationType = applicationType;
         _services = services.AddSingleton<INavigationConfiguration>(this);
     }
 
@@ -202,66 +179,4 @@ public class NavigationConfigurator : INavigationConfiguration
         return this;
     }
 
-    /// <summary>
-    /// Registers all <see cref="ContentPage" />s matching a page model via default naming convention
-    /// `MyPage => MyPageModel` naming convention and adds them all as scoped services.
-    /// </summary>
-    /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
-    [RequiresUnreferencedCode("This method uses reflection to scan types in assemblies, which is not trim-compatible. Use AddPage method for each page instead.")]
-    public NavigationConfigurator AddPages(params Assembly[] otherAssemblies)
-        => AddPages(pageName => $"{pageName}Model", otherAssemblies);
-
-    /// <summary>
-    /// Registers all <see cref="ContentPage" />s matching a page model via provided
-    /// `<paramref name="pageToModelNameConvention" />` naming convention and adds them all as scoped services.
-    /// </summary>
-    /// <remarks>If a corresponding interface is found `IMyPageModel` the view model will be registered through the interface.</remarks>
-    /// <param name="pageToModelNameConvention">Given a page class name returns the corresponding page model class name.</param>
-    /// <param name="otherAssemblies">Assemblies to look for pages and page models.</param>
-    [RequiresUnreferencedCode("This method uses reflection to scan types in assemblies, which is not trim-compatible. Use AddPage method for each page instead.")]
-    public NavigationConfigurator AddPages(Func<string, string> pageToModelNameConvention, params Assembly[] otherAssemblies)
-    {
-        var assemblies = new[] { _applicationType.Assembly }.Concat(otherAssemblies).Distinct();
-        var types = assemblies.SelectMany(a => a.GetTypes()).ToList();
-
-        var notifyPropertyChangedInterfaces = types
-                                              .Where(t => t.IsInterface && t.IsAssignableTo(typeof(INotifyPropertyChanged)))
-                                              .GroupBy(t => t.Name)
-                                              .ToDictionary(g => g.Key, g => g.First());
-
-        var notifyPropertyChangedClasses = types
-                                           .Where(t => t is { IsClass: true, IsAbstract: false } && t.IsAssignableTo(typeof(INotifyPropertyChanged)))
-                                           .GroupBy(t => t.Name)
-                                           .ToDictionary(g => g.Key, g => g.First());
-
-        var pageTypes = types.Where(t => t.IsSubclassOf(typeof(ContentPage)));
-
-        foreach (var pageType in pageTypes)
-        {
-            var pageModelTypeName = pageToModelNameConvention(pageType.Name);
-
-            if (!notifyPropertyChangedClasses.TryGetValue(pageModelTypeName, out var pageModelType))
-            {
-                continue;
-            }
-
-            var pageModelInterfaceTypeName = $"I{pageModelTypeName}";
-
-            if (notifyPropertyChangedInterfaces.TryGetValue(pageModelInterfaceTypeName, out var pageModelInterfaceType) &&
-                _mapping.TryAdd(pageModelInterfaceType, pageType))
-            {
-                _services
-                    .AddScoped(pageModelInterfaceType, pageModelType)
-                    .AddScoped(pageType);
-            }
-            else if (_mapping.TryAdd(pageModelType, pageType))
-            {
-                _services
-                    .AddScoped(pageModelType)
-                    .AddScoped(pageType);
-            }
-        }
-
-        return this;
-    }
 }

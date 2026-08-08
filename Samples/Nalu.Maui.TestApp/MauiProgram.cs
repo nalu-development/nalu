@@ -22,44 +22,30 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
+            // AddPages() is SOURCE-GENERATED: every ContentPage in this assembly is registered,
+            // including the view-only harness pages (no page model) that previously needed
+            // explicit AddPage<T>() calls.
             .UseNaluNavigation<App>(nav => nav
                                            .AddPages()
-                                           // View-only pages (no page models) exercised by "Scaffold View Only Tests":
-                                           // AddPages() skips them (no matching model), the view-only overload registers them.
-                                           .AddPage<Tests.ViewOnlyOnePage>()
-                                           .AddPage<Tests.ViewOnlyTwoPage>()
-                                           .AddPage<Tests.ViewOnlyDetailPage>()
-                                           .AddPage<Tests.ViewOnlyGuardPage>()
-                                           // Page-lifecycle harness pages (also view-only).
-                                           .AddPage<Tests.ScaffoldLifecycleOnePage>()
-                                           .AddPage<Tests.ScaffoldLifecycleTwoPage>()
-                                           .AddPage<Tests.ScaffoldLifecycleDetailPage>()
-                                           // Restore harness pages (view-only) — "Scaffold Restore Tests".
-                                           .AddPage<Tests.RestoreHomePage>()
-                                           .AddPage<Tests.RestoreOtherPage>()
-                                           .AddPage<Tests.RestoreDetailPage>()
-                                           .AddPage<Tests.RestoreForgottenPage>()
-                                           .AddPage<Tests.RestoreDeepPage>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
-                                           // Navigation-state snapshot & restore, exercised by the "Scaffold Restore
-                                           // Tests" harness. DISABLED at launch: the harness scaffold toggles Enabled
-                                           // around its own lifetime (ctor on / Dispose off), so other suites never
-                                           // capture or restore.
-                                           .WithRestore(restore =>
-                                               {
-                                                   Tests.ScaffoldRestoreTestSupport.Options = restore;
-                                                   restore.Enabled = false;
-                                                   restore.AddIntent<Tests.RestoreDetailIntent>();
-                                               }
-                                           )
+            )
+            // Navigation-state snapshot & restore, exercised by the "Scaffold Restore
+            // Tests" harness. DISABLED at launch: the harness scaffold toggles Enabled
+            // around its own lifetime (ctor on / Dispose off), so other suites never
+            // capture or restore. AddIntents() is source-generated (discovers every
+            // IEnteringAware<T>/IAppearingAware<T> intent, e.g. RestoreDetailIntent).
+            .UseNaluNavigationRestore(restore =>
+                {
+                    Tests.ScaffoldRestoreTestSupport.Options = restore;
+                    restore.Enabled = false;
+                    restore.AddIntents();
+                }
             )
             .UseNaluTabBar()
-            .UseNaluScaffold(scaffold => scaffold
-                // Model-first overlays exercised by the "Scaffold Overlay Service Tests" harness.
-                .AddOverlay<Tests.VmSheetModel, Tests.VmSheetView>()
-                .AddOverlay<Tests.VmPopupModel, Tests.VmPopupView>()
-            )
+            // Model-first overlays exercised by the "Scaffold Overlay Service Tests" harness.
+            // AddOverlays() is source-generated (anchors on IOverlayRef ctor parameters).
+            .UseNaluScaffold(scaffold => scaffold.AddOverlays())
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()

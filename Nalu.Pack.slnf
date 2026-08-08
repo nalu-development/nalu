@@ -7,8 +7,9 @@
       "Source\\Nalu.Maui.Layouts\\Nalu.Maui.Layouts.csproj",
       "Source\\Nalu.Maui.VirtualScroll\\Nalu.Maui.VirtualScroll.csproj",
       "Source\\Nalu.Maui.Navigation\\Nalu.Maui.Navigation.csproj",
+      "Source\\Nalu.Maui.Navigation.SourceGenerators\\Nalu.Maui.Navigation.SourceGenerators.csproj",
       "Source\\Nalu.Maui.Scaffold\\Nalu.Maui.Scaffold.csproj",
-      "Source\\Nalu.Maui\\Nalu.Maui.csproj",
+      "Source\\Nalu.Maui.Scaffold.SourceGenerators\\Nalu.Maui.Scaffold.SourceGenerators.csproj",
       "Tests\\Nalu.Maui.Test\\Nalu.Maui.Test.csproj"
     ]
   }

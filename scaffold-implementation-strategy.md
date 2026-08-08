@@ -11,7 +11,8 @@
 
 - Library `Source/Nalu.Maui.Scaffold` in `Nalu.slnx` (net10.0 / -android / -ios26.0; iOS floor 12.2).
   Now in `Nalu.Pack.slnf` (August 2026): `11.0.0-scaffoldN.N` preview nupkgs are being cut for
-  real-app testing; `Nalu.Maui` meta-package inclusion still pending the release decision.
+  real-app testing. The `Nalu.Maui` meta-package was RETIRED (August 2026) — consumers reference
+  the individual packages; no inclusion decision remains.
 - Public structure API (§3): `Scaffold` → `ScaffoldArea`/`ScaffoldTabBar` → `ScaffoldRoot`,
   terse XAML via implicit conversions, engine-owned read-only selection
   (`CurrentArea`/`CurrentRoot`/`IsSelected`), template metadata quintet
@@ -106,19 +107,44 @@
   Android; docfx page `conceptual_docs/navigation-restore.md`. Branch:
   `feature/navigation-restore`.
 
+- **Source-generated registrations SHIPPED (August 2026, branch
+  `feature/navigation-source-generator`)**: `AddPages()` / `AddIntents()` (Navigation) and
+  `AddOverlays()` (Scaffold) are emitted at compile time by analyzer assemblies packed inside
+  the respective NuGet packages — trim/AOT-safe, replacing the reflection `AddPages(...)`
+  overloads (removed, breaking). Restore opt-in moved to `builder.UseNaluNavigationRestore(...)`.
+  Attributes: `[AutoNavigationPage]`, `[AutoNavigationIntent]`, `[AutoOverlay]`. VIEW-ONLY
+  overlays added (`AddOverlay<TView>()`: a View taking `IOverlayRef` is its own lifecycle
+  target). 27 generator tests (incl. incrementality-as-invariant) + full suites green; full
+  DevFlow iOS run green (one pre-existing flyout flake, tracked separately).
+- **Restore (§9) MERGED to main (August 2026, PR #177)**; `ForgetAsync` scoping semantics
+  pinned by dedicated unit tests (pages below a forgotten page keep restoring; the exclusion
+  dies on pop; a forgotten ROOT excludes only its own stack, other roots keep tracking).
+
+- **Predictive-back polish SHIPPED (August 2026)**: the peeked page is padded for where it
+  will LAND (its own nav/tab bar inset intent, dispatched per-view — fixes the revealed-page
+  jump on commit), and **shared-element flights now scrub with the gesture** — the flight
+  session became seekable (build / Seek(progress, sourceDx) / Finish), driven by
+  BackEventCompat progress, completing on commit and reversing on cancel. Verified on an
+  API 36 emulator against the DailyHelper photo pair; full Android DevFlow suite green.
+
 **Next steps, in recommended order:**
 
-1. **P3 remainder**: deep-link mapping (URI → `INavigationInfo`).
-2. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
+1. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
    object-level effects only).
-3. Housekeeping when releasable: `Nalu.Maui` meta-package inclusion decision, docfx pages.
-4. Optional/parked: flyout edge-swipe open; predictive-back shared-element flights — newly
-   FEASIBLE since the Android engine replacement (see §8.1 addendum); Shell-host restore
-   verification (engine-level design should work there — untested, unadvertised).
+2. Optional/parked: flyout edge-swipe open; Shell-host restore verification (engine-level
+   design should work there — untested, unadvertised).
 
-**Resolved (August 2026):** the NaluTabBar full-height issue on Android API 37 (Shell host) is
-fixed on `fix/nalutabbar-api37` (`RowDefinitions="Auto"` root + height-only Unspecified measure
-spec + the reporter's `View.Layout` NRE fix), awaiting merge to `main`.
+**Decided (August 2026): deep-link mapping stays APP-SIDE.** A library URI → `INavigationInfo`
+layer was dropped: the edge cases are irreducibly app-specific (scheme design, auth gates,
+missing/deleted targets, cold-vs-warm policy, notification payload shapes). The supported
+surface is what apps compose it from: typed absolute navigation
+(`Navigation.Absolute()...WithIntent(...)`) and `TryStopRestoreAsync()` for preempting a
+pending restore when a link arrives at boot — recipe documented in
+`conceptual_docs/navigation-restore.md` ("Recipe: handling deep links").
+
+**Resolved (August 2026):** the NaluTabBar full-height issue on Android API 37 (Shell host) —
+`RowDefinitions="Auto"` root + height-only Unspecified measure spec + the reporter's
+`View.Layout` NRE fix — is MERGED to `main` (#162).
 
 ## 1. Goals
 
@@ -140,7 +166,9 @@ Build a complete replacement for MAUI `Shell` on mobile platforms that:
 - Replacing or wrapping MAUI Shell (Shell support in Nalu.Maui.Navigation stays as-is; Scaffold is an *alternative host*).
 - Windows / Mac Catalyst support.
 - View-state snapshotting (restore replays *navigation*, it never deserializes page UI state).
-- URI-based routing as the primary API (deep links are a mapping layer on top of Nalu absolute navigation, P3).
+- URI-based routing in any form: deep links are APP-SIDE (decided August 2026) — apps map their
+  URIs onto Nalu absolute navigation themselves; the library only guarantees the primitives
+  (typed absolute navigation, `TryStopRestoreAsync`).
 
 ---
 
@@ -151,7 +179,7 @@ Build a complete replacement for MAUI `Shell` on mobile platforms that:
   IMPLEMENTED: net10.0 / net10.0-android / net10.0-ios26.0 (net11 later); iOS floor 12.2, Android 21
   (repo low-floor policy — native sheets would be runtime-guarded, §7.2); `InternalsVisibleTo`
   grants from Core and Navigation. In `Nalu.Pack.slnf` since August 2026 (preview nupkgs for
-  real-app testing); `Nalu.Maui` meta-package inclusion waits for the release decision.
+  real-app testing); the `Nalu.Maui` meta-package was retired instead of extended.
 - `Nalu.Maui.Navigation` keeps working with MAUI Shell exactly as today — existing users unaffected
   (verified: zero engine changes; all pre-existing tests green throughout).
 - The host-abstraction contracts stay `internal`, consumed via IVT (see §4).
@@ -1239,11 +1267,12 @@ The Scaffold must own, with exact ordering:
 ### P3 — restore, deep links, polish
 
 > **Status (August 2026): snapshot/restore DONE** (§9 — engine-level, both platforms,
-> kill-and-relaunch verified). Remaining: deep links, iOS 18 zoom opportunism.
+> kill-and-relaunch verified). Deep links DROPPED (app-side — see §0). Remaining:
+> iOS 18 zoom opportunism (optional).
 
 - ✅ Snapshot/restore per §9 (DEBUG DevEx first; production is the same mechanism behind
   `Enabled`/`MaxAge` policy).
-- Deep-link mapping layer (URI → `INavigationInfo`).
+- ~~Deep-link mapping layer (URI → `INavigationInfo`)~~ — dropped, app-side by decision (§0).
 - iOS 18 zoom-transition opportunism (optional), docs (docfx conceptual), migration guide from NaluShell.
 - **Exit**: docs published; TestApp/UITest coverage for every §5–§9 behavior.
 

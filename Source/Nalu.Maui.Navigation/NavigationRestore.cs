@@ -64,7 +64,7 @@ public interface INavigationRestoreStore
 
 /// <summary>
 /// Navigation-state snapshot &amp; restore (opt-in via
-/// <c>UseNaluNavigation(nav =&gt; nav.WithRestore(...))</c>): after an app restart the engine
+/// <c>builder.UseNaluNavigationRestore(...)</c>): after an app restart the engine
 /// replays the last captured navigation — root selection, pushed stack and the intents that
 /// materialized those pages — landing the user exactly where they were. Restore replays
 /// <b>navigation</b>; it never serializes page UI state.
@@ -132,7 +132,7 @@ public interface INavigationRestore
 
 /// <summary>
 /// Configures navigation-state snapshot &amp; restore inside
-/// <see cref="NavigationConfigurator.WithRestore"/>.
+/// <c>builder.UseNaluNavigationRestore(...)</c>.
 /// </summary>
 public sealed class NavigationRestoreOptions
 {
@@ -140,10 +140,10 @@ public sealed class NavigationRestoreOptions
     private readonly Dictionary<Type, string> _intentIdsByType = [];
 
     /// <summary>
-    /// Whether restore is active. Defaults to true (calling <c>WithRestore</c> is the opt-in);
-    /// the library cannot see the app's build configuration, so a DEBUG-only policy is
-    /// expressed app-side: <c>options.Enabled = isDebugBuild</c> (or wrap the whole
-    /// <c>WithRestore</c> call in <c>#if DEBUG</c>).
+    /// Whether restore is active. Defaults to true (calling <c>UseNaluNavigationRestore</c> is
+    /// the opt-in); the library cannot see the app's build configuration, so a DEBUG-only policy
+    /// is expressed app-side: <c>options.Enabled = isDebugBuild</c> (or wrap the whole
+    /// <c>UseNaluNavigationRestore</c> call in <c>#if DEBUG</c>).
     /// </summary>
     public bool Enabled { get; set; } = true;
 

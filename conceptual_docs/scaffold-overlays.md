@@ -73,13 +73,29 @@ quick-switch panels. `ScaffoldTabBar.ShowPanelAsync(...)` is the area-level equi
 
 ## MVVM overlays — `IOverlayService`
 
-For model-first flows, register model/view pairs and show overlays without touching views:
+For model-first flows, register overlays and show them without touching views:
 
 ```csharp
-builder.UseNaluScaffold(scaffold => scaffold
-    .AddOverlay<ConfirmDeleteModel, ConfirmDeleteView>()
-    .AddOverlay<FilterSheetModel, FilterSheetView>());
+builder.UseNaluScaffold(scaffold => scaffold.AddOverlays());
 ```
+
+**`AddOverlays()` is source-generated** (the generator ships inside the NuGet package): at
+build time it discovers every class whose public constructor takes `IOverlayRef` — the
+model-first anchor — and emits plain `AddOverlay<...>` calls, AOT/trim-safe:
+
+- a **`View`-derived** class taking `IOverlayRef` registers **view-only**
+  (`AddOverlay<TView>()`): the view is its own lifecycle target, shown via
+  `Show*Async<TView>()`, its `BindingContext` left untouched;
+- any **other** class is an overlay **model**, paired with the `View` whose constructor takes
+  the model type (a view assigning it to `BindingContext` wins ties), or the
+  `FooModel → FooView` naming convention.
+
+`[AutoOverlay]` tunes the discovery: opt in a model that doesn't inject `IOverlayRef`, name
+the view explicitly with `[AutoOverlay(typeof(TheView))]` when several match, or opt out with
+`[AutoOverlay(Enabled = false)]`. Overlays in **other assemblies** (which the generator does
+not scan) register manually — `AddOverlay<TModel, TView>()`, `AddOverlay<TView>()` and the
+view-factory overload all remain available and compose freely with `AddOverlays()`.
+Diagnostics `NALU0101`–`NALU0103` flag unresolvable or ambiguous views.
 
 ```csharp
 public class ItemsPageModel(IOverlayService overlays)

@@ -6,10 +6,12 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Controls\Nalu.Maui.Controls.csproj" />
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
+      <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Scaffold\Nalu.Maui.Scaffold.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.VirtualScroll\Nalu.Maui.VirtualScroll.csproj" />
-      <ProjectReference Include="..\..\Source\Nalu.Maui\Nalu.Maui.csproj" />
     </ItemGroup>
 
     <ItemGroup>

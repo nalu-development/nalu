@@ -101,4 +101,15 @@ public interface IScaffoldConfigurator
         TView>(Func<IServiceProvider, TModel, TView> viewFactory)
         where TModel : class
         where TView : View;
+
+    /// <summary>
+    /// Registers a VIEW-ONLY overlay: the view is its own lifecycle target — it receives
+    /// <see cref="IOverlayRef"/> (and services) via its single public constructor, intents are
+    /// delivered to its <c>OnEnteringAsync</c>, and it is shown via
+    /// <c>Show*Async&lt;TView&gt;()</c>. Its <c>BindingContext</c> is left untouched.
+    /// </summary>
+    /// <typeparam name="TView">The overlay view, acting as its own model.</typeparam>
+    IScaffoldConfigurator AddOverlay<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] TView>()
+        where TView : View;
 }

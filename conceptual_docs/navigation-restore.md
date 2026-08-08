@@ -19,24 +19,44 @@ Typical uses:
 
 ## Enabling it
 
-Restore is opt-in per app:
+Restore is opt-in per app, configured as its own builder step next to `UseNaluNavigation`
+(call order between the two does not matter):
 
 ```csharp
-.UseNaluNavigation<App>(nav => nav
-    .AddPages()
-    .WithRestore(restore =>
-    {
+.UseNaluNavigation<App>(nav => nav.AddPages())
+.UseNaluNavigationRestore(restore =>
+{
 #if !DEBUG
-        restore.Enabled = false;            // DEBUG-only DevEx policy, expressed app-side
+    restore.Enabled = false;            // DEBUG-only DevEx policy, expressed app-side
 #endif
-        restore.MaxAge = TimeSpan.FromHours(12);   // optional: stale snapshots are discarded
-        restore.AddIntent<ProductDetailIntent>();  // every intent type that should replay
-    })
-)
+    restore.MaxAge = TimeSpan.FromHours(12);   // optional: stale snapshots are discarded
+    restore.AddIntents();               // source-generated: registers every discovered intent
+})
 ```
 
-`Enabled` defaults to `true` once `WithRestore` is called — the library cannot see your build
-configuration, so a DEBUG-only policy is a one-line app-side decision (as above).
+`Enabled` defaults to `true` once `UseNaluNavigationRestore` is called — the library cannot
+see your build configuration, so a DEBUG-only policy is a one-line app-side decision (as
+above).
+
+**`AddIntents()` is source-generated**: at build time it finds every intent type your pages
+and page models receive through `IEnteringAware<T>` / `IAppearingAware<T>` and registers it
+with a stable id — AOT/trim-safe, always in sync with the code. Two levers tune it, both on
+the intent type:
+
+```csharp
+[AutoNavigationIntent(Enabled = false)]         // never replay: reaching a page with this
+public record CreateDraftIntent;                // intent ends the restorable stack there
+
+[AutoNavigationIntent("product-detail")]        // stable wire id decoupled from the type name
+public record ProductDetailIntent(string ProductId);
+```
+
+Intents deriving from `AwaitableIntent` are never registered — their completion source cannot
+survive a restart. Two restorable intents sharing a short name is a **compile-time error**
+(`NALU0005`) until you disambiguate with an explicit `[AutoNavigationIntent("...")]` id.
+Intents defined in **other assemblies** (which
+the generator does not scan) are registered manually with `restore.AddIntent<T>("stable-id")`
+— the two styles compose freely.
 
 ## Capture is automatic
 
@@ -45,8 +65,8 @@ recorded (and serialized) at navigation time. Whether a page is restorable deriv
 was reached:
 
 - navigated to **without an intent** → restorable (it needs no context to reproduce);
-- navigated to with an intent whose type is **registered via `AddIntent<T>()`** → restorable,
-  the same intent replays on restore;
+- navigated to with an intent whose type is **registered** (via the generated `AddIntents()`
+  or a manual `AddIntent<T>()`) → restorable, the same intent replays on restore;
 - navigated to with an **unregistered intent** (or one that fails to serialize) → the
   restorable stack *ends at that page*: its context cannot be reproduced, so neither it nor
   anything above it restores.
@@ -106,7 +126,10 @@ public class CheckoutPageModel(INavigationRestore restore) : IEnteringAware
 ```
 
 - **`ForgetAsync()`** — removes the current page from the restoration stack: a restore lands
-  on the page below it (and pages above cannot restore either). Lasts until the page pops.
+  on the page below it (and pages above cannot restore either). The exclusion is scoped to
+  that page instance — pages below keep restoring, and it lifts when the page pops. Called on
+  a **root** page it excludes that root and its whole stack (roots never pop, so it lasts for
+  the app session) while every other root keeps tracking normally.
 - **`RestoreWithIntentAsync(intent)`** — sets or replaces the intent replayed for the current
   page: swap a "create draft" intent for a "saved entity id" one once state materializes, or
   make a page reached with an unregistered intent restorable again by providing a registered
@@ -163,6 +186,51 @@ public async Task OnInitializationCompletedAsync()
 `TryStopRestoreAsync()` returns `true` when there was a pending (or in-flight) restore to
 stop; the discarded snapshot is replaced by a fresh capture of wherever the app goes next.
 
+### Recipe: handling deep links
+
+Nalu deliberately ships **no URI routing** — scheme design, auth gates, missing targets and
+notification payload shapes are app-specific. What the library guarantees is the pair of
+primitives a deep-link handler composes: typed absolute navigation, and
+`TryStopRestoreAsync()` so a link and a pending boot-time restore never fight over the first
+navigation (the link must win — otherwise the replay ignores it, or lands the user somewhere
+else first).
+
+```csharp
+public sealed class DeepLinkHandler(INavigationService navigation, INavigationRestore restore)
+{
+    public async Task HandleAsync(Uri uri)
+    {
+        // Your parsing, your rules: auth gates, tenant checks, deleted targets…
+        if (TryParseOrder(uri, out var orderId))
+        {
+            // A pending restore must not race the link: drop it and lift the
+            // navigation-suppression window. Inert (false) when restore is off,
+            // or already replayed, or on a warm start — safe to call unconditionally.
+            await restore.TryStopRestoreAsync();
+
+            await navigation.GoToAsync(
+                Navigation.Absolute()
+                          .Root<OrdersPageModel>()
+                          .Push<OrderDetailPageModel>()
+                          .WithIntent(new OrderIntent(orderId))
+            );
+        }
+    }
+}
+```
+
+Funnel every platform entry point into that one handler: `Application.OnAppLinkRequestReceived`
+for universal/app links, the platform activity/scene callbacks for custom schemes and
+notification taps. On a **cold start** the URI typically arrives before the engine finished
+booting — stash it and invoke the handler from your initialization flow (the same place the
+authentication redirect above lives, after the initial page's first appearing), not from the
+platform callback directly. On a **warm start** the handler can run immediately: there is no
+pending restore, `TryStopRestoreAsync()` no-ops, and the absolute navigation simply happens.
+
+The captured snapshot updates automatically as the link navigation lands, so killing the app
+afterwards restores the deep-linked stack like any other — including the typed intent, when
+its type is [registered for restore](#enabling-it).
+
 ## Customization
 
 - **`IIntentSerializer`** — the wire format. The default is System.Text.Json reflection,
@@ -172,9 +240,11 @@ stop; the discarded snapshot is replaced by a fresh capture of wherever the app 
 - **`INavigationRestoreStore`** — persistence. The default is a JSON file in the app cache
   directory (which has exactly the "safe to delete" semantics restore data wants); replace it
   in DI for custom locations.
-- **Intent type ids** — `AddIntent<T>("stable-name")` registers the id stored in the snapshot
-  (defaulting to the type's short name, collision-checked). Never an assembly-qualified name:
-  renames invalidate old snapshots instead of deserializing the wrong thing.
+- **Intent type ids** — the id stored in the snapshot defaults to the type's short name,
+  collision-checked; override it with `[AutoNavigationIntent("stable-name")]` (picked
+  up by the generated `AddIntents()`) or a manual `AddIntent<T>("stable-name")`. Never an
+  assembly-qualified name: renames invalidate old snapshots instead of deserializing the
+  wrong thing.
 
 ## What does NOT restore
 

@@ -49,6 +49,19 @@ internal sealed class ScaffoldOverlayRegistry : IScaffoldConfigurator
 
         return this;
     }
+
+    public IScaffoldConfigurator AddOverlay<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] TView>()
+        where TView : View
+    {
+        // View-only: the view IS the lifecycle target — one instance serves both roles.
+        _registrations[typeof(TView)] = new ScaffoldOverlayRegistration(
+            static provider => ActivatorUtilities.CreateInstance<TView>(provider),
+            static (_, model) => (View) model
+        );
+
+        return this;
+    }
 }
 
 /// <summary>
@@ -247,8 +260,13 @@ internal sealed class ScaffoldOverlayService(INavigationService navigationServic
             var view = registration.CreateView(provider, model);
 
             // Views taking the model usually assign it themselves; make the convention hold
-            // regardless so bindings work with either constructor shape.
-            view.BindingContext ??= model;
+            // regardless so bindings work with either constructor shape. View-only overlays
+            // (view == model) keep their BindingContext untouched — self-assignment would
+            // sever inherited contexts for no gain.
+            if (!ReferenceEquals(view, model))
+            {
+                view.BindingContext ??= model;
+            }
 
             try
             {

@@ -63,6 +63,11 @@
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup Label="Source generator (packed as an analyzer, not referenced by the library itself)">
+    <ProjectReference Include="..\Nalu.Maui.Navigation.SourceGenerators\Nalu.Maui.Navigation.SourceGenerators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="..\Nalu.Maui.Navigation.SourceGenerators\bin\$(Configuration)\netstandard2.0\Nalu.Maui.Navigation.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <Compile Update="Platforms\Android\NaluTabBar.cs">
       <ExcludeFromCurrentConfiguration>true</ExcludeFromCurrentConfiguration>

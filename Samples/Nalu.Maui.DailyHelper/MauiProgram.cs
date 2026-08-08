@@ -15,25 +15,30 @@ public static class MauiProgram
 
         builder
             .UseMauiApp<App>()
-            .UseNaluNavigation<App>(nav => nav
-                .AddPages()
+            // AddPages() is SOURCE-GENERATED (trim/AOT-safe): every ContentPage in this assembly
+            // is registered with its inferred page model (ctor BindingContext assignment, single
+            // INPC ctor parameter, or the MyPage -> MyPageModel naming convention).
+            .UseNaluNavigation<App>(nav => nav.AddPages())
 
-                // Navigation-state restoration: relaunch the app and land exactly where you
-                // were — including inside the task editor, whose intent is rehydrated (see
-                // TaskEditorIntent / IIntentHydrator on the Today & Tasks page models).
-                // Enabled unconditionally here (it IS the demo); real apps usually gate it:
-                //   restore.Enabled = isDebugBuild;
-                .WithRestore(restore =>
-                    {
-                        restore.MaxAge = TimeSpan.FromDays(1);
-                        restore.AddIntent<TaskEditorIntent>();
-                    }
-                )
+            // Navigation-state restoration: relaunch the app and land exactly where you
+            // were — including inside the task editor, whose intent is rehydrated (see
+            // TaskEditorIntent / IIntentHydrator on the Today & Tasks page models).
+            // AddIntents() is source-generated too: it registers every intent discovered via
+            // IEnteringAware<T>/IAppearingAware<T>, honoring [AutoNavigationIntent].
+            // Enabled unconditionally here (it IS the demo); real apps usually gate it:
+            //   restore.Enabled = isDebugBuild;
+            .UseNaluNavigationRestore(restore =>
+                {
+                    restore.MaxAge = TimeSpan.FromDays(1);
+                    restore.AddIntents();
+                }
             )
 
             // Model-first overlays (§7.2): the duration sheet is shown via IOverlayService
             // from the task editor's page model — no view references in the model.
-            .UseNaluScaffold(scaffold => scaffold.AddOverlay<DurationSheetModel, DurationSheetView>())
+            // AddOverlays() is source-generated: it discovers classes taking IOverlayRef in
+            // their constructor and pairs each model with its view.
+            .UseNaluScaffold(scaffold => scaffold.AddOverlays())
             .UseSkiaSharp()
             .UseNaluControls()
             .UseNaluVirtualScroll()

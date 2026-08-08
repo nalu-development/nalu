@@ -427,13 +427,13 @@ public partial class AppShell : Shell
 3. ✅ Verify page registration
 
 ```csharp
-// Manual registration
+// Source-generated registration of every page in the assembly (AOT/trim-safe)
+.UseNaluNavigation<App>(nav => nav.AddPages())
+
+// Or manual registration (also for pages in other assemblies)
 .UseNaluNavigation<App>(nav => nav
     .AddPage<MainPageModel, MainPage>()
 )
-
-// Or auto-discovery (⚠️ not AOT-compatible - use AddPage for each page instead)
-.UseNaluNavigation<App>(nav => nav.AddPages())
 ```
 
 4. ✅ Confirm page constructor signature
@@ -553,7 +553,7 @@ public static WeakReference<Page>? CurrentPageRef { get; set; }
 
 ```csharp
 .UseNaluNavigation<App>(nav => nav
-    .AddPage<MainPageModel, MainPage>() // ⚠️ For AOT compatibility, use AddPage for each page instead of AddPages()
+    .AddPages()
     .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
 )
 ```
@@ -793,7 +793,7 @@ public ValueTask OnEnteringAsync()
 1. **Ensure ViewModels are registered**
 
 ```csharp
-// ✅ Automatic registration (⚠️ not AOT-compatible - use AddPage for each page instead)
+// ✅ Source-generated registration (AOT/trim-safe)
 .UseNaluNavigation<App>(nav => nav.AddPages())
 
 // ✅ Manual registration
@@ -802,27 +802,28 @@ public ValueTask OnEnteringAsync()
 )
 ```
 
-2. **Check naming convention**
+2. **Check how the model is inferred**
 
 ```csharp
-// Default convention: MainPage -> MainPageModel
-// If using different convention:
-.UseNaluNavigation<App>(nav => nav
-    .AddPages(pageType => 
-        pageType.Name.Replace("Page", "ViewModel")
-    )
-)
+// The generated AddPages() infers the model from the page constructor first:
+// the parameter assigned to BindingContext (or a single INPC parameter) wins,
+// then the MainPage -> MainPageModel naming convention applies.
+// A page with no discoverable model is registered view-only (NALU0001 info).
+public MainPage(MyCustomViewModel viewModel) // registered as AddPage<MyCustomViewModel, MainPage>
+{
+    InitializeComponent();
+    BindingContext = viewModel;
+}
 ```
 
-3. **Verify ViewModel is in scanned assembly**
+3. **Verify the ViewModel's assembly**
 
 ```csharp
-// Scans the App assembly (⚠️ not AOT-compatible - use AddPage for each page instead)
-.UseNaluNavigation<App>(nav => nav.AddPages())
-
-// If ViewModel is in different assembly, register manually
+// The generator only scans the assembly being compiled.
+// Pages/models living in another assembly are registered manually:
 .UseNaluNavigation<App>(nav => nav
-    .AddPage<MyPageModel, MyPage>()
+    .AddPages()
+    .AddPage<MyPageModel, MyPage>() // from the shared library
 )
 ```
 

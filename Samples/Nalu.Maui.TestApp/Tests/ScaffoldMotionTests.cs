@@ -19,7 +19,7 @@ public partial class MoRootPageModel(INavigationService navigationService) : Obs
     public Task PushInset() => navigationService.GoToAsync(Navigation.Relative().Push<MoInsetPageModel>());
 }
 
-/// <summary>Model-less pages are not registered by AddPages(): the second tab root needs one.</summary>
+/// <summary>Gives the second tab root a page model (kept from the pre-source-generator era; the generated AddPages() maps it by naming convention).</summary>
 [UsedImplicitly]
 public partial class MoSecondPageModel : ObservableObject;
 

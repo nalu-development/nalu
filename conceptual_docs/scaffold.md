@@ -140,7 +140,7 @@ programmatic navigations.
 
 That also means engine-level features light up unchanged — including
 [navigation state restoration](navigation-restore.md): opt in with
-`UseNaluNavigation(nav => nav.WithRestore(...))` and the app lands exactly where it was after
+`builder.UseNaluNavigationRestore(...)` and the app lands exactly where it was after
 a restart (the Scaffold is the verified host).
 
 ## Sample app

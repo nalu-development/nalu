@@ -20,8 +20,8 @@ namespace Nalu.Maui.TestApp.Tests;
 public sealed record RestoreDetailIntent(string Value);
 
 /// <summary>
-/// Runtime toggle for the restore options: MauiProgram's <c>WithRestore</c> parks the live
-/// options instance here; the harness scaffold flips <c>Enabled</c> around its own lifetime.
+/// Runtime toggle for the restore options: MauiProgram's <c>UseNaluNavigationRestore</c> parks
+/// the live options instance here; the harness scaffold flips <c>Enabled</c> around its own lifetime.
 /// </summary>
 public static class ScaffoldRestoreTestSupport
 {

@@ -60,15 +60,28 @@ The engines (custom on both platforms) are built for **truthful flights**:
   constant mid-flight.
 - Unmatched pairs and not-yet-laid-out targets gracefully fall back to the plain slide.
 
+## Depth cues
+
+Stacked motions (push, pop, and both interactive gestures) carry two automatic depth cues so
+the moving page's boundary always reads, whatever the content: the page travelling **above**
+casts a soft shadow (Android elevation / iOS layer shadow — both composited, no per-frame
+cost), and the page revealed **beneath** sits under a subtle dim proportional to how covered
+it still is, lifting as the top page departs. Side-by-side motions (root switches) get
+neither — those pages are adjacent, not stacked.
+
 ## Interactive gestures
 
 - **iOS edge-swipe pop**: left-edge pan scrubs the pop choreography — including shared-element
   flights — under the finger; release either completes (dispatching the pop through the
   engine) or cancels. Pages whose model implements `ILeavingGuard` block the gesture and route
   through the guard instead.
-- **Android predictive back**: the system back gesture peeks the page below with the standard
-  slide; committing hands off to the engine pop (guards honored, `enableOnBackInvokedCallback`
-  required, root pages defer to the native back-to-home preview).
+- **Android predictive back**: the system back gesture peeks the page below — padded for
+  where it will land (its own nav/tab bar footprints, not the scrubbed page's) — and scrubs
+  the pop under the finger, **including shared-element flights**: matching
+  `Scaffold.TransitionName` pairs fly between the two pages driven by the gesture, complete
+  with the settle on commit, and reverse home on cancel. Committing hands off to the engine
+  pop (guards honored, `enableOnBackInvokedCallback` required, root pages defer to the native
+  back-to-home preview).
 
 ## Modal pages
 
