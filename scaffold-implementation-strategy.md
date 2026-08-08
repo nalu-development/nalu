@@ -122,12 +122,18 @@
 
 **Next steps, in recommended order:**
 
-1. **P3 remainder**: deep-link mapping (URI → `INavigationInfo`).
-2. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
+1. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
    object-level effects only).
-3. Optional/parked: flyout edge-swipe open; predictive-back shared-element flights — newly
+2. Optional/parked: flyout edge-swipe open; predictive-back shared-element flights — newly
    FEASIBLE since the Android engine replacement (see §8.1 addendum); Shell-host restore
    verification (engine-level design should work there — untested, unadvertised).
+
+**Decided (August 2026): deep-link mapping stays APP-SIDE.** A library URI → `INavigationInfo`
+layer was dropped: the edge cases are irreducibly app-specific (scheme design, auth gates,
+missing/deleted targets, cold-vs-warm policy, notification payload shapes). The supported
+surface is what apps compose it from: typed absolute navigation
+(`Navigation.Absolute()...WithIntent(...)`) and `TryStopRestoreAsync()` for preempting a
+pending restore when a link arrives at boot.
 
 **Resolved (August 2026):** the NaluTabBar full-height issue on Android API 37 (Shell host) —
 `RowDefinitions="Auto"` root + height-only Unspecified measure spec + the reporter's
@@ -153,7 +159,9 @@ Build a complete replacement for MAUI `Shell` on mobile platforms that:
 - Replacing or wrapping MAUI Shell (Shell support in Nalu.Maui.Navigation stays as-is; Scaffold is an *alternative host*).
 - Windows / Mac Catalyst support.
 - View-state snapshotting (restore replays *navigation*, it never deserializes page UI state).
-- URI-based routing as the primary API (deep links are a mapping layer on top of Nalu absolute navigation, P3).
+- URI-based routing in any form: deep links are APP-SIDE (decided August 2026) — apps map their
+  URIs onto Nalu absolute navigation themselves; the library only guarantees the primitives
+  (typed absolute navigation, `TryStopRestoreAsync`).
 
 ---
 
@@ -1252,11 +1260,12 @@ The Scaffold must own, with exact ordering:
 ### P3 — restore, deep links, polish
 
 > **Status (August 2026): snapshot/restore DONE** (§9 — engine-level, both platforms,
-> kill-and-relaunch verified). Remaining: deep links, iOS 18 zoom opportunism.
+> kill-and-relaunch verified). Deep links DROPPED (app-side — see §0). Remaining:
+> iOS 18 zoom opportunism (optional).
 
 - ✅ Snapshot/restore per §9 (DEBUG DevEx first; production is the same mechanism behind
   `Enabled`/`MaxAge` policy).
-- Deep-link mapping layer (URI → `INavigationInfo`).
+- ~~Deep-link mapping layer (URI → `INavigationInfo`)~~ — dropped, app-side by decision (§0).
 - iOS 18 zoom-transition opportunism (optional), docs (docfx conceptual), migration guide from NaluShell.
 - **Exit**: docs published; TestApp/UITest coverage for every §5–§9 behavior.
 
