@@ -11,6 +11,14 @@ namespace Nalu.Maui.Test.ScaffoldTests;
 /// </summary>
 public class NavigationRestoreTests
 {
+    static NavigationRestoreTests()
+    {
+        // The replay loop enqueues each step through the page dispatcher. In a FULL suite run
+        // another test class happens to install the global stub first; a FILTERED run of this
+        // class alone must not depend on that ordering.
+        DispatcherProvider.SetCurrent(new DispatcherProviderStub());
+    }
+
     public sealed record SearchIntent(string Value);
 
     public sealed record DetailIntent(string Value);
@@ -208,6 +216,8 @@ public class NavigationRestoreTests
 
         public IReadOnlyList<NavigationStackPage> HomeStack => HomeRoot.NavigationStack.PushedPages;
 
+        public IReadOnlyList<NavigationStackPage> SearchStack => SearchRoot.NavigationStack.PushedPages;
+
         public void Dispose()
         {
             Scaffold.Dispose();
@@ -343,6 +353,101 @@ public class NavigationRestoreTests
 
         second.TabBar.CurrentRoot.Should().Be(second.HomeRoot);
         second.HomeStack.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Killing the app on a forgotten page restores the pages below it")]
+    public async Task KillingOnAForgottenPageRestoresThePagesBelowIt()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store))
+        {
+            await first.BootAsync();
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().WithIntent(new DetailIntent("kept")));
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>());
+
+            // Forgetting excludes THIS page (and anything later pushed on top of it) — the
+            // rest of the stack keeps restoring.
+            await first.RestoreApi.ForgetAsync();
+            await first.Restore.FlushAsync();
+        }
+
+        using var second = new Harness(store);
+        await second.BootAsync();
+
+        second.HomeStack.Should().ContainSingle().Which.Page.Should().BeOfType<DetailPage>();
+    }
+
+    [Fact(DisplayName = "Popping a forgotten page resumes tracking for what follows")]
+    public async Task PoppingAForgottenPageResumesTracking()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store))
+        {
+            await first.BootAsync();
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().Push<IDeepDetailPageModel>());
+
+            // Wizard-style: the top page forgets itself, then pops. The exclusion lives on
+            // the page INSTANCE, so it dies with the pop — everything after tracks normally.
+            await first.RestoreApi.ForgetAsync();
+            await first.NavigationService.GoToAsync(Navigation.Relative().Pop());
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDeepDetailPageModel>());
+            await first.Restore.FlushAsync();
+        }
+
+        using var second = new Harness(store);
+        await second.BootAsync();
+
+        second.HomeStack.Should().HaveCount(2);
+        second.HomeStack[0].Page.Should().BeOfType<DetailPage>();
+        second.HomeStack[1].Page.Should().BeOfType<DeepDetailPage>();
+    }
+
+    [Fact(DisplayName = "A forgotten root keeps its whole stack out of the snapshot, even when revisited")]
+    public async Task ForgottenRootStaysUntrackedIncludingItsStack()
+    {
+        var store = new InMemoryStore();
+        using var harness = new Harness(store);
+        await harness.BootAsync();
+
+        await harness.RestoreApi.ForgetAsync(); // current page = home root
+
+        // Pushes on the forgotten root are untracked too: their context builds on it.
+        await harness.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>());
+        await harness.Restore.FlushAsync();
+        ParseSnapshot(store.Stored!).RootSegment.Should().BeNull("the forgotten root's stack builds on it");
+
+        // Roots never pop: leaving and returning does not lift the exclusion.
+        (await harness.NavigationService.GoToAsync(Navigation.Absolute().Root<ISearchPageModel>())).Should().BeTrue();
+        (await harness.NavigationService.GoToAsync(Navigation.Absolute().Root<IHomePageModel>())).Should().BeTrue();
+        await harness.Restore.FlushAsync();
+
+        ParseSnapshot(store.Stored!).RootSegment.Should().BeNull("the root instance is still alive, so its exclusion persists");
+    }
+
+    [Fact(DisplayName = "Other roots keep tracking after a root forgot itself")]
+    public async Task OtherRootsKeepTrackingAfterARootForgotItself()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store))
+        {
+            await first.BootAsync();
+            await first.RestoreApi.ForgetAsync(); // home root forgets itself
+
+            // The snapshot always describes the CURRENT root: switching to an unforgotten
+            // root re-enables capture in full, stack and intents included.
+            (await first.NavigationService.GoToAsync(Navigation.Absolute().Root<ISearchPageModel>())).Should().BeTrue();
+            await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().WithIntent(new DetailIntent("kept")));
+            await first.Restore.FlushAsync();
+        }
+
+        using var second = new Harness(store);
+        await second.BootAsync();
+
+        second.TabBar.CurrentRoot.Should().Be(second.SearchRoot);
+        second.SearchStack.Should().ContainSingle().Which.Page.Should().BeOfType<DetailPage>();
     }
 
     [Fact(DisplayName = "RestoreWithIntentAsync replaces the captured intent for the current page")]

@@ -126,7 +126,10 @@ public class CheckoutPageModel(INavigationRestore restore) : IEnteringAware
 ```
 
 - **`ForgetAsync()`** — removes the current page from the restoration stack: a restore lands
-  on the page below it (and pages above cannot restore either). Lasts until the page pops.
+  on the page below it (and pages above cannot restore either). The exclusion is scoped to
+  that page instance — pages below keep restoring, and it lifts when the page pops. Called on
+  a **root** page it excludes that root and its whole stack (roots never pop, so it lasts for
+  the app session) while every other root keeps tracking normally.
 - **`RestoreWithIntentAsync(intent)`** — sets or replaces the intent replayed for the current
   page: swap a "create draft" intent for a "saved entity id" one once state materializes, or
   make a page reached with an unregistered intent restorable again by providing a registered
