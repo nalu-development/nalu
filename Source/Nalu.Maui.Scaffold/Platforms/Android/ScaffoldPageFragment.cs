@@ -135,7 +135,7 @@ internal sealed class ScaffoldPageFragment : Fragment
         platformView.ScaleX = 1f;
         platformView.ScaleY = 1f;
         platformView.Alpha = 1f;
-        ScaffoldPageDepth.SetDim(platformView, 0f);
+        ScaffoldPageDepth.SetDepth(platformView, 0f, 0f);
 
         platformView.LayoutParameters = new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent,
