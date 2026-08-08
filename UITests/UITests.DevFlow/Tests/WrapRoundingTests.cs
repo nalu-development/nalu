@@ -6,9 +6,11 @@ namespace Nalu.Maui.UITests.Tests;
 
 /// <summary>
 /// Regression test for the WrapLayout measure/arrange wrap flip inside VirtualScroll:
-/// the cell is measured at a fractional width (419.1) whose UIKit pixel-aligned frame is
-/// NARROWER (419.0), so a wrap row summing exactly to the measured width used to re-wrap
+/// the cell is measured at a fractional width (339.1) whose UIKit pixel-aligned frame is
+/// NARROWER (339.0), so a wrap row summing exactly to the measured width used to re-wrap
 /// during arrange, pushing the second child onto a phantom line outside the measured cell.
+/// The width is deliberately smaller than every test device's window: Android clamps
+/// RecyclerView cells to the window width, which would make the row wrap legitimately.
 /// </summary>
 public class WrapRoundingTests(NaluApp app) : BaseUiTest(app)
 {
