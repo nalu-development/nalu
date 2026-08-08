@@ -55,6 +55,20 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
 
     #region Symbol analysis
 
+    /// <summary>The first declaration the anchor predicate visits is the anchor's canonical one.</summary>
+    private static bool IsCanonicalAnchorDeclaration(INamedTypeSymbol symbol, ClassDeclarationSyntax declaration, CancellationToken ct)
+    {
+        foreach (var reference in symbol.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(ct) is ClassDeclarationSyntax candidate && IsAnchorCandidate(candidate))
+            {
+                return ReferenceEquals(candidate, declaration);
+            }
+        }
+
+        return false;
+    }
+
     private static bool IsAnchorCandidate(SyntaxNode node)
     {
         if (node is not ClassDeclarationSyntax declaration)
@@ -118,7 +132,10 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
             return null;
         }
 
-        if (!ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration))
+        // Partial dedup must mirror THIS provider's predicate: the anchor signal (ctor taking
+        // IOverlayRef, or an attribute) may live in a different partial than the base list —
+        // e.g. a XAML view-only overlay whose code-behind has the ctor and no base.
+        if (!IsCanonicalAnchorDeclaration(symbol, declaration, ct))
         {
             return null;
         }
@@ -196,7 +213,7 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
             return null;
         }
 
-        if (!ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration))
+        if (!IsCanonicalDeclaration(symbol, declaration, ct))
         {
             return null;
         }
@@ -261,6 +278,27 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
 
     private static bool IsNaluType(INamedTypeSymbol type, string metadataName)
         => type.MetadataName == metadataName && type.ContainingNamespace is { Name: "Nalu", ContainingNamespace.IsGlobalNamespace: true };
+
+    /// <summary>
+    /// The canonical declaration of a (possibly partial) type is the FIRST one carrying a
+    /// base list — the only kind the syntax predicates visit. Emitting the candidate from it
+    /// keeps discovery deterministic and independent of which partial declares the base
+    /// (XAML code-behinds often declare none; the XamlG-generated part carries it).
+    /// </summary>
+    private static bool IsCanonicalDeclaration(INamedTypeSymbol symbol, TypeDeclarationSyntax declaration, CancellationToken ct)
+    {
+        foreach (var reference in symbol.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(ct) is TypeDeclarationSyntax { BaseList: not null } candidate)
+            {
+                return ReferenceEquals(candidate, declaration);
+            }
+        }
+
+        // No declaration carries a base list (plain classes visited by predicates that do not
+        // require one): the first declaration is canonical.
+        return ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration);
+    }
 
     private static bool DerivesFromView(INamedTypeSymbol type)
     {

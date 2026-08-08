@@ -55,6 +55,33 @@ public class ScaffoldOverlayGeneratorTests
         result.GeneratedText.Should().NotContain("AddOverlay<global::MyApp.QuickPopup, ");
     }
 
+    [Fact(DisplayName = "XAML-style partial view whose code-behind declares no base list is discovered")]
+    public void XamlPartialViewWithoutBaseListInCodeBehindIsDiscovered()
+    {
+        var result = ScaffoldGeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using Nalu;
+
+            namespace MyApp;
+
+            // Code-behind part: no base list.
+            public partial class QuickPopup
+            {
+                public QuickPopup(IOverlayRef overlay)
+                {
+                }
+            }
+
+            // XamlG-style generated part: carries the base list.
+            public partial class QuickPopup : ContentView;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("scaffold.AddOverlay<global::MyApp.QuickPopup>();");
+    }
+
     [Fact(DisplayName = "Naming convention FooModel -> FooView applies when no view ctor takes the model")]
     public void NamingConventionFallback()
     {

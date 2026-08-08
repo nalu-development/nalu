@@ -67,9 +67,11 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             return null;
         }
 
-        // Partial classes (XAML pages) surface once per declaration: only the first
-        // declaration produces the candidate, deterministically.
-        if (!ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration))
+        // Partial classes (XAML pages) surface once per base-listed declaration — and only
+        // those pass the syntax predicate: the developer's code-behind often declares no base
+        // at all (the XamlG-generated part carries it). The FIRST base-listed declaration
+        // produces the candidate, deterministically.
+        if (!IsCanonicalDeclaration(symbol, declaration, ct))
         {
             return null;
         }
@@ -162,7 +164,7 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             return null;
         }
 
-        if (!ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration))
+        if (!IsCanonicalDeclaration(symbol, declaration, ct))
         {
             return null;
         }
@@ -242,6 +244,26 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
     }
 
     private static string Fqn(ISymbol symbol) => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+    /// <summary>
+    /// The canonical declaration of a (possibly partial) type is the FIRST one carrying a
+    /// base list — the only kind the syntax predicates visit. Emitting the candidate from it
+    /// keeps discovery deterministic and independent of which partial declares the base.
+    /// </summary>
+    private static bool IsCanonicalDeclaration(INamedTypeSymbol symbol, TypeDeclarationSyntax declaration, CancellationToken ct)
+    {
+        foreach (var reference in symbol.DeclaringSyntaxReferences)
+        {
+            if (reference.GetSyntax(ct) is TypeDeclarationSyntax { BaseList: not null } candidate)
+            {
+                return ReferenceEquals(candidate, declaration);
+            }
+        }
+
+        // No declaration carries a base list (plain classes visited by predicates that do not
+        // require one): the first declaration is canonical.
+        return ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration);
+    }
 
     private static bool DerivesFromContentPage(INamedTypeSymbol type)
     {

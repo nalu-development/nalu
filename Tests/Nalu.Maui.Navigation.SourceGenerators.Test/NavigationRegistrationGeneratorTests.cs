@@ -34,6 +34,62 @@ public class NavigationRegistrationGeneratorTests
         result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.DetailViewModel, global::MyApp.DetailPage>();");
     }
 
+    [Fact(DisplayName = "XAML-style partial page whose code-behind declares no base list is discovered")]
+    public void XamlPartialWithoutBaseListInCodeBehindIsDiscovered()
+    {
+        // Real-world XAML shape: the developer's code-behind declares NO base type — the
+        // XamlG-generated partial carries it (and the base may be an app-level ContentPageBase).
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public class ContentPageBase : ContentPage;
+
+            public class DetailViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            // Code-behind part: no base list.
+            public partial class DetailPage
+            {
+                public DetailPage(DetailViewModel model)
+                {
+                    BindingContext = model;
+                }
+            }
+
+            // XamlG-style generated part: carries the base list.
+            public partial class DetailPage : ContentPageBase;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.DetailViewModel, global::MyApp.DetailPage>();");
+    }
+
+    [Fact(DisplayName = "Page deriving from an app-level ContentPage subclass is discovered")]
+    public void PageDerivingFromIntermediateBaseIsDiscovered()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+
+            namespace MyApp;
+
+            public abstract class ContentPageBase : ContentPage;
+
+            public class SettingsPage : ContentPageBase;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SettingsPage>();");
+    }
+
     [Fact(DisplayName = "Interface-typed BindingContext parameter resolves its single implementation")]
     public void InterfaceModelResolvesImplementation()
     {
