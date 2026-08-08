@@ -62,6 +62,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private bool _backPreviewActive;
     private Page? _predictiveHandoffPage;
     private bool _previewOwnsTransitionFlag;
+
+    /// <summary>One long-lived listener instance for every frozen host (it references no page).</summary>
+    private static readonly FrozenInsetsListener _frozenInsetsListener = new();
+
+    /// <summary>Consumes insets so a frozen host's subtree keeps its stale (correct) layout.</summary>
+    private sealed class FrozenInsetsListener : Java.Lang.Object, AndroidX.Core.View.IOnApplyWindowInsetsListener
+    {
+        public AndroidX.Core.View.WindowInsetsCompat? OnApplyWindowInsets(AView? view, AndroidX.Core.View.WindowInsetsCompat? insets)
+            => AndroidX.Core.View.WindowInsetsCompat.Consumed;
+    }
     private ScaffoldFlightSession? _backFlightSession;
     private float _backProgress;
     private LeavingPage? _leavingPage;
@@ -130,6 +140,22 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // Inset intent BEFORE the fragment commit: the incoming page attaches with its final
         // insets while the outgoing page keeps its stale layout — no jumps during transitions.
+        // "Keeps its stale layout" is ENFORCED, not hoped for: the outgoing host's insets
+        // dispatch is frozen first (a consuming listener — API 30+, where consumption stops
+        // the subtree without starving siblings), because any pass landing mid-transition
+        // would re-pad the covered page with the INCOMING page's chrome intent (differing
+        // intents — e.g. a nav-bar page pushing an overlap page — made its content jump and
+        // corrupted its scroll position for the eventual pop). One-way per host: every mount
+        // builds a fresh host and re-applies the page's own insets.
+        // (NOT a managed View subclass on purpose: a managed Java peer in the host chain
+        // defers the GC-bridge release of popped pages past the leak detector's patience.)
+        if (OperatingSystem.IsAndroidVersionAtLeast(30)
+            && !ReferenceEquals(targetPage, _currentPage)
+            && _currentFragment?.View is { } outgoingHost)
+        {
+            AndroidX.Core.View.ViewCompat.SetOnApplyWindowInsetsListener(outgoingHost, _frozenInsetsListener);
+        }
+
         platformView.ChromeBottomDesired = barVisible;
         platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
         platformView.ChromeTopDesired = navBarInsets;
@@ -339,6 +365,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 if (leaving is not null)
                 {
+                    // WEAK captures only, in EVERY animator Update handler: a strong capture in
+                    // an update-listener closure roots the captured view (and its page and
+                    // model) past the animator's life — a GC-bridge peculiarity the leak
+                    // suites catch (End handlers do not exhibit it; Update handlers do).
+                    var weakFragment = new WeakReference<ScaffoldPageFragment>(fragment);
+                    var weakLeavingView = new WeakReference<AView>(previousView!);
+
                     if (depthPop)
                     {
                         // The popped page departs with a shadow; the revealed one brightens as it goes.
@@ -346,16 +379,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                         leaving.Animator.Update += (_, args) =>
                         {
-                            if (fragment.View is { } revealedView)
+                            if (weakFragment.TryGetTarget(out var incoming)
+                                && incoming.View is { } revealedView
+                                && weakLeavingView.TryGetTarget(out var poppedView))
                             {
-                                ScaffoldPageDepth.SetDepth(revealedView, 1f - (float) args.Animation.AnimatedFraction, previousView!.TranslationX);
+                                ScaffoldPageDepth.SetDepth(revealedView, 1f - (float) args.Animation.AnimatedFraction, poppedView.TranslationX);
                             }
                         };
                     }
                     else if (depthPush)
                     {
                         // The covered page dims under the incoming one.
-                        leaving.Animator.Update += (_, args) => ScaffoldPageDepth.SetDepth(previousView!, (float) args.Animation.AnimatedFraction, fragment.View?.TranslationX ?? 0f);
+                        leaving.Animator.Update += (_, args) =>
+                        {
+                            if (weakLeavingView.TryGetTarget(out var coveredView))
+                            {
+                                var seam = weakFragment.TryGetTarget(out var incoming) ? incoming.View?.TranslationX ?? 0f : 0f;
+                                ScaffoldPageDepth.SetDepth(coveredView, (float) args.Animation.AnimatedFraction, seam);
+                            }
+                        };
                     }
                 }
 
@@ -585,19 +627,35 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         animator.SetDuration(150);
 
         // The flights ride home with the page; the peek dims back toward covered.
+        // WEAK captures in the Update handler (see the sync's leaving-animator note).
+        var weakCancelTop = new WeakReference<AView>(topView);
+        var weakCancelPeek = peekView is null ? null : new WeakReference<AView>(peekView);
+        var weakCancelSession = flightSession is null ? null : new WeakReference<ScaffoldFlightSession>(flightSession);
+
         animator.Update += (_, args) =>
         {
-            var flightProgress = startProgress * (1 - (float)args.Animation.AnimatedFraction);
-            flightSession?.Seek(flightProgress, topView.TranslationX);
-
-            if (peekView is not null)
+            if (!weakCancelTop.TryGetTarget(out var top))
             {
-                ScaffoldPageDepth.SetDepth(peekView, 1f - flightProgress, topView.TranslationX);
+                return;
+            }
+
+            var flightProgress = startProgress * (1 - (float)args.Animation.AnimatedFraction);
+
+            if (weakCancelSession is not null && weakCancelSession.TryGetTarget(out var session))
+            {
+                session.Seek(flightProgress, top.TranslationX);
+            }
+
+            if (weakCancelPeek is not null && weakCancelPeek.TryGetTarget(out var peek))
+            {
+                ScaffoldPageDepth.SetDepth(peek, 1f - flightProgress, top.TranslationX);
             }
         };
 
         animator.AnimationEnd += (_, _) =>
         {
+            // Severed explicitly: defense in depth alongside the weak captures.
+            animator.RemoveAllUpdateListeners();
             flightSession?.Finish();
             TearDownPeekDepth(topView, peekView);
             RemovePeek(peekView);
@@ -682,20 +740,39 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // The flights complete their remaining path while the page settles offscreen and the
         // peek finishes brightening.
+        // WEAK captures in the Update handler (see the sync's leaving-animator note): the top
+        // page is about to POP — a strong capture here roots it, its page and model forever.
+        var weakCommitTop = new WeakReference<AView>(topView);
+        var weakCommitPeek = peekView is null ? null : new WeakReference<AView>(peekView);
+        var weakCommitSession = flightSession is null ? null : new WeakReference<ScaffoldFlightSession>(flightSession);
+
         animator.Update += (_, args) =>
         {
-            var flightProgress = startProgress + ((1 - startProgress) * (float)args.Animation.AnimatedFraction);
-            flightSession?.Seek(flightProgress, topView.TranslationX);
-
-            if (peekView is not null)
+            if (!weakCommitTop.TryGetTarget(out var top))
             {
-                ScaffoldPageDepth.SetDepth(peekView, 1f - flightProgress, topView.TranslationX);
+                return;
+            }
+
+            var flightProgress = startProgress + ((1 - startProgress) * (float)args.Animation.AnimatedFraction);
+
+            if (weakCommitSession is not null && weakCommitSession.TryGetTarget(out var session))
+            {
+                session.Seek(flightProgress, top.TranslationX);
+            }
+
+            if (weakCommitPeek is not null && weakCommitPeek.TryGetTarget(out var peek))
+            {
+                ScaffoldPageDepth.SetDepth(peek, 1f - flightProgress, top.TranslationX);
             }
         };
 
         animator.AnimationEnd += (_, _) => settle.TrySetResult();
         animator.Start();
         await settle.Task.ConfigureAwait(true);
+
+        // Severed explicitly: a lingering Java-side update-listener chain would root the
+        // closure — and the departed page's view, page and model with it.
+        animator.RemoveAllUpdateListeners();
 
         // Flights are AT their destination — the live views they hand back to sit exactly there.
         flightSession?.Finish();
@@ -854,6 +931,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Cleared FIRST: Cancel() raises AnimationEnd, which must find nothing left to do.
         _leavingPage = null;
         leaving.Animator.Cancel();
+
+        // Severed EXPLICITLY: a Java-side update-listener chain outlives the managed wrapper
+        // and roots its closure — which captures the popped page's view — leaking the page and
+        // its model (caught by the leak-detector suites).
+        leaving.Animator.RemoveAllUpdateListeners();
         leaving.Completion.TrySetResult();
 
         // Restoring accessibility costs nothing visually (unlike the motion state, left alone
