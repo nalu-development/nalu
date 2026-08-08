@@ -133,7 +133,8 @@ layer was dropped: the edge cases are irreducibly app-specific (scheme design, a
 missing/deleted targets, cold-vs-warm policy, notification payload shapes). The supported
 surface is what apps compose it from: typed absolute navigation
 (`Navigation.Absolute()...WithIntent(...)`) and `TryStopRestoreAsync()` for preempting a
-pending restore when a link arrives at boot.
+pending restore when a link arrives at boot — recipe documented in
+`conceptual_docs/navigation-restore.md` ("Recipe: handling deep links").
 
 **Resolved (August 2026):** the NaluTabBar full-height issue on Android API 37 (Shell host) —
 `RowDefinitions="Auto"` root + height-only Unspecified measure spec + the reporter's

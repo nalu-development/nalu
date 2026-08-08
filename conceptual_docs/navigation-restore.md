@@ -186,6 +186,51 @@ public async Task OnInitializationCompletedAsync()
 `TryStopRestoreAsync()` returns `true` when there was a pending (or in-flight) restore to
 stop; the discarded snapshot is replaced by a fresh capture of wherever the app goes next.
 
+### Recipe: handling deep links
+
+Nalu deliberately ships **no URI routing** — scheme design, auth gates, missing targets and
+notification payload shapes are app-specific. What the library guarantees is the pair of
+primitives a deep-link handler composes: typed absolute navigation, and
+`TryStopRestoreAsync()` so a link and a pending boot-time restore never fight over the first
+navigation (the link must win — otherwise the replay ignores it, or lands the user somewhere
+else first).
+
+```csharp
+public sealed class DeepLinkHandler(INavigationService navigation, INavigationRestore restore)
+{
+    public async Task HandleAsync(Uri uri)
+    {
+        // Your parsing, your rules: auth gates, tenant checks, deleted targets…
+        if (TryParseOrder(uri, out var orderId))
+        {
+            // A pending restore must not race the link: drop it and lift the
+            // navigation-suppression window. Inert (false) when restore is off,
+            // or already replayed, or on a warm start — safe to call unconditionally.
+            await restore.TryStopRestoreAsync();
+
+            await navigation.GoToAsync(
+                Navigation.Absolute()
+                          .Root<OrdersPageModel>()
+                          .Push<OrderDetailPageModel>()
+                          .WithIntent(new OrderIntent(orderId))
+            );
+        }
+    }
+}
+```
+
+Funnel every platform entry point into that one handler: `Application.OnAppLinkRequestReceived`
+for universal/app links, the platform activity/scene callbacks for custom schemes and
+notification taps. On a **cold start** the URI typically arrives before the engine finished
+booting — stash it and invoke the handler from your initialization flow (the same place the
+authentication redirect above lives, after the initial page's first appearing), not from the
+platform callback directly. On a **warm start** the handler can run immediately: there is no
+pending restore, `TryStopRestoreAsync()` no-ops, and the absolute navigation simply happens.
+
+The captured snapshot updates automatically as the link navigation lands, so killing the app
+afterwards restores the deep-linked stack like any other — including the typed intent, when
+its type is [registered for restore](#enabling-it).
+
 ## Customization
 
 - **`IIntentSerializer`** — the wire format. The default is System.Text.Json reflection,
