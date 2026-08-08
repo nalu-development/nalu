@@ -38,7 +38,7 @@ internal sealed class NaluAsyncCommand(Func<Task> execute, Func<IElementHandler?
     {
         try
         {
-            await execute().ConfigureAwait(true);
+            await execute();
         }
         finally
         {

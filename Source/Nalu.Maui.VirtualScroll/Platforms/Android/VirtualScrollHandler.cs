@@ -4,6 +4,7 @@ using AndroidX.SwipeRefreshLayout.Widget;
 using AViewGroup = Android.Views.ViewGroup;
 using AView = Android.Views.View;
 using Microsoft.Maui.Platform;
+using Nalu.Internals;
 using PlatformView = Android.Views.View;
 
 namespace Nalu;
@@ -260,9 +261,9 @@ public partial class VirtualScrollHandler
             handler._flattenedAdapter = flattenedAdapter;
             handler._touchHelperCallback?.SetAdapter(flattenedAdapter);
             
-#pragma warning disable VSTHRD100
-            async void ListenForAnimationComplete()
-#pragma warning restore VSTHRD100
+            void ListenForAnimationComplete() => NotifyAnimationCompleteAsync().FireAndForget();
+
+            async Task NotifyAnimationCompleteAsync()
             {
                 await Task.Yield();
                 handler._animator?.InvokeIsRunning(handler._animatorIsRunningListener);

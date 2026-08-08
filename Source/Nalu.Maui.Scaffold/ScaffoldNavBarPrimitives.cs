@@ -203,7 +203,7 @@ public abstract class ScaffoldNavBarButtonBase : Border
     {
         Microsoft.Maui.Controls.ViewExtensions.CancelAnimations(_pressHighlight);
         _pressHighlight.Opacity = 1;
-        _ = _pressHighlight.FadeTo(0, 400, Easing.CubicOut);
+        _ = _pressHighlight.FadeToAsync(0, 400, Easing.CubicOut);
     }
 
     /// <summary>A user icon replaces the drawn glyph entirely (and renders untinted).</summary>
@@ -233,8 +233,8 @@ public sealed class ScaffoldBackButton : ScaffoldNavBarButtonBase
         : base("M14.5 5.5 L7.5 12 L14.5 18.5")
     {
         // Typed bindings: string paths resolve via reflection and break under trimming/AOT.
-        BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.CanNavigateBack));
-        BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.BackCommand));
+        BindVisibility(BindingBase.Create(static (ScaffoldNavBarContext c) => c.CanNavigateBack));
+        BindCommand(BindingBase.Create(static (ScaffoldNavBarContext c) => c.BackCommand));
     }
 }
 
@@ -249,8 +249,8 @@ public sealed class ScaffoldCloseButton : ScaffoldNavBarButtonBase
     public ScaffoldCloseButton()
         : base("M6.5 6.5 L17.5 17.5 M17.5 6.5 L6.5 17.5")
     {
-        BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.IsCloseButtonVisible));
-        BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.BackCommand));
+        BindVisibility(BindingBase.Create(static (ScaffoldNavBarContext c) => c.IsCloseButtonVisible));
+        BindCommand(BindingBase.Create(static (ScaffoldNavBarContext c) => c.BackCommand));
     }
 }
 
@@ -283,13 +283,13 @@ public sealed class ScaffoldFlyoutButton : ScaffoldNavBarButtonBase
     {
         if (Side == ScaffoldFlyoutSide.Start)
         {
-            BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.IsFlyoutStartButtonVisible));
-            BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.OpenFlyoutStartCommand));
+            BindVisibility(BindingBase.Create(static (ScaffoldNavBarContext c) => c.IsFlyoutStartButtonVisible));
+            BindCommand(BindingBase.Create(static (ScaffoldNavBarContext c) => c.OpenFlyoutStartCommand));
         }
         else
         {
-            BindVisibility(Binding.Create(static (ScaffoldNavBarContext c) => c.IsFlyoutEndButtonVisible));
-            BindCommand(Binding.Create(static (ScaffoldNavBarContext c) => c.OpenFlyoutEndCommand));
+            BindVisibility(BindingBase.Create(static (ScaffoldNavBarContext c) => c.IsFlyoutEndButtonVisible));
+            BindCommand(BindingBase.Create(static (ScaffoldNavBarContext c) => c.OpenFlyoutEndCommand));
         }
     }
 }

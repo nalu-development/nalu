@@ -68,7 +68,7 @@ internal static class ScaffoldSharedElementTransitions
 
             // The drawable is captured NOW — MAUI's async image pipeline may swap or clear it
             // between this capture and the flight start one frame later.
-            var imageDrawable = fromElement is Microsoft.Maui.Controls.Image && fromPlatform is ImageView imageView
+            var imageDrawable = fromElement is Image && fromPlatform is ImageView imageView
                 ? imageView.Drawable
                 : null;
 
@@ -485,8 +485,8 @@ internal sealed class ScaffoldFlightSession(
         var drawable = prep.ImageDrawable!;
         var imageWidth = (float)Math.Max(drawable.IntrinsicWidth, 1);
         var imageHeight = (float)Math.Max(drawable.IntrinsicHeight, 1);
-        var fromFill = (prep.FromElement as Microsoft.Maui.Controls.Image)?.Aspect != Aspect.AspectFit;
-        var toFill = (toElement as Microsoft.Maui.Controls.Image)?.Aspect != Aspect.AspectFit;
+        var fromFill = (prep.FromElement as Image)?.Aspect != Aspect.AspectFit;
+        var toFill = (toElement as Image)?.Aspect != Aspect.AspectFit;
 
         var flight = new ScaffoldSharedElementTransitions.FlightLayout(container.Context!)
         {

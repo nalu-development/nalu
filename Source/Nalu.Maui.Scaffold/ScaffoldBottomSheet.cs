@@ -338,7 +338,7 @@ public sealed class ScaffoldBottomSheetView : Border
 
         var height = ResolveDetentHeight(Math.Clamp(detentIndex, 0, _presentation.Detents.Length - 1));
 
-        return this.TranslateTo(0, _sheetHeight - height, _animationDuration, Easing.CubicOut);
+        return this.TranslateToAsync(0, _sheetHeight - height, _animationDuration, Easing.CubicOut);
     }
 
     /// <summary>The configured maximum sheet width (presenters clamp the window width by it).</summary>
@@ -422,11 +422,11 @@ public sealed class ScaffoldBottomSheetView : Border
     {
         TranslationY = _sheetHeight;
 
-        return this.TranslateTo(0, InitialOffset, _animationDuration, Easing.CubicOut);
+        return this.TranslateToAsync(0, InitialOffset, _animationDuration, Easing.CubicOut);
     }
 
     /// <summary>Slides out from the current position past the bottom edge.</summary>
-    internal Task ExitAsync() => this.TranslateTo(0, _sheetHeight, _animationDuration, Easing.CubicIn);
+    internal Task ExitAsync() => this.TranslateToAsync(0, _sheetHeight, _animationDuration, Easing.CubicIn);
 
 
     /// <summary>Snaps to the nearest detent — or dismisses when pulled far enough below the smallest one.</summary>
@@ -445,6 +445,6 @@ public sealed class ScaffoldBottomSheetView : Border
         }
 
         var target = _detentOffsets.MinBy(offset => Math.Abs(offset - position));
-        await this.TranslateTo(0, target, _animationDuration, Easing.CubicOut);
+        await this.TranslateToAsync(0, target, _animationDuration, Easing.CubicOut);
     }
 }

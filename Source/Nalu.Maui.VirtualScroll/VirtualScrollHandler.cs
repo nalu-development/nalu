@@ -147,6 +147,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     /// content size until it has been laid out, and it is never laid out while it measures zero);
     /// the real extent replaces it as soon as the content settles.
     /// </summary>
+    // ReSharper disable once UnusedMember.Local — used by the Apple platform partial
     private static double EstimateContentExtent(IVirtualScroll virtualScroll)
     {
         if (virtualScroll.ItemsLayout is not LinearVirtualScrollLayout linearLayout || virtualScroll.Adapter is not { } adapter)
@@ -178,6 +179,7 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
     }
 
     /// <summary>Whether the adapter currently reports at least one item, header or footer.</summary>
+    // ReSharper disable once UnusedMember.Local — used by the Apple platform partial
     private static bool HasContent(IVirtualScroll virtualScroll)
     {
         if (virtualScroll.Adapter is not { } adapter)

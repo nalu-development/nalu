@@ -45,6 +45,7 @@ internal static class ScaffoldChromeLayoutHelpers
 /// inset becomes the strip height (which already covers the system inset) — the page treats the
 /// bar exactly like a system bar. Mirrors NaluShellItemRendererNavigationLayout.
 /// </summary>
+// ReSharper disable once RedundantNameQualifier — inside a View subclass the bare name binds to the nested Android.Views.View.IOnApplyWindowInsetsListener
 internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.IOnApplyWindowInsetsListener
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();

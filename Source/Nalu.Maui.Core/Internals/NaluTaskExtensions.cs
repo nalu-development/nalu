@@ -10,11 +10,9 @@ internal static class NaluTaskExtensions
 {
     public static async void FireAndForget<TResult>(this Task<TResult> task, Action<Exception>? errorCallback = null)
     {
-        TResult? result = default;
-
         try
         {
-            result = await task.ConfigureAwait(false);
+            _ = await task.ConfigureAwait(false);
         }
         catch (Exception exc)
         {

@@ -17,20 +17,6 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 {
     private readonly Scaffold _scaffold;
     private Page? _observedPage;
-    private string? _title;
-    private View? _titleView;
-    private Page? _currentPage;
-    private object? _pageBindingContext;
-    private Color? _foreground;
-    private double _scrollOffset;
-    private bool _isScrolledUnder;
-    private double _scrollRampStart;
-    private double _scrollRampEnd = 100;
-    private bool _canNavigateBack;
-    private bool _isFlyoutStartButtonVisible;
-    private bool _isFlyoutEndButtonVisible;
-    private bool _isModal;
-    private bool _isCloseButtonVisible;
 
     /// <inheritdoc />
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -38,15 +24,15 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// <summary>Gets the current page's <see cref="Page.Title"/>.</summary>
     public string? Title
     {
-        get => _title;
-        internal set => SetField(ref _title, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>Gets the current page's <see cref="Scaffold.TitleViewProperty"/> content, replacing the title label when set.</summary>
     public View? TitleView
     {
-        get => _titleView;
-        internal set => SetField(ref _titleView, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -56,8 +42,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public Page? CurrentPage
     {
-        get => _currentPage;
-        internal set => SetField(ref _currentPage, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -67,8 +53,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public object? PageBindingContext
     {
-        get => _pageBindingContext;
-        internal set => SetField(ref _pageBindingContext, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -78,8 +64,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public Color? Foreground
     {
-        get => _foreground;
-        internal set => SetField(ref _foreground, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -90,10 +76,10 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public double ScrollOffset
     {
-        get => _scrollOffset;
+        get;
         internal set
         {
-            SetField(ref _scrollOffset, value);
+            SetField(ref field, value);
             IsScrolledUnder = value > 0.5;
         }
     }
@@ -101,8 +87,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// <summary>Gets whether the tracked content has scrolled past its rest position.</summary>
     public bool IsScrolledUnder
     {
-        get => _isScrolledUnder;
-        private set => SetField(ref _isScrolledUnder, value);
+        get;
+        private set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -112,8 +98,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public double ScrollRampStart
     {
-        get => _scrollRampStart;
-        internal set => SetField(ref _scrollRampStart, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -122,36 +108,36 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public double ScrollRampEnd
     {
-        get => _scrollRampEnd;
-        internal set => SetField(ref _scrollRampEnd, value);
-    }
+        get;
+        internal set => SetField(ref field, value);
+    } = 100;
 
     /// <summary>Gets whether the current navigation stack has at least one pushed page.</summary>
     public bool CanNavigateBack
     {
-        get => _canNavigateBack;
-        internal set => SetField(ref _canNavigateBack, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>Gets whether the start-drawer button should show (content resolves + policy).</summary>
     public bool IsFlyoutStartButtonVisible
     {
-        get => _isFlyoutStartButtonVisible;
-        internal set => SetField(ref _isFlyoutStartButtonVisible, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>Gets whether the end-drawer button should show (content resolves + policy).</summary>
     public bool IsFlyoutEndButtonVisible
     {
-        get => _isFlyoutEndButtonVisible;
-        internal set => SetField(ref _isFlyoutEndButtonVisible, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>Gets whether the current page is a modal page (<see cref="Scaffold.PageModeProperty"/>).</summary>
     public bool IsModal
     {
-        get => _isModal;
-        internal set => SetField(ref _isModal, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>
@@ -160,8 +146,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// </summary>
     public bool IsCloseButtonVisible
     {
-        get => _isCloseButtonVisible;
-        internal set => SetField(ref _isCloseButtonVisible, value);
+        get;
+        internal set => SetField(ref field, value);
     }
 
     /// <summary>Pops the current page through the navigation engine — guards and lifecycle run.</summary>

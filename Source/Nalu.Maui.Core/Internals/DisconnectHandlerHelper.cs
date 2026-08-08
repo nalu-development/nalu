@@ -1,10 +1,7 @@
-using System;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui;
-using ViewExtensions = Microsoft.Maui.Controls.ViewExtensions;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member

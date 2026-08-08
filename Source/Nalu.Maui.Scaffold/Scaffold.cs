@@ -485,7 +485,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         // The guard beats a close racing the enter animation: cleanup runs (and clears the
         // request) BEFORE presentation settles, and the late presented-event must not overwrite
         // the dismissed state.
-        if (await presenter.ShowOverlayAsync(request).ConfigureAwait(true)
+        if (await presenter.ShowOverlayAsync(request)
             && ReferenceEquals(_flyoutRequest, request))
         {
             OnFlyoutPresented(side);
@@ -587,7 +587,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         handle.Attach(this, request);
 
         // On failure the presenter has already run Cleanup — the handle comes back closed.
-        await presenter.ShowOverlayAsync(request).ConfigureAwait(true);
+        await presenter.ShowOverlayAsync(request);
 
         return handle;
     }
@@ -655,7 +655,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         sheetView.SetDismissCallback(() => presenter.CloseOverlayAsync(request));
 
         // On failure the presenter has already run Cleanup — the handle comes back closed.
-        await presenter.ShowOverlayAsync(request).ConfigureAwait(true);
+        await presenter.ShowOverlayAsync(request);
 
         return handle;
     }
@@ -680,7 +680,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         {
             // Toggle: the caller's fresh resources are released untouched.
             cleanup?.Invoke();
-            await presenter.CloseOverlayAsync(current).ConfigureAwait(true);
+            await presenter.CloseOverlayAsync(current);
 
             return;
         }
@@ -721,11 +721,11 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
         if (replace)
         {
-            await presenter.ReplaceTabBarPanelAsync(request).ConfigureAwait(true);
+            await presenter.ReplaceTabBarPanelAsync(request);
         }
         else
         {
-            await presenter.ShowOverlayAsync(request).ConfigureAwait(true);
+            await presenter.ShowOverlayAsync(request);
         }
     }
 
@@ -743,7 +743,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
             return false;
         }
 
-        return await navigationService.GoToAsync(navigation).ConfigureAwait(true);
+        return await navigationService.GoToAsync(navigation);
     }
 
     private int _rootSelectionInFlight;
@@ -775,7 +775,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
         try
         {
-            return await SelectRootAsync(root).ConfigureAwait(true);
+            return await SelectRootAsync(root);
         }
         finally
         {

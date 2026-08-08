@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Android.Views;
 using AndroidX.RecyclerView.Widget;
 using Microsoft.Maui.Platform;
@@ -58,9 +57,6 @@ internal class VirtualScrollRecyclerViewAdapter : Platform.VirtualScrollNativeAd
 
         return reuseId;
     }
-
-    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "ApplyBindings")]
-    private static extern void ReapplyBindings(BindableObject bindable);
 
     public override void OnBindViewHolder(RecyclerView.ViewHolder holder, int position)
     {

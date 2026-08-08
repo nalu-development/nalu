@@ -39,9 +39,6 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     private readonly HashSet<Window> _hookedWindows = [];
     private readonly AsyncLocal<bool> _isReplayNavigation = new();
 
-    private NavigationService? _navigationService;
-    private IIntentSerializer? _intentSerializer;
-    private INavigationRestoreStore? _store;
     private NavigationRestoreBoot? _pendingBoot;
     private bool _bootAttempted;
     private bool _suppressNavigations;
@@ -60,11 +57,11 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     /// <summary>Test seam: whether the suppression window is currently armed (regardless of the replay flow).</summary>
     internal bool IsSuppressionActive => _suppressNavigations;
 
-    private NavigationService NavigationService => _navigationService ??= (NavigationService) _serviceProvider.GetRequiredService<INavigationService>();
+    private NavigationService NavigationService => field ??= (NavigationService) _serviceProvider.GetRequiredService<INavigationService>();
 
-    private IIntentSerializer IntentSerializer => _intentSerializer ??= _serviceProvider.GetRequiredService<IIntentSerializer>();
+    private IIntentSerializer IntentSerializer => field ??= _serviceProvider.GetRequiredService<IIntentSerializer>();
 
-    private INavigationRestoreStore Store => _store ??= _serviceProvider.GetRequiredService<INavigationRestoreStore>();
+    private INavigationRestoreStore Store => field ??= _serviceProvider.GetRequiredService<INavigationRestoreStore>();
 
     public NavigationRestoreService(IServiceProvider serviceProvider)
     {
@@ -137,7 +134,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
         // The snapshot on disk was already consumed (read-and-delete at boot); re-capture the
         // CURRENT state so the next launch reflects wherever the app actually goes next.
-        await CaptureAndFlushAsync().ConfigureAwait(true);
+        await CaptureAndFlushAsync();
 
         return true;
     }
@@ -395,7 +392,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
                     _suppressNavigations = false;
                 }
 
-                if (!await DispatchReplayNavigationAsync(dispatcher, navigations[i].Navigation, navigations[i].Intent).ConfigureAwait(true))
+                if (!await DispatchReplayNavigationAsync(dispatcher, navigations[i].Navigation, navigations[i].Intent))
                 {
                     // Canceled/failed guard-free push should not happen; keep what landed.
                     return;
@@ -412,7 +409,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
             // Re-persist immediately (not debounced): the snapshot was DELETED at boot, so
             // until this write a crash would lose the restored state.
-            await SwallowedFlushAsync().ConfigureAwait(true);
+            await SwallowedFlushAsync();
         }
     }
 
@@ -430,10 +427,10 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
                 {
                     if (intent is not null)
                     {
-                        await HydrateIntentAsync(intent).ConfigureAwait(true);
+                        await HydrateIntentAsync(intent);
                     }
 
-                    return await NavigationService.GoToAsync(navigation).ConfigureAwait(true);
+                    return await NavigationService.GoToAsync(navigation);
                 }
                 finally
                 {
@@ -483,7 +480,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
             if (hydrateMethod is not null)
             {
-                await ((ValueTask) hydrateMethod.Invoke(target, [intent])!).ConfigureAwait(true);
+                await ((ValueTask) hydrateMethod.Invoke(target, [intent])!);
 
                 return;
             }

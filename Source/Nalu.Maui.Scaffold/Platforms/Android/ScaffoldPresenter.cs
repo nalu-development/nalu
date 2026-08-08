@@ -67,10 +67,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private static readonly FrozenInsetsListener _frozenInsetsListener = new();
 
     /// <summary>Consumes insets so a frozen host's subtree keeps its stale (correct) layout.</summary>
-    private sealed class FrozenInsetsListener : Java.Lang.Object, AndroidX.Core.View.IOnApplyWindowInsetsListener
+    private sealed class FrozenInsetsListener : Java.Lang.Object, IOnApplyWindowInsetsListener
     {
-        public AndroidX.Core.View.WindowInsetsCompat? OnApplyWindowInsets(AView? view, AndroidX.Core.View.WindowInsetsCompat? insets)
-            => AndroidX.Core.View.WindowInsetsCompat.Consumed;
+        public WindowInsetsCompat? OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
+            => WindowInsetsCompat.Consumed;
     }
     private ScaffoldFlightSession? _backFlightSession;
     private float _backProgress;
@@ -153,7 +153,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             && !ReferenceEquals(targetPage, _currentPage)
             && _currentFragment?.View is { } outgoingHost)
         {
-            AndroidX.Core.View.ViewCompat.SetOnApplyWindowInsetsListener(outgoingHost, _frozenInsetsListener);
+            ViewCompat.SetOnApplyWindowInsetsListener(outgoingHost, _frozenInsetsListener);
         }
 
         platformView.ChromeBottomDesired = barVisible;
@@ -383,7 +383,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                                 && incoming.View is { } revealedView
                                 && weakLeavingView.TryGetTarget(out var poppedView))
                             {
-                                ScaffoldPageDepth.SetDepth(revealedView, 1f - (float) args.Animation.AnimatedFraction, poppedView.TranslationX);
+                                ScaffoldPageDepth.SetDepth(revealedView, 1f - args.Animation.AnimatedFraction, poppedView.TranslationX);
                             }
                         };
                     }
@@ -395,7 +395,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                             if (weakLeavingView.TryGetTarget(out var coveredView))
                             {
                                 var seam = weakFragment.TryGetTarget(out var incoming) ? incoming.View?.TranslationX ?? 0f : 0f;
-                                ScaffoldPageDepth.SetDepth(coveredView, (float) args.Animation.AnimatedFraction, seam);
+                                ScaffoldPageDepth.SetDepth(coveredView, args.Animation.AnimatedFraction, seam);
                             }
                         };
                     }
@@ -423,7 +423,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // Deterministic completion: presentation of the new page plus the outgoing page's
                 // motion, with a settle timeout as a safety net.
                 var settled = Task.WhenAll(fragment.PresentedTask, leavingTask);
-                await Task.WhenAny(settled, Task.Delay(_settleTimeoutMs)).ConfigureAwait(true);
+                await Task.WhenAny(settled, Task.Delay(_settleTimeoutMs));
             }
             finally
             {
@@ -447,7 +447,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             }
         }
 
-        await Task.WhenAll(navChromeTask, chromeTask).ConfigureAwait(true);
+        await Task.WhenAll(navChromeTask, chromeTask);
 
         scaffold.UpdateBackCallbackEnabled();
 
@@ -564,7 +564,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             else
             {
                 // Fresh platform view: destination geometry exists at its first pre-draw.
-                AndroidX.Core.View.OneShotPreDrawListener.Add(
+                OneShotPreDrawListener.Add(
                     belowView,
                     new Java.Lang.Runnable(() =>
                         {
@@ -639,7 +639,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 return;
             }
 
-            var flightProgress = startProgress * (1 - (float)args.Animation.AnimatedFraction);
+            var flightProgress = startProgress * (1 - args.Animation.AnimatedFraction);
 
             if (weakCancelSession is not null && weakCancelSession.TryGetTarget(out var session))
             {
@@ -753,7 +753,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 return;
             }
 
-            var flightProgress = startProgress + ((1 - startProgress) * (float)args.Animation.AnimatedFraction);
+            var flightProgress = startProgress + ((1 - startProgress) * args.Animation.AnimatedFraction);
 
             if (weakCommitSession is not null && weakCommitSession.TryGetTarget(out var session))
             {
@@ -768,7 +768,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         animator.AnimationEnd += (_, _) => settle.TrySetResult();
         animator.Start();
-        await settle.Task.ConfigureAwait(true);
+        await settle.Task;
 
         // Severed explicitly: a lingering Java-side update-listener chain would root the
         // closure — and the departed page's view, page and model with it.
@@ -784,7 +784,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         _predictiveHandoffPage = belowPage;
 
         var popped = scaffold.NavigationService is { } navigationService
-            && await navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).ConfigureAwait(true);
+            && await navigationService.GoToAsync(Navigation.Relative().Pop());
 
         if (!popped && ReferenceEquals(_predictiveHandoffPage, belowPage))
         {
@@ -799,7 +799,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             restoreAnimator.SetDuration(_overlayDurationMs);
             restoreAnimator.AnimationEnd += (_, _) => restore.TrySetResult();
             restoreAnimator.Start();
-            await restore.Task.ConfigureAwait(true);
+            await restore.Task;
             TearDownPeekDepth(topView, peekView);
             RemovePeek(peekView);
             ClearPreviewTransitionFlag();
@@ -1131,7 +1131,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     strip.FreezeInsets();
                 }
 
-                await AnimateStripToAsync(strip, 0, animated).ConfigureAwait(true);
+                await AnimateStripToAsync(strip, 0, animated);
 
                 if (strip.TranslationY == 0)
                 {
@@ -1171,7 +1171,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             {
                 _lastStripHeight = stripToRemove.Height;
                 stripToRemove.FreezeInsets();
-                await AnimateStripToAsync(stripToRemove, stripToRemove.Height, animated).ConfigureAwait(true);
+                await AnimateStripToAsync(stripToRemove, stripToRemove.Height, animated);
             }
 
             stripToRemove.Visibility = ViewStates.Gone;
@@ -1351,7 +1351,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 strip.FreezeInsets();
             }
 
-            await AnimateNavStripToAsync(strip, 0, animated).ConfigureAwait(true);
+            await AnimateNavStripToAsync(strip, 0, animated);
 
             if (strip.TranslationY == 0)
             {
@@ -1961,7 +1961,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Scrim: brush update only, no re-animation.
         entry.ScrimView.Background = replacement.Scrim;
 
-        await previous.Content.FadeTo(0, 100);
+        await previous.Content.FadeToAsync(0, 100);
         (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
         ScaffoldOverlayAnimations.ResetContent(previous.Content);
         previous.Cleanup?.Invoke();
@@ -1977,7 +1977,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         entry.ContentPlatform = panel;
 
         replacement.Content.Opacity = 0;
-        await replacement.Content.FadeTo(1, 100);
+        await replacement.Content.FadeToAsync(1, 100);
     }
 
     public Task CloseOverlayAsync(ScaffoldOverlayRequest request)

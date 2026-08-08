@@ -48,7 +48,7 @@ internal sealed class ScaffoldNavigationImpl(Scaffold scaffold) : INavigation
         }
 
         var topPage = stack.PushedPages[^1].Page;
-        var popped = await navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).ConfigureAwait(true);
+        var popped = await navigationService.GoToAsync(Navigation.Relative().Pop());
 
         return popped ? topPage : null!;
     }
@@ -63,14 +63,14 @@ internal sealed class ScaffoldNavigationImpl(Scaffold scaffold) : INavigation
             return;
         }
 
-        var navigation = Nalu.Navigation.Relative();
+        var navigation = Navigation.Relative();
 
         for (var i = 0; i < popCount; i++)
         {
             navigation.Pop();
         }
 
-        await navigationService.GoToAsync(navigation).ConfigureAwait(true);
+        await navigationService.GoToAsync(navigation);
     }
 
     public Task PushAsync(Page page) => throw new NotSupportedException(_unsupportedMessage);

@@ -212,8 +212,8 @@ public class HorizontalWrapLayoutManager : LayoutManager
                 // Finalize current row and start new one
                 rows.Add(currentRow);
                 currentRow = RowInfo.Create();
-                isFirstInRow = true;
-                // Recalculate widthWithSpacing since isFirstInRow changed
+
+                // This child opens the new row: no leading spacing.
                 widthWithSpacing = desiredWidth;
             }
 

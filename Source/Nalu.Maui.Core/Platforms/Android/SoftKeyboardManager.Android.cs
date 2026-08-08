@@ -5,6 +5,7 @@ using AndroidX.Core.View;
 using Java.Lang;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
+using Nalu.Internals;
 using Object = Java.Lang.Object;
 using Rect = Android.Graphics.Rect;
 using View = Android.Views.View;
@@ -67,9 +68,10 @@ public static partial class SoftKeyboardManager
             }
         );
 
-#pragma warning disable VSTHRD100
-    private static async void ScrollToFocusedField(TextView focusedView)
-#pragma warning restore VSTHRD100
+    private static void ScrollToFocusedField(TextView focusedView) =>
+        ScrollToFocusedFieldAsync(focusedView).FireAndForget();
+
+    private static async Task ScrollToFocusedFieldAsync(TextView focusedView)
     {
         await Task.Delay(50); // Allow time for the layout to adjust
 

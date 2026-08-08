@@ -305,11 +305,11 @@ public sealed class ScaffoldTabBarItemView : Grid
 
         if (root is not null)
         {
-            _label.SetBinding(Label.TextProperty, Binding.Create(static (ScaffoldRoot r) => r.Title, source: root));
+            _label.SetBinding(Label.TextProperty, BindingBase.Create(static (ScaffoldRoot r) => r.Title, source: root));
         }
         else
         {
-            _label.SetBinding(Label.TextProperty, Binding.Create(static (ScaffoldTabBarView v) => v.OverflowTitle, source: owner));
+            _label.SetBinding(Label.TextProperty, BindingBase.Create(static (ScaffoldTabBarView v) => v.OverflowTitle, source: owner));
         }
 
         Add(new VerticalStackLayout

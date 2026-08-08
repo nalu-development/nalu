@@ -8,8 +8,7 @@ namespace Nalu;
 /// </summary>
 public abstract class ViewBoxBase : View, IViewBox, ISafeAreaView
 {
-    private ILayoutManager? _layoutManager;
-    private ILayoutManager LayoutManager => _layoutManager ??= CreateLayoutManager();
+    private ILayoutManager LayoutManager => field ??= CreateLayoutManager();
 
     bool ISafeAreaView.IgnoreSafeArea => false;
 

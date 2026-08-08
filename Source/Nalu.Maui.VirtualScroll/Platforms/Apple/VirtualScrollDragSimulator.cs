@@ -43,7 +43,7 @@ internal static class VirtualScrollDragSimulator
             var x = from.X + ((to.X - from.X) * step / steps);
             var y = from.Y + ((to.Y - from.Y) * step / steps);
             collectionView.UpdateInteractiveMovement(new CoreGraphics.CGPoint(x, y));
-            await Task.Delay(30).ConfigureAwait(true);
+            await Task.Delay(30);
         }
 
         // Mirrors Ended.

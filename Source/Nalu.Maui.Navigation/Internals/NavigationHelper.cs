@@ -43,7 +43,7 @@ internal static partial class NavigationHelper
     private static async ValueTask WithLifecyclePageAsync(Page page, Func<ValueTask> invoke)
     {
         _lifecyclePage.Value = page;
-        await invoke().ConfigureAwait(true);
+        await invoke();
     }
 
     private static MethodInfo? GetImplementedLifecycleMethod(

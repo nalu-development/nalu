@@ -275,7 +275,7 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
     {
         try
         {
-            await _navigationService.GoToAsync(navigation).ConfigureAwait(true);
+            await _navigationService.GoToAsync(navigation);
         }
         finally
         {
@@ -450,7 +450,7 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
 
         if (_scaffold.Presenter is { } presenter)
         {
-            await presenter.SynchronizeAsync(targetRoot.Root, hint).ConfigureAwait(true);
+            await presenter.SynchronizeAsync(targetRoot.Root, hint);
         }
 
         completeAction?.Invoke();

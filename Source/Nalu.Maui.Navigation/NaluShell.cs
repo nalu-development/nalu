@@ -2,7 +2,6 @@ using System.Text.RegularExpressions;
 using Nalu.Internals;
 // ReSharper disable once RedundantUsingDirective
 using System.Windows.Input;
-using Microsoft.Maui.Controls;
 
 namespace Nalu;
 

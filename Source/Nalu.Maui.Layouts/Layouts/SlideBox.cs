@@ -292,7 +292,7 @@ public class SlideBox : Layout
         // Re-coerce: indexes may have shifted, the selection may have appeared or vanished.
         // SetValue would no-op on an unchanged number, so the coerced companions are synced
         // explicitly (the initial "index 0 exists now" case never raises a change).
-        var coerced = (int) CoerceIndex(SelectedIndex < 0 ? 0 : SelectedIndex)!;
+        var coerced = (int) CoerceIndex(SelectedIndex < 0 ? 0 : SelectedIndex);
 
         if (coerced != SelectedIndex)
         {
@@ -321,7 +321,7 @@ public class SlideBox : Layout
 
         // Selecting the same number re-runs coercion: a disabled selection moves to the
         // nearest enabled slide, and a first-enabled item resurrects a -1 selection.
-        var target = (int) (CoerceIndex(SelectedIndex is -1 ? Items.IndexOf(item) : SelectedIndex))!;
+        var target = (int) CoerceIndex(SelectedIndex is -1 ? Items.IndexOf(item) : SelectedIndex);
 
         if (target != SelectedIndex)
         {

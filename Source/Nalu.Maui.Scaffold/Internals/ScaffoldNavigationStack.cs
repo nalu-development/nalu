@@ -15,7 +15,6 @@ namespace Nalu;
 internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
 {
     private readonly List<NavigationStackPage> _pushedPages = [];
-    private Page? _rootPage;
 
     /// <summary>
     /// Gets or sets the root page instance. Lifecycle is owned by the content-level proxy
@@ -23,21 +22,21 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     /// </summary>
     public Page? RootPage
     {
-        get => _rootPage;
+        get;
         set
         {
-            if (ReferenceEquals(_rootPage, value))
+            if (ReferenceEquals(field, value))
             {
                 return;
             }
 
-            if (_rootPage is not null)
+            if (field is not null)
             {
-                FindHostPage()?.RemoveLogicalChild(_rootPage);
-                Scaffold.CleanupPageFlyoutContent(_rootPage);
+                FindHostPage()?.RemoveLogicalChild(field);
+                Scaffold.CleanupPageFlyoutContent(field);
             }
 
-            _rootPage = value;
+            field = value;
 
             if (value is not null)
             {

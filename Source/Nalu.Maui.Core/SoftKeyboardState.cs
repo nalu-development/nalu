@@ -8,9 +8,6 @@ namespace Nalu;
 /// </summary>
 public class SoftKeyboardState : INotifyPropertyChanged
 {
-    private double _height;
-    private bool _isVisible;
-    private SoftKeyboardAdjustMode _adjustMode;
     private readonly WeakEventManager _weakEventManager = new();
 
     /// <summary>
@@ -18,8 +15,8 @@ public class SoftKeyboardState : INotifyPropertyChanged
     /// </summary>
     public SoftKeyboardAdjustMode AdjustMode
     {
-        get => _adjustMode;
-        internal set => SetField(ref _adjustMode, value);
+        get;
+        internal set => SetField(ref field, value);
     }
     
     /// <summary>
@@ -27,8 +24,8 @@ public class SoftKeyboardState : INotifyPropertyChanged
     /// </summary>
     public double Height
     {
-        get => _height;
-        internal set => SetField(ref _height, value);
+        get;
+        internal set => SetField(ref field, value);
     }
     
     /// <summary>
@@ -36,10 +33,10 @@ public class SoftKeyboardState : INotifyPropertyChanged
     /// </summary>
     public bool IsVisible
     {
-        get => _isVisible;
+        get;
         internal set
         {
-            if (SetField(ref _isVisible, value))
+            if (SetField(ref field, value))
             {
                 OnPropertyChanged(nameof(IsHidden));
             }
@@ -49,7 +46,7 @@ public class SoftKeyboardState : INotifyPropertyChanged
     /// <summary>
     /// Gets a value indicating whether the soft keyboard is currently hidden.
     /// </summary>
-    public bool IsHidden => !_isVisible;
+    public bool IsHidden => !IsVisible;
 
     /// <inheritdoc />
     public event PropertyChangedEventHandler? PropertyChanged

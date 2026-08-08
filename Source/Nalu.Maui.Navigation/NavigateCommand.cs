@@ -68,7 +68,7 @@ public partial class NavigateCommand : IMarkupExtension<ICommand>
 
             try
             {
-                await navigationService.GoToAsync(navigation).ConfigureAwait(true);
+                await navigationService.GoToAsync(navigation);
             }
             catch (Exception ex)
             {

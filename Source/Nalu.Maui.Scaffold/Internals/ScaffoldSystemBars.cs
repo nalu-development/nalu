@@ -249,10 +249,10 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
         {
             try
             {
-                await Task.Delay(_sampleDebounceMs).ConfigureAwait(true);
+                await Task.Delay(_sampleDebounceMs);
                 _sampleScheduled = false;
 
-                if (_sampler is { } sampler && await sampler().ConfigureAwait(true) is { } luminance)
+                if (_sampler is { } sampler && await sampler() is { } luminance)
                 {
                     _sampledLuminance = luminance;
                     Recompute();

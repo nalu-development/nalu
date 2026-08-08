@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Nalu;
 
@@ -191,7 +190,7 @@ internal static class ScaffoldOverlayLifecycle
         switch (model)
         {
             case IAsyncDisposable asyncDisposable:
-                await asyncDisposable.DisposeAsync().ConfigureAwait(true);
+                await asyncDisposable.DisposeAsync();
 
                 break;
 
@@ -215,7 +214,7 @@ internal sealed class ScaffoldOverlayService(INavigationService navigationServic
         where TModel : class
     {
         var overlayRef = new ScaffoldOverlayRef<TResult>();
-        await ShowCoreAsync<TModel>(overlayRef, intent, sheet: false, options, sheetOptions: null).ConfigureAwait(true);
+        await ShowCoreAsync<TModel>(overlayRef, intent, sheet: false, options, sheetOptions: null);
 
         return overlayRef.Result;
     }
@@ -228,7 +227,7 @@ internal sealed class ScaffoldOverlayService(INavigationService navigationServic
         where TModel : class
     {
         var overlayRef = new ScaffoldOverlayRef<TResult>();
-        await ShowCoreAsync<TModel>(overlayRef, intent, sheet: true, popupOptions: null, options).ConfigureAwait(true);
+        await ShowCoreAsync<TModel>(overlayRef, intent, sheet: true, popupOptions: null, options);
 
         return overlayRef.Result;
     }
@@ -270,28 +269,28 @@ internal sealed class ScaffoldOverlayService(INavigationService navigationServic
 
             try
             {
-                await ScaffoldOverlayLifecycle.SendEnteringAsync(model, intent).ConfigureAwait(true);
+                await ScaffoldOverlayLifecycle.SendEnteringAsync(model, intent);
 
                 // A close requested during OnEnteringAsync skips the presentation entirely.
                 if (!overlayRef.CloseRequestedBeforePresentation)
                 {
                     var handle = sheet
-                        ? await scaffold.ShowBottomSheetAsync(view, sheetOptions).ConfigureAwait(true)
-                        : await scaffold.ShowPopupAsync(view, popupOptions).ConfigureAwait(true);
+                        ? await scaffold.ShowBottomSheetAsync(view, sheetOptions)
+                        : await scaffold.ShowPopupAsync(view, popupOptions);
 
                     overlayRef.Bind(handle);
 
                     // Same-context completion (RunContinuationsAsynchronously TCS owned by the handle).
 #pragma warning disable VSTHRD003
-                    await handle.Closed.ConfigureAwait(true);
+                    await handle.Closed;
 #pragma warning restore VSTHRD003
                 }
 
-                await ScaffoldOverlayLifecycle.SendLeavingAsync(model).ConfigureAwait(true);
+                await ScaffoldOverlayLifecycle.SendLeavingAsync(model);
             }
             finally
             {
-                await ScaffoldOverlayLifecycle.DisposeAsync(model).ConfigureAwait(true);
+                await ScaffoldOverlayLifecycle.DisposeAsync(model);
             }
         }
         finally

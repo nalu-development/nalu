@@ -212,8 +212,8 @@ public class VerticalWrapLayoutManager : LayoutManager
                 // Finalize current column and start new one
                 columns.Add(currentColumn);
                 currentColumn = ColumnInfo.Create();
-                isFirstInColumn = true;
-                // Recalculate heightWithSpacing since isFirstInColumn changed
+
+                // This child opens the new column: no leading spacing.
                 heightWithSpacing = desiredHeight;
             }
 

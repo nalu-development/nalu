@@ -1222,7 +1222,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Scrim: brush update only, no re-animation.
         entry.ScrimView.Background = replacement.Scrim;
 
-        await previous.Content.FadeTo(0, 100);
+        await previous.Content.FadeToAsync(0, 100);
         entry.ContentPlatform.RemoveFromSuperview();
         ScaffoldOverlayAnimations.ResetContent(previous.Content);
         previous.Cleanup?.Invoke();
@@ -1237,7 +1237,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         entry.ContentPlatform = panel;
 
         replacement.Content.Opacity = 0;
-        await replacement.Content.FadeTo(1, 100);
+        await replacement.Content.FadeToAsync(1, 100);
     }
 
     public Task CloseOverlayAsync(ScaffoldOverlayRequest request)

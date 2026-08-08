@@ -143,11 +143,11 @@ public sealed class ScaffoldTabBarOverflowView : Border
     {
         // Close first, then navigate: a no-op selection (current root, empty stack) must
         // still dismiss the panel, and the engine's own sync would close it anyway.
-        await closeAsync().ConfigureAwait(true);
+        await closeAsync();
 
         if (barView.TabBar is { } tabBar)
         {
-            await tabBar.SelectRootAsync(root).ConfigureAwait(true);
+            await tabBar.SelectRootAsync(root);
         }
     }
 }

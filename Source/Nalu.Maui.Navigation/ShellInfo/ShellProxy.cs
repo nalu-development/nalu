@@ -116,7 +116,7 @@ internal class ShellProxy : IShellProxy, IDisposable
             // Wait for the animation to complete
             // I know this is a hack, but I don't see any other way to do this
             // given `shell.GoToAsync` does not wait for the animation to complete
-            await Task.Delay(500).ConfigureAwait(true);
+            await Task.Delay(500);
         }
 
         completeAction?.Invoke();

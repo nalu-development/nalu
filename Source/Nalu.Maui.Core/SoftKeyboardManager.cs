@@ -1,3 +1,4 @@
+// ReSharper disable once RedundantUsingDirective — required by the iOS partial members below
 using System.Runtime.CompilerServices;
 
 namespace Nalu;
