@@ -43,11 +43,9 @@ public static class MauiProgram
                 }
             )
             .UseNaluTabBar()
-            .UseNaluScaffold(scaffold => scaffold
-                // Model-first overlays exercised by the "Scaffold Overlay Service Tests" harness.
-                .AddOverlay<Tests.VmSheetModel, Tests.VmSheetView>()
-                .AddOverlay<Tests.VmPopupModel, Tests.VmPopupView>()
-            )
+            // Model-first overlays exercised by the "Scaffold Overlay Service Tests" harness.
+            // AddOverlays() is source-generated (anchors on IOverlayRef ctor parameters).
+            .UseNaluScaffold(scaffold => scaffold.AddOverlays())
             .UseSkiaSharp()
             .UseNaluLayouts()
             .UseNaluControls()

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup Label="Build">
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Not packed on its own: the assembly ships as an analyzer inside the Nalu.Maui.Scaffold package. -->
+    <IsPackable>false</IsPackable>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep the Roslyn floor LOW on purpose: it defines the minimum SDK/IDE that can load the generator. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup Label="Shared generator plumbing (linked: analyzer assemblies must stay standalone)">
+    <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\EquatableArray.cs" Link="Shared\EquatableArray.cs" />
+    <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\LocationInfo.cs" Link="Shared\LocationInfo.cs" />
+    <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\Polyfills.cs" Link="Shared\Polyfills.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+</Project>

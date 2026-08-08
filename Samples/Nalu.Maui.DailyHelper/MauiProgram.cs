@@ -36,7 +36,9 @@ public static class MauiProgram
 
             // Model-first overlays (§7.2): the duration sheet is shown via IOverlayService
             // from the task editor's page model — no view references in the model.
-            .UseNaluScaffold(scaffold => scaffold.AddOverlay<DurationSheetModel, DurationSheetView>())
+            // AddOverlays() is source-generated: it discovers classes taking IOverlayRef in
+            // their constructor and pairs each model with its view.
+            .UseNaluScaffold(scaffold => scaffold.AddOverlays())
             .UseSkiaSharp()
             .UseNaluControls()
             .UseNaluVirtualScroll()

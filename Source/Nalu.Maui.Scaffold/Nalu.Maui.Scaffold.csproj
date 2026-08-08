@@ -45,4 +45,9 @@
     <ProjectReference Include="..\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
     <ProjectReference Include="..\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
   </ItemGroup>
+
+  <ItemGroup Label="Source generator (packed as an analyzer, not referenced by the library itself)">
+    <ProjectReference Include="..\Nalu.Maui.Scaffold.SourceGenerators\Nalu.Maui.Scaffold.SourceGenerators.csproj" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="..\Nalu.Maui.Scaffold.SourceGenerators\bin\$(Configuration)\netstandard2.0\Nalu.Maui.Scaffold.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
 </Project>
