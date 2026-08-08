@@ -52,6 +52,16 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     /// <summary>The last insets the window dispatched, BEFORE the chrome rewrite (see <see cref="ApplyInsetsTo"/>).</summary>
     private WindowInsetsCompat? _lastRawInsets;
 
+    /// <summary>
+    /// The predictive-back peek and its OWN chrome intent. The layer-wide intent
+    /// (<see cref="ScaffoldLayout.PageTopInsetPx"/>/<see cref="ScaffoldLayout.PageBottomInsetPx"/>)
+    /// belongs to the scrubbed TOP page for the whole gesture, so a peeked page whose chrome
+    /// differs (nav bar shown vs overlapped, tab bar back vs hidden) gets its rewrite
+    /// re-dispatched directly to its subtree after every layer-level dispatch — it must be
+    /// padded for where it will LAND, or the commit jumps.
+    /// </summary>
+    private (AView View, int TopInsetPx, int BottomInsetPx)? _peekIntent;
+
     public ScaffoldPageLayerLayout(IntPtr javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
     {
@@ -96,11 +106,43 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
         }
     }
 
+    /// <summary>Registers the peek's chrome intent; cleared via <see cref="ClearPeekInsetIntent(AView)"/> (or the parameterless overload).</summary>
+    public void SetPeekInsetIntent(AView peekView, int topInsetPx, int bottomInsetPx)
+        => _peekIntent = (peekView, topInsetPx, bottomInsetPx);
+
+    /// <summary>Clears the peek intent, tolerating stale calls for a view that is no longer the peek.</summary>
+    public void ClearPeekInsetIntent(AView peekView)
+    {
+        if (_peekIntent is { } intent && ReferenceEquals(intent.View, peekView))
+        {
+            _peekIntent = null;
+        }
+    }
+
+    /// <summary>
+    /// Unconditional clear for the sync taking over the presentation: from that point the
+    /// layer-wide intent describes the incoming page (a committed peek was precomputed with
+    /// the same values), and a lingering per-view override would fight later chrome changes.
+    /// </summary>
+    public void ClearPeekInsetIntent() => _peekIntent = null;
+
+    /// <summary>Overrides the layer-wide rewrite on the peek subtree (runs AFTER it, so it wins).</summary>
+    private void RedispatchPeekIntent()
+    {
+        if (_peekIntent is { } peek && _lastRawInsets is { } raw)
+        {
+            ViewCompat.DispatchApplyWindowInsets(peek.View, Rewrite(raw, peek.TopInsetPx, peek.BottomInsetPx));
+        }
+    }
+
     public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
     {
         if (!TransitionInFlight)
         {
-            return base.DispatchApplyWindowInsets(insets);
+            var result = base.DispatchApplyWindowInsets(insets);
+            RedispatchPeekIntent();
+
+            return result;
         }
 
         // Mid-transition the pages are TRANSFORMED, and MAUI derives a page's safe-area padding
@@ -114,7 +156,10 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 
         try
         {
-            return base.DispatchApplyWindowInsets(insets);
+            var result = base.DispatchApplyWindowInsets(insets);
+            RedispatchPeekIntent();
+
+            return result;
         }
         finally
         {
@@ -198,7 +243,11 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     {
         if (_lastRawInsets is { } raw)
         {
-            ViewCompat.DispatchApplyWindowInsets(pageView, Rewrite(raw));
+            var rewritten = _peekIntent is { } peek && ReferenceEquals(peek.View, pageView)
+                ? Rewrite(raw, peek.TopInsetPx, peek.BottomInsetPx)
+                : Rewrite(raw);
+
+            ViewCompat.DispatchApplyWindowInsets(pageView, rewritten);
         }
 
         // ...and ask the window for a real pass too: MAUI computes a hosted view's safe-area
@@ -217,17 +266,21 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     }
 
     private WindowInsetsCompat Rewrite(WindowInsetsCompat insets)
+        => Parent is ScaffoldLayout { } scaffoldLayout
+            ? Rewrite(insets, scaffoldLayout.PageTopInsetPx, scaffoldLayout.PageBottomInsetPx)
+            : insets;
+
+    private static WindowInsetsCompat Rewrite(WindowInsetsCompat insets, int topInsetPx, int bottomInsetPx)
     {
-        if (Parent is ScaffoldLayout { } scaffoldLayout
-            && (scaffoldLayout.PageBottomInsetPx > 0 || scaffoldLayout.PageTopInsetPx > 0))
+        if (topInsetPx > 0 || bottomInsetPx > 0)
         {
             var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
 
             var modifiedSystemBarInsets = Insets.Of(
                 systemBarInsets.Left,
-                scaffoldLayout.PageTopInsetPx > 0 ? scaffoldLayout.PageTopInsetPx : systemBarInsets.Top,
+                topInsetPx > 0 ? topInsetPx : systemBarInsets.Top,
                 systemBarInsets.Right,
-                scaffoldLayout.PageBottomInsetPx > 0 ? scaffoldLayout.PageBottomInsetPx : systemBarInsets.Bottom
+                bottomInsetPx > 0 ? bottomInsetPx : systemBarInsets.Bottom
             )!;
 
             using var builder = new WindowInsetsCompat.Builder(insets);

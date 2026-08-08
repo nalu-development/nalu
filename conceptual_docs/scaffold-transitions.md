@@ -66,9 +66,13 @@ The engines (custom on both platforms) are built for **truthful flights**:
   flights — under the finger; release either completes (dispatching the pop through the
   engine) or cancels. Pages whose model implements `ILeavingGuard` block the gesture and route
   through the guard instead.
-- **Android predictive back**: the system back gesture peeks the page below with the standard
-  slide; committing hands off to the engine pop (guards honored, `enableOnBackInvokedCallback`
-  required, root pages defer to the native back-to-home preview).
+- **Android predictive back**: the system back gesture peeks the page below — padded for
+  where it will land (its own nav/tab bar footprints, not the scrubbed page's) — and scrubs
+  the pop under the finger, **including shared-element flights**: matching
+  `Scaffold.TransitionName` pairs fly between the two pages driven by the gesture, complete
+  with the settle on commit, and reverse home on cancel. Committing hands off to the engine
+  pop (guards honored, `enableOnBackInvokedCallback` required, root pages defer to the native
+  back-to-home preview).
 
 ## Modal pages
 

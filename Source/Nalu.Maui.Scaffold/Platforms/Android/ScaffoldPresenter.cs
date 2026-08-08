@@ -61,6 +61,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private Page? _backBelowPage;
     private bool _backPreviewActive;
     private Page? _predictiveHandoffPage;
+    private bool _previewOwnsTransitionFlag;
+    private ScaffoldFlightSession? _backFlightSession;
+    private float _backProgress;
     private LeavingPage? _leavingPage;
 
     public bool HasOverlay => _overlays.Count > 0;
@@ -299,6 +302,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             if (pageLayer is not null)
             {
                 pageLayer.TransitionInFlight = animated;
+
+                // The sync owns the flag from here (its finally below clears it): a pending
+                // preview-cancel animator must not clear it mid-transition. Any per-peek inset
+                // override ends too — the layer-wide intent set above describes the incoming
+                // page now (an adopted peek was precomputed with exactly those values).
+                _previewOwnsTransitionFlag = false;
+                pageLayer.ClearPeekInsetIntent();
             }
 
             try
@@ -390,19 +400,93 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // via transitionAlpha — repair before the page becomes visible under the scrubbed one.
         ScaffoldPageRestore.Repair(belowPage);
 
-        _ = container;
+        // The preview spans a transition for the inset machinery too: the flag parks the
+        // scrubbed transforms for the span of any insets dispatch (so nothing gets padded for
+        // where it momentarily sits) and blocks input on pages in motion. The commit's sync
+        // (or the cancel path below) restores it.
+        pageLayer.TransitionInFlight = true;
+        _previewOwnsTransitionFlag = true;
+
+        // The peek is padded for where it will LAND, not for the top page's chrome: the
+        // layer-wide inset intent still belongs to the scrubbed page for the whole gesture
+        // (its nav bar may overlap content while the revealed page shows one, its tab bar may
+        // be hidden while the revealed root brings it back), so the peek registers its OWN
+        // intent, computed exactly like the sync will compute it on commit.
+        var belowTabVisible = _currentRoot.Parent is ScaffoldTabBar && Scaffold.ComputeTabBarVisible(_currentRoot, belowPage);
+        var belowNavBarVisible = scaffold.ResolveNavBarView(belowPage) is not null && Scaffold.GetIsNavBarVisible(belowPage);
+        var belowNavBarInsets = belowNavBarVisible && !Scaffold.GetNavBarOverlapsContent(belowPage);
+
+        pageLayer.SetPeekInsetIntent(
+            belowView,
+            belowNavBarInsets ? _lastNavStripHeight : 0,
+            belowTabVisible ? _lastStripHeight : 0
+        );
+
+        // A freshly mounted view gets no insets dispatch of its own (the window only
+        // re-dispatches when the insets CHANGE): without this the peeked page lays out
+        // edge-to-edge — content under the status bar — and jumps into place when the pop
+        // commits and a real dispatch finally lands.
+        pageLayer.ApplyInsetsTo(belowView);
+
         _backPeekView = belowView;
         _backTopView = topView;
         _backBelowPage = belowPage;
         _backPreviewActive = true;
+        _backProgress = 0f;
+
+        // Shared elements fly DURING the gesture: matching pairs between the scrubbed page
+        // (source, captured at rest — that is now) and the peek (destination) are built as a
+        // SEEKABLE session the scrub drives — the same flights a committed pop would play,
+        // driven by the finger instead of an animator.
+        var topTagged = ScaffoldTransitions.Collect(topPage);
+        var belowTagged = ScaffoldTransitions.Collect(belowPage);
+        var sharedNames = ScaffoldTransitions.MatchingNames(topTagged, belowTagged);
+
+        if (sharedNames.Count > 0
+            && ScaffoldSharedElementTransitions.Prepare(
+                mauiContext,
+                container,
+                topPage,
+                belowPage,
+                sharedNames,
+                topTagged,
+                scaffold.ResolvePageTransition(topPage).DurationSeconds
+            ) is { } flightSession)
+        {
+            _backFlightSession = flightSession;
+
+            if (belowView.Width > 0)
+            {
+                // A previously-presented page kept its layout: destination geometry is valid now.
+                flightSession.TryBuild();
+                flightSession.Seek(0f, 0f);
+            }
+            else
+            {
+                // Fresh platform view: destination geometry exists at its first pre-draw.
+                AndroidX.Core.View.OneShotPreDrawListener.Add(
+                    belowView,
+                    new Java.Lang.Runnable(() =>
+                        {
+                            if (ReferenceEquals(_backFlightSession, flightSession) && flightSession.TryBuild())
+                            {
+                                flightSession.Seek(_backProgress, topView.TranslationX);
+                            }
+                        }
+                    )
+                );
+            }
+        }
     }
 
-    /// <summary>Predictive back, gesture progressing: page-motion-only scrub (v1).</summary>
+    /// <summary>Predictive back, gesture progressing: page motion + shared-element flights, finger-driven.</summary>
     public void UpdateBackPreview(float progress)
     {
         if (_backPreviewActive && _backTopView is { } topView)
         {
+            _backProgress = progress;
             topView.TranslationX = progress * _backPreviewMaxShift * (topView.Width > 0 ? topView.Width : 0);
+            _backFlightSession?.Seek(progress, topView.TranslationX);
         }
     }
 
@@ -417,21 +501,56 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         _backPreviewActive = false;
         var topView = _backTopView;
         var peekView = _backPeekView;
+        var flightSession = _backFlightSession;
         _backTopView = null;
         _backPeekView = null;
         _backBelowPage = null;
+        _backFlightSession = null;
 
         if (topView is null)
         {
+            flightSession?.Finish();
             RemovePeek(peekView);
+            ClearPreviewTransitionFlag();
 
             return;
         }
 
+        var startProgress = _backProgress;
         var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
         animator.SetDuration(150);
-        animator.AnimationEnd += (_, _) => RemovePeek(peekView);
+
+        // The flights ride home with the page.
+        animator.Update += (_, args) => flightSession?.Seek(startProgress * (1 - (float)args.Animation.AnimatedFraction), topView.TranslationX);
+
+        animator.AnimationEnd += (_, _) =>
+        {
+            flightSession?.Finish();
+            RemovePeek(peekView);
+
+            // Clearing re-dispatches: the pages recompute their padding at rest.
+            ClearPreviewTransitionFlag();
+        };
+
         animator.Start();
+    }
+
+    /// <summary>
+    /// Ends the preview's transition span — a no-op once a sync has taken the flag over
+    /// (its own finally clears it when the presentation settles), so a late animator-end
+    /// callback can never re-dispatch insets in the middle of someone else's transition.
+    /// </summary>
+    private void ClearPreviewTransitionFlag()
+    {
+        if (_previewOwnsTransitionFlag)
+        {
+            _previewOwnsTransitionFlag = false;
+
+            if (_pageLayer is { } pageLayer)
+            {
+                pageLayer.TransitionInFlight = false;
+            }
+        }
     }
 
     /// <summary>
@@ -452,24 +571,35 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         var topView = _backTopView;
         var peekView = _backPeekView;
         var belowPage = _backBelowPage;
+        var flightSession = _backFlightSession;
         _backTopView = null;
         _backPeekView = null;
         _backBelowPage = null;
+        _backFlightSession = null;
 
         if (topView is null || belowPage is null)
         {
+            flightSession?.Finish();
             RemovePeek(peekView);
 
             return;
         }
 
+        var startProgress = _backProgress;
         var width = topView.Width > 0 ? topView.Width : 1;
         var settle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, width)!;
         animator.SetDuration((long)(_overlayDurationMs * (1 - (topView.TranslationX / width))));
+
+        // The flights complete their remaining path while the page settles offscreen.
+        animator.Update += (_, args) => flightSession?.Seek(startProgress + ((1 - startProgress) * (float)args.Animation.AnimatedFraction), topView.TranslationX);
+
         animator.AnimationEnd += (_, _) => settle.TrySetResult();
         animator.Start();
         await settle.Task.ConfigureAwait(true);
+
+        // Flights are AT their destination — the live views they hand back to sit exactly there.
+        flightSession?.Finish();
 
         _predictiveHandoffPage = belowPage;
 
@@ -487,6 +617,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             restoreAnimator.Start();
             await restore.Task.ConfigureAwait(true);
             RemovePeek(peekView);
+            ClearPreviewTransitionFlag();
         }
     }
 
@@ -500,10 +631,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             topView.TranslationX = 0f;
         }
 
+        _backFlightSession?.Finish();
+        _backFlightSession = null;
         RemovePeek(_backPeekView);
         _backTopView = null;
         _backPeekView = null;
         _backBelowPage = null;
+
+        // Everything is back at rest; the invalidating sync (re)takes the flag if it animates.
+        ClearPreviewTransitionFlag();
     }
 
     /// <summary>A page still mounted in the fragment container while it plays its leaving motion.</summary>
@@ -653,6 +789,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             _pageLayer?.RemoveView(peekView);
         }
+
+        // Either way its per-peek inset intent ends here: an adopted view is padded by the
+        // layer-wide intent the sync just set (same values — the peek precomputed them).
+        if (peekView is not null)
+        {
+            _pageLayer?.ClearPeekInsetIntent(peekView);
+        }
     }
 
     private FragmentContainerView EnsureContainer(ScaffoldLayout platformView)
@@ -680,6 +823,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         _backPeekView = null;
         _backTopView = null;
         _backBelowPage = null;
+        _backFlightSession = null;
         _predictiveHandoffPage = null;
         _leavingPage = null;
 

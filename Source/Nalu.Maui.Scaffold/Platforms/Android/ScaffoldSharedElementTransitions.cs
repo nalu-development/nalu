@@ -275,27 +275,111 @@ internal sealed class ScaffoldFlightSession(
     }
 
     private bool _started;
+    private List<IFlight>? _flights;
+    private List<AView>? _flightViews;
+    private List<Action>? _cleanup;
+    private ViewGroupOverlay? _mountedOverlay;
+
+    /// <summary>Whether the flights are built and mounted (seekable).</summary>
+    public bool IsBuilt => _flights is not null;
 
     /// <summary>Measures the destination side, builds the overlay flights and starts the animator.</summary>
     public void Start()
     {
+        if (!TryBuild())
+        {
+            return;
+        }
+
+        var animator = ValueAnimator.OfFloat(0f, 1f)!;
+        animator.SetDuration((long)(durationSeconds * 1000));
+        animator.SetInterpolator(new AccelerateDecelerateInterpolator());
+        animator.Update += (_, args) => Seek((float)args.Animation.AnimatedValue!, 0);
+        animator.AnimationEnd += (_, _) => Finish();
+        animator.Start();
+    }
+
+    /// <summary>
+    /// Builds and mounts the flights WITHOUT a driver — the predictive-back scrub seeks them
+    /// (<see cref="Seek"/>) and tears them down (<see cref="Finish"/>) itself. Returns false
+    /// when nothing usable matched (a failed build never takes the gesture down).
+    /// </summary>
+    public bool TryBuild()
+    {
         try
         {
-            StartCore();
+            return BuildCore();
         }
         catch (Exception exception)
         {
-            // A failed flight must never take the navigation down with it — the page slide
+            // A failed flight must never take the navigation down with it — the page motion
             // still runs and the live views were not hidden yet (that happens last).
             System.Diagnostics.Debug.WriteLine($"[Nalu] Shared-element flight failed: {exception}");
+
+            return false;
         }
     }
 
-    private void StartCore()
+    /// <summary>
+    /// Applies the flight state for a progress in [0,1]. <paramref name="sourceDx"/> carries a
+    /// moving SOURCE page (the predictive-back scrub translates it): the flights ride the
+    /// shift, decaying to zero as they approach their destination.
+    /// </summary>
+    public void Seek(float progress, float sourceDx)
+    {
+        if (_flights is not { } flights)
+        {
+            return;
+        }
+
+        progress = Math.Clamp(progress, 0f, 1f);
+
+        foreach (var flight in flights)
+        {
+            flight.Apply(progress);
+        }
+
+        if (_flightViews is { } views)
+        {
+            var shift = sourceDx * (1 - progress);
+
+            foreach (var view in views)
+            {
+                view.TranslationX = shift;
+            }
+        }
+    }
+
+    /// <summary>Unmounts the flights and restores the live pair views. Idempotent.</summary>
+    public void Finish()
+    {
+        if (_flightViews is { } views && _mountedOverlay is { } overlay)
+        {
+            foreach (var view in views)
+            {
+                overlay.Remove(view);
+            }
+        }
+
+        if (_cleanup is { } cleanup)
+        {
+            foreach (var action in cleanup)
+            {
+                action();
+            }
+        }
+
+        _flights = null;
+        _flightViews = null;
+        _cleanup = null;
+        _mountedOverlay = null;
+    }
+
+    private bool BuildCore()
     {
         if (_started || container.Overlay is not ViewGroupOverlay overlay || toPage.Handler?.PlatformView is not AView toRoot)
         {
-            return;
+            return false;
         }
 
         _started = true;
@@ -358,7 +442,7 @@ internal sealed class ScaffoldFlightSession(
 
         if (flights.Count == 0)
         {
-            return;
+            return false;
         }
 
         foreach (var action in hide)
@@ -376,31 +460,12 @@ internal sealed class ScaffoldFlightSession(
             flight.Apply(0);
         }
 
-        var animator = ValueAnimator.OfFloat(0f, 1f)!;
-        animator.SetDuration((long)(durationSeconds * 1000));
-        animator.SetInterpolator(new AccelerateDecelerateInterpolator());
-        animator.Update += (_, args) =>
-        {
-            var progress = (float)args.Animation.AnimatedValue!;
+        _flights = flights;
+        _flightViews = flightViews;
+        _cleanup = cleanup;
+        _mountedOverlay = overlay;
 
-            foreach (var flight in flights)
-            {
-                flight.Apply(progress);
-            }
-        };
-        animator.AnimationEnd += (_, _) =>
-        {
-            foreach (var view in flightViews)
-            {
-                overlay.Remove(view);
-            }
-
-            foreach (var action in cleanup)
-            {
-                action();
-            }
-        };
-        animator.Start();
+        return true;
     }
 
     /// <summary>

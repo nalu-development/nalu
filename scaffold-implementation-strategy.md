@@ -120,13 +120,19 @@
   pinned by dedicated unit tests (pages below a forgotten page keep restoring; the exclusion
   dies on pop; a forgotten ROOT excludes only its own stack, other roots keep tracking).
 
+- **Predictive-back polish SHIPPED (August 2026)**: the peeked page is padded for where it
+  will LAND (its own nav/tab bar inset intent, dispatched per-view — fixes the revealed-page
+  jump on commit), and **shared-element flights now scrub with the gesture** — the flight
+  session became seekable (build / Seek(progress, sourceDx) / Finish), driven by
+  BackEventCompat progress, completing on commit and reversing on cancel. Verified on an
+  API 36 emulator against the DailyHelper photo pair; full Android DevFlow suite green.
+
 **Next steps, in recommended order:**
 
 1. Verify one REAL IDE XAML hot reload session on the DailyHelper (§4.2 harness covered the
    object-level effects only).
-2. Optional/parked: flyout edge-swipe open; predictive-back shared-element flights — newly
-   FEASIBLE since the Android engine replacement (see §8.1 addendum); Shell-host restore
-   verification (engine-level design should work there — untested, unadvertised).
+2. Optional/parked: flyout edge-swipe open; Shell-host restore verification (engine-level
+   design should work there — untested, unadvertised).
 
 **Decided (August 2026): deep-link mapping stays APP-SIDE.** A library URI → `INavigationInfo`
 layer was dropped: the edge cases are irreducibly app-specific (scheme design, auth gates,
