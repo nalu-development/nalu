@@ -42,7 +42,13 @@ public class ScaffoldFlyoutChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
             try
             {
-                await App.WaitForBoundsAsync(pageMarkerAutomationId, b => b.Y > 0, TimeSpan.FromSeconds(2));
+                // Settled display, not a single sample: when selecting BACK a cross-area root,
+                // the page being navigated AWAY from is the one that hosted the marker before —
+                // during its exit motion it still reports positioned bounds, so a gate-rejected
+                // tap would otherwise read as a successful selection, never be retried, and the
+                // marker page then disappears when the in-flight navigation commits (the engine
+                // disposes the leaving root page).
+                await App.WaitForSettledDisplayAsync(pageMarkerAutomationId, TimeSpan.FromSeconds(2));
 
                 return;
             }
