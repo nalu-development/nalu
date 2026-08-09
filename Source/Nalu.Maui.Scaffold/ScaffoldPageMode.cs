@@ -10,7 +10,7 @@ public enum ScaffoldPageMode
     Default,
 
     /// <summary>
-    /// Modal presentation (§7.1): enters from the bottom by default (an explicit page-attached
+    /// Modal presentation: enters from the bottom by default (an explicit page-attached
     /// <see cref="Scaffold.PageTransitionProperty"/> still wins), covers the tab bar, and the
     /// default nav bar shows the title only (no back chevron, no drawer buttons).
     /// System back is blocked entirely — the iOS edge swipe and the Android predictive back get

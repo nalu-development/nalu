@@ -1,20 +1,26 @@
 # Scaffold Popups & Bottom Sheets
 
 The Scaffold ships one shared overlay primitive powering popups, bottom sheets, drawers and
-the tab bar's overflow panel: entries **stack** in open order, each above its own scrim, with
-consistent back/scrim-tap dismissal — identical on iOS and Android, no platform modals
-involved.
+the tab bar's overflow panel: popups and sheets **stack** freely in open order, each above its
+own scrim (the drawer and the tab bar panel are single-instance; the panel's scrim sits below
+the bar), with consistent back/scrim-tap dismissal — identical on iOS and Android, no platform
+modals involved.
 
 ## Popups
 
 ```csharp
 IScaffoldPopup popup = await scaffold.ShowPopupAsync(new MyPopupView());
+
+// Then either await the close...
 await popup.Closed;          // completes on EVERY close path
-await popup.CloseAsync();    // or close programmatically (also IAsyncDisposable)
+
+// ...OR close it programmatically (also IAsyncDisposable):
+await popup.CloseAsync();
 ```
 
 `ScaffoldPopupOptions` (or the equivalent `ScaffoldPopup.*` attached properties on the view
-itself) control presentation:
+itself — except `Anchor`, `AnchorOffset` and `CustomPlacer`, which are call-site only) control
+presentation:
 
 | Option | Purpose |
 |--------|---------|
@@ -68,8 +74,9 @@ declaring options on the sheet view.
 
 `Scaffold.ShowTabBarPanelAsync(View, Brush? scrim, bool closeIfOpened)` presents a panel
 docked above the tab bar **while keeping the bar interactive** (the scrim covers the page, not
-the bar) — this is what the default tab bar's overflow "More" uses, available for your own
-quick-switch panels. `ScaffoldTabBar.ShowPanelAsync(...)` is the area-level equivalent.
+the bar) — this is what the default tab bar's overflow "More" uses (see
+[Structure & Tab Bar](scaffold-structure.md#the-tab-bar)), available for your own quick-switch
+panels. `ScaffoldTabBar.ShowPanelAsync(...)` is the area-level equivalent.
 
 ## MVVM overlays — `IOverlayService`
 
@@ -113,6 +120,12 @@ public class ItemsPageModel(IOverlayService overlays)
 The overlay model can receive an intent, and closes itself through its `IOverlayRef`
 (injected), optionally with a result. Options can still be passed per call, or declared on the
 view via the attached properties.
+
+Contract notes: keep ONE public constructor per model/view (multi-constructor selection is not
+service-aware); `ILeavingAware` and `IAsyncDisposable`/`IDisposable` run on close, in one DI
+scope per presentation. While the app is not scaffold-hosted (a non-scaffold navigation host,
+or a platform without scaffold hosting — see [platform support](scaffold.md#platform-support)),
+every call is a graceful no-op returning `default` immediately.
 
 ## Stack semantics
 

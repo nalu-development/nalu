@@ -87,8 +87,7 @@ The Scaffold is a XAML element describing the whole app: areas → roots → pag
                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
                xmlns:pages="clr-namespace:MyApp.Pages"
-               x:Class="MyApp.AppScaffold"
-               nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}">
+               x:Class="MyApp.AppScaffold">
 
     <nalu:ScaffoldTabBar>
         <nalu:ScaffoldRoot Title="Today" PageType="{x:Type pages:TodayPage}">
@@ -153,7 +152,7 @@ point to see everything working together.
 ## Platform support
 
 - Scaffold **hosting** (the chrome, transitions, gestures): **iOS** 12.2+ and **Android**
-  API 21+ (`net10.0-ios` / `net10.0-android`).
+  API 21+.
 - The **package** is referencable from every platform (Windows/Mac Catalyst pick the neutral
   `net10.0` assembly): `UseNaluScaffold()` is callable everywhere and always registers
   `IOverlayService` and `IScaffoldFlyoutController`, so shared page models keep injecting

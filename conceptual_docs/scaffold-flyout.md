@@ -33,15 +33,21 @@ page can present its own drawer content (it is cleaned up when the page leaves t
 
 ## The menu view
 
-`ScaffoldFlyoutMenuView` renders the scaffold structure as a menu: a flat entry per root for a
-single-root area, group headers for multi-root areas — using each root's `Title`/`CurrentIcon`
-and selecting through the same engine path as tab taps (guards fire; selecting the active root
-pops to root). Custom flyout content can build the same behavior with
-`ScaffoldRoot.SelectCommand`.
+`ScaffoldFlyoutMenuView` renders the scaffold structure as a menu: a flat entry per VISIBLE
+root for a single-root area, group headers for multi-root areas — using each root's
+`Title`/`CurrentIcon` and selecting through the same engine path as tab taps (guards fire;
+selecting the active root pops to root). `ScaffoldTabBar` areas are excluded by default (their
+roots already live in the bar): opt them in with `IsTabBarDisplayed="True"` — without it, a
+tab-bar-only app renders an empty drawer. Customization points: `HeaderView`, `FooterView`,
+`ItemTemplate`, `PanelBackground`, `ContentPadding`, `ItemSpacing`, plus the styleable
+`ScaffoldFlyoutMenuItemView` / `ScaffoldFlyoutMenuGroupHeader` item types. Custom flyout
+content can build the same behavior with `ScaffoldRoot.SelectCommand`.
 
 ## Options
 
-Attach `ScaffoldFlyoutOptions` per side (`FlyoutStartOptions` / `FlyoutEndOptions`):
+Set `ScaffoldFlyoutOptions` per side (`FlyoutStartOptions` / `FlyoutEndOptions`) — these are
+scaffold-level only, unlike content and mode which resolve page → area → scaffold. Defaults:
+`WidthRatio` 0.85, `MaximumWidth` 360, scrim black at 40% opacity.
 
 | Property | Purpose |
 |----------|---------|

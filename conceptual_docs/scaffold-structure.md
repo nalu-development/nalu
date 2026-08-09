@@ -47,7 +47,10 @@ roots (reusing the same item template).
 
 The default bar is styled with plain MAUI implicit styles (`ScaffoldTabBarView`,
 `ScaffoldTabBarItemView`, `ScaffoldTabBarOverflowView` are public types) — colors, pill
-background, spacing and fonts are all standard setters.
+background, spacing and fonts are all standard setters. Notable knobs on `ScaffoldTabBarView`:
+`ItemWidth`, `OverflowIcon`/`OverflowTitle` ("More"), `BarBackground`, `BarCornerRadius`,
+`BarMargin`, `BarPadding`, `BarShadow` — and the `ScaffoldTabBarView.BadgeText` attached
+property for per-root badges (set it on the `ScaffoldRoot`).
 
 ### Replacing the bar entirely
 
@@ -66,9 +69,10 @@ Inside a custom bar, bind the area's `Roots` and use each root's `Title`, `Curre
 `IsSelected` and `SelectCommand` — selection stays engine-routed (guards and lifecycle fire).
 
 The bar view owns its bottom safe-area behavior: the strip is sized to the bar's measured
-height and the bar extends into the bottom inset. Consume the inset inside your bar with
-`SafeAreaEdges` (e.g. `None,None,None,Container` on the element that should clear the system
-bar) — a full-bleed background can reach the very bottom edge while its content stays clear.
+height and the bar extends into the bottom inset. Consume the inset on a CHILD of your bar
+with `SafeAreaEdges` (e.g. `None,None,None,Container` on the element that should clear the
+system bar) — never on the bar's root, whose size change would not propagate on iOS. A
+full-bleed background can reach the very bottom edge while its content stays clear.
 
 ### Per-page tab bar visibility
 
@@ -76,13 +80,13 @@ bar) — a full-bleed background can reach the very bottom edge while its conten
 <ContentPage nalu:Scaffold.TabBarVisibility="Hidden"> <!-- Auto | Visible | Hidden -->
 ```
 
-`Auto` shows the bar on root pages and hides it on pushed pages. Visibility changes animate
-(slide), concurrently with the page transition.
+`Visible` is the default — set `Auto` per page to show the bar on root pages and hide it on
+pushed pages. Visibility changes animate (slide), concurrently with the page transition.
 
 ## Initial selection
 
-Set `Scaffold.InitialRootPageType` to boot on a specific root; the default is the first
-visible root.
+Set `Scaffold.InitialRootPageType` to boot on a specific root; the default is the first root
+of the first area (`IsVisible` is not considered).
 
 ## Runtime structure changes & XAML hot reload
 

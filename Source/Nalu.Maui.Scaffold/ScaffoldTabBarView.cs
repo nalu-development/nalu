@@ -6,8 +6,8 @@ namespace Nalu;
 
 /// <summary>
 /// The default Nalu tab bar component: a floating pill bar rendering one
-/// <see cref="ScaffoldTabBarItemView"/> per visible <see cref="ScaffoldRoot"/> from the metadata
-/// quintet, with fixed <see cref="ItemWidth"/> slots and a trailing "More" item collecting the
+/// <see cref="ScaffoldTabBarItemView"/> per visible <see cref="ScaffoldRoot"/> (built from its
+/// title, icons, visibility and badge), with fixed <see cref="ItemWidth"/> slots and a trailing "More" item collecting the
 /// roots that don't fit (shown in a <see cref="ScaffoldTabBarOverflowView"/> above the bar).
 /// Created automatically as the default value of <see cref="ScaffoldTabBar.TabBarViewProperty"/> —
 /// style it or replace it entirely with any custom view.

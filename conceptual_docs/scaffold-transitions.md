@@ -64,17 +64,18 @@ The engines (custom on both platforms) are built for **truthful flights**:
 
 Stacked motions (push, pop, and both interactive gestures) carry two automatic depth cues so
 the moving page's boundary always reads, whatever the content: the page travelling **above**
-casts a soft shadow (Android elevation / iOS layer shadow — both composited, no per-frame
-cost), and the page revealed **beneath** sits under a subtle dim proportional to how covered
-it still is, lifting as the top page departs. Side-by-side motions (root switches) get
-neither — those pages are adjacent, not stacked.
+casts a soft shadow (an iOS layer shadow; on Android a seam gradient drawn with the dim —
+elevation is deliberately not used, OEM themes scale it into invisibility), and the page
+revealed **beneath** sits under a subtle dim proportional to how covered it still is, lifting
+as the top page departs. Side-by-side motions (root switches) get neither — those pages are
+adjacent, not stacked.
 
 ## Interactive gestures
 
-- **iOS edge-swipe pop**: left-edge pan scrubs the pop choreography — including shared-element
-  flights — under the finger; release either completes (dispatching the pop through the
-  engine) or cancels. Pages whose model implements `ILeavingGuard` block the gesture and route
-  through the guard instead.
+- **iOS edge-swipe pop**: leading-edge pan (RTL-aware) scrubs the pop choreography — including
+  shared-element flights — under the finger; release either completes (dispatching the pop
+  through the engine) or cancels. On pages whose model implements `ILeavingGuard` the swipe
+  simply does not engage — use the back button, which runs the guard.
 - **Android predictive back**: the system back gesture peeks the page below — padded for
   where it will land (its own nav/tab bar footprints, not the scrubbed page's) — and scrubs
   the pop under the finger, **including shared-element flights**: matching
@@ -95,14 +96,16 @@ Modals are **navigation**, not overlays — same stack, same lifecycle, differen
   chevron and drawer buttons, and blocks system back entirely (Android back/predictive back,
   iOS edge swipe) — dismissal is programmatic only.
 - `DismissableModal` additionally shows the close (X) button and lets the Android system back
-  dismiss; both route through the navigation engine (guards and lifecycle run).
+  dismiss; both route through the navigation engine (guards and lifecycle run). Interactive
+  previews stay disabled for both modal modes — on iOS the X is the only gesture-free
+  affordance.
 - Push and pop modals with regular navigations (`Push<MyModalPageModel>()` / `Pop()`); the nav
   bar context exposes `IsModal` / `IsCloseButtonVisible` for custom bars.
 
 ## Notes
 
-- Tab/root switches use `SlideStart`/`SlideEnd` presentation (direction of travel), not the
-  page spec.
+- Tab/root switches don't use the page spec: neighbouring roots slide in the direction of
+  travel, roots in different areas cross-fade.
 - Navigating while the soft keyboard is open dismisses it before the swap on both platforms.
 - Transitions with and without shared elements move identically — the flights ride the same
   page motion.

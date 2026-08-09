@@ -1,6 +1,6 @@
 # Scaffold System Bars
 
-The Scaffold keeps the **status-bar icon style** (and Android's gesture-navigation bar) in
+The Scaffold keeps the **status-bar icon style** (and Android's navigation bar) in
 contrast with whatever is actually visible behind it — automatically, on both platforms, with
 live updates for theme changes, scroll-driven chrome, flyouts and navigation.
 
@@ -46,5 +46,5 @@ Resolution is page → area → scaffold. Two things to know:
 - **iOS**: applied through the view-controller chain (`preferredStatusBarStyle`); UIKit
   cross-fades style changes. No `Info.plist` changes needed.
 - **Android**: applied via `WindowInsetsControllerCompat` for both the status bar and the
-  gesture-navigation bar; SystemUI fades the flips. The pixel sampler uses `PixelCopy`
+  navigation bar; SystemUI fades the flips. The pixel sampler uses `PixelCopy`
   (API 26+; older devices fall back to the semantic rules).

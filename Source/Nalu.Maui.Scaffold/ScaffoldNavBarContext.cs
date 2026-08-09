@@ -7,7 +7,9 @@ namespace Nalu;
 
 /// <summary>
 /// The binding context of the mounted nav bar view (the default template or a custom
-/// replacement): one observable object per <see cref="Scaffold"/>, updated on every navigation.
+/// replacement): one observable object per <see cref="Scaffold"/>, updated on every navigation
+/// and live while the current page's title, title view, binding context, scroll ramp or
+/// flyout policies change.
 /// Custom bars bind to it directly (e.g. <c>IsVisible="{Binding CanNavigateBack}"</c>,
 /// <c>Command="{Binding BackCommand}"</c>) — the same contract the built-in
 /// <see cref="ScaffoldBackButton"/>, <see cref="ScaffoldFlyoutButton"/> and
@@ -60,7 +62,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// <summary>
     /// Gets the effective <see cref="ScaffoldNavBarAppearance.Foreground"/>: the color
     /// fallback of every primitive (title text, glyphs) — a color set directly or via style
-    /// on a primitive wins over it.
+    /// on a primitive wins over it. Null when no appearance in the chain sets one, in which
+    /// case primitives use their built-in default color.
     /// </summary>
     public Color? Foreground
     {
@@ -84,7 +87,7 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Gets whether the tracked content has scrolled past its rest position.</summary>
+    /// <summary>Gets whether the tracked content is scrolled down (offset above 0.5dp).</summary>
     public bool IsScrolledUnder
     {
         get;
@@ -92,9 +95,9 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets the current page's default interpolation ramp start
-    /// (<see cref="Scaffold.ScrollRampStartProperty"/>): the <c>RampStart</c> fallback of every
-    /// scroll-value interpolation on the page.
+    /// Gets the effective interpolation ramp start for the current page (resolved
+    /// page → area → scaffold via <see cref="Scaffold.ScrollRampStartProperty"/>; 0 by
+    /// default): the <c>RampStart</c> fallback of every scroll-value interpolation on the page.
     /// </summary>
     public double ScrollRampStart
     {
@@ -103,8 +106,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets the current page's default interpolation ramp end
-    /// (<see cref="Scaffold.ScrollRampEndProperty"/>).
+    /// Gets the effective interpolation ramp end for the current page (resolved
+    /// page → area → scaffold via <see cref="Scaffold.ScrollRampEndProperty"/>; 100 by default).
     /// </summary>
     public double ScrollRampEnd
     {
@@ -112,21 +115,32 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         internal set => SetField(ref field, value);
     } = 100;
 
-    /// <summary>Gets whether the current navigation stack has at least one pushed page.</summary>
+    /// <summary>
+    /// Gets whether back navigation is offered: the stack has at least one pushed page and the
+    /// current page is not modal.
+    /// </summary>
     public bool CanNavigateBack
     {
         get;
         internal set => SetField(ref field, value);
     }
 
-    /// <summary>Gets whether the start-drawer button should show (content resolves + policy).</summary>
+    /// <summary>
+    /// Gets whether the start-drawer button should show: flyout content resolves, the page is
+    /// not modal, and the <see cref="ScaffoldFlyoutButtonVisibility"/> policy allows it
+    /// (by default only at the stack root).
+    /// </summary>
     public bool IsFlyoutStartButtonVisible
     {
         get;
         internal set => SetField(ref field, value);
     }
 
-    /// <summary>Gets whether the end-drawer button should show (content resolves + policy).</summary>
+    /// <summary>
+    /// Gets whether the end-drawer button should show: flyout content resolves, the page is
+    /// not modal, and the <see cref="ScaffoldFlyoutButtonVisibility"/> policy allows it
+    /// (by default only at the stack root).
+    /// </summary>
     public bool IsFlyoutEndButtonVisible
     {
         get;
@@ -150,7 +164,10 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         internal set => SetField(ref field, value);
     }
 
-    /// <summary>Pops the current page through the navigation engine — guards and lifecycle run.</summary>
+    /// <summary>
+    /// Pops the current page through the navigation engine — guards and lifecycle run.
+    /// Cannot execute while a pop is already in flight.
+    /// </summary>
     public ICommand BackCommand { get; }
 
     /// <summary>Opens the start-edge flyout.</summary>

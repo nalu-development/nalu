@@ -6,11 +6,15 @@ public static class ScaffoldAppBuilderExtensions
     /// <summary>
     /// Registers the Nalu <see cref="Scaffold"/> handler and services. Required for
     /// scaffold-hosted apps; requires <c>UseNaluNavigation</c> to be configured as well.
+    /// Safe to call on every platform: off iOS/Android the registered services
+    /// (<see cref="IOverlayService"/>, <see cref="IScaffoldFlyoutController"/>) degrade to
+    /// graceful no-ops — hosting an actual <see cref="Scaffold"/> still throws.
     /// </summary>
     /// <param name="builder">The MAUI application builder.</param>
     /// <param name="configure">
-    /// Optional scaffold configuration — model-first overlay registrations for
-    /// <see cref="IOverlayService"/> via <see cref="IScaffoldConfigurator.AddOverlay{TModel,TView}()"/>.
+    /// Optional overlay registration for <see cref="IOverlayService"/> — usually the
+    /// source-generated <c>AddOverlays()</c>, or explicit
+    /// <see cref="IScaffoldConfigurator.AddOverlay{TModel,TView}()"/> calls.
     /// </param>
     /// <returns>The same builder, for chaining.</returns>
     public static MauiAppBuilder UseNaluScaffold(this MauiAppBuilder builder, Action<IScaffoldConfigurator>? configure = null)

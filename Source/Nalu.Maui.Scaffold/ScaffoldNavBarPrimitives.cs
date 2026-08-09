@@ -222,9 +222,9 @@ public abstract class ScaffoldNavBarButtonBase : Border
 }
 
 /// <summary>
-/// The nav bar back button: visible while the current stack has pushed pages, pops through the
-/// navigation engine (guards run). Drop it anywhere inside a custom nav bar — it binds to the
-/// inherited <see cref="ScaffoldNavBarContext"/>.
+/// The nav bar back button: visible while the stack has pushed pages and the current page is
+/// not modal; pops through the navigation engine (guards run). Drop it anywhere inside a
+/// custom nav bar — it binds to the inherited <see cref="ScaffoldNavBarContext"/>.
 /// </summary>
 public sealed class ScaffoldBackButton : ScaffoldNavBarButtonBase
 {
@@ -255,9 +255,10 @@ public sealed class ScaffoldCloseButton : ScaffoldNavBarButtonBase
 }
 
 /// <summary>
-/// A nav bar drawer button: opens the corresponding flyout; visible when its content resolves
-/// and its <see cref="ScaffoldFlyoutButtonVisibility"/> policy allows it. Drop it anywhere
-/// inside a custom nav bar — it binds to the inherited <see cref="ScaffoldNavBarContext"/>.
+/// A nav bar drawer button: opens the corresponding flyout; visible when its content resolves,
+/// the page is not modal, and its <see cref="ScaffoldFlyoutButtonVisibility"/> policy allows
+/// it (by default only at the stack root). Drop it anywhere inside a custom nav bar — it binds
+/// to the inherited <see cref="ScaffoldNavBarContext"/>.
 /// </summary>
 public sealed class ScaffoldFlyoutButton : ScaffoldNavBarButtonBase
 {
@@ -338,7 +339,10 @@ public sealed class ScaffoldNavBarTitle : Grid
             propertyChanged: static title => (_, value) => title._label?.FontAttributes = value
         );
 
-    /// <summary>Gets or sets the title color.</summary>
+    /// <summary>
+    /// Gets or sets the title color. When not set (directly or via style), the effective
+    /// <see cref="ScaffoldNavBarContext.Foreground"/> applies, then the built-in default.
+    /// </summary>
     public Color TextColor
     {
         get => (Color)GetValue(TextColorProperty);

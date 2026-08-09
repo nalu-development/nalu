@@ -14,7 +14,11 @@ public partial class ScaffoldHandler;
 
 #else
 
-/// <summary>Handler for <see cref="Scaffold"/> (iOS and Android only).</summary>
+/// <summary>
+/// Neutral-platform handler for <see cref="Scaffold"/>: registered on every platform, but
+/// creating the platform view throws <see cref="PlatformNotSupportedException"/> — the
+/// scaffold is realized on iOS and Android only.
+/// </summary>
 public partial class ScaffoldHandler : Microsoft.Maui.Handlers.ViewHandler<Scaffold, object>
 {
     /// <summary>Initializes a new <see cref="ScaffoldHandler"/>.</summary>

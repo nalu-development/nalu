@@ -51,7 +51,7 @@ public class ScaffoldTabBar : ScaffoldArea
     /// <c>CanExecute</c>).
     /// </summary>
     /// <param name="root">The root to select; must belong to this tab bar's <see cref="ScaffoldArea.Roots"/>.</param>
-    /// <returns>True when the navigation was executed (even if a guard canceled it midway).</returns>
+    /// <returns>True when the selection navigation completed; false when a guard canceled it, another selection is already in flight, or the tab bar is not hosted in a Scaffold.</returns>
     public Task<bool> SelectRootAsync(ScaffoldRoot root)
         => this.GetScaffoldOrDefault() is { } scaffold ? scaffold.SelectRootGatedAsync(root) : Task.FromResult(false);
 
@@ -85,11 +85,6 @@ public class ScaffoldTabBar : ScaffoldArea
     }
 
     /// <summary>
-    /// Detaches the bar view from the element tree while the chrome is unmounted (hidden page,
-    /// non-tab-bar area): the element tree reflects the actually-presented chrome.
-    /// <see cref="GetOrCreateBarView"/> re-attaches on the next mount.
-    /// </summary>
-    /// <summary>
     /// Releases a bar view PERMANENTLY replaced by a live <c>TabBarView</c> swap (runtime
     /// replacement or XAML hot reload): unlike an area switch — where the outgoing bar stays
     /// alive for the return — a replaced bar is never remounted, so it is detached and its
@@ -105,6 +100,11 @@ public class ScaffoldTabBar : ScaffoldArea
         oldBarView.DisconnectHandlers();
     }
 
+    /// <summary>
+    /// Detaches the bar view from the element tree while the chrome is unmounted (hidden page,
+    /// non-tab-bar area): the element tree reflects the actually-presented chrome.
+    /// <see cref="GetOrCreateBarView"/> re-attaches on the next mount.
+    /// </summary>
     internal void OnBarViewUnmounted()
     {
         if (TabBarView is { } barView && ReferenceEquals(barView.Parent, this))

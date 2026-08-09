@@ -30,7 +30,7 @@ public readonly struct ScaffoldSheetDetent
     /// <summary>A detent hugging the sheet content's measured height.</summary>
     public static ScaffoldSheetDetent Content { get; } = new(DetentKind.Content, 0);
 
-    /// <summary>A detent at the given fraction (0..1) of the available presentation height.</summary>
+    /// <summary>A detent at the given fraction (0..1) of the available height (window minus the top system inset).</summary>
     public static ScaffoldSheetDetent Fraction(double fraction) => new(DetentKind.Fraction, fraction);
 
     /// <summary>A detent at the given absolute height in device-independent units.</summary>
@@ -52,8 +52,9 @@ public readonly struct ScaffoldSheetDetent
 
 /// <summary>
 /// Presentation options of <see cref="Scaffold.ShowBottomSheetAsync"/>. The sheet renders in the
-/// top overlay layer, slides from the bottom edge over any chrome, and handles drag between
-/// detents and pull-down-to-close at the virtual view layer (no native sheet involved).
+/// top overlay layer and slides from the bottom edge over any chrome. Drag is recognized
+/// natively (cooperatively with inner scrollables); detent geometry, snapping and
+/// pull-down-to-close live at the virtual view layer — no native sheet controller is involved.
 /// </summary>
 public sealed class ScaffoldBottomSheetOptions
 {
@@ -64,8 +65,8 @@ public sealed class ScaffoldBottomSheetOptions
     public bool? CloseOnScrimTap { get; init; }
 
     /// <summary>
-    /// Gets or sets whether the system back gesture closes the sheet. Defaults to true; when
-    /// false, back is consumed without closing while the sheet is topmost.
+    /// Gets or sets whether the Android system back closes the sheet (iOS has no system back).
+    /// Defaults to true; when false, back is consumed without closing while the sheet is topmost.
     /// </summary>
     public bool? CloseOnBack { get; init; }
 
@@ -76,13 +77,17 @@ public sealed class ScaffoldBottomSheetOptions
     /// </summary>
     public double? MaxWidth { get; init; }
 
-    /// <summary>Gets or sets the resting heights. Defaults to a single <see cref="ScaffoldSheetDetent.Content"/> detent.</summary>
+    /// <summary>
+    /// Gets or sets the resting heights (order and duplicates are irrelevant — heights are
+    /// sorted and de-duplicated). Must be non-empty when set. Defaults to a single
+    /// <see cref="ScaffoldSheetDetent.Content"/> detent.
+    /// </summary>
     public ScaffoldSheetDetent[]? Detents { get; init; }
 
     /// <summary>Gets or sets the index (into <see cref="Detents"/>) the sheet opens at. Defaults to 0.</summary>
     public int? InitialDetent { get; init; }
 
-    /// <summary>Gets or sets whether dragging below the smallest detent dismisses the sheet. Defaults to true.</summary>
+    /// <summary>Gets or sets whether releasing a drag well below the smallest detent (~56dp) dismisses the sheet. Defaults to true.</summary>
     public bool? AllowPullDownToClose { get; init; }
 
     /// <summary>Gets or sets whether the built-in drag handle is shown. Defaults to true.</summary>
@@ -189,8 +194,8 @@ internal sealed record ScaffoldSheetPresentation(
 
 /// <summary>
 /// The bottom sheet chrome of <see cref="Scaffold.ShowBottomSheetAsync"/>: a top-rounded surface
-/// with an optional drag handle hosting the user content, owning the drag gesture, detent
-/// snapping and pull-down-to-close entirely at the virtual view layer.
+/// with an optional drag handle hosting the user content. Drag is recognized natively; detent
+/// snapping and pull-down-to-close live at the virtual view layer.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -201,8 +206,9 @@ internal sealed record ScaffoldSheetPresentation(
 /// does), dragging far enough below the smallest detent dismisses (when allowed).
 /// </para>
 /// <para>
-/// Instances are created per presentation — the type is public as a styling surface (and for
-/// <see cref="SnapToDetentAsync"/>):
+/// Instances are created per presentation — the type is public as a styling surface;
+/// <see cref="SnapToDetentAsync"/> is reachable from the content via
+/// <c>(ScaffoldBottomSheetView?)content.Parent?.Parent</c>:
 /// <code>
 /// &lt;Style TargetType="nalu:ScaffoldBottomSheetView"&gt;
 ///     &lt;Setter Property="SheetBackground" Value="{AppThemeBinding Light=..., Dark=...}" /&gt;
@@ -251,8 +257,9 @@ public sealed class ScaffoldBottomSheetView : Border
         );
 
     /// <summary>
-    /// Gets or sets the sheet surface brush. Drives the view's own
-    /// <see cref="VisualElement.Background"/> — style THIS, not <c>Background</c>.
+    /// Gets or sets the sheet surface brush. Defaults to opaque white — set it per theme.
+    /// Drives the view's own <see cref="VisualElement.Background"/> — style THIS, not
+    /// <c>Background</c>.
     /// </summary>
     public Brush? SheetBackground
     {
@@ -260,14 +267,14 @@ public sealed class ScaffoldBottomSheetView : Border
         set => SetValue(SheetBackgroundProperty, value);
     }
 
-    /// <summary>Gets or sets the radius of the sheet's top corners.</summary>
+    /// <summary>Gets or sets the radius of the sheet's top corners. Defaults to 16.</summary>
     public double SheetCornerRadius
     {
         get => (double)GetValue(SheetCornerRadiusProperty);
         set => SetValue(SheetCornerRadiusProperty, value);
     }
 
-    /// <summary>Gets or sets the drag handle color.</summary>
+    /// <summary>Gets or sets the drag handle color. Defaults to #4D8E8E93.</summary>
     public Color HandleColor
     {
         get => (Color)GetValue(HandleColorProperty);
@@ -326,8 +333,8 @@ public sealed class ScaffoldBottomSheetView : Border
 
     /// <summary>
     /// Animates the sheet to the given detent (index into
-    /// <see cref="ScaffoldBottomSheetOptions.Detents"/>) — the programmatic counterpart of
-    /// dragging. No-op before presentation settles.
+    /// <see cref="ScaffoldBottomSheetOptions.Detents"/>, clamped into range) — the programmatic
+    /// counterpart of dragging. No-op until the sheet's geometry is initialized.
     /// </summary>
     public Task SnapToDetentAsync(int detentIndex)
     {

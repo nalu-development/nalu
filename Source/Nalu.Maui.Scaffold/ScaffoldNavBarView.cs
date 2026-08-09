@@ -6,14 +6,14 @@ namespace Nalu;
 /// The default Nalu navigation bar component, created automatically as the
 /// <see cref="Scaffold.NavBarViewProperty"/> default at the scaffold level. Slots, in order:
 /// start-drawer button, back button, title (or the page's
-/// <see cref="Scaffold.TitleViewProperty"/> content), end-drawer button — all driven by the
-/// <see cref="ScaffoldNavBarContext"/> binding context. Style it or replace it entirely with any
-/// custom view.
+/// <see cref="Scaffold.TitleViewProperty"/> content), end-drawer button, close button — all
+/// driven by the <see cref="ScaffoldNavBarContext"/> binding context. Style it or replace it
+/// entirely with any custom view.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The component spans the whole top strip and opts into the safe area itself, so its content
-/// sits below the status inset while the bar contributes its footprint to the page per §5.4.
+/// sits below the status inset while the bar contributes its footprint to the page.
 /// The strip BACKGROUND is not the bar's concern: it belongs to the chrome and is driven by the
 /// effective <see cref="ScaffoldNavBarAppearance"/> (attached via
 /// <see cref="Scaffold.NavBarAppearanceProperty"/>) — the same is true for any custom bar.
@@ -80,8 +80,8 @@ public sealed class ScaffoldNavBarView : Grid
 
     /// <summary>
     /// Gets or sets the gap around the title column. The icon buttons themselves sit flush
-    /// (zero spacing, zero leading padding by default): their 44dp tap targets' inner
-    /// whitespace provides the optical rhythm around the 24dp glyphs.
+    /// (zero spacing): their 44dp tap targets' inner whitespace provides the optical rhythm
+    /// around the 24dp glyphs.
     /// </summary>
     public double Spacing
     {

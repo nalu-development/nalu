@@ -7,8 +7,9 @@ namespace Nalu;
 
 /// <summary>
 /// The opt-in drawer menu over the owning scaffold's VISIBLE roots — set it as
-/// <see cref="Scaffold.FlyoutStart"/> (or any other flyout content level) to get the default
-/// navigation drawer. Rules: an area with a single visible root renders as a flat entry (root
+/// <see cref="Scaffold.FlyoutStart"/> (or any other flyout content level) AND set the matching
+/// <see cref="Scaffold.FlyoutStartModeProperty"/> to <c>Flyout</c> (or <c>Auto</c>) to get the
+/// default navigation drawer. Rules: an area with a single visible root renders as a flat entry (root
 /// title + icon, selected highlight); an area with several visible roots renders its text-only
 /// <see cref="ScaffoldArea.Title"/> as a group header with the roots below;
 /// <see cref="ScaffoldTabBar"/> areas are excluded unless <see cref="IsTabBarDisplayed"/>.

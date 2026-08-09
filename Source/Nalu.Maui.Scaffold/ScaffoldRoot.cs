@@ -46,8 +46,8 @@ public class ScaffoldRoot : Element
     public static readonly BindableProperty CurrentIconProperty = _currentIconPropertyKey.BindableProperty;
 
     /// <summary>
-    /// Gets or sets the root page type, registered with the Nalu navigation configuration
-    /// (<c>AddPage</c>/<c>AddPages</c>).
+    /// Gets or sets the root page type — the page, or its registered page-model type
+    /// (<c>AddPage</c>/<c>AddPages</c>). Required: scaffold initialization throws when unset.
     /// </summary>
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     public Type? PageType { get; set; }

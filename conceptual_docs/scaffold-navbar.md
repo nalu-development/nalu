@@ -1,15 +1,16 @@
 # Scaffold Nav Bar
 
 The nav bar is a Nalu-drawn strip: same layout, same styling, same behavior on iOS and
-Android. Enable the default bar scaffold-wide:
+Android. The default bar is mounted out of the box — set `Scaffold.NavBarView` only to
+restyle-by-instance, replace it with a custom view, or remove it with `{x:Null}`.
 
-```xml
-<nalu:Scaffold nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}">
-```
-
-The default bar composes four slots: flyout button(s), back/close button, title, and the
-page's `TitleView`. All primitives are public, individually styleable types:
-`ScaffoldBackButton`, `ScaffoldCloseButton`, `ScaffoldFlyoutButton`, `ScaffoldNavBarTitle`.
+The default bar composes three columns: leading (start-drawer button, back button), center
+(title, or the page's `TitleView` in its place), trailing (end-drawer button, close button).
+All primitives are public, individually styleable types: `ScaffoldBackButton`,
+`ScaffoldCloseButton`, `ScaffoldFlyoutButton`, `ScaffoldNavBarTitle` — plus their shared base
+`ScaffoldNavBarButtonBase` (`Icon`, `IconColor`, `PressedBrush`): style it with
+`ApplyToDerivedTypes="True"` to theme all three buttons at once. Default metrics:
+`BarHeight` 48, `BarPadding` 8,0, `Spacing` 8.
 
 ## Titles and TitleView
 
@@ -62,7 +63,9 @@ replacement:
 | `OffsetY` | Vertical offset (hide-on-scroll effects). |
 
 Appearance objects are live: mutating a property (or animating it via bindings) applies
-immediately, per frame.
+immediately, per frame. Careful with shared `Style`s: an appearance declared in a style is ONE
+object attached to many elements — fine for constants, broken for per-page bindings. Defaults:
+`Background` #F7FFFFFF, `Opacity` 1, `OffsetY` 0.
 
 ## Per-page visibility & overlap
 

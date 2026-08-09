@@ -28,7 +28,8 @@ public interface IOverlayRef
 /// MVVM overlay presentation: shows model-first popups and bottom sheets registered via
 /// <see cref="IScaffoldConfigurator.AddOverlay{TModel,TView}()"/>, mirroring the navigation
 /// engine's conventions — intents delivered to <c>OnEnteringAsync(TIntent)</c>,
-/// <c>ILeavingAware</c>/<c>IDisposable</c> honored on close, one DI scope per presentation.
+/// <c>ILeavingAware</c> and <c>IAsyncDisposable</c>/<c>IDisposable</c> honored on close, one
+/// DI scope per presentation.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -40,42 +41,45 @@ public interface IOverlayRef
 /// <para>
 /// The returned task completes when the overlay CLOSES, whatever the path: with the result the
 /// model reported via <see cref="IOverlayRef.CloseAsync(object?)"/>, or <c>default</c> on
-/// dismissal (scrim tap, pull-down, system back, navigation).
+/// dismissal (scrim tap, pull-down, system back, navigation). Closing from
+/// <c>OnEnteringAsync</c> skips the presentation entirely — the task completes without ever
+/// showing the overlay.
 /// </para>
 /// <para>
-/// While the app is not scaffold-hosted (e.g. on platforms without scaffold hosting, such as
-/// Windows or Mac Catalyst), every call is a graceful no-op completing immediately with
-/// <c>default</c> — shared page models can inject and call the service unconditionally.
+/// Whenever the app is not scaffold-hosted — a non-scaffold navigation host, or a platform
+/// without scaffold hosting (Windows, Mac Catalyst) — every call is a graceful no-op
+/// completing immediately with <c>default</c>: shared page models can inject and call the
+/// service unconditionally.
 /// </para>
 /// </remarks>
 public interface IOverlayService
 {
-    /// <summary>Shows a registered popup model and awaits its result.</summary>
+    /// <summary>Shows a registered overlay model as a popup and awaits its result.</summary>
     /// <typeparam name="TModel">The registered overlay model.</typeparam>
     /// <typeparam name="TResult">The result type the model reports via <see cref="IOverlayRef.CloseAsync(object?)"/>.</typeparam>
-    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>.</param>
+    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>; falls back to the parameterless <c>OnEnteringAsync()</c> when no matching overload exists.</param>
     /// <param name="options">Call-site presentation overrides (each set property wins over the view's attached values).</param>
     Task<TResult?> ShowPopupAsync<TModel, TResult>(object? intent = null, ScaffoldPopupOptions? options = null)
         where TModel : class;
 
-    /// <summary>Shows a registered popup model with no result; the task completes when it closes.</summary>
+    /// <summary>Shows a registered overlay model as a popup with no result; the task completes when it closes.</summary>
     /// <typeparam name="TModel">The registered overlay model.</typeparam>
-    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>.</param>
+    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>; falls back to the parameterless <c>OnEnteringAsync()</c> when no matching overload exists.</param>
     /// <param name="options">Call-site presentation overrides (each set property wins over the view's attached values).</param>
     Task ShowPopupAsync<TModel>(object? intent = null, ScaffoldPopupOptions? options = null)
         where TModel : class;
 
-    /// <summary>Shows a registered bottom sheet model and awaits its result.</summary>
+    /// <summary>Shows a registered overlay model as a bottom sheet and awaits its result.</summary>
     /// <typeparam name="TModel">The registered overlay model.</typeparam>
     /// <typeparam name="TResult">The result type the model reports via <see cref="IOverlayRef.CloseAsync(object?)"/>.</typeparam>
-    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>.</param>
+    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>; falls back to the parameterless <c>OnEnteringAsync()</c> when no matching overload exists.</param>
     /// <param name="options">Call-site presentation overrides (each set property wins over the view's attached values).</param>
     Task<TResult?> ShowBottomSheetAsync<TModel, TResult>(object? intent = null, ScaffoldBottomSheetOptions? options = null)
         where TModel : class;
 
-    /// <summary>Shows a registered bottom sheet model with no result; the task completes when it closes.</summary>
+    /// <summary>Shows a registered overlay model as a bottom sheet with no result; the task completes when it closes.</summary>
     /// <typeparam name="TModel">The registered overlay model.</typeparam>
-    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>.</param>
+    /// <param name="intent">Optional intent delivered to the model's <c>OnEnteringAsync(TIntent)</c>; falls back to the parameterless <c>OnEnteringAsync()</c> when no matching overload exists.</param>
     /// <param name="options">Call-site presentation overrides (each set property wins over the view's attached values).</param>
     Task ShowBottomSheetAsync<TModel>(object? intent = null, ScaffoldBottomSheetOptions? options = null)
         where TModel : class;
@@ -101,6 +105,9 @@ public interface IScaffoldConfigurator
     /// Registers a model-first overlay pairing with an explicit view factory — the zero-magic
     /// escape hatch (no reflection over <typeparamref name="TView"/>'s constructors).
     /// </summary>
+    /// <typeparam name="TModel">The overlay model; gets <see cref="IOverlayRef"/> and services via its single public constructor.</typeparam>
+    /// <typeparam name="TView">The overlay view, built by <paramref name="viewFactory"/>.</typeparam>
+    /// <param name="viewFactory">Builds the view from the presentation scope (<see cref="IOverlayRef"/> resolvable) and the model instance.</param>
     IScaffoldConfigurator AddOverlay<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)] TModel,
         TView>(Func<IServiceProvider, TModel, TView> viewFactory)

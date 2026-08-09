@@ -12,6 +12,6 @@ public interface IScaffoldFlyoutController
     /// <param name="side">The edge the drawer slides in from.</param>
     Task OpenAsync(ScaffoldFlyoutSide side);
 
-    /// <summary>Closes the open drawer (or any other presented overlay), if any.</summary>
+    /// <summary>Closes the open drawer, if any; other overlays are unaffected.</summary>
     Task CloseAsync();
 }

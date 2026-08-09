@@ -17,7 +17,7 @@ namespace Nalu;
 [AcceptEmptyServiceProvider]
 public sealed class NavBarBindingExtension : IMarkupExtension<BindingBase>
 {
-    /// <summary>Gets or sets the path within the <see cref="ScaffoldNavBarContext"/>.</summary>
+    /// <summary>Gets or sets the path within the <see cref="ScaffoldNavBarContext"/> ('.', the default, binds the context itself).</summary>
     public string Path { get; set; } = ".";
 
     /// <summary>Gets or sets the binding mode.</summary>

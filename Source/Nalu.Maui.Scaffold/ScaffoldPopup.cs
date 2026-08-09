@@ -52,8 +52,8 @@ public enum ScaffoldPopupPlacement
 /// </summary>
 public interface IScaffoldPopupPlacer
 {
-    /// <summary>Computes the popup rectangle.</summary>
-    /// <param name="area">The safe presentation area (system insets excluded; chrome ignored).</param>
+    /// <summary>Computes the popup rectangle. The returned rectangle is used as-is — the placer owns any clamping.</summary>
+    /// <param name="area">The safe presentation area (system insets and <see cref="ScaffoldPopupOptions.Margin"/> already excluded; chrome ignored).</param>
     /// <param name="contentSize">The measured content size (already constrained to the area).</param>
     /// <param name="anchorBounds">The anchor bounds when <see cref="ScaffoldPopupOptions.Anchor"/> is set.</param>
     Rect Place(Rect area, Size contentSize, Rect? anchorBounds);
@@ -78,8 +78,9 @@ public sealed class ScaffoldPopupOptions
     public bool? CloseOnScrimTap { get; init; }
 
     /// <summary>
-    /// Gets or sets whether the system back gesture closes the popup. Defaults to true; when
-    /// false, back is consumed without closing while this popup is topmost.
+    /// Gets or sets whether the Android system back closes the popup (iOS has no system back;
+    /// the edge-swipe pop is disabled while an overlay is open). Defaults to true; when false,
+    /// back is consumed without closing while this popup is topmost.
     /// </summary>
     public bool? CloseOnBack { get; init; }
 
@@ -92,13 +93,13 @@ public sealed class ScaffoldPopupOptions
     /// </summary>
     public Thickness? Margin { get; init; }
 
-    /// <summary>Gets or sets the placement. Anchor placements require <see cref="Anchor"/>. Defaults to Center.</summary>
+    /// <summary>Gets or sets the placement. Anchor placements fall back to <c>Center</c> when <see cref="Anchor"/> is unset or not realized. Defaults to Center.</summary>
     public ScaffoldPopupPlacement? Placement { get; init; }
 
     /// <summary>Gets or sets the view the anchor placements position relative to.</summary>
     public View? Anchor { get; init; }
 
-    /// <summary>Gets or sets an extra offset applied by the anchor placements.</summary>
+    /// <summary>Gets or sets the gap pushing the popup away from the anchor along the placement direction (sign follows the chosen side; RTL-mirrored).</summary>
     public Point AnchorOffset { get; init; }
 
     /// <summary>Gets or sets a fully custom placement, overriding <see cref="Placement"/>.</summary>

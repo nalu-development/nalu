@@ -56,9 +56,11 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
     /// <summary>
     /// Attached property holding the start-edge (leading) flyout content.
-    /// Resolution order, most specific wins: current <see cref="Page"/> →
-    /// current <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> itself (global).
-    /// No value at any level means the flyout is disabled (the default).
+    /// Resolution walks the current stack as an override chain, most specific first: the
+    /// topmost pushed page that SET the value, older pushed pages, the root page, the current
+    /// <see cref="ScaffoldArea"/>, then the <see cref="Scaffold"/> itself — so a page's drawer
+    /// survives pushes that don't override it. Content alone does not enable a drawer: the
+    /// matching <see cref="ScaffoldFlyoutMode"/> must also be non-<c>Disabled</c>.
     /// The content is a plain MAUI view, logically parented to the element it is attached to
     /// (a per-page flyout inherits that page's BindingContext).
     /// </summary>
@@ -74,10 +76,11 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
     /// <summary>
     /// Attached property controlling the start-edge drawer's behavior
-    /// (<see cref="ScaffoldFlyoutMode"/>). Resolution, most specific SET value wins:
-    /// current <see cref="Page"/> → current <see cref="ScaffoldArea"/> → the
-    /// <see cref="Scaffold"/>. Defaults to <see cref="ScaffoldFlyoutMode.Disabled"/> —
-    /// a drawer requires content AND an explicitly enabling mode.
+    /// (<see cref="ScaffoldFlyoutMode"/>). Resolution, most specific SET value wins: the
+    /// topmost pushed page that SET it, older pushed pages, the root page, the current
+    /// <see cref="ScaffoldArea"/>, then the <see cref="Scaffold"/>. Defaults to
+    /// <see cref="ScaffoldFlyoutMode.Disabled"/> — a drawer requires content AND an
+    /// explicitly enabling mode.
     /// </summary>
     public static readonly BindableProperty FlyoutStartModeProperty =
         BindableProperty.CreateAttached("FlyoutStartMode", typeof(ScaffoldFlyoutMode), typeof(Scaffold), ScaffoldFlyoutMode.Disabled);
@@ -237,10 +240,11 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         BindableProperty.CreateAttached("TransitionName", typeof(string), typeof(Scaffold), null);
 
     /// <summary>
-    /// Attached property declaring the push/pop transition of a <see cref="Page"/> (§8.2).
+    /// Attached property declaring the push/pop transition of a <see cref="Page"/>.
     /// Set on a page it overrides the scaffold-level value; set on the <see cref="Scaffold"/>
-    /// itself it is the default for every page. Resolution:
-    /// page → scaffold → <see cref="ScaffoldPageTransition.Default"/>.
+    /// itself it is the default for every page. Resolution: page-attached value →
+    /// <see cref="ScaffoldPageTransition.SlideFromBottom"/> for modal pages → scaffold-level
+    /// value → <see cref="ScaffoldPageTransition.Default"/>.
     /// The spec belongs to the PUSHED page: it enters with it and leaves with it reversed
     /// (pop and the iOS interactive edge swipe replay it backwards).
     /// </summary>
@@ -248,11 +252,12 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         BindableProperty.CreateAttached("PageTransition", typeof(ScaffoldPageTransition), typeof(Scaffold), null);
 
     /// <summary>
-    /// Attached property declaring a page's presentation mode (§7.1):
+    /// Attached property declaring a page's presentation mode:
     /// <see cref="ScaffoldPageMode.Default"/>, <see cref="ScaffoldPageMode.Modal"/> or
     /// <see cref="ScaffoldPageMode.DismissableModal"/>. Modal pages enter from the bottom,
-    /// cover the tab bar, get no interactive back preview and show a title-only nav bar
-    /// (plus a close button for <see cref="ScaffoldPageMode.DismissableModal"/>).
+    /// cover the tab bar and show a title-only nav bar. Plain <see cref="ScaffoldPageMode.Modal"/>
+    /// blocks system back entirely (dismissal is programmatic); DismissableModal adds the close
+    /// button and lets the Android system back pop through the engine.
     /// </summary>
     public static readonly BindableProperty PageModeProperty =
         BindableProperty.CreateAttached("PageMode", typeof(ScaffoldPageMode), typeof(Scaffold), ScaffoldPageMode.Default);
@@ -270,8 +275,9 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
     /// <summary>
     /// Gets or sets the page type of the root to open at startup. Optional: when not set, the
-    /// first root of the first area is opened. Must match the <see cref="ScaffoldRoot.PageType"/>
-    /// of one of the scaffold's roots.
+    /// first root of the first area is opened. Accepts the page type or its registered
+    /// page-model type; must match the <see cref="ScaffoldRoot.PageType"/> of one of the
+    /// scaffold's roots, or startup throws <see cref="InvalidOperationException"/>.
     /// </summary>
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
     public Type? InitialRootPageType { get; set; }
@@ -443,8 +449,8 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
     }
 
     /// <summary>
-    /// Opens the flyout for the given side, resolving its content from the current page,
-    /// then the current area, then the scaffold's own value. No-op when the drawer does not
+    /// Opens the flyout for the given side, resolving its content through the stack override
+    /// chain (see <see cref="FlyoutStartProperty"/>). No-op when the drawer does not
     /// exist — no content configured at any level, its mode resolves to
     /// <see cref="ScaffoldFlyoutMode.Disabled"/> (or <see cref="ScaffoldFlyoutMode.Auto"/>
     /// while pages are pushed) — or the scaffold is not presented yet, or a flyout is
@@ -1182,6 +1188,13 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
             && Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy
             && rootProxy.Root.NavigationStack.PushedPages.Count > 0)
         {
+            // A plain Modal blocks system back on every channel — same rule as the Android
+            // dispatcher callback: the press is consumed without popping.
+            if (GetPageMode(rootProxy.Root.NavigationStack.PushedPages[^1].Page) == ScaffoldPageMode.Modal)
+            {
+                return true;
+            }
+
             Dispatcher.Dispatch(() => navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).FireAndForget(Handler));
 
             return true;

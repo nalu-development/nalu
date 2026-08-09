@@ -13,6 +13,7 @@ public enum ScrollValueExtrapolation
     /// <summary>
     /// The value keeps extrapolating linearly — a range mapping becomes a speed factor
     /// (e.g. parallax: <c>RampStart=0, RampEnd=100, From=0, To=50</c> = half-speed translation).
+    /// Numeric targets only: <see cref="Color"/>/<see cref="Brush"/> endpoints always clamp.
     /// </summary>
     Extend
 }
@@ -23,20 +24,25 @@ public enum ScrollValueExtrapolation
 /// scroll channel (<see cref="ScaffoldNavBarContext.ScrollOffset"/> plus the page-level
 /// <see cref="Scaffold.ScrollRampStartProperty"/>/<see cref="Scaffold.ScrollRampEndProperty"/> ramp
 /// defaults and the app theme), targeting elements in the scaffold's tree and
-/// <see cref="ScaffoldNavBarAppearance"/> objects alike.
+/// <see cref="ScaffoldNavBarAppearance"/> objects alike. Not derivable outside this library —
+/// use <see cref="ScrollValueExtension"/> or <see cref="ThemeScrollValueExtension"/>.
 /// </summary>
 public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 {
     /// <summary>Gets or sets the scroll offset where interpolation starts (defaults to the page-level <see cref="Scaffold.ScrollRampStartProperty"/>).</summary>
     public double? RampStart { get; set; }
 
-    /// <summary>Gets or sets the scroll offset where interpolation ends (defaults to the page-level <see cref="Scaffold.ScrollRampEndProperty"/>).</summary>
+    /// <summary>
+    /// Gets or sets the scroll offset where interpolation ends (defaults to the page-level
+    /// <see cref="Scaffold.ScrollRampEndProperty"/>); equal to <see cref="RampStart"/> makes
+    /// the value step at that offset.
+    /// </summary>
     public double? RampEnd { get; set; }
 
     /// <summary>Gets or sets the behavior outside the [RampStart, RampEnd] window.</summary>
     public ScrollValueExtrapolation Extrapolate { get; set; }
 
-    /// <summary>Gets or sets the easing shaping the ramp interior.</summary>
+    /// <summary>Gets or sets the easing applied inside [RampStart, RampEnd]; extrapolated values stay linear.</summary>
     public Easing? Easing { get; set; }
 
     private protected abstract (object? FromLight, object? ToLight, object? FromDark, object? ToDark) GetEndpoints();
@@ -155,16 +161,17 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 /// <see cref="Scaffold.ScrollRampStartProperty"/>/<see cref="Scaffold.ScrollRampEndProperty"/> ramp).
 /// Works on numeric, <see cref="Color"/> and solid <see cref="Brush"/> properties, on any
 /// element inside the scaffold's tree and on <see cref="ScaffoldNavBarAppearance"/>:
-/// <c>Opacity="{nalu:ScrollValue From=0, To=1}"</c>. For theme-dependent endpoints use
+/// <c>Opacity="{nalu:ScrollValue From=0, To=1}"</c>. Must be applied directly on the target's
+/// bindable property — Style setters are not supported. For theme-dependent endpoints use
 /// <see cref="ThemeScrollValueExtension"/>.
 /// </summary>
 [RequireService([typeof(IProvideValueTarget)])]
 public sealed class ScrollValueExtension : ScrollValueExtensionBase
 {
-    /// <summary>Gets or sets the value at (and below) <c>RampStart</c>.</summary>
+    /// <summary>Gets or sets the value at <c>RampStart</c> (held below it unless <see cref="ScrollValueExtrapolation.Extend"/>).</summary>
     public object? From { get; set; }
 
-    /// <summary>Gets or sets the value at (and above) <c>RampEnd</c>.</summary>
+    /// <summary>Gets or sets the value at <c>RampEnd</c> (held above it unless <see cref="ScrollValueExtrapolation.Extend"/>).</summary>
     public object? To { get; set; }
 
     private protected override (object?, object?, object?, object?) GetEndpoints() => (From, To, null, null);
@@ -179,16 +186,16 @@ public sealed class ScrollValueExtension : ScrollValueExtensionBase
 [RequireService([typeof(IProvideValueTarget)])]
 public sealed class ThemeScrollValueExtension : ScrollValueExtensionBase
 {
-    /// <summary>Gets or sets the light-theme value at (and below) <c>RampStart</c>.</summary>
+    /// <summary>Gets or sets the light-theme value at <c>RampStart</c> (held below it unless <see cref="ScrollValueExtrapolation.Extend"/>).</summary>
     public object? FromLight { get; set; }
 
-    /// <summary>Gets or sets the light-theme value at (and above) <c>RampEnd</c>.</summary>
+    /// <summary>Gets or sets the light-theme value at <c>RampEnd</c> (held above it unless <see cref="ScrollValueExtrapolation.Extend"/>).</summary>
     public object? ToLight { get; set; }
 
-    /// <summary>Gets or sets the dark-theme value at (and below) <c>RampStart</c> (falls back to <see cref="FromLight"/>).</summary>
+    /// <summary>Gets or sets the dark-theme value at <c>RampStart</c> (falls back to <see cref="FromLight"/>).</summary>
     public object? FromDark { get; set; }
 
-    /// <summary>Gets or sets the dark-theme value at (and above) <c>RampEnd</c> (falls back to <see cref="ToLight"/>).</summary>
+    /// <summary>Gets or sets the dark-theme value at <c>RampEnd</c> (falls back to <see cref="ToLight"/>).</summary>
     public object? ToDark { get; set; }
 
     private protected override (object?, object?, object?, object?) GetEndpoints() => (FromLight, ToLight, FromDark, ToDark);

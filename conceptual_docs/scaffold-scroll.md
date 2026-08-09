@@ -30,7 +30,12 @@ vertical offset into the ambient `ScaffoldNavBarContext`:
 | `IsScrolledUnder` | Whether content has scrolled under the nav bar (threshold-style checks). |
 
 Each page starts its own scroll story: navigating away and back rebinds the channel, and a
-page without a tracker reads a resting offset — bindings settle at their `From` endpoints.
+page without a tracker reads offset 0 — bindings settle at their `From` endpoints.
+
+Two practical caveats: the platform scroll container is searched at most 3 levels below the
+tracked view, and on Android a recycler-backed tracker (`CollectionView`, `VirtualScroll`)
+has no absolute offset — the value accumulates scroll deltas, so with variable item heights
+thresholds stay reliable but exact pixel mapping (tight parallax) may drift.
 
 ## 2. The ramp
 
