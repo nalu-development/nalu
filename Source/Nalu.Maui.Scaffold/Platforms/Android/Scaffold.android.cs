@@ -63,11 +63,24 @@ public partial class Scaffold
             return;
         }
 
+        // A plain Modal cannot be dismissed by system back (predictive or not): the callback
+        // stays enabled (no back-to-home preview) and the press is consumed silently.
+        // DismissableModal deliberately falls through to the engine pop.
+        if (TopPushedPage() is { } topPage && GetPageMode(topPage) == ScaffoldPageMode.Modal)
+        {
+            return;
+        }
+
         if (NavigationService is { } navigationService && HasPushedPages())
         {
             Dispatcher.Dispatch(() => navigationService.GoToAsync(Nalu.Navigation.Relative().Pop()).FireAndForget(Handler));
         }
     }
+
+    private Page? TopPushedPage()
+        => (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack.PushedPages is { Count: > 0 } pushed
+            ? pushed[^1].Page
+            : null;
 
     /// <summary>
     /// Predictive-back integration (§ predictive back design): the system back gesture scrubs

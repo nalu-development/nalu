@@ -91,9 +91,11 @@ Modals are **navigation**, not overlays — same stack, same lifecycle, differen
 <ContentPage nalu:Scaffold.PageMode="Modal">              <!-- Default | Modal | DismissableModal -->
 ```
 
-- `Modal` presents with `SlideFromBottom` (override with a page transition), shows the
-  close button instead of back, and blocks the back gesture/pop chrome.
-- `DismissableModal` additionally allows system back / close dismissal without a guard.
+- `Modal` presents with `SlideFromBottom` (override with a page transition), hides the back
+  chevron and drawer buttons, and blocks system back entirely (Android back/predictive back,
+  iOS edge swipe) — dismissal is programmatic only.
+- `DismissableModal` additionally shows the close (X) button and lets the Android system back
+  dismiss; both route through the navigation engine (guards and lifecycle run).
 - Push and pop modals with regular navigations (`Push<MyModalPageModel>()` / `Pop()`); the nav
   bar context exposes `IsModal` / `IsCloseButtonVisible` for custom bars.
 

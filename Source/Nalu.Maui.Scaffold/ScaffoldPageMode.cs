@@ -11,17 +11,18 @@ public enum ScaffoldPageMode
 
     /// <summary>
     /// Modal presentation (§7.1): enters from the bottom by default (an explicit page-attached
-    /// <see cref="Scaffold.PageTransitionProperty"/> still wins), covers the tab bar, gets no
-    /// interactive back preview (iOS edge swipe, Android predictive back — Android system back
-    /// still commits through the engine, where <see cref="ILeavingGuard"/> decides), and the
+    /// <see cref="Scaffold.PageTransitionProperty"/> still wins), covers the tab bar, and the
     /// default nav bar shows the title only (no back chevron, no drawer buttons).
-    /// Dismissal is programmatic.
+    /// System back is blocked entirely — the iOS edge swipe and the Android predictive back get
+    /// no preview, and the Android back press is consumed without popping. Dismissal is
+    /// programmatic only (engine pops still run <see cref="ILeavingGuard"/> and lifecycle).
     /// </summary>
     Modal,
 
     /// <summary>
-    /// <see cref="Modal"/> plus a trailing close (X) button on the default nav bar, popping the
-    /// page through the navigation engine (guards and lifecycle run).
+    /// <see cref="Modal"/> plus dismissal affordances: a trailing close (X) button on the
+    /// default nav bar, and the Android system back pops again — both route through the
+    /// navigation engine (guards and lifecycle run). The interactive previews stay disabled.
     /// </summary>
     DismissableModal
 }

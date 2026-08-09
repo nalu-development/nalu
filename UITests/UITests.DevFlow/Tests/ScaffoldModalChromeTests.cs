@@ -82,7 +82,7 @@ public class ScaffoldModalChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLife
     }
 
     [Fact]
-    public async Task SystemBackPopsModalThroughEngine()
+    public async Task SystemBackIsConsumedByPlainModal()
     {
         Assert.SkipUnless(!await App.IsAppleAsync(), "System back is an Android-only channel.");
 
@@ -90,8 +90,26 @@ public class ScaffoldModalChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLife
         await App.TapAsync("PushPlainModal");
         await WaitDisplayedAsync("PlainModalPage");
 
-        // Android system back is NOT blocked for modals: it commits through the engine
-        // (ILeavingGuard would be consulted; none here, so the modal pops).
+        // A plain Modal blocks system back entirely: the press is consumed, nothing pops.
+        await App.SystemBackAsync();
+        await Task.Delay(800);
+        await WaitDisplayedAsync("PlainModalPage");
+
+        // Programmatic close remains the only dismissal.
+        await App.TapAsync("ClosePlainModal");
+        await WaitDisplayedAsync("ModalHomePage");
+    }
+
+    [Fact]
+    public async Task SystemBackDismissesDismissableModal()
+    {
+        Assert.SkipUnless(!await App.IsAppleAsync(), "System back is an Android-only channel.");
+
+        await WaitDisplayedAsync("ModalHomePage");
+        await App.TapAsync("PushDismissableModal");
+        await WaitDisplayedAsync("DismissableModalPage");
+
+        // DismissableModal keeps the system back channel: pops through the engine.
         await App.SystemBackAsync();
         await WaitDisplayedAsync("ModalHomePage");
     }
