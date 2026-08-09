@@ -75,6 +75,7 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         if (ctx.SemanticModel.GetDeclaredSymbol(declaration, ct) is not { } symbol ||
             symbol.IsAbstract ||
             symbol.IsGenericType ||
+            IsScaffoldSymbol(symbol) ||
             !DerivesFromContentPage(symbol) ||
             IsAutoRegistrationDisabled(symbol))
         {
@@ -113,7 +114,7 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         }
 
         var rootType = ResolveRootType(lead, compilation);
-        var rootIsPage = rootType is not null && (IsContentPageSymbol(rootType) || DerivesFromContentPage(rootType));
+        var rootIsPage = rootType is not null && !IsScaffoldSymbol(rootType) && (IsContentPageSymbol(rootType) || DerivesFromContentPage(rootType));
 
         var rootFqn = rootType is not null
             ? Fqn(rootType)
@@ -364,6 +365,13 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
     {
         for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
         {
+            // Nalu.Scaffold derives from ContentPage for hosting reasons, but a scaffold is
+            // the app SHELL, never a navigation destination: anything under it is excluded.
+            if (IsScaffoldSymbol(baseType))
+            {
+                return false;
+            }
+
             if (baseType is { Name: "ContentPage", ContainingNamespace: { Name: "Controls", ContainingNamespace: { Name: "Maui", ContainingNamespace: { Name: "Microsoft", ContainingNamespace.IsGlobalNamespace: true } } } })
             {
                 return true;
@@ -372,6 +380,9 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
 
         return false;
     }
+
+    private static bool IsScaffoldSymbol(INamedTypeSymbol type)
+        => type is { Name: "Scaffold", ContainingNamespace: { Name: "Nalu", ContainingNamespace.IsGlobalNamespace: true } };
 
     private static bool IsAutoRegistrationDisabled(INamedTypeSymbol type)
         => type.GetAttributes()

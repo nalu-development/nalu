@@ -31,6 +31,8 @@ internal static class GeneratorTestHarness
 
         namespace Nalu
         {
+            public class Scaffold : Microsoft.Maui.Controls.ContentPage;
+
             public class NavigationConfigurator
             {
                 public NavigationConfigurator AddPage<TPage>() => this;

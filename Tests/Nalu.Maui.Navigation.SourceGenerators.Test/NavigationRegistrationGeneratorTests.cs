@@ -284,6 +284,48 @@ public class NavigationRegistrationGeneratorTests
         System.Text.RegularExpressions.Regex.Matches(result.GeneratedText, "AddPage<global::MyApp\\.HomePage>").Count.Should().Be(1);
     }
 
+    [Fact(DisplayName = "Scaffold subclasses are never pages, from either discovery path")]
+    public void ScaffoldSubclassesAreExcluded()
+    {
+        // Nalu.Scaffold derives from ContentPage for hosting reasons, but it is the app
+        // shell: an AppScaffold (typically XAML-defined) must never reach AddPages.
+        var result = GeneratorTestHarness.Run(
+            [
+                """
+                using Microsoft.Maui.Controls;
+                using Nalu;
+
+                namespace MyApp;
+
+                public partial class AppScaffold : Scaffold
+                {
+                    public AppScaffold()
+                    {
+                    }
+                }
+
+                public class HomePage : ContentPage;
+                """
+            ],
+            xamlFiles:
+            [
+                new GeneratorTestHarness.XamlFile(
+                    "AppScaffold.xaml",
+                    """
+                    <nalu:Scaffold xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                   xmlns:nalu="clr-namespace:Nalu"
+                                   x:Class="MyApp.AppScaffold" />
+                    """
+                )
+            ]
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.HomePage>();");
+        result.GeneratedText.Should().NotContain("AppScaffold");
+    }
+
     [Fact(DisplayName = "Concrete base page other pages derive from is registered too (abstract stays out)")]
     public void ConcreteBasePageIsRegistered()
     {
