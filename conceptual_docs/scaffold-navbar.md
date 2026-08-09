@@ -1,6 +1,6 @@
 # Scaffold Nav Bar
 
-The nav bar is a Nalu-drawn strip: same layout, same styling, same behavior on iOS and
+The nav bar is a plain MAUI view strip: same layout, same styling, same behavior on iOS and
 Android. The default bar is mounted out of the box — set `Scaffold.NavBarView` only to
 restyle-by-instance, replace it with a custom view, or remove it with `{x:Null}`.
 

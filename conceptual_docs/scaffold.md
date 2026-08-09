@@ -2,7 +2,7 @@
 
 [![Nalu.Maui.Scaffold NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Scaffold.svg)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Scaffold)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/)
 
-A complete, Nalu-drawn application shell for .NET MAUI — tab bar, nav bar, drawers, popups,
+A complete application shell for .NET MAUI — tab bar, nav bar, drawers, popups,
 bottom sheets, page transitions and shared elements — replacing MAUI `Shell` as the host for
 [Nalu navigation](navigation.md), on **iOS and Android**.
 

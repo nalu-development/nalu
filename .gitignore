@@ -371,3 +371,4 @@ Source/**/AndroidNative/.gradle/
 Source/**/AndroidNative/**/build/
 Source/**/AndroidNative/local.properties
 release-notes-draft.md
+scaffold-implementation-strategy.md
