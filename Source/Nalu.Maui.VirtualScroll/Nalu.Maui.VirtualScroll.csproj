@@ -7,7 +7,7 @@
       Commercial use requires an active GitHub Sponsors subscription (https://github.com/sponsors/albyrock87); no services are included.
       By installing this package, you agree to the terms outlined in the LICENSE.md.
     </Description>
-    <PackageTags>MAUI</PackageTags>
+    <PackageTags>MAUI;collectionview;virtualization;recyclerview;uicollectionview;performance;drag-drop</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

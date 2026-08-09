@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
     <Product>Nalu.Maui.Core</Product>
-    <Description>.NET MAUI developer utilities</Description>
-    <PackageTags>MAUI</PackageTags>
+    <Description>Core utilities for .NET MAUI: a consistent cross-platform soft-keyboard manager (Resize/Pan on iOS too, observable keyboard state) and NSUrlBackgroundSessionHttpMessageHandler for HTTP requests that survive iOS backgrounding.</Description>
+    <PackageTags>MAUI;soft-keyboard;background;http;ios</PackageTags>
     <IsAotCompatible>true</IsAotCompatible>
     <RootNamespace>Nalu</RootNamespace>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>

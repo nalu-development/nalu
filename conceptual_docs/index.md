@@ -55,8 +55,8 @@ embedded **leak-detector** helps you identify memory leaks, and opt-in
 
 ### Scaffold [![Nalu.Maui.Scaffold NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Scaffold.svg)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Scaffold)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/)
 
-A complete, Nalu-drawn application shell replacing MAUI `Shell` as the navigation host
-(**preview**): tab bar with automatic overflow, nav bar with a per-property appearance system
+A complete, Nalu-drawn application shell replacing MAUI `Shell` as the navigation host:
+tab bar with automatic overflow, nav bar with a per-property appearance system
 and scroll-driven chrome, drawers, popups and bottom sheets, modal presentation, declarative
 page transitions with **shared elements**, interactive back gestures (iOS edge swipe and
 Android **predictive back**, both scrubbing the same seekable choreography), and system bars
@@ -71,6 +71,9 @@ that automatically contrast with your UI — identical on iOS and Android, all e
     </nalu:ScaffoldTabBar>
 </nalu:Scaffold>
 ```
+
+Available on [NuGet.org](https://www.nuget.org/packages/Nalu.Maui.Scaffold/):
+`dotnet add package Nalu.Maui.Scaffold`.
 
 **See more on the [Scaffold Wiki](scaffold.md)** — including the
 [NaluShell migration guide](scaffold-migration.md).

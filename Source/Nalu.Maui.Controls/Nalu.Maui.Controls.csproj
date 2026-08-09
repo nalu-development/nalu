@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
     <Product>Nalu.Maui.Controls</Product>
-    <Description>.NET MAUI developer utilities</Description>
-    <PackageTags>MAUI</PackageTags>
+    <Description>Cross-platform controls for .NET MAUI: DurationWheel (a rotary TimeSpan editor) and InteractableCanvasView (a SkiaSharp canvas with enhanced touch support and propagation control).</Description>
+    <PackageTags>MAUI;controls;skiasharp;duration;canvas</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>

@@ -6,9 +6,8 @@ A complete, Nalu-drawn application shell for .NET MAUI — tab bar, nav bar, dra
 bottom sheets, page transitions and shared elements — replacing MAUI `Shell` as the host for
 [Nalu navigation](navigation.md), on **iOS and Android**.
 
-> **Preview.** The Scaffold ships as `11.0.0-scaffoldN.N` pre-release packages while the API
-> settles. `Nalu.Maui.Navigation` keeps working with MAUI Shell exactly as before — the Scaffold
-> is an *additional* host, not a breaking change.
+> `Nalu.Maui.Navigation` keeps working with MAUI Shell exactly as before — the Scaffold is an
+> *additional* host, not a breaking change.
 
 ## Why a Scaffold?
 
@@ -51,7 +50,7 @@ title, parallax — and the status-bar icons flipping to match. All declarative.
 ### 1. Installation
 
 ```bash
-dotnet add package Nalu.Maui.Scaffold --prerelease
+dotnet add package Nalu.Maui.Scaffold
 ```
 
 ### 2. Setup in MauiProgram.cs

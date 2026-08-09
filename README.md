@@ -12,7 +12,7 @@ If `Nalu.Maui` is valuable to your work, consider sponsoring the author on GitHu
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=github&style=for-the-badge)](https://github.com/sponsors/albyrock87)
 
-### The Scaffold — your whole app shell, drawn by Nalu 🧪
+### The Scaffold — your whole app shell, drawn by Nalu [![Nalu.Maui.Scaffold NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Scaffold.svg)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Scaffold)](https://www.nuget.org/packages/Nalu.Maui.Scaffold/)
 
 ![Scaffold showcase: shared-element transitions flying between pages, a per-page drawer, a bottom sheet hosting the duration wheel, scroll-driven chrome and the floating tab bar](https://raw.githubusercontent.com/nalu-development/nalu/main/Images/readme-scaffold-showcase.gif)
 
@@ -22,7 +22,7 @@ A complete replacement for MAUI `Shell` on **iOS and Android** where **every pie
 
 Because the Scaffold *hosts* Nalu navigation, every interaction — tab tap, back gesture, flyout selection — routes through the engine: guards, lifecycle and intents always run, and [state restoration](conceptual_docs/navigation-restore.md) lands your users exactly where they left off after a restart.
 
-- 📦 **Preview** — pre-release packages are published to [GitHub Packages](https://github.com/nalu-development/nalu/packages) while the API settles (GitHub authentication required); not yet on NuGet.org. `Nalu.Maui.Navigation` keeps working with MAUI `Shell` exactly as before: the Scaffold is an **additional host**, not a breaking change.
+- 📦 **Available on [NuGet.org](https://www.nuget.org/packages/Nalu.Maui.Scaffold/)**: `dotnet add package Nalu.Maui.Scaffold`. `Nalu.Maui.Navigation` keeps working with MAUI `Shell` exactly as before: the Scaffold is an **additional host**, not a breaking change.
 - 📖 Docs: [Overview](conceptual_docs/scaffold.md) · [Structure & Tab Bar](conceptual_docs/scaffold-structure.md) · [Nav Bar](conceptual_docs/scaffold-navbar.md) · [Flyouts](conceptual_docs/scaffold-flyout.md) · [Popups & Sheets](conceptual_docs/scaffold-overlays.md) · [Transitions](conceptual_docs/scaffold-transitions.md) · [Migrating from NaluShell](conceptual_docs/scaffold-migration.md)
 
 ### See it in motion

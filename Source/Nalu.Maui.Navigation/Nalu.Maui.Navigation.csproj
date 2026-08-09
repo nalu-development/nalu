@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
     <Product>Nalu.Maui</Product>
-    <Description>.NET MAUI developer utilities</Description>
-    <PackageTags>MAUI</PackageTags>
+    <Description>Fluent, type-safe MVVM navigation for .NET MAUI: relative/absolute navigation, guards, typed intents, a built-in leak detector, source-generated trim/AOT-safe page registration, and opt-in state restoration. Works with MAUI Shell, NaluShell and the Nalu Scaffold.</Description>
+    <PackageTags>MAUI;navigation;mvvm;shell;routing;lifecycle;state-restoration</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <NoWarn>NU5129</NoWarn>
     <IsAotCompatible>true</IsAotCompatible>

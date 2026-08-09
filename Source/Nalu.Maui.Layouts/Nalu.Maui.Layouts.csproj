@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
     <Product>Nalu.Maui.Layouts</Product>
-    <Description>.NET MAUI developer utilities</Description>
-    <PackageTags>MAUI</PackageTags>
+    <Description>XAML layout primitives for .NET MAUI: ToggleTemplate (an if for XAML), TemplateBox, ViewBox with clipping and scoped binding contexts, animated ExpanderViewBox, state-retaining SlideBox pager, wrap layouts and the Magnet constraint-based layout system.</Description>
+    <PackageTags>MAUI;layouts;templates;expander;slidebox;constraint-layout;xaml</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>

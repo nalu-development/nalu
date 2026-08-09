@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Package">
     <Product>Nalu.Maui.Scaffold</Product>
-    <Description>.NET MAUI developer utilities</Description>
-    <PackageTags>MAUI</PackageTags>
+    <Description>A complete, fully drawn application shell for .NET MAUI replacing Shell on iOS and Android: restylable tab bar, nav bar and drawers, popups and bottom sheets, modal presentation, page transitions with shared elements, iOS edge-swipe and Android predictive back, scroll-driven chrome and system-bar styling — every navigation routes through the Nalu engine (guards, lifecycle, intents).</Description>
+    <PackageTags>MAUI;shell;scaffold;navigation;tabbar;navbar;flyout;bottomsheet;popup;transitions;shared-elements;predictive-back</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
