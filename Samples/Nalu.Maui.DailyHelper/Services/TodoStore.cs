@@ -137,9 +137,9 @@ public sealed class TodoStore : IDisposable
 
         return
         [
-            new TodoItem(Guid.NewGuid(), "Morning run", "5k along the river", today, false, 0),
-            new TodoItem(Guid.NewGuid(), "Water the plants", null, today, false, 1),
-            new TodoItem(Guid.NewGuid(), "Grocery shopping", "Basil, mozzarella, tomatoes", today, false, 2),
+            new TodoItem(Guid.NewGuid(), "Morning run", "5k along the river", today, false, 0) { Duration = TimeSpan.FromMinutes(45) },
+            new TodoItem(Guid.NewGuid(), "Water the plants", null, today, false, 1) { Duration = TimeSpan.FromMinutes(15) },
+            new TodoItem(Guid.NewGuid(), "Grocery shopping", "Basil, mozzarella, tomatoes", today, false, 2) { Duration = TimeSpan.FromHours(1) },
             new TodoItem(Guid.NewGuid(), "Call the plumber", "Kitchen sink drips", today.AddDays(1), false, 3),
             new TodoItem(Guid.NewGuid(), "Book dentist appointment", null, today.AddDays(2), false, 4),
             new TodoItem(Guid.NewGuid(), "Plan weekend hike", "Check the forecast first!", today.AddDays(3), false, 5),

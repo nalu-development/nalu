@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:nl="https://nalu-development.github.com/nalu/layouts"
              xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
              xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
@@ -53,6 +54,74 @@
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding OpenWeatherCommand}" />
                         </Border.GestureRecognizers>
+                    </Border>
+
+                    <!-- Insights card: two chips sliding between panels (Nalu.Maui.Layouts).
+                         The SlideBox animates the switch; the ToggleTemplate inside the first
+                         slide swaps the whole panel when the last task completes. -->
+                    <Border Style="{StaticResource Card}" Padding="16,12">
+                        <VerticalStackLayout Spacing="10">
+                            <HorizontalStackLayout Spacing="8">
+                                <Border StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="14,5"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}">
+                                    <Label Text="Progress" FontFamily="SemiBold" FontSize="13" TextColor="{StaticResource Accent}"
+                                           Opacity="{Binding ProgressChipOpacity}" />
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding SelectInsightCommand}" CommandParameter="0" />
+                                    </Border.GestureRecognizers>
+                                </Border>
+                                <Border StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="14,5"
+                                        BackgroundColor="{AppThemeBinding Light={StaticResource AccentSoftLight}, Dark={StaticResource AccentSoftDark}}">
+                                    <Label Text="Effort" FontFamily="SemiBold" FontSize="13" TextColor="{StaticResource Accent}"
+                                           Opacity="{Binding EffortChipOpacity}" />
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding SelectInsightCommand}" CommandParameter="1" />
+                                    </Border.GestureRecognizers>
+                                </Border>
+                            </HorizontalStackLayout>
+
+                            <nl:SlideBox SelectedIndex="{Binding InsightIndex, Mode=TwoWay}" HeightRequest="74">
+                                <nl:SlideBoxItem>
+                                    <DataTemplate x:DataType="pm:TodayPageModel">
+                                        <nl:ToggleTemplate Value="{Binding AllDone}">
+                                            <nl:ToggleTemplate.WhenTrue>
+                                                <DataTemplate x:DataType="pm:TodayPageModel">
+                                                    <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                                                        <Label Text="&#xe877;" FontFamily="Material" FontSize="34" TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                                                        <VerticalStackLayout Spacing="1" VerticalOptions="Center">
+                                                            <Label Text="All caught up" FontFamily="SemiBold" FontSize="16" />
+                                                            <Label Text="Every task for today is done" Style="{StaticResource Muted}" />
+                                                        </VerticalStackLayout>
+                                                    </HorizontalStackLayout>
+                                                </DataTemplate>
+                                            </nl:ToggleTemplate.WhenTrue>
+                                            <nl:ToggleTemplate.WhenFalse>
+                                                <DataTemplate x:DataType="pm:TodayPageModel">
+                                                    <VerticalStackLayout Spacing="7" VerticalOptions="Center">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <Label Text="{Binding ProgressLabel}" FontFamily="SemiBold" FontSize="15" />
+                                                            <Label Grid.Column="1" Text="{Binding OpenCountLabel}" Style="{StaticResource Muted}" />
+                                                        </Grid>
+                                                        <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Accent}" />
+                                                    </VerticalStackLayout>
+                                                </DataTemplate>
+                                            </nl:ToggleTemplate.WhenFalse>
+                                        </nl:ToggleTemplate>
+                                    </DataTemplate>
+                                </nl:SlideBoxItem>
+                                <nl:SlideBoxItem>
+                                    <DataTemplate x:DataType="pm:TodayPageModel">
+                                        <HorizontalStackLayout Spacing="12" VerticalOptions="Center">
+                                            <Label Text="&#xe8b5;" FontFamily="Material" FontSize="34" TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                                            <VerticalStackLayout Spacing="1" VerticalOptions="Center">
+                                                <Label Text="{Binding PlannedDurationLabel}" FontFamily="SemiBold" FontSize="16" />
+                                                <Label Text="{Binding OpenCountLabel}" Style="{StaticResource Muted}" />
+                                            </VerticalStackLayout>
+                                        </HorizontalStackLayout>
+                                    </DataTemplate>
+                                </nl:SlideBoxItem>
+                            </nl:SlideBox>
+                        </VerticalStackLayout>
                     </Border>
 
                     <Label Text="Tasks for today" Style="{StaticResource SectionTitle}" Margin="0,6,0,0" />

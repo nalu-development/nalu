@@ -41,6 +41,7 @@ public static class MauiProgram
             .UseNaluScaffold(scaffold => scaffold.AddOverlays())
             .UseSkiaSharp()
             .UseNaluControls()
+            .UseNaluLayouts()
             .UseNaluVirtualScroll()
             .ConfigureFonts(fonts =>
                 {

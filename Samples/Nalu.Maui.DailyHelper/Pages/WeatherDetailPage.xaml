@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:nl="https://nalu-development.github.com/nalu/layouts"
              xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
              xmlns:pm="clr-namespace:Nalu.Maui.DailyHelper.PageModels"
              xmlns:m="clr-namespace:Nalu.Maui.DailyHelper.Models"
@@ -134,16 +135,39 @@
 
             <Label Text="Coming days" Style="{StaticResource SectionTitle}" Margin="20,4,20,0" />
 
+            <!-- Each day expands inline (Nalu.Maui.Layouts ExpanderViewBox): the row is the
+                 collapsed 48dp band; tapping animates the 3-hourly preview open — the
+                 surrounding ScrollView content flows smoothly around the growing box. -->
             <VerticalStackLayout Padding="16,0" BindableLayout.ItemsSource="{Binding Days}">
                 <BindableLayout.ItemTemplate>
-                    <DataTemplate x:DataType="m:DaySummary">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Padding="4,12">
-                            <Label Text="{Binding DayLabel}" FontSize="15" VerticalOptions="Center" />
-                            <Label Grid.Column="1" Text="{Binding Glyph}" FontFamily="Material" FontSize="20"
-                                   TextColor="{StaticResource Accent}" VerticalOptions="Center" />
-                            <Label Grid.Column="2" Text="{Binding MinMaxLabel}" Style="{StaticResource Muted}"
-                                   WidthRequest="80" HorizontalTextAlignment="End" VerticalOptions="Center" />
-                        </Grid>
+                    <DataTemplate x:DataType="pm:DayRow">
+                        <nl:ExpanderViewBox CollapsedHeight="48" IsExpanded="{Binding IsExpanded}">
+                            <VerticalStackLayout>
+                                <Grid HeightRequest="48" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12" Padding="4,0">
+                                    <Label Text="{Binding Summary.DayLabel}" FontSize="15" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="{Binding Summary.Glyph}" FontFamily="Material" FontSize="20"
+                                           TextColor="{StaticResource Accent}" VerticalOptions="Center" />
+                                    <Label Grid.Column="2" Text="{Binding Summary.MinMaxLabel}" Style="{StaticResource Muted}"
+                                           WidthRequest="80" HorizontalTextAlignment="End" VerticalOptions="Center" />
+                                    <Label Grid.Column="3" Text="{Binding ChevronGlyph}" FontFamily="Material" FontSize="20"
+                                           Style="{StaticResource Muted}" VerticalOptions="Center" />
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding ToggleExpandedCommand}" />
+                                    </Grid.GestureRecognizers>
+                                </Grid>
+                                <HorizontalStackLayout Padding="0,2,0,12" BindableLayout.ItemsSource="{Binding Hours}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="m:HourForecast">
+                                            <VerticalStackLayout WidthRequest="56" Spacing="5" Padding="0,4">
+                                                <Label Text="{Binding TimeLabel}" Style="{StaticResource Muted}" FontSize="11" HorizontalOptions="Center" />
+                                                <Label Text="{Binding Glyph}" FontFamily="Material" FontSize="19" TextColor="{StaticResource Accent}" HorizontalOptions="Center" />
+                                                <Label Text="{Binding TemperatureLabel}" FontFamily="SemiBold" FontSize="13" HorizontalOptions="Center" />
+                                            </VerticalStackLayout>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </nl:ExpanderViewBox>
                     </DataTemplate>
                 </BindableLayout.ItemTemplate>
             </VerticalStackLayout>

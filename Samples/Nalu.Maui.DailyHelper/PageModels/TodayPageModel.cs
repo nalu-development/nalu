@@ -28,6 +28,40 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IIntentH
 
     public string DateLabel => DateTime.Today.ToString("dddd, d MMMM");
 
+    /// <summary>The insights card slide (0 = progress, 1 = effort) — drives the SlideBox.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgressChipOpacity), nameof(EffortChipOpacity))]
+    public partial int InsightIndex { get; set; }
+
+    public double ProgressChipOpacity => InsightIndex == 0 ? 1 : 0.45;
+
+    public double EffortChipOpacity => InsightIndex == 1 ? 1 : 0.45;
+
+    /// <summary>Open tasks due today (the list below).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AllDone), nameof(Progress), nameof(ProgressLabel), nameof(OpenCountLabel))]
+    public partial int OpenCount { get; set; }
+
+    /// <summary>Completed tasks (any due date up to today).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AllDone), nameof(Progress), nameof(ProgressLabel))]
+    public partial int DoneCount { get; set; }
+
+    [ObservableProperty]
+    public partial int OverdueCount { get; set; }
+
+    /// <summary>Total expected effort of the remaining tasks, from the duration wheel.</summary>
+    [ObservableProperty]
+    public partial string PlannedDurationLabel { get; set; } = "—";
+
+    public bool AllDone => OpenCount == 0 && DoneCount > 0;
+
+    public double Progress => OpenCount + DoneCount == 0 ? 0 : (double) DoneCount / (OpenCount + DoneCount);
+
+    public string ProgressLabel => $"{DoneCount} of {OpenCount + DoneCount} done";
+
+    public string OpenCountLabel => OpenCount == 1 ? "1 task left" : $"{OpenCount} tasks left";
+
     public TodayPageModel(INavigationService navigation, WeatherStore weather, TodoStore todos)
     {
         _navigation = navigation;
@@ -44,6 +78,27 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IIntentH
         );
 
         TodosAdapter = VirtualScroll.CreateObservableCollectionAdapter(_items);
+
+        // Insights card stats: one unfiltered pass over the store keeps the SlideBox slides
+        // (progress ring + planned effort) live with every toggle/edit.
+        _subscriptions.Add(
+            _todos.Connect()
+                  .ToCollection()
+                  .Subscribe(items =>
+                  {
+                      var open = items.Where(t => t.Bucket == TodoBucket.Today).ToList();
+                      OpenCount = open.Count;
+                      DoneCount = items.Count(t => t.IsDone);
+                      OverdueCount = open.Count(t => t.IsOverdue);
+
+                      var planned = open.Aggregate(TimeSpan.Zero, (total, t) => total + (t.Duration ?? TimeSpan.Zero));
+                      PlannedDurationLabel = planned == TimeSpan.Zero
+                          ? "No effort estimated"
+                          : planned.Hours > 0
+                              ? planned.Minutes > 0 ? $"{planned.Hours} h {planned.Minutes} min planned" : $"{planned.Hours} h planned"
+                              : $"{planned.Minutes} min planned";
+                  })
+        );
 
         _subscriptions.Add(_weather.Current.Subscribe(current => Current = current));
     }
@@ -75,6 +130,9 @@ public partial class TodayPageModel : ObservableObject, IEnteringAware, IIntentH
 
     [RelayCommand]
     private void Toggle(TodoItem item) => _todos.Toggle(item.Id);
+
+    [RelayCommand]
+    private void SelectInsight(string index) => InsightIndex = int.Parse(index);
 
     [RelayCommand]
     private Task OpenWeatherAsync() => _navigation.GoToAsync(Nav.Push<WeatherDetailPageModel>());
