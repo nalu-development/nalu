@@ -75,7 +75,7 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         if (ctx.SemanticModel.GetDeclaredSymbol(declaration, ct) is not { } symbol ||
             symbol.IsAbstract ||
             symbol.IsGenericType ||
-            !DerivesFromContentPage(symbol, out var ancestorFqns) ||
+            !DerivesFromContentPage(symbol) ||
             IsAutoRegistrationDisabled(symbol))
         {
             return null;
@@ -98,8 +98,6 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             ctorModel,
             ambiguous,
             ExtractIntents(symbol),
-            ancestorFqns,
-            HasAutoNavigationPageAttribute(symbol),
             LocationInfo.From(declaration)
         );
     }
@@ -115,27 +113,11 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         }
 
         var rootType = ResolveRootType(lead, compilation);
-        var rootIsPage = rootType is not null && (IsContentPageSymbol(rootType) || DerivesFromContentPage(rootType, out _));
+        var rootIsPage = rootType is not null && (IsContentPageSymbol(rootType) || DerivesFromContentPage(rootType));
 
-        // The candidate's ancestors are the root type and ITS chain: they feed the
-        // base-page exclusion exactly like syntax-discovered candidates.
-        var ancestors = new List<string>();
         var rootFqn = rootType is not null
             ? Fqn(rootType)
             : "global::" + (lead.RootClrNamespace is { } clrNs ? clrNs + "." + lead.RootName : lead.RootName);
-
-        if (rootType is not null && !IsContentPageSymbol(rootType))
-        {
-            ancestors.Add(rootFqn);
-
-            if (DerivesFromContentPage(rootType, out var rootAncestors))
-            {
-                foreach (var ancestor in rootAncestors)
-                {
-                    ancestors.Add(ancestor);
-                }
-            }
-        }
 
         var (ctorModel, ambiguous) = InferConstructorModel(symbol, ct);
 
@@ -145,8 +127,6 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             ctorModel,
             ambiguous,
             ExtractIntents(symbol),
-            ancestors.Count == 0 ? EquatableArray<string>.Empty : new EquatableArray<string>([.. ancestors]),
-            HasAutoNavigationPageAttribute(symbol),
             default
         );
 
@@ -380,29 +360,18 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         return ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration);
     }
 
-    private static bool DerivesFromContentPage(INamedTypeSymbol type, out EquatableArray<string> ancestorFqns)
+    private static bool DerivesFromContentPage(INamedTypeSymbol type)
     {
-        List<string>? ancestors = null;
-
         for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
         {
             if (baseType is { Name: "ContentPage", ContainingNamespace: { Name: "Controls", ContainingNamespace: { Name: "Maui", ContainingNamespace: { Name: "Microsoft", ContainingNamespace.IsGlobalNamespace: true } } } })
             {
-                ancestorFqns = ancestors is null ? EquatableArray<string>.Empty : new EquatableArray<string>([.. ancestors]);
-
                 return true;
             }
-
-            (ancestors ??= []).Add(Fqn(baseType));
         }
-
-        ancestorFqns = EquatableArray<string>.Empty;
 
         return false;
     }
-
-    private static bool HasAutoNavigationPageAttribute(INamedTypeSymbol type)
-        => type.GetAttributes().Any(static a => a.AttributeClass is { } attributeClass && IsNaluType(attributeClass, "AutoNavigationPageAttribute"));
 
     private static bool IsAutoRegistrationDisabled(INamedTypeSymbol type)
         => type.GetAttributes()
@@ -482,11 +451,6 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
                        .OrderBy(static p => p.PageFqn, StringComparer.Ordinal)
                        .ToList();
 
-        // A concrete page other candidates derive from (an app-level ContentPageBase) is
-        // infrastructure, not a navigation destination: excluded unless [AutoNavigationPage]
-        // opts it back in explicitly.
-        var baseFqns = new HashSet<string>(pageList.SelectMany(static p => p.AncestorFqns), StringComparer.Ordinal);
-        pageList = pageList.Where(p => p.ExplicitlyEnabled || !baseFqns.Contains(p.PageFqn)).ToList();
 
         var modelList = models
                         .GroupBy(static m => m.Fqn, StringComparer.Ordinal)

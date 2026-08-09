@@ -56,11 +56,11 @@ is inferred, in order:
    the model implements it);
 4. otherwise the page is registered **view-only** (see [View-Only Navigation](navigation-view-only.md)).
 
-Exclude a page from the generated registration with `[AutoNavigationPage(Enabled = false)]`.
-A concrete page that **other pages derive from** (an app-level `ContentPageBase`) is treated
-as infrastructure and skipped automatically — mark it `[AutoNavigationPage]` if it really is
-a navigation destination too. The generator reports diagnostics (`NALU0001`–`NALU0006`) for
-view-only fallbacks, ambiguous models and intent id collisions.
+Exclude a page from the generated registration with `[AutoNavigationPage(Enabled = false)]`
+(abstract pages are always skipped; a concrete base page other pages derive from is
+registered like any other — harmless if never navigated to). The generator reports
+diagnostics (`NALU0001`–`NALU0006`) for view-only fallbacks, ambiguous models and
+intent id collisions.
 
 **Manual configuration options** (usable alongside `AddPages()` — e.g. for pages living in
 **other assemblies**, which the generator does not scan):

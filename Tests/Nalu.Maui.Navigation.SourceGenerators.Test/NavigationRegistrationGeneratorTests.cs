@@ -284,16 +284,19 @@ public class NavigationRegistrationGeneratorTests
         System.Text.RegularExpressions.Regex.Matches(result.GeneratedText, "AddPage<global::MyApp\\.HomePage>").Count.Should().Be(1);
     }
 
-    [Fact(DisplayName = "Concrete base page other pages derive from is excluded")]
-    public void ConcreteBasePageIsExcluded()
+    [Fact(DisplayName = "Concrete base page other pages derive from is registered too (abstract stays out)")]
+    public void ConcreteBasePageIsRegistered()
     {
+        // Registering a never-navigated concrete base is harmless; only abstract bases are skipped.
         var result = GeneratorTestHarness.Run(
             """
             using Microsoft.Maui.Controls;
 
             namespace MyApp;
 
-            public class ContentPageBase : ContentPage;
+            public abstract class AbstractPageBase : ContentPage;
+
+            public class ContentPageBase : AbstractPageBase;
 
             public class HomePage : ContentPageBase;
             """
@@ -301,29 +304,8 @@ public class NavigationRegistrationGeneratorTests
 
         result.OutputCompilationErrors.Should().BeEmpty();
         result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.HomePage>();");
-        result.GeneratedText.Should().NotContain("ContentPageBase>");
-    }
-
-    [Fact(DisplayName = "AutoNavigationPage opts a derived-from base page back in")]
-    public void AutoNavigationPageKeepsBasePage()
-    {
-        var result = GeneratorTestHarness.Run(
-            """
-            using Microsoft.Maui.Controls;
-            using Nalu;
-
-            namespace MyApp;
-
-            [AutoNavigationPage]
-            public class SharedPage : ContentPage;
-
-            public class SpecializedPage : SharedPage;
-            """
-        );
-
-        result.OutputCompilationErrors.Should().BeEmpty();
-        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SharedPage>();");
-        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SpecializedPage>();");
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.ContentPageBase>();");
+        result.GeneratedText.Should().NotContain("AbstractPageBase>");
     }
 
     [Fact(DisplayName = "Empty assembly emits a per-assembly scoping breadcrumb in AddPages")]

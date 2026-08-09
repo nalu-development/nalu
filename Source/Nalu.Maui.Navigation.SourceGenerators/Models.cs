@@ -20,16 +20,12 @@ internal sealed record ModelRef(string Fqn, bool IsInterface, bool ImplementsInp
 /// <param name="CtorModel">Model inferred from the constructor (BindingContext assignment, else single INPC parameter).</param>
 /// <param name="AmbiguousCtorModels">BindingContext is assigned from more than one constructor parameter type.</param>
 /// <param name="PageIntents">Intents implemented by the page itself (view-only pages are their own lifecycle target).</param>
-/// <param name="AncestorFqns">Base types up to (excluding) ContentPage — used to drop base pages other candidates derive from.</param>
-/// <param name="ExplicitlyEnabled">[AutoNavigationPage] present: keeps the page even when other candidates derive from it.</param>
 internal sealed record PageCandidate(
     string PageFqn,
     string PageName,
     ModelRef? CtorModel,
     bool AmbiguousCtorModels,
     EquatableArray<IntentSpec> PageIntents,
-    EquatableArray<string> AncestorFqns,
-    bool ExplicitlyEnabled,
     LocationInfo Location
 );
 
