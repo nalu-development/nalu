@@ -145,6 +145,145 @@ public class NavigationRegistrationGeneratorTests
         result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SettingsPage>();");
     }
 
+    [Fact(DisplayName = "XAML source-gen mode: page discovered from the .xaml AdditionalFile alone")]
+    public void SourceGenModePageDiscoveredFromXamlFile()
+    {
+        // Simulates MauiXamlInflator=sourcegen: NO XamlG partial exists in the compilation
+        // (the base-carrying partial is emitted by MAUI's own generator, invisible to us).
+        // The only signals are the bare code-behind and the .xaml AdditionalFile.
+        var result = GeneratorTestHarness.Run(
+            [
+                """
+                using System.ComponentModel;
+                using MyApp.Pages;
+
+                namespace MyApp;
+
+                public class InitializationViewModel : INotifyPropertyChanged
+                {
+                    public event PropertyChangedEventHandler? PropertyChanged;
+                }
+
+                public partial class InitializationPage
+                {
+                    public InitializationPage(InitializationViewModel viewModel)
+                    {
+                        BindingContext = viewModel;
+                    }
+
+                    public object? BindingContext { get; set; }
+                }
+                """,
+                """
+                using Microsoft.Maui.Controls;
+
+                namespace MyApp.Pages;
+
+                public abstract class ContentPageBase : ContentPage;
+                """
+            ],
+            xamlFiles:
+            [
+                new GeneratorTestHarness.XamlFile(
+                    "Pages/InitializationPage.xaml",
+                    """
+                    <?xml version="1.0" encoding="utf-8" ?>
+                    <pages:ContentPageBase xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                           xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                           xmlns:pages="clr-namespace:MyApp.Pages"
+                                           x:Class="MyApp.InitializationPage">
+                        <Label Text="Hello" />
+                    </pages:ContentPageBase>
+                    """
+                )
+            ]
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.InitializationViewModel, global::MyApp.InitializationPage>();");
+    }
+
+    [Fact(DisplayName = "XAML source-gen mode: default-xmlns ContentPage root and non-page XAML")]
+    public void SourceGenModeDefaultXmlnsAndNonPages()
+    {
+        var result = GeneratorTestHarness.Run(
+            [
+                """
+                namespace MyApp;
+
+                public partial class HomePage
+                {
+                    public HomePage()
+                    {
+                    }
+                }
+
+                public partial class BadgeView;
+                """
+            ],
+            xamlFiles:
+            [
+                new GeneratorTestHarness.XamlFile(
+                    "HomePage.xaml",
+                    """
+                    <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                 x:Class="MyApp.HomePage" />
+                    """
+                ),
+                new GeneratorTestHarness.XamlFile(
+                    "BadgeView.xaml",
+                    """
+                    <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                 x:Class="MyApp.BadgeView" />
+                    """
+                )
+            ]
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.HomePage>();");
+        result.GeneratedText.Should().NotContain("BadgeView");
+    }
+
+    [Fact(DisplayName = "XamlG mode: syntax and XAML discovery of the same page dedupe to one registration")]
+    public void DualDiscoveryDedupes()
+    {
+        var result = GeneratorTestHarness.Run(
+            [
+                """
+                using Microsoft.Maui.Controls;
+
+                namespace MyApp;
+
+                // XamlG mode: the generated partial IS in the compilation (syntax path sees it)...
+                public partial class HomePage : ContentPage
+                {
+                    public HomePage()
+                    {
+                    }
+                }
+                """
+            ],
+            // ...and the .xaml AdditionalFile is present too (XAML path sees it as well).
+            xamlFiles:
+            [
+                new GeneratorTestHarness.XamlFile(
+                    "HomePage.xaml",
+                    """
+                    <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                 x:Class="MyApp.HomePage" />
+                    """
+                )
+            ]
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        System.Text.RegularExpressions.Regex.Matches(result.GeneratedText, "AddPage<global::MyApp\\.HomePage>").Count.Should().Be(1);
+    }
+
     [Fact(DisplayName = "Concrete base page other pages derive from is excluded")]
     public void ConcreteBasePageIsExcluded()
     {

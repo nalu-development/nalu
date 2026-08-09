@@ -55,6 +55,84 @@ public class ScaffoldOverlayGeneratorTests
         result.GeneratedText.Should().NotContain("AddOverlay<global::MyApp.QuickPopup, ");
     }
 
+    [Fact(DisplayName = "XAML source-gen mode: view-only overlay discovered from the .xaml AdditionalFile alone")]
+    public void SourceGenModeViewOnlyOverlayDiscoveredFromXamlFile()
+    {
+        // Simulates MauiXamlInflator=sourcegen: NO generated partial in the compilation —
+        // the code-behind is bare, the View base is only visible through the .xaml root.
+        var result = ScaffoldGeneratorTestHarness.Run(
+            """
+            using Nalu;
+
+            namespace MyApp;
+
+            public partial class QuickPopup
+            {
+                public QuickPopup(IOverlayRef overlay)
+                {
+                }
+            }
+            """,
+            xamlFiles:
+            [
+                new ScaffoldGeneratorTestHarness.XamlFile(
+                    "QuickPopup.xaml",
+                    """
+                    <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                 x:Class="MyApp.QuickPopup" />
+                    """
+                )
+            ]
+        );
+
+        // The View base lives in MAUI's generated partial, absent from this TEST compilation:
+        // the only acceptable output error is the resulting TView constraint violation.
+        result.OutputCompilationErrors.Should().OnlyContain(static d => d.Id == "CS0311");
+        result.GeneratedText.Should().Contain("scaffold.AddOverlay<global::MyApp.QuickPopup>();");
+        result.GeneratedText.Should().NotContain("AddOverlay<global::MyApp.QuickPopup, ");
+    }
+
+    [Fact(DisplayName = "XAML source-gen mode: model pairs with the view discovered from its .xaml file")]
+    public void SourceGenModeModelPairsWithXamlView()
+    {
+        var result = ScaffoldGeneratorTestHarness.Run(
+            """
+            using Nalu;
+
+            namespace MyApp;
+
+            public class DurationSheetModel(IOverlayRef overlay);
+
+            public partial class DurationSheetView
+            {
+                public DurationSheetView(DurationSheetModel model)
+                {
+                    BindingContext = model;
+                }
+
+                public object? BindingContext { get; set; }
+            }
+            """,
+            xamlFiles:
+            [
+                new ScaffoldGeneratorTestHarness.XamlFile(
+                    "DurationSheetView.xaml",
+                    """
+                    <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                 x:Class="MyApp.DurationSheetView" />
+                    """
+                )
+            ]
+        );
+
+        // See above: the missing MAUI-generated partial makes the TView constraint the only
+        // acceptable output error in the test compilation.
+        result.OutputCompilationErrors.Should().OnlyContain(static d => d.Id == "CS0311");
+        result.GeneratedText.Should().Contain("scaffold.AddOverlay<global::MyApp.DurationSheetModel, global::MyApp.DurationSheetView>();");
+    }
+
     [Fact(DisplayName = "XAML-style partial view whose code-behind declares no base list is discovered")]
     public void XamlPartialViewWithoutBaseListInCodeBehindIsDiscovered()
     {

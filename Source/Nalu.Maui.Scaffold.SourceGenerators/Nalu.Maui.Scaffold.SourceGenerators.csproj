@@ -18,6 +18,7 @@
     <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\EquatableArray.cs" Link="Shared\EquatableArray.cs" />
     <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\LocationInfo.cs" Link="Shared\LocationInfo.cs" />
     <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\Polyfills.cs" Link="Shared\Polyfills.cs" />
+    <Compile Include="..\Nalu.Maui.Navigation.SourceGenerators\XamlLeadParser.cs" Link="Shared\XamlLeadParser.cs" />
   </ItemGroup>
 
   <ItemGroup>

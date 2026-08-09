@@ -44,12 +44,26 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
                             .Select(static (candidate, _) => candidate!)
                             .WithTrackingName("Models");
 
+        // XAML-side discovery: MAUI injects every MauiXaml item as an AdditionalFile. This is
+        // the only path that survives the MAUI XAML source generator (its generated x:Class
+        // partial — the one carrying the base type — is invisible to other generators).
+        var xamlPages = context.AdditionalTextsProvider
+                               .Where(static text => text.Path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+                               .Select(static (text, ct) => XamlLeadParser.Parse(text.GetText(ct)?.ToString()))
+                               .Where(static lead => lead is not null)
+                               .Combine(context.CompilationProvider)
+                               .Select(static (pair, ct) => ResolveXamlCandidate(pair.Left!, pair.Right, ct))
+                               .Where(static candidate => candidate is not null)
+                               .Select(static (candidate, _) => candidate!)
+                               .WithTrackingName("XamlPages");
+
         var input = pages.Collect()
                          .Combine(models.Collect())
+                         .Combine(xamlPages.Collect())
                          .Combine(hasNalu)
                          .WithTrackingName("Registrations");
 
-        context.RegisterSourceOutput(input, static (spc, data) => Emit(spc, data.Left.Left, data.Left.Right, data.Right));
+        context.RegisterSourceOutput(input, static (spc, data) => Emit(spc, data.Left.Left.Left, data.Left.Left.Right, data.Left.Right, data.Right));
     }
 
     #region Symbol analysis
@@ -89,6 +103,105 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             LocationInfo.From(declaration)
         );
     }
+
+    private static XamlPageCandidate? ResolveXamlCandidate(XamlLead lead, Compilation compilation, CancellationToken ct)
+    {
+        if (compilation.GetTypeByMetadataName(lead.ClassMetadataName) is not { } symbol ||
+            symbol.IsAbstract ||
+            symbol.IsGenericType ||
+            IsAutoRegistrationDisabled(symbol))
+        {
+            return null;
+        }
+
+        var rootType = ResolveRootType(lead, compilation);
+        var rootIsPage = rootType is not null && (IsContentPageSymbol(rootType) || DerivesFromContentPage(rootType, out _));
+
+        // The candidate's ancestors are the root type and ITS chain: they feed the
+        // base-page exclusion exactly like syntax-discovered candidates.
+        var ancestors = new List<string>();
+        var rootFqn = rootType is not null
+            ? Fqn(rootType)
+            : "global::" + (lead.RootClrNamespace is { } clrNs ? clrNs + "." + lead.RootName : lead.RootName);
+
+        if (rootType is not null && !IsContentPageSymbol(rootType))
+        {
+            ancestors.Add(rootFqn);
+
+            if (DerivesFromContentPage(rootType, out var rootAncestors))
+            {
+                foreach (var ancestor in rootAncestors)
+                {
+                    ancestors.Add(ancestor);
+                }
+            }
+        }
+
+        var (ctorModel, ambiguous) = InferConstructorModel(symbol, ct);
+
+        var candidate = new PageCandidate(
+            Fqn(symbol),
+            symbol.Name,
+            ctorModel,
+            ambiguous,
+            ExtractIntents(symbol),
+            ancestors.Count == 0 ? EquatableArray<string>.Empty : new EquatableArray<string>([.. ancestors]),
+            HasAutoNavigationPageAttribute(symbol),
+            default
+        );
+
+        return new XamlPageCandidate(candidate, rootFqn, rootIsPage);
+    }
+
+    private static INamedTypeSymbol? ResolveRootType(XamlLead lead, Compilation compilation)
+    {
+        if (lead.RootClrNamespace is { } clrNamespace)
+        {
+            return compilation.GetTypeByMetadataName(clrNamespace + "." + lead.RootName);
+        }
+
+        if (lead.RootXmlnsUri is not { } uri)
+        {
+            return null;
+        }
+
+        // Resolve the URI the way XAML does: XmlnsDefinition attributes of the compiling
+        // assembly and every referenced assembly map it to CLR namespaces.
+        foreach (var assembly in ReferencedAssembliesAndSelf(compilation))
+        {
+            foreach (var attribute in assembly.GetAttributes())
+            {
+                if (attribute.AttributeClass is { Name: "XmlnsDefinitionAttribute" } &&
+                    attribute.ConstructorArguments.Length >= 2 &&
+                    attribute.ConstructorArguments[0].Value is string attributeUri &&
+                    attribute.ConstructorArguments[1].Value is string clrNs &&
+                    string.Equals(attributeUri, uri, StringComparison.Ordinal) &&
+                    compilation.GetTypeByMetadataName(clrNs + "." + lead.RootName) is { } resolved)
+                {
+                    return resolved;
+                }
+            }
+        }
+
+        // Fallback for the default MAUI namespace when no XmlnsDefinition is visible
+        // (e.g. reference assemblies without attributes).
+        return uri is "http://schemas.microsoft.com/dotnet/2021/maui" or "http://xamarin.com/schemas/2014/forms"
+            ? compilation.GetTypeByMetadataName("Microsoft.Maui.Controls." + lead.RootName)
+            : null;
+    }
+
+    private static IEnumerable<IAssemblySymbol> ReferencedAssembliesAndSelf(Compilation compilation)
+    {
+        yield return compilation.Assembly;
+
+        foreach (var reference in compilation.SourceModule.ReferencedAssemblySymbols)
+        {
+            yield return reference;
+        }
+    }
+
+    private static bool IsContentPageSymbol(INamedTypeSymbol type)
+        => type is { Name: "ContentPage", ContainingNamespace: { Name: "Controls", ContainingNamespace: { Name: "Maui", ContainingNamespace: { Name: "Microsoft", ContainingNamespace.IsGlobalNamespace: true } } } };
 
     private static (ModelRef? Model, bool Ambiguous) InferConstructorModel(INamedTypeSymbol page, CancellationToken ct)
     {
@@ -321,15 +434,49 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
 
     private sealed record Registration(RegistrationKind Kind, string PageFqn, string? ModelFqn, string? ImplementationFqn);
 
-    private static void Emit(SourceProductionContext context, ImmutableArray<PageCandidate> pages, ImmutableArray<ModelCandidate> models, bool hasNalu)
+    private static void Emit(SourceProductionContext context, ImmutableArray<PageCandidate> pages, ImmutableArray<ModelCandidate> models, ImmutableArray<XamlPageCandidate> xamlPages, bool hasNalu)
     {
         if (!hasNalu)
         {
             return;
         }
 
+        // Merge the two discovery paths. Syntax candidates come first so the dedupe below
+        // keeps their (located) diagnostics; XAML candidates add what only the .xaml files
+        // reveal — pages whose base type lives in a generated partial we cannot see.
+        var merged = pages.ToList();
+        var knownPageFqns = new HashSet<string>(merged.Select(static p => p.PageFqn), StringComparer.Ordinal);
+
+        foreach (var xamlPage in xamlPages.Where(static x => x.RootIsPage))
+        {
+            merged.Add(xamlPage.Candidate);
+            knownPageFqns.Add(xamlPage.Candidate.PageFqn);
+        }
+
+        // Fixpoint for XAML base-page chains: a page whose root did not resolve to a
+        // ContentPage symbol is still a page when its root IS another discovered page
+        // (a base page itself defined in XAML, whose generated partial is invisible).
+        var deferred = xamlPages.Where(static x => !x.RootIsPage).ToList();
+        var progressed = true;
+
+        while (progressed)
+        {
+            progressed = false;
+
+            for (var i = deferred.Count - 1; i >= 0; i--)
+            {
+                if (knownPageFqns.Contains(deferred[i].RootFqn))
+                {
+                    merged.Add(deferred[i].Candidate);
+                    knownPageFqns.Add(deferred[i].Candidate.PageFqn);
+                    deferred.RemoveAt(i);
+                    progressed = true;
+                }
+            }
+        }
+
         // Defensive dedupe (partial declarations are already collapsed at analysis time).
-        var pageList = pages
+        var pageList = merged
                        .GroupBy(static p => p.PageFqn, StringComparer.Ordinal)
                        .Select(static g => g.First())
                        .OrderBy(static p => p.PageFqn, StringComparer.Ordinal)

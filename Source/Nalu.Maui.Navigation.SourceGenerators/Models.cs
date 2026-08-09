@@ -34,6 +34,16 @@ internal sealed record PageCandidate(
 );
 
 /// <summary>
+/// A page discovered through its .xaml file — the path that works even when the x:Class
+/// partial (carrying the base type) is emitted by the MAUI XAML source generator, whose
+/// output no other generator can see.
+/// </summary>
+/// <param name="RootFqn">The XAML root type: the page's base. Best-effort FQN when unresolved.</param>
+/// <param name="RootIsPage">The root type resolved to a ContentPage(-derived) symbol. When false
+/// the candidate participates only via the emit-time fixpoint (XAML base page chains).</param>
+internal sealed record XamlPageCandidate(PageCandidate Candidate, string RootFqn, bool RootIsPage);
+
+/// <summary>
 /// A source-declared INotifyPropertyChanged class or interface: the search space for the
 /// naming-convention fallback and for resolving interface models to their implementation.
 /// </summary>

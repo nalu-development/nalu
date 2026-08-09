@@ -10,7 +10,7 @@ namespace Nalu.Maui.Navigation.SourceGenerators;
 /// </summary>
 internal readonly record struct LocationInfo(string FilePath, TextSpan TextSpan, LinePositionSpan LineSpan)
 {
-    public Location ToLocation() => Location.Create(FilePath, TextSpan, LineSpan);
+    public Location ToLocation() => string.IsNullOrEmpty(FilePath) ? Location.None : Location.Create(FilePath, TextSpan, LineSpan);
 
     public static LocationInfo From(SyntaxNode node)
     {

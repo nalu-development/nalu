@@ -45,12 +45,26 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
                            .Select(static (candidate, _) => candidate!)
                            .WithTrackingName("OverlayViews");
 
+        // XAML-side discovery: MAUI injects every MauiXaml item as an AdditionalFile. The only
+        // path that survives the MAUI XAML source generator (its generated x:Class partial —
+        // the one carrying the View base — is invisible to other generators).
+        var xamlViews = context.AdditionalTextsProvider
+                               .Where(static text => text.Path.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase))
+                               .Select(static (text, ct) => XamlLeadParser.Parse(text.GetText(ct)?.ToString()))
+                               .Where(static lead => lead is not null)
+                               .Combine(context.CompilationProvider)
+                               .Select(static (pair, ct) => ResolveXamlViewCandidate(pair.Left!, pair.Right, ct))
+                               .Where(static candidate => candidate is not null)
+                               .Select(static (candidate, _) => candidate!)
+                               .WithTrackingName("XamlOverlayViews");
+
         var input = anchors.Collect()
                            .Combine(views.Collect())
+                           .Combine(xamlViews.Collect())
                            .Combine(hasNalu)
                            .WithTrackingName("OverlayRegistrations");
 
-        context.RegisterSourceOutput(input, static (spc, data) => Emit(spc, data.Left.Left, data.Left.Right, data.Right));
+        context.RegisterSourceOutput(input, static (spc, data) => Emit(spc, data.Left.Left.Left, data.Left.Left.Right, data.Left.Right, data.Right));
     }
 
     #region Symbol analysis
@@ -218,6 +232,12 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
             return null;
         }
 
+        return BuildViewCandidate(symbol, ct);
+    }
+
+    /// <summary>Symbol-level view-candidate construction, shared by the syntax and XAML pipelines.</summary>
+    private static OverlayViewCandidate BuildViewCandidate(INamedTypeSymbol symbol, CancellationToken ct)
+    {
         var parameterTypes = new List<string>();
         var bindingContextTypes = new List<string>();
 
@@ -300,6 +320,71 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
         return ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration);
     }
 
+    private static XamlOverlayViewCandidate? ResolveXamlViewCandidate(XamlLead lead, Compilation compilation, CancellationToken ct)
+    {
+        if (compilation.GetTypeByMetadataName(lead.ClassMetadataName) is not { } symbol ||
+            symbol.IsAbstract ||
+            symbol.IsGenericType)
+        {
+            return null;
+        }
+
+        var rootType = ResolveRootType(lead, compilation);
+        var rootIsView = rootType is not null && DerivesFromView(rootType);
+
+        var rootFqn = rootType is not null
+            ? Fqn(rootType)
+            : "global::" + (lead.RootClrNamespace is { } clrNs ? clrNs + "." + lead.RootName : lead.RootName);
+
+        return new XamlOverlayViewCandidate(BuildViewCandidate(symbol, ct), rootFqn, rootIsView);
+    }
+
+    private static INamedTypeSymbol? ResolveRootType(XamlLead lead, Compilation compilation)
+    {
+        if (lead.RootClrNamespace is { } clrNamespace)
+        {
+            return compilation.GetTypeByMetadataName(clrNamespace + "." + lead.RootName);
+        }
+
+        if (lead.RootXmlnsUri is not { } uri)
+        {
+            return null;
+        }
+
+        // Resolve the URI the way XAML does: XmlnsDefinition attributes of the compiling
+        // assembly and every referenced assembly map it to CLR namespaces.
+        foreach (var assembly in ReferencedAssembliesAndSelf(compilation))
+        {
+            foreach (var attribute in assembly.GetAttributes())
+            {
+                if (attribute.AttributeClass is { Name: "XmlnsDefinitionAttribute" } &&
+                    attribute.ConstructorArguments.Length >= 2 &&
+                    attribute.ConstructorArguments[0].Value is string attributeUri &&
+                    attribute.ConstructorArguments[1].Value is string clrNs &&
+                    string.Equals(attributeUri, uri, StringComparison.Ordinal) &&
+                    compilation.GetTypeByMetadataName(clrNs + "." + lead.RootName) is { } resolved)
+                {
+                    return resolved;
+                }
+            }
+        }
+
+        // Fallback for the default MAUI namespace when no XmlnsDefinition is visible.
+        return uri is "http://schemas.microsoft.com/dotnet/2021/maui" or "http://xamarin.com/schemas/2014/forms"
+            ? compilation.GetTypeByMetadataName("Microsoft.Maui.Controls." + lead.RootName)
+            : null;
+    }
+
+    private static IEnumerable<IAssemblySymbol> ReferencedAssembliesAndSelf(Compilation compilation)
+    {
+        yield return compilation.Assembly;
+
+        foreach (var reference in compilation.SourceModule.ReferencedAssemblySymbols)
+        {
+            yield return reference;
+        }
+    }
+
     private static bool DerivesFromView(INamedTypeSymbol type)
     {
         for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
@@ -319,7 +404,7 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
 
     private sealed record Registration(string? ModelFqn, string ViewFqn);
 
-    private static void Emit(SourceProductionContext context, ImmutableArray<OverlayAnchor> anchors, ImmutableArray<OverlayViewCandidate> views, bool hasNalu)
+    private static void Emit(SourceProductionContext context, ImmutableArray<OverlayAnchor> anchors, ImmutableArray<OverlayViewCandidate> views, ImmutableArray<XamlOverlayViewCandidate> xamlViews, bool hasNalu)
     {
         if (!hasNalu)
         {
@@ -332,7 +417,38 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
                          .OrderBy(static a => a.Fqn, StringComparer.Ordinal)
                          .ToList();
 
-        var viewList = views
+        // Merge the two discovery paths (syntax first: XAML candidates add views whose base
+        // type lives in a generated partial we cannot see), with a fixpoint for XAML views
+        // based on other XAML views.
+        var merged = views.ToList();
+        var knownViewFqns = new HashSet<string>(merged.Select(static v => v.Fqn), StringComparer.Ordinal);
+
+        foreach (var xamlView in xamlViews.Where(static x => x.RootIsView))
+        {
+            merged.Add(xamlView.Candidate);
+            knownViewFqns.Add(xamlView.Candidate.Fqn);
+        }
+
+        var deferred = xamlViews.Where(static x => !x.RootIsView).ToList();
+        var progressed = true;
+
+        while (progressed)
+        {
+            progressed = false;
+
+            for (var i = deferred.Count - 1; i >= 0; i--)
+            {
+                if (knownViewFqns.Contains(deferred[i].RootFqn))
+                {
+                    merged.Add(deferred[i].Candidate);
+                    knownViewFqns.Add(deferred[i].Candidate.Fqn);
+                    deferred.RemoveAt(i);
+                    progressed = true;
+                }
+            }
+        }
+
+        var viewList = merged
                        .GroupBy(static v => v.Fqn, StringComparer.Ordinal)
                        .Select(static g => g.First())
                        .ToList();
@@ -349,7 +465,9 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (anchor.IsView)
+            // An anchor whose View base is only visible through its .xaml file (invisible
+            // generated partial) is still a VIEW-ONLY overlay.
+            if (anchor.IsView || knownViewFqns.Contains(anchor.Fqn))
             {
                 registrations.Add(new Registration(null, anchor.Fqn));
 

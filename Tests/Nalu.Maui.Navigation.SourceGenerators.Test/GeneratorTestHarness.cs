@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using Nalu.Maui.Navigation.SourceGenerators;
 
 namespace Nalu.Maui.Test.SourceGenerators;
@@ -87,15 +88,24 @@ internal static class GeneratorTestHarness
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable)
         );
 
+    /// <summary>An in-memory .xaml AdditionalFile, as MAUI's MauiXaml→AdditionalFiles wiring provides them.</summary>
+    public sealed class XamlFile(string path, string content) : AdditionalText
+    {
+        public override string Path { get; } = path;
+
+        public override SourceText GetText(CancellationToken cancellationToken = default) => SourceText.From(content);
+    }
+
     public static Result Run(string userSource, bool includeStubs = true)
         => Run([userSource], includeStubs);
 
-    public static Result Run(string[] userSources, bool includeStubs = true)
+    public static Result Run(string[] userSources, bool includeStubs = true, XamlFile[]? xamlFiles = null)
     {
         var compilation = includeStubs ? CreateCompilation([Stubs, .. userSources]) : CreateCompilation(userSources);
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new NavigationRegistrationGenerator().AsSourceGenerator()],
+            additionalTexts: xamlFiles is null ? [] : [.. xamlFiles],
             driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true),
             parseOptions: new CSharpParseOptions(LanguageVersion.Latest)
         );

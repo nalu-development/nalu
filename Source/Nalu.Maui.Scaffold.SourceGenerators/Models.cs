@@ -19,6 +19,16 @@ internal sealed record OverlayAnchor(
 );
 
 /// <summary>
+/// A view discovered through its .xaml file — the path that works even when the x:Class
+/// partial (carrying the View base) is emitted by the MAUI XAML source generator, whose
+/// output no other generator can see.
+/// </summary>
+/// <param name="RootFqn">The XAML root type: the view's base. Best-effort FQN when unresolved.</param>
+/// <param name="RootIsView">The root type resolved to a View-derived symbol. When false the
+/// candidate participates only via the emit-time fixpoint (XAML base-view chains).</param>
+internal sealed record XamlOverlayViewCandidate(OverlayViewCandidate Candidate, string RootFqn, bool RootIsView);
+
+/// <summary>
 /// A source-declared, non-abstract <c>View</c> subclass — the search space for resolving an
 /// overlay model's view.
 /// </summary>
