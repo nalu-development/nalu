@@ -42,6 +42,11 @@ public interface IOverlayRef
 /// model reported via <see cref="IOverlayRef.CloseAsync(object?)"/>, or <c>default</c> on
 /// dismissal (scrim tap, pull-down, system back, navigation).
 /// </para>
+/// <para>
+/// While the app is not scaffold-hosted (e.g. on platforms without scaffold hosting, such as
+/// Windows or Mac Catalyst), every call is a graceful no-op completing immediately with
+/// <c>default</c> — shared page models can inject and call the service unconditionally.
+/// </para>
 /// </remarks>
 public interface IOverlayService
 {

@@ -152,5 +152,11 @@ point to see everything working together.
 
 ## Platform support
 
-- **iOS** 12.2+ and **Android** API 21+ (`net10.0-ios` / `net10.0-android`).
-- Windows/Mac Catalyst are currently not targeted by the Scaffold package.
+- Scaffold **hosting** (the chrome, transitions, gestures): **iOS** 12.2+ and **Android**
+  API 21+ (`net10.0-ios` / `net10.0-android`).
+- The **package** is referencable from every platform (Windows/Mac Catalyst pick the neutral
+  `net10.0` assembly): `UseNaluScaffold()` is callable everywhere and always registers
+  `IOverlayService` and `IScaffoldFlyoutController`, so shared page models keep injecting
+  them — every call is a graceful no-op (default results, no UI) while the app is not
+  scaffold-hosted. Hosting an actual `Scaffold` on Windows/Catalyst throws
+  `PlatformNotSupportedException`.
