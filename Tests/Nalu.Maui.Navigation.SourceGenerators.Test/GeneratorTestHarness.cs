@@ -88,8 +88,11 @@ internal static class GeneratorTestHarness
         );
 
     public static Result Run(string userSource, bool includeStubs = true)
+        => Run([userSource], includeStubs);
+
+    public static Result Run(string[] userSources, bool includeStubs = true)
     {
-        var compilation = includeStubs ? CreateCompilation(Stubs, userSource) : CreateCompilation(userSource);
+        var compilation = includeStubs ? CreateCompilation([Stubs, .. userSources]) : CreateCompilation(userSources);
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             [new NavigationRegistrationGenerator().AsSourceGenerator()],

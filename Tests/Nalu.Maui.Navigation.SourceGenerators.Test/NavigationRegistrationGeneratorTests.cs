@@ -71,6 +71,61 @@ public class NavigationRegistrationGeneratorTests
         result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.DetailViewModel, global::MyApp.DetailPage>();");
     }
 
+    [Fact(DisplayName = "Real-world XAML shape: separate trees, cross-namespace base, XamlG attributes")]
+    public void RealWorldXamlShapeIsDiscovered()
+    {
+        // Mirrors an actual app: the code-behind and the XamlG part are DIFFERENT files,
+        // the base class lives in another namespace, and the generated part carries the
+        // XamlFilePath attribute and InitializeComponent.
+        var result = GeneratorTestHarness.Run(
+            [
+                """
+                using System.ComponentModel;
+                using MyApp.Pages;
+
+                namespace MyApp;
+
+                public class InitializationViewModel : INotifyPropertyChanged
+                {
+                    public event PropertyChangedEventHandler? PropertyChanged;
+                }
+
+                public partial class InitializationPage
+                {
+                    public InitializationPage(InitializationViewModel viewModel)
+                    {
+                        BindingContext = viewModel;
+                        InitializeComponent();
+                    }
+                }
+                """,
+                """
+                using Microsoft.Maui.Controls;
+
+                namespace MyApp.Pages;
+
+                public abstract class ContentPageBase : ContentPage;
+                """,
+                """
+                // XamlG-style generated file.
+                namespace MyApp
+                {
+                    [global::System.CodeDom.Compiler.GeneratedCode("Microsoft.Maui.Controls.SourceGen", "1.0.0.0")]
+                    public partial class InitializationPage : global::MyApp.Pages.ContentPageBase
+                    {
+                        private void InitializeComponent()
+                        {
+                        }
+                    }
+                }
+                """
+            ]
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.InitializationViewModel, global::MyApp.InitializationPage>();");
+    }
+
     [Fact(DisplayName = "Page deriving from an app-level ContentPage subclass is discovered")]
     public void PageDerivingFromIntermediateBaseIsDiscovered()
     {
