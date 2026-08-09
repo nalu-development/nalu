@@ -61,7 +61,7 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         if (ctx.SemanticModel.GetDeclaredSymbol(declaration, ct) is not { } symbol ||
             symbol.IsAbstract ||
             symbol.IsGenericType ||
-            !DerivesFromContentPage(symbol) ||
+            !DerivesFromContentPage(symbol, out var ancestorFqns) ||
             IsAutoRegistrationDisabled(symbol))
         {
             return null;
@@ -84,6 +84,8 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             ctorModel,
             ambiguous,
             ExtractIntents(symbol),
+            ancestorFqns,
+            HasAutoNavigationPageAttribute(symbol),
             LocationInfo.From(declaration)
         );
     }
@@ -265,18 +267,29 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         return ReferenceEquals(symbol.DeclaringSyntaxReferences[0].GetSyntax(ct), declaration);
     }
 
-    private static bool DerivesFromContentPage(INamedTypeSymbol type)
+    private static bool DerivesFromContentPage(INamedTypeSymbol type, out EquatableArray<string> ancestorFqns)
     {
+        List<string>? ancestors = null;
+
         for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
         {
             if (baseType is { Name: "ContentPage", ContainingNamespace: { Name: "Controls", ContainingNamespace: { Name: "Maui", ContainingNamespace: { Name: "Microsoft", ContainingNamespace.IsGlobalNamespace: true } } } })
             {
+                ancestorFqns = ancestors is null ? EquatableArray<string>.Empty : new EquatableArray<string>([.. ancestors]);
+
                 return true;
             }
+
+            (ancestors ??= []).Add(Fqn(baseType));
         }
+
+        ancestorFqns = EquatableArray<string>.Empty;
 
         return false;
     }
+
+    private static bool HasAutoNavigationPageAttribute(INamedTypeSymbol type)
+        => type.GetAttributes().Any(static a => a.AttributeClass is { } attributeClass && IsNaluType(attributeClass, "AutoNavigationPageAttribute"));
 
     private static bool IsAutoRegistrationDisabled(INamedTypeSymbol type)
         => type.GetAttributes()
@@ -321,6 +334,12 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
                        .Select(static g => g.First())
                        .OrderBy(static p => p.PageFqn, StringComparer.Ordinal)
                        .ToList();
+
+        // A concrete page other candidates derive from (an app-level ContentPageBase) is
+        // infrastructure, not a navigation destination: excluded unless [AutoNavigationPage]
+        // opts it back in explicitly.
+        var baseFqns = new HashSet<string>(pageList.SelectMany(static p => p.AncestorFqns), StringComparer.Ordinal);
+        pageList = pageList.Where(p => p.ExplicitlyEnabled || !baseFqns.Contains(p.PageFqn)).ToList();
 
         var modelList = models
                         .GroupBy(static m => m.Fqn, StringComparer.Ordinal)
@@ -495,6 +514,15 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
 
             """
         );
+
+        if (registrations.Count == 0)
+        {
+            builder.AppendLine("        // No pages were discovered in THIS assembly. AddPages() scans only the compiling");
+            builder.AppendLine("        // project: pages living in other assemblies must call their own generated");
+            builder.AppendLine("        // AddPages() there or be registered manually via AddPage<...>(). A page is any");
+            builder.AppendLine("        // non-abstract, non-generic class deriving (directly or indirectly) from");
+            builder.AppendLine("        // Microsoft.Maui.Controls.ContentPage, in any partial declaration.");
+        }
 
         foreach (var registration in registrations)
         {

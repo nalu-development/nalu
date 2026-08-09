@@ -145,6 +145,63 @@ public class NavigationRegistrationGeneratorTests
         result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SettingsPage>();");
     }
 
+    [Fact(DisplayName = "Concrete base page other pages derive from is excluded")]
+    public void ConcreteBasePageIsExcluded()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+
+            namespace MyApp;
+
+            public class ContentPageBase : ContentPage;
+
+            public class HomePage : ContentPageBase;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.HomePage>();");
+        result.GeneratedText.Should().NotContain("ContentPageBase>");
+    }
+
+    [Fact(DisplayName = "AutoNavigationPage opts a derived-from base page back in")]
+    public void AutoNavigationPageKeepsBasePage()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using Nalu;
+
+            namespace MyApp;
+
+            [AutoNavigationPage]
+            public class SharedPage : ContentPage;
+
+            public class SpecializedPage : SharedPage;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SharedPage>();");
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.SpecializedPage>();");
+    }
+
+    [Fact(DisplayName = "Empty assembly emits a per-assembly scoping breadcrumb in AddPages")]
+    public void EmptyAssemblyEmitsBreadcrumb()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            namespace MyApp;
+
+            public class NotAPage;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("No pages were discovered in THIS assembly");
+    }
+
     [Fact(DisplayName = "Interface-typed BindingContext parameter resolves its single implementation")]
     public void InterfaceModelResolvesImplementation()
     {
