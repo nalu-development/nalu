@@ -1,0 +1,102 @@
+name: Deploy Docs
+
+# Publishing the documentation site is a MANUAL action: trigger it from the Actions tab
+# whenever the docs should go live (typically right after a release, but at your discretion).
+# The docfx build still runs on every push/PR inside build.yml purely as a broken-docs guard.
+on:
+  workflow_dispatch:
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  MINVERBUILDMETADATA: build.${{github.run_number}}
+
+# One Pages deployment at a time; never cancel a deploy already in flight.
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build-docs:
+    name: Build Documentation
+    runs-on: windows-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          fetch-depth: 0
+      - name: configure_java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: "Setup .NET SDK"
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: "Ensure workloads" # https://github.com/actions/runner/issues/3578
+        run: dotnet workload install maui --version 10.0.103
+        shell: pwsh
+      # See build.yml: caching Gradle keeps the Android native build inside the daemon's
+      # 30s connection window on cold Windows runners.
+      - name: "Cache Gradle"
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
+          restore-keys: |
+            ${{runner.os}}-gradle-
+
+      - name: "Dotnet Tool Restore"
+        run: dotnet tool restore
+        shell: pwsh
+      - name: "Dotnet Cake Build"
+        run: dotnet cake --target=Build
+        shell: pwsh
+
+      - name: Build Documentation Metadata
+        run: dotnet docfx metadata docfx.json
+        shell: pwsh
+      - name: Build Documentation
+        run: dotnet docfx build docfx.json
+        shell: pwsh
+      - name: Upload Documentation Site
+        uses: actions/upload-artifact@v7
+        with:
+          name: docfx-site
+          path: _site
+
+  deploy-gh-pages:
+    name: Deploy GitHub Pages
+    needs: build-docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download Documentation Site
+        uses: actions/download-artifact@v8
+        with:
+          name: docfx-site
+          path: ./_site
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: './_site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

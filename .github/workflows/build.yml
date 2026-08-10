@@ -155,40 +155,6 @@ jobs:
           ForEach-Object { dotnet nuget push $_ --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key ${{ steps.login.outputs.NUGET_API_KEY }} }
         shell: pwsh
 
-  deploy-gh-pages:
-    name: Deploy GitHub Pages
-    needs: build
-    # Published docs follow RELEASES, not main: the site should describe the version people can
-    # actually install, so it ships on the same event as the NuGet packages. The docfx build still
-    # runs on every push and PR (see the build job) — that keeps broken docs from reaching a
-    # release, it just no longer publishes.
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Download Documentation Site
-        uses: actions/download-artifact@v8
-        with:
-          name: docfx-site
-          path: ./_site
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: './_site'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+  # Publishing the documentation site is a MANUAL action — trigger the "Deploy Docs" workflow
+  # from the Actions tab whenever the site should go live. The docfx build above still runs on
+  # every push/PR purely as a broken-docs guard (and its docfx-site artifact stays inspectable).
