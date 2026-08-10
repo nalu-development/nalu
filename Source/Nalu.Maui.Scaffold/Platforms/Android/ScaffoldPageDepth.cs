@@ -8,15 +8,15 @@ using AView = Android.Views.View;
 namespace Nalu;
 
 /// <summary>
-/// Depth cues for stacked page motion (push, pop, predictive back), drawn into the REVEALED
-/// page's foreground: a dim proportional to how covered it still is, plus an edge-shadow
-/// gradient anchored at the seam under the moving page's leading edge. Drawn by us on purpose —
-/// platform elevation shadows are scaled by OEM theme alphas (verified near-invisible on
-/// OxygenOS), while a foreground drawable renders identically everywhere, needs no hierarchy
-/// changes, and stays below the overlay flights. The dim strength mirrors Android's own
-/// predictive-back scrim (stronger than the iOS counterpart, which matches ITS platform look
-/// and keeps the reliable layer shadow instead). Side-by-side motions (root switches) get
-/// neither cue.
+/// Depth cues for stacked page motion (push, pop, predictive back): a dim drawn into the
+/// REVEALED page's foreground, proportional to how covered it still is. Drawn by us on purpose —
+/// a foreground drawable renders identically everywhere, needs no hierarchy changes, and stays
+/// below the overlay flights. The strength mirrors Android's own predictive-back scrim.
+/// The dim is the ONLY visible cue: an edge-shadow gradient anchored to the moving page was
+/// tried and dropped — its invalidation lags a frame behind the animator-driven translation,
+/// which reads as a shadow detached from the page during fast settles — and the elevation
+/// shadow is suppressed too (see <see cref="ApplyShadow"/>), so both platforms present the
+/// same dim-only look. Side-by-side motions (root switches) get no cue.
 /// </summary>
 internal static class ScaffoldPageDepth
 {
@@ -24,31 +24,28 @@ internal static class ScaffoldPageDepth
     private const float _maxDimAlpha = 0.30f;
 
     /// <summary>
-    /// Peak alpha of the edge shadow at the seam. Deliberately soft: iOS renders a blurred
-    /// gaussian layer shadow, and a strong linear band reads as a hard stripe next to it —
-    /// a wider, weaker, eased gradient matches that look.
+    /// Keeps the moving page stacked ABOVE the revealed one. The null outline provider is what
+    /// makes this a pure z-ORDER: without an outline the renderer draws no elevation shadow, so
+    /// the dim stays the only visible cue on every device theme.
     /// </summary>
-    private const float _edgeShadowAlpha = 0.16f;
+    public static void ApplyShadow(AView view)
+    {
+        view.OutlineProvider = null;
+        view.TranslationZ = view.Context!.ToPixels(12);
+    }
 
-    private const float _edgeShadowWidthDp = 40f;
+    /// <summary>Clears the stacking applied by <see cref="ApplyShadow"/>.</summary>
+    public static void ClearShadow(AView view)
+    {
+        view.TranslationZ = 0f;
+        view.OutlineProvider = Android.Views.ViewOutlineProvider.Background;
+    }
 
     /// <summary>
-    /// Keeps the moving page stacked ABOVE the revealed one (whatever elevation shadow the
-    /// device theme still draws is a bonus). The guaranteed visible cue is the seam shadow
-    /// drawn by <see cref="SetDepth"/> on the page below.
+    /// Draws the revealed page's dim: <paramref name="coverage"/> is how covered it still is
+    /// (1 = fully covered, 0 = fully revealed — removes the overlay).
     /// </summary>
-    public static void ApplyShadow(AView view) => view.TranslationZ = view.Context!.ToPixels(12);
-
-    /// <summary>Clears the elevation applied by <see cref="ApplyShadow"/>.</summary>
-    public static void ClearShadow(AView view) => view.TranslationZ = 0f;
-
-    /// <summary>
-    /// Draws the revealed page's depth state: <paramref name="coverage"/> is how covered it
-    /// still is (1 = fully covered, 0 = fully revealed — removes everything);
-    /// <paramref name="seamPx"/> is the moving page's leading edge in the revealed page's
-    /// coordinates — the edge shadow hugs it from the left. Pass 0 to omit the seam shadow.
-    /// </summary>
-    public static void SetDepth(AView view, float coverage, float seamPx)
+    public static void SetDim(AView view, float coverage)
     {
         if (!OperatingSystem.IsAndroidVersionAtLeast(23))
         {
@@ -59,7 +56,7 @@ internal static class ScaffoldPageDepth
 
         if (coverage <= 0f)
         {
-            if (view.Foreground is DepthDrawable)
+            if (view.Foreground is DimDrawable)
             {
                 view.Foreground = null;
             }
@@ -67,69 +64,33 @@ internal static class ScaffoldPageDepth
             return;
         }
 
-        if (view.Foreground is not DepthDrawable depth)
+        if (view.Foreground is not DimDrawable dim)
         {
-            depth = new DepthDrawable(view.Context!.ToPixels(_edgeShadowWidthDp));
-            view.Foreground = depth;
+            dim = new DimDrawable();
+            view.Foreground = dim;
         }
 
-        depth.Update(
-            dimAlpha: (int) (coverage * _maxDimAlpha * 255),
-            shadowAlpha: (int) (_edgeShadowAlpha * 255),
-            seamPx
-        );
+        dim.Update((int) (coverage * _maxDimAlpha * 255));
     }
 
-    /// <summary>The dim + seam-shadow pair, identifiable so foreign foregrounds are never clobbered.</summary>
-    private sealed class DepthDrawable(float shadowWidthPx) : Drawable
+    /// <summary>The dim, identifiable so foreign foregrounds are never clobbered.</summary>
+    private sealed class DimDrawable : Drawable
     {
         private readonly Paint _dimPaint = new();
-        private readonly Paint _shadowPaint = new();
-        private readonly Matrix _shadowMatrix = new();
-        private LinearGradient? _shadowShader;
         private int _dimAlpha;
-        private int _shadowAlpha;
-        private float _seamPx;
 
-        public void Update(int dimAlpha, int shadowAlpha, float seamPx)
+        public void Update(int dimAlpha)
         {
             _dimAlpha = dimAlpha;
-            _shadowAlpha = shadowAlpha;
-            _seamPx = seamPx;
             InvalidateSelf();
         }
 
         public override void Draw(Canvas canvas)
         {
-            var bounds = Bounds;
-
             if (_dimAlpha > 0)
             {
                 _dimPaint.Color = Color.Argb(_dimAlpha, 0, 0, 0);
-                canvas.DrawRect(bounds, _dimPaint);
-            }
-
-            if (_shadowAlpha > 0 && _seamPx > 0)
-            {
-                // One gradient, translated to the seam per frame: no per-frame allocations.
-                // Eased three-stop ramp (quadratic-ish): reads like a blurred shadow, not a band.
-                _shadowShader ??= new LinearGradient(
-                    0,
-                    0,
-                    shadowWidthPx,
-                    0,
-                    [Color.Argb(0, 0, 0, 0).ToArgb(), Color.Argb(64, 0, 0, 0).ToArgb(), Color.Argb(255, 0, 0, 0).ToArgb()],
-                    [0f, 0.55f, 1f],
-                    Shader.TileMode.Clamp!
-                );
-
-                _shadowPaint.SetShader(_shadowShader);
-
-                var seam = Math.Min(_seamPx, bounds.Right);
-                _shadowMatrix.SetTranslate(seam - shadowWidthPx, 0);
-                _shadowShader.SetLocalMatrix(_shadowMatrix);
-                _shadowPaint.Alpha = _shadowAlpha;
-                canvas.DrawRect(seam - shadowWidthPx, bounds.Top, seam, bounds.Bottom, _shadowPaint);
+                canvas.DrawRect(Bounds, _dimPaint);
             }
         }
 

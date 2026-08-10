@@ -278,7 +278,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 if (depthPop)
                 {
-                    ScaffoldPageDepth.SetDepth(view, 1f, 0f);
+                    ScaffoldPageDepth.SetDim(view, 1f);
                 }
             };
             _currentFragment = fragment;
@@ -379,11 +379,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                         leaving.Animator.Update += (_, args) =>
                         {
-                            if (weakFragment.TryGetTarget(out var incoming)
-                                && incoming.View is { } revealedView
-                                && weakLeavingView.TryGetTarget(out var poppedView))
+                            if (weakFragment.TryGetTarget(out var incoming) && incoming.View is { } revealedView)
                             {
-                                ScaffoldPageDepth.SetDepth(revealedView, 1f - args.Animation.AnimatedFraction, poppedView.TranslationX);
+                                ScaffoldPageDepth.SetDim(revealedView, 1f - args.Animation.AnimatedFraction);
                             }
                         };
                     }
@@ -394,8 +392,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                         {
                             if (weakLeavingView.TryGetTarget(out var coveredView))
                             {
-                                var seam = weakFragment.TryGetTarget(out var incoming) ? incoming.View?.TranslationX ?? 0f : 0f;
-                                ScaffoldPageDepth.SetDepth(coveredView, args.Animation.AnimatedFraction, seam);
+                                ScaffoldPageDepth.SetDim(coveredView, args.Animation.AnimatedFraction);
                             }
                         };
                     }
@@ -437,12 +434,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 if (fragment.View is { } presentedView)
                 {
                     ScaffoldPageDepth.ClearShadow(presentedView);
-                    ScaffoldPageDepth.SetDepth(presentedView, 0f, 0f);
+                    ScaffoldPageDepth.SetDim(presentedView, 0f);
                 }
 
                 if (previousView is not null)
                 {
-                    ScaffoldPageDepth.SetDepth(previousView, 0f, 0f);
+                    ScaffoldPageDepth.SetDim(previousView, 0f);
                 }
             }
         }
@@ -526,7 +523,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Depth cues: the scrubbed page casts a shadow so its boundary reads against the peek,
         // which starts fully dimmed and brightens as the page departs.
         ScaffoldPageDepth.ApplyShadow(topView);
-        ScaffoldPageDepth.SetDepth(belowView, 1f, 0f);
+        ScaffoldPageDepth.SetDim(belowView, 1f);
 
         _backPeekView = belowView;
         _backTopView = topView;
@@ -590,7 +587,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             if (_backPeekView is { } peekView)
             {
-                ScaffoldPageDepth.SetDepth(peekView, 1f - progress, topView.TranslationX);
+                ScaffoldPageDepth.SetDim(peekView, 1f - progress);
             }
         }
     }
@@ -648,7 +645,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             if (weakCancelPeek is not null && weakCancelPeek.TryGetTarget(out var peek))
             {
-                ScaffoldPageDepth.SetDepth(peek, 1f - flightProgress, top.TranslationX);
+                ScaffoldPageDepth.SetDim(peek, 1f - flightProgress);
             }
         };
 
@@ -677,7 +674,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         if (peekView is not null)
         {
-            ScaffoldPageDepth.SetDepth(peekView, 0f, 0f);
+            ScaffoldPageDepth.SetDim(peekView, 0f);
         }
     }
 
@@ -762,7 +759,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             if (weakCommitPeek is not null && weakCommitPeek.TryGetTarget(out var peek))
             {
-                ScaffoldPageDepth.SetDepth(peek, 1f - flightProgress, top.TranslationX);
+                ScaffoldPageDepth.SetDim(peek, 1f - flightProgress);
             }
         };
 

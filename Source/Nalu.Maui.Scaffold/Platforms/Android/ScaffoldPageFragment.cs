@@ -131,11 +131,11 @@ internal sealed class ScaffoldPageFragment : Fragment
         // transform alone so unmounting does not flash it) — clear it before hosting it again.
         platformView.TranslationX = 0f;
         platformView.TranslationY = 0f;
-        platformView.TranslationZ = 0f;
         platformView.ScaleX = 1f;
         platformView.ScaleY = 1f;
         platformView.Alpha = 1f;
-        ScaffoldPageDepth.SetDepth(platformView, 0f, 0f);
+        ScaffoldPageDepth.ClearShadow(platformView);
+        ScaffoldPageDepth.SetDim(platformView, 0f);
 
         platformView.LayoutParameters = new ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MatchParent,

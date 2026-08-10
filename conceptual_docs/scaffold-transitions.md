@@ -7,8 +7,10 @@ animations, interactive gestures on both platforms — no Shell/Fragment animati
 
 A `ScaffoldPageTransition` declares how the **pushed** page enters (`Enter` motion: fractional
 translation, scale, opacity), what the covered page does behind it (`Behind`), and the
-duration. The pop plays the same spec in reverse — as does the iOS interactive edge swipe and
-Android predictive back.
+duration. The pop plays the same spec in reverse. The **interactive gestures** (iOS edge
+swipe, Android predictive back) deliberately do NOT replay custom specs: a horizontal drag
+scrubs the standard slide so the page tracks the finger — the page's own spec plays on
+programmatic pushes and pops.
 
 Built-in specs: `Default` (plain slide), `SlideFromRight` (iOS-style with behind parallax),
 `SlideUpFade`, `ZoomFade`, `SlideFromBottom` (the modal default), `None`.
@@ -62,17 +64,14 @@ The engines (custom on both platforms) are built for **truthful flights**:
 
 ## Depth cues
 
-Stacked motions (push, pop, and both interactive gestures) carry two automatic depth cues so
-the moving page's boundary always reads, whatever the content: the page travelling **above**
-casts a soft shadow (an iOS layer shadow; on Android a seam gradient drawn with the dim —
-elevation is deliberately not used, OEM themes scale it into invisibility), and the page
-revealed **beneath** sits under a subtle dim proportional to how covered it still is, lifting
-as the top page departs. Side-by-side motions (root switches) get neither — those pages are
-adjacent, not stacked.
+Stacked motions (push, pop, and both interactive gestures) carry one automatic depth cue,
+identical on iOS and Android: the page revealed **beneath** sits under a well-visible dim
+proportional to how covered it still is, lifting as the top page departs. Side-by-side motions
+(root switches) get no cue — those pages are adjacent, not stacked.
 
 ## Interactive gestures
 
-- **iOS edge-swipe pop**: leading-edge pan (RTL-aware) scrubs the pop choreography — including
+- **iOS edge-swipe pop**: leading-edge pan (RTL-aware) scrubs the standard slide — including
   shared-element flights — under the finger; release either completes (dispatching the pop
   through the engine) or cancels. On pages whose model implements `ILeavingGuard` the swipe
   simply does not engage — use the back button, which runs the guard.

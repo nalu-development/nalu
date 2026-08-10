@@ -146,9 +146,13 @@ internal static class ScaffoldSharedElementTransitions
     }
 
     /// <summary>
-    /// Begins a SCRUBBABLE pop session for the interactive edge swipe: the same choreography a
-    /// programmatic pop plays (page slide + shared-element flights when pairs match and the
-    /// revealed views are already laid out), interpolated MANUALLY per fraction.
+    /// Begins a SCRUBBABLE pop session for the interactive edge swipe: the STANDARD slide (plus
+    /// shared-element flights when pairs match and the revealed views are already laid out),
+    /// interpolated MANUALLY per fraction. The page's own <see cref="ScaffoldPageTransition"/>
+    /// deliberately does NOT drive the gesture: a finger dragging horizontally must scrub
+    /// horizontal motion (a slide-up page would fade/sink under the finger instead of tracking
+    /// it) — the same precedence Android's predictive back applies. Custom transitions still
+    /// play on programmatic pops.
     /// A paused <see cref="UIViewPropertyAnimator"/> is deliberately NOT used: measured on
     /// iOS 26 (simulator and device), a paused animator accepts <c>FractionComplete</c> (state
     /// Active, read-back correct) but never renders the interpolation — started animators work,
@@ -163,9 +167,9 @@ internal static class ScaffoldSharedElementTransitions
         Page poppedPage,
         Page revealedPage,
         UIView poppedView,
-        UIView revealedView,
-        ScaffoldPageTransition transition)
+        UIView revealedView)
     {
+        var transition = ScaffoldPageTransition.Default;
         var pairs = MatchPairs(mauiContext, poppedPage, revealedPage);
 
         // Synchronous readiness gate only: the revealed page was just peek-mounted, one layout
@@ -176,12 +180,6 @@ internal static class ScaffoldSharedElementTransitions
         if (pairs.Any(p => !IsLaidOut(p.To)))
         {
             pairs = [];
-        }
-
-        // The flight geometry assumes the standard slide: shared-element pops always play it.
-        if (pairs.Count > 0)
-        {
-            transition = ScaffoldPageTransition.Default;
         }
 
         var overlay = new UIView(container.Bounds) { UserInteractionEnabled = false };

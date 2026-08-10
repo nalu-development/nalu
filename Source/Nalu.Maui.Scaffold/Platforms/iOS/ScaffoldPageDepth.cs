@@ -1,40 +1,18 @@
-using CoreGraphics;
 using UIKit;
 
 namespace Nalu;
 
 /// <summary>
-/// Depth cues for stacked page motion (push, pop, interactive edge pop): a layer shadow on the
-/// page moving ABOVE (its boundary reads against any content) and a subtle dim on the page
-/// revealed BENEATH, proportional to how covered it still is. Side-by-side motions (root
-/// switches) get neither — the pages are adjacent, not stacked.
+/// Depth cues for stacked page motion (push, pop, interactive edge pop): a well-visible dim on
+/// the page revealed BENEATH, proportional to how covered it still is (the same cue, at the
+/// same strength, as the Android presenter — the platforms read identically). A layer shadow on
+/// the moving page was tried and dropped in favor of the dim alone. Side-by-side motions (root
+/// switches) get no cue — the pages are adjacent, not stacked.
 /// </summary>
 internal static class ScaffoldPageDepth
 {
-    private const float _maxDimAlpha = 0.15f;
+    private const float _maxDimAlpha = 0.30f;
     private const int _dimViewTag = 0x4E414C55; // "NALU"
-
-    /// <summary>
-    /// Puts a shadow on the moving page. The explicit <c>ShadowPath</c> is what keeps it cheap:
-    /// with it Core Animation pre-renders the shadow and moving the layer costs nothing;
-    /// without it every frame pays an offscreen pass.
-    /// </summary>
-    public static void ApplyShadow(UIView view)
-    {
-        var layer = view.Layer;
-        layer.ShadowColor = UIColor.Black.CGColor;
-        layer.ShadowOpacity = 0.25f;
-        layer.ShadowRadius = 12f;
-        layer.ShadowOffset = CGSize.Empty;
-        layer.ShadowPath = UIBezierPath.FromRect(view.Bounds).CGPath;
-    }
-
-    /// <summary>Clears the shadow applied by <see cref="ApplyShadow"/>.</summary>
-    public static void ClearShadow(UIView view)
-    {
-        view.Layer.ShadowOpacity = 0f;
-        view.Layer.ShadowPath = null;
-    }
 
     /// <summary>
     /// Dims the revealed page for how covered it still is (1 = fully covered, 0 = fully

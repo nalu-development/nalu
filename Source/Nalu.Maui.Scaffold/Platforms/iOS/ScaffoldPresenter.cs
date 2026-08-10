@@ -280,9 +280,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         belowView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
         container.InsertSubviewBelow(belowView, topView);
 
-        // Depth cues: the scrubbed page casts a shadow so its boundary reads against the peek,
-        // which starts fully dimmed and brightens as the page departs.
-        ScaffoldPageDepth.ApplyShadow(topView);
+        // Depth cue: the peek starts fully dimmed and brightens as the scrubbed page departs.
         ScaffoldPageDepth.SetDim(belowView, 1f);
 
         var session = ScaffoldSharedElementTransitions.BeginInteractivePopSession(
@@ -291,8 +289,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             topPage,
             belowPage,
             topView,
-            belowView,
-            scaffold.ResolvePageTransition(topPage)
+            belowView
         );
 
         _interactivePop = new InteractivePopState(topPage, belowPage, belowView, topView, container.Bounds.Width, session);
@@ -325,7 +322,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 var cancelDim = ScaffoldPageDepth.AnimateDimAsync(state.BelowView, 1f, _transitionDurationSeconds);
                 await state.Session.CancelAsync();
                 await cancelDim;
-                ScaffoldPageDepth.ClearShadow(state.TopView);
                 ScaffoldPageDepth.RemoveDim(state.BelowView);
                 UnmountPeek();
 
@@ -352,7 +348,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // pre-gesture presentation — slide the top page back over the peek, then unmount.
                 _popHandoff = null;
                 await UIView.AnimateAsync(_transitionDurationSeconds, () => state.TopView.Transform = CGAffineTransform.MakeIdentity());
-                ScaffoldPageDepth.ClearShadow(state.TopView);
                 ScaffoldPageDepth.RemoveDim(state.BelowView);
                 UnmountPeek();
 
@@ -428,10 +423,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // A remounted page keeps the transform its unmount animation left behind (covered pages
         // are detached, never destroyed) — setting Frame under an active transform corrupts the
-        // geometry (the page lands offscreen). Always clear before framing; depth cues from a
-        // previous departure (shadow, dim) clear with it.
+        // geometry (the page lands offscreen). Always clear before framing; the depth dim from
+        // a previous departure clears with it.
         ResetMotion(newView);
-        ScaffoldPageDepth.ClearShadow(newView);
         ScaffoldPageDepth.RemoveDim(newView);
         newView.Frame = container.Bounds;
         newView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
@@ -457,8 +451,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 var pushSpec = scaffold.ResolvePageTransition(targetPage);
                 var coveredView = previousController?.View;
 
-                // Depth cues span any animated push: the incoming page slides above with a
-                // shadow while the covered page dims beneath it.
+                // Depth cue spans any animated push: the covered page dims beneath the
+                // incoming one.
                 var pushAnimates = coveredView is not null
                     && (pushSpec.IsAnimated
                         || (previousPage is not null
@@ -468,7 +462,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 if (pushAnimates)
                 {
-                    ScaffoldPageDepth.ApplyShadow(newView);
                     ScaffoldPageDepth.SetDim(coveredView!, 0f);
                     coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, _transitionDurationSeconds);
                 }
@@ -502,9 +495,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                         await coverDim;
                     }
 
-                    // The presented page keeps no shadow; the covered page (detached, kept
-                    // alive) keeps no dim for its next reveal.
-                    ScaffoldPageDepth.ClearShadow(newView);
+                    // The covered page (detached, kept alive) keeps no dim for its next
+                    // reveal.
                     ScaffoldPageDepth.RemoveDim(coveredView!);
                 }
 
@@ -519,8 +511,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // The POPPED page's own spec, reversed: it leaves the way it entered.
                 var popSpec = previousPage is not null ? scaffold.ResolvePageTransition(previousPage) : ScaffoldPageTransition.Default;
 
-                // Depth cues span any animated pop: the departing page casts a shadow, the
-                // revealed one starts dimmed and brightens as it goes.
+                // Depth cue spans any animated pop: the revealed page starts dimmed and
+                // brightens as the departing one goes.
                 var popAnimates = popSpec.IsAnimated
                     || (previousPage is not null
                         && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0);
@@ -529,7 +521,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 if (popAnimates)
                 {
-                    ScaffoldPageDepth.ApplyShadow(previousView);
                     ScaffoldPageDepth.SetDim(newView, 1f);
                     revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, _transitionDurationSeconds);
                 }
@@ -556,7 +547,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     }
 
                     ScaffoldPageDepth.RemoveDim(newView);
-                    ScaffoldPageDepth.ClearShadow(previousView);
                 }
 
                 break;
