@@ -519,4 +519,4 @@ Each tab maintains its own navigation stack independently.
 
 ## API Reference
 
-For complete API documentation, see the [API reference](api/Nalu.html).
+For complete API documentation, see the [API reference](../api/Nalu.yml).
