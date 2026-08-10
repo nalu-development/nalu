@@ -100,8 +100,6 @@ internal sealed class ScaffoldBottomSheetGesture
                                   || !_sheet.IsFullyOpen
                                   || (total > 0 && scrollView.ContentOffset.Y + scrollView.AdjustedContentInset.Top <= 0.5);
 
-                Console.WriteLine($"[SHEETG] total={total:F0} off={_scrollView?.ContentOffset.Y:F1} inset={_scrollView?.AdjustedContentInset.Top:F1} open={_sheet.IsFullyOpen} claim={shouldClaim}");
-
                 if (shouldClaim)
                 {
                     // Apply the accumulated movement so there is no dead zone.

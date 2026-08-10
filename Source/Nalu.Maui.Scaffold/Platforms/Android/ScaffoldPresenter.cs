@@ -2008,10 +2008,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         entry.Closing = true;
         var request = entry.Request;
 
-        // Owner cleanup runs BEFORE the exit animation (matching the original primitive):
-        // state clears immediately, so a rapid re-open is never blocked by the animation tail.
-        request.Cleanup?.Invoke();
-
         if (request.Kind == ScaffoldOverlayKind.Flyout)
         {
             // The icons return to the underlying resolution as the flyout starts sliding away.
@@ -2019,6 +2015,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
+
+        // Owner cleanup (state flags, logical-child detach, handle completion) runs AFTER the
+        // exit animation: detaching the content's logical child earlier freezes its exit
+        // transforms — the sheet/popup would sit still and vanish at the end.
+        request.Cleanup?.Invoke();
 
         (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
         (entry.ScrimPlatform.Parent as AViewGroup)?.RemoveView(entry.ScrimPlatform);

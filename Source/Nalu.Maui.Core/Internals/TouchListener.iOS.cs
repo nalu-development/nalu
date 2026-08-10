@@ -106,6 +106,13 @@ internal class ControlledTouchGestureRecognizer : UIGestureRecognizer
         {
             State = UIGestureRecognizerState.Cancelled;
         }
+        else if (State == UIGestureRecognizerState.Possible)
+        {
+            // Unclaimed observation MUST resolve to Failed: UIKit delays the touch-end
+            // delivery to the view (DelaysTouchesEnded default) until this recognizer
+            // resolves — staying in Possible would swallow the release forever.
+            State = UIGestureRecognizerState.Failed;
+        }
     }
 
     public override void TouchesEnded(NSSet touches, UIEvent evt)
@@ -117,6 +124,13 @@ internal class ControlledTouchGestureRecognizer : UIGestureRecognizer
         if (!args.Propagates || State is UIGestureRecognizerState.Began or UIGestureRecognizerState.Changed)
         {
             State = UIGestureRecognizerState.Ended;
+        }
+        else if (State == UIGestureRecognizerState.Possible)
+        {
+            // A tap that was only OBSERVED (never claimed) must FAIL the recognizer, or the
+            // delayed touch-end never reaches the pressed control (e.g. a Button inside a
+            // bottom sheet stays pressed forever and its click never fires).
+            State = UIGestureRecognizerState.Failed;
         }
     }
 
