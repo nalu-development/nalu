@@ -1,6 +1,5 @@
 using AndroidX.Activity;
 using AndroidX.AppCompat.App;
-using AndroidX.Lifecycle;
 
 namespace Nalu;
 
@@ -14,8 +13,8 @@ namespace Nalu;
 /// type only overrides <see cref="OnBackPressedCallback.HandleOnBackPressed"/>. When MAUI's
 /// callback sits above ours and is enabled, the system delivers Started/Progressed to MAUI's
 /// empty defaults — the page still pops on Pressed, but the scrub preview never runs.
-/// <see cref="Scaffold"/> keeps this callback on top while it consumes back; see
-/// <c>Scaffold.android.cs</c>.
+/// Registration order guarantees this callback stays above MAUI's; see the ordering contract
+/// on <c>Scaffold.EnsureBackCallback</c> (<c>Scaffold.android.cs</c>).
 /// </remarks>
 internal sealed class ScaffoldBackCallback(Scaffold scaffold, AppCompatActivity activity) : OnBackPressedCallback(false)
 {
@@ -31,19 +30,4 @@ internal sealed class ScaffoldBackCallback(Scaffold scaffold, AppCompatActivity 
         => (scaffold.Presenter as ScaffoldPresenter)?.CancelBackPreview();
 
     public override void HandleOnBackPressed() => scaffold.HandleSystemBack();
-}
-
-/// <summary>
-/// Re-asserts <see cref="ScaffoldBackCallback"/> as the top dispatcher entry after MAUI's
-/// lifecycle-aware callback re-adds itself on <c>ON_START</c>.
-/// </summary>
-internal sealed class ScaffoldBackCallbackLifecycleObserver(Scaffold scaffold) : Java.Lang.Object, ILifecycleEventObserver
-{
-    public void OnStateChanged(ILifecycleOwner source, Lifecycle.Event e)
-    {
-        if (e == Lifecycle.Event.OnStart)
-        {
-            scaffold.AssertBackCallbackOnTop();
-        }
-    }
 }

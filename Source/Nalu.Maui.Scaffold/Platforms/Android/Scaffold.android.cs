@@ -7,7 +7,7 @@ namespace Nalu;
 public partial class Scaffold
 {
     private ScaffoldBackCallback? _backCallback;
-    private ScaffoldBackCallbackLifecycleObserver? _backCallbackLifecycleObserver;
+    private bool _backCallbackRegistered;
 
     /// <summary>
     /// Registers the system-back handler on the activity's OnBackPressedDispatcher.
@@ -16,21 +16,42 @@ public partial class Scaffold
     /// back integration builds on: <see cref="OnBackPressedCallback.Enabled"/> mirrors whether
     /// the Scaffold can pop, so the system's back-to-home preview still works at root pages.
     /// </summary>
+    /// <remarks>
+    /// ORDERING CONTRACT. The dispatcher delivers back events — including the predictive
+    /// Started/Progressed stream — to the topmost ENABLED callback only. MAUI's
+    /// MauiOnBackPressedCallback overrides just Pressed, so whenever it is enabled (apps with
+    /// OnBackPressed lifecycle handlers) and sits above ours, pages pop with no scrub preview.
+    /// Ours must therefore stay above MAUI's — and both are lifecycle-aware adds, which androidx
+    /// re-adds on every ON_START in lifecycle-OBSERVER registration order. MAUI registers inside
+    /// MauiAppCompatActivity.OnCreate but AFTER CreatePlatformWindow (where we first land here),
+    /// so a same-frame add would register our observer first and hand MAUI the top slot forever.
+    /// Deferring our add by one frame flips that: androidx itself then keeps us on top — at
+    /// startup and after every foreground — with no dispatcher churn and nothing to re-assert.
+    /// </remarks>
     internal void EnsureBackCallback(AppCompatActivity activity)
     {
         if (_backCallback is null || !ReferenceEquals(_backCallback.Activity, activity))
         {
             TearDownBackCallback();
-
             _backCallback = new ScaffoldBackCallback(this, activity);
+        }
 
-            // Non-lifecycle add: we own Enabled ourselves. Lifecycle-aware add would fight
-            // MAUI's MauiOnBackPressedCallback for top-of-stack on every ON_START.
-            activity.OnBackPressedDispatcher.AddCallback(_backCallback);
+        if (!_backCallbackRegistered)
+        {
+            var callback = _backCallback;
 
-            // MAUI registers its callback AFTER CreatePlatformWindow (where we first land here).
-            // Post so our ON_START observer is attached after MAUI's and wins the re-add race.
-            activity.Window?.DecorView?.Post(() => AttachBackCallbackLifecycle(activity));
+            // Retried on every sync until it lands (the guards make it idempotent); the one-frame
+            // gap is unreachable by a human back press. Registered with the activity as owner:
+            // Remove() tears down the lifecycle observer along with the callback.
+            activity.Window?.DecorView?.Post(() =>
+                {
+                    if (!_backCallbackRegistered && ReferenceEquals(_backCallback, callback))
+                    {
+                        activity.OnBackPressedDispatcher.AddCallback(activity, callback);
+                        _backCallbackRegistered = true;
+                    }
+                }
+            );
         }
 
         UpdateBackCallbackEnabled();
@@ -38,74 +59,24 @@ public partial class Scaffold
 
     /// <summary>
     /// Re-evaluates whether the scaffold consumes system back: only while the current stack has
-    /// pushed pages. At a root page the callback stays disabled so the platform default applies —
-    /// the app backgrounds with the native predictive back-to-home preview intact.
+    /// pushed pages or an overlay is presented. At a root page the callback stays disabled so the
+    /// platform default applies — the app backgrounds with the native predictive back-to-home
+    /// preview intact. (Enabled lives on the callback object, so it survives the lifecycle
+    /// remove/re-add cycles across background/foreground.)
     /// </summary>
     internal void UpdateBackCallbackEnabled()
     {
-        if (_backCallback is null)
+        if (_backCallback is not null)
         {
-            return;
+            _backCallback.Enabled = HasPushedPages() || Presenter is { HasOverlay: true };
         }
-
-        var wasEnabled = _backCallback.Enabled;
-        var enabled = HasPushedPages() || Presenter is { HasOverlay: true };
-        _backCallback.Enabled = enabled;
-
-        // While we consume back we must sit above MAUI's Pressed-only callback; otherwise
-        // Started/Progressed hit MAUI's empty defaults and the scrub never runs.
-        if (enabled && !wasEnabled)
-        {
-            AssertBackCallbackOnTop();
-        }
-    }
-
-    /// <summary>
-    /// Puts our callback at the top of the dispatcher. The dispatcher delivers predictive-back
-    /// events only to the topmost enabled callback — staying above MAUI is enough (no need to
-    /// reach into MAUI internals). Skipped while a scrub is in flight so Remove/Add cannot
-    /// cancel the gesture mid-preview.
-    /// </summary>
-    internal void AssertBackCallbackOnTop()
-    {
-        if (_backCallback is null || Presenter is ScaffoldPresenter { HasBackPreview: true })
-        {
-            return;
-        }
-
-        var activity = _backCallback.Activity;
-        var enabled = _backCallback.Enabled;
-
-        _backCallback.Remove();
-        activity.OnBackPressedDispatcher.AddCallback(_backCallback);
-        _backCallback.Enabled = enabled;
-    }
-
-    private void AttachBackCallbackLifecycle(AppCompatActivity activity)
-    {
-        if (_backCallback is null
-            || !ReferenceEquals(_backCallback.Activity, activity)
-            || _backCallbackLifecycleObserver is not null)
-        {
-            return;
-        }
-
-        _backCallbackLifecycleObserver = new ScaffoldBackCallbackLifecycleObserver(this);
-        activity.Lifecycle.AddObserver(_backCallbackLifecycleObserver);
-        AssertBackCallbackOnTop();
     }
 
     internal void TearDownBackCallback()
     {
-        if (_backCallbackLifecycleObserver is not null && _backCallback is not null)
-        {
-            _backCallback.Activity.Lifecycle.RemoveObserver(_backCallbackLifecycleObserver);
-            _backCallbackLifecycleObserver.Dispose();
-            _backCallbackLifecycleObserver = null;
-        }
-
         _backCallback?.Remove();
         _backCallback = null;
+        _backCallbackRegistered = false;
     }
 
     private bool HasPushedPages()
