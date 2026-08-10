@@ -32,6 +32,7 @@ public partial class ScaffoldHandler : ViewHandler<Scaffold, ScaffoldLayout>
     {
         if (VirtualView is { } scaffold)
         {
+            scaffold.TearDownBackCallback();
             (scaffold.Presenter as IDisposable)?.Dispose();
             scaffold.Presenter = null;
         }

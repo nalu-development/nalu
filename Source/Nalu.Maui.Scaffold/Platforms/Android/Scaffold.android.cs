@@ -7,6 +7,7 @@ namespace Nalu;
 public partial class Scaffold
 {
     private ScaffoldBackCallback? _backCallback;
+    private ScaffoldBackCallbackLifecycleObserver? _backCallbackLifecycleObserver;
 
     /// <summary>
     /// Registers the system-back handler on the activity's OnBackPressedDispatcher.
@@ -19,9 +20,17 @@ public partial class Scaffold
     {
         if (_backCallback is null || !ReferenceEquals(_backCallback.Activity, activity))
         {
-            _backCallback?.Remove();
+            TearDownBackCallback();
+
             _backCallback = new ScaffoldBackCallback(this, activity);
-            activity.OnBackPressedDispatcher.AddCallback(activity, _backCallback);
+
+            // Non-lifecycle add: we own Enabled ourselves. Lifecycle-aware add would fight
+            // MAUI's MauiOnBackPressedCallback for top-of-stack on every ON_START.
+            activity.OnBackPressedDispatcher.AddCallback(_backCallback);
+
+            // MAUI registers its callback AFTER CreatePlatformWindow (where we first land here).
+            // Post so our ON_START observer is attached after MAUI's and wins the re-add race.
+            activity.Window?.DecorView?.Post(() => AttachBackCallbackLifecycle(activity));
         }
 
         UpdateBackCallbackEnabled();
@@ -34,10 +43,69 @@ public partial class Scaffold
     /// </summary>
     internal void UpdateBackCallbackEnabled()
     {
-        if (_backCallback is not null)
+        if (_backCallback is null)
         {
-            _backCallback.Enabled = HasPushedPages() || Presenter is { HasOverlay: true };
+            return;
         }
+
+        var wasEnabled = _backCallback.Enabled;
+        var enabled = HasPushedPages() || Presenter is { HasOverlay: true };
+        _backCallback.Enabled = enabled;
+
+        // While we consume back we must sit above MAUI's Pressed-only callback; otherwise
+        // Started/Progressed hit MAUI's empty defaults and the scrub never runs.
+        if (enabled && !wasEnabled)
+        {
+            AssertBackCallbackOnTop();
+        }
+    }
+
+    /// <summary>
+    /// Puts our callback at the top of the dispatcher. The dispatcher delivers predictive-back
+    /// events only to the topmost enabled callback — staying above MAUI is enough (no need to
+    /// reach into MAUI internals). Skipped while a scrub is in flight so Remove/Add cannot
+    /// cancel the gesture mid-preview.
+    /// </summary>
+    internal void AssertBackCallbackOnTop()
+    {
+        if (_backCallback is null || Presenter is ScaffoldPresenter { HasBackPreview: true })
+        {
+            return;
+        }
+
+        var activity = _backCallback.Activity;
+        var enabled = _backCallback.Enabled;
+
+        _backCallback.Remove();
+        activity.OnBackPressedDispatcher.AddCallback(_backCallback);
+        _backCallback.Enabled = enabled;
+    }
+
+    private void AttachBackCallbackLifecycle(AppCompatActivity activity)
+    {
+        if (_backCallback is null
+            || !ReferenceEquals(_backCallback.Activity, activity)
+            || _backCallbackLifecycleObserver is not null)
+        {
+            return;
+        }
+
+        _backCallbackLifecycleObserver = new ScaffoldBackCallbackLifecycleObserver(this);
+        activity.Lifecycle.AddObserver(_backCallbackLifecycleObserver);
+        AssertBackCallbackOnTop();
+    }
+
+    internal void TearDownBackCallback()
+    {
+        if (_backCallbackLifecycleObserver is not null && _backCallback is not null)
+        {
+            _backCallback.Activity.Lifecycle.RemoveObserver(_backCallbackLifecycleObserver);
+            _backCallbackLifecycleObserver.Dispose();
+            _backCallbackLifecycleObserver = null;
+        }
+
+        _backCallback?.Remove();
+        _backCallback = null;
     }
 
     private bool HasPushedPages()
