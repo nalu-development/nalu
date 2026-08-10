@@ -43,7 +43,7 @@ public partial class Scaffold
     private bool HasPushedPages()
         => (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack.PushedPages.Count > 0;
 
-    private void HandleSystemBack()
+    internal void HandleSystemBack()
     {
         // Overlays dismiss (topmost first) before the navigation engine is ever consulted —
         // the same policy §7.2 defines for popups.
@@ -81,28 +81,4 @@ public partial class Scaffold
         => (Proxy?.CurrentItem.CurrentSection as ScaffoldRootProxy)?.Root.NavigationStack.PushedPages is { Count: > 0 } pushed
             ? pushed[^1].Page
             : null;
-
-    /// <summary>
-    /// Predictive-back integration (§ predictive back design): the system back gesture scrubs
-    /// the pop under the finger — page motion AND shared-element flights (the same seekable
-    /// session a committed pop plays, driven by gesture progress). Guarded pages
-    /// (<see cref="ILeavingGuard"/>) get NO preview, but the committed back still routes
-    /// through the engine, which runs the guard. Root pages keep the callback disabled — the
-    /// native back-to-home preview applies.
-    /// </summary>
-    internal sealed class ScaffoldBackCallback(Scaffold scaffold, AppCompatActivity activity) : OnBackPressedCallback(false)
-    {
-        public AppCompatActivity Activity => activity;
-
-        public override void HandleOnBackStarted(BackEventCompat backEvent)
-            => (scaffold.Presenter as ScaffoldPresenter)?.StartBackPreview();
-
-        public override void HandleOnBackProgressed(BackEventCompat backEvent)
-            => (scaffold.Presenter as ScaffoldPresenter)?.UpdateBackPreview(backEvent.Progress);
-
-        public override void HandleOnBackCancelled()
-            => (scaffold.Presenter as ScaffoldPresenter)?.CancelBackPreview();
-
-        public override void HandleOnBackPressed() => scaffold.HandleSystemBack();
-    }
 }
