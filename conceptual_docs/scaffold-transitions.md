@@ -83,6 +83,64 @@ proportional to how covered it still is, lifting as the top page departs. Side-b
   pop (guards honored, `enableOnBackInvokedCallback` required, root pages defer to the native
   back-to-home preview).
 
+## Android back interop
+
+Predictive back requires `android:enableOnBackInvokedCallback="true"` in the manifest — and
+that opt-in is **application-wide**: every window of the app (dialogs and third-party popup
+windows included) switches to the new back dispatch and stops receiving the legacy
+`KEYCODE_BACK`. The Scaffold plays well with the rest of the ecosystem on top of that:
+
+- **The Scaffold's callback keeps itself topmost** on the activity's `OnBackPressedDispatcher`.
+  Libraries register permanently-enabled callbacks of their own (analytics SDKs, popup
+  frameworks); if one sits above the Scaffold's it swallows the predictive stream in its empty
+  `Started`/`Progressed` defaults — pages still pop, but the scrub silently never runs.
+- **`AndroidLifecycle.OnBackPressed` delegates keep working.** MAUI's activity gives those
+  delegates the first chance at every back press, but its own callback is permanently disabled
+  for non-Shell window content — so the Scaffold pumps the event itself: delegates run first
+  (a consumer wins over every Scaffold concern), and when nothing at all consumes, the press is
+  re-dispatched below, exactly like MAUI's own handling.
+- **Third-party popups hosted in their own window** (some vendors present popups as separate
+  focusable windows): while such a popup is focused, the system delivers back to *that*
+  window — if the vendor never registered an `OnBackInvokedCallback` there, back does nothing.
+  No library on the activity window (Nalu included) can intercept this; until the vendor adds
+  predictive-back support, restore the old close-on-back behavior from the app:
+
+  ```csharp
+  #if ANDROID
+  // Wire these to your popup's Opened/Closed events.
+  Android.Window.IOnBackInvokedCallback? _popupBackCallback;
+
+  void OnPopupOpened(object? sender, EventArgs e)
+  {
+      if (!OperatingSystem.IsAndroidVersionAtLeast(33)
+          || (sender as IElement)?.Handler?.PlatformView is not Android.Views.View view
+          || view.FindOnBackInvokedDispatcher() is not { } dispatcher)
+      {
+          return;
+      }
+
+      _popupBackCallback = new PopupBackCallback(() => ClosePopup());
+      dispatcher.RegisterOnBackInvokedCallback(0 /* PRIORITY_DEFAULT */, _popupBackCallback);
+  }
+
+  void OnPopupClosed(object? sender, EventArgs e)
+  {
+      if (OperatingSystem.IsAndroidVersionAtLeast(33)
+          && _popupBackCallback is { } callback
+          && (sender as IElement)?.Handler?.PlatformView is Android.Views.View view)
+      {
+          view.FindOnBackInvokedDispatcher()?.UnregisterOnBackInvokedCallback(callback);
+          _popupBackCallback = null;
+      }
+  }
+
+  sealed class PopupBackCallback(Action onBack) : Java.Lang.Object, Android.Window.IOnBackInvokedCallback
+  {
+      public void OnBackInvoked() => onBack();
+  }
+  #endif
+  ```
+
 ## Modal pages
 
 Modals are **navigation**, not overlays — same stack, same lifecycle, different presentation:
