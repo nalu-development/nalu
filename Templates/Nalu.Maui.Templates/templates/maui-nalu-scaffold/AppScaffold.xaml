@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<nalu:Scaffold xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+               xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+               xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+               xmlns:pages="clr-namespace:MauiNaluApp.Pages"
+               x:Class="MauiNaluApp.AppScaffold"
+               nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}"
+               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+
+    <!-- The whole application structure: one tab bar, two roots, each hosting its own
+         navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->
+
+    <!-- Global nav bar strip surface; any page can override per property with its own
+         nalu:Scaffold.NavBarAppearance (a delta — unset properties inherit this one). -->
+    <nalu:Scaffold.NavBarAppearance>
+        <nalu:ScaffoldNavBarAppearance Foreground="{StaticResource Accent}">
+            <nalu:ScaffoldNavBarAppearance.Background>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
+            </nalu:ScaffoldNavBarAppearance.Background>
+        </nalu:ScaffoldNavBarAppearance>
+    </nalu:Scaffold.NavBarAppearance>
+
+    <nalu:ScaffoldTabBar>
+        <nalu:ScaffoldRoot Title="Home" PageType="{x:Type pages:HomePage}">
+            <nalu:ScaffoldRoot.Icon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe88a;" Color="{StaticResource TabIcon}" Size="24" />
+            </nalu:ScaffoldRoot.Icon>
+            <nalu:ScaffoldRoot.SelectedIcon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe88a;" Color="{StaticResource Accent}" Size="24" />
+            </nalu:ScaffoldRoot.SelectedIcon>
+        </nalu:ScaffoldRoot>
+
+        <nalu:ScaffoldRoot Title="Settings" PageType="{x:Type pages:SettingsPage}">
+            <nalu:ScaffoldRoot.Icon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe8b8;" Color="{StaticResource TabIcon}" Size="24" />
+            </nalu:ScaffoldRoot.Icon>
+            <nalu:ScaffoldRoot.SelectedIcon>
+                <FontImageSource FontFamily="Material" Glyph="&#xe8b8;" Color="{StaticResource Accent}" Size="24" />
+            </nalu:ScaffoldRoot.SelectedIcon>
+        </nalu:ScaffoldRoot>
+    </nalu:ScaffoldTabBar>
+
+</nalu:Scaffold>

@@ -9,6 +9,7 @@
       "Source\\Nalu.Maui.Navigation\\Nalu.Maui.Navigation.csproj",
       "Source\\Nalu.Maui.Navigation.SourceGenerators\\Nalu.Maui.Navigation.SourceGenerators.csproj",
       "Source\\Nalu.Maui.Scaffold\\Nalu.Maui.Scaffold.csproj",
+      "Templates\\Nalu.Maui.Templates\\Nalu.Maui.Templates.csproj",
       "Source\\Nalu.Maui.Scaffold.SourceGenerators\\Nalu.Maui.Scaffold.SourceGenerators.csproj",
       "Tests\\Nalu.Maui.Test\\Nalu.Maui.Test.csproj",
       "Tests\\Nalu.Maui.Navigation.SourceGenerators.Test\\Nalu.Maui.Navigation.SourceGenerators.Test.csproj",

@@ -23,6 +23,7 @@ A complete replacement for MAUI `Shell` on **iOS and Android** where **every pie
 Because the Scaffold *hosts* Nalu navigation, every interaction — tab tap, back gesture, flyout selection — routes through the engine: guards, lifecycle and intents always run, and [state restoration](conceptual_docs/navigation-restore.md) lands your users exactly where they left off after a restart.
 
 - 📦 **Available on [NuGet.org](https://www.nuget.org/packages/Nalu.Maui.Scaffold/)**: `dotnet add package Nalu.Maui.Scaffold`. `Nalu.Maui.Navigation` keeps working with MAUI `Shell` exactly as before: the Scaffold is an **additional host**, not a breaking change.
+- 🚀 **New app?** Start from the template: `dotnet new install Nalu.Maui.Templates`, then `dotnet new maui-nalu-scaffold -n MyApp` — tab bar, model-first navigation, a shared-element transition and predictive back already wired.
 - 📖 Docs: [Overview](conceptual_docs/scaffold.md) · [Structure & Tab Bar](conceptual_docs/scaffold-structure.md) · [Nav Bar](conceptual_docs/scaffold-navbar.md) · [Flyouts](conceptual_docs/scaffold-flyout.md) · [Popups & Sheets](conceptual_docs/scaffold-overlays.md) · [Transitions](conceptual_docs/scaffold-transitions.md) · [Migrating from NaluShell](conceptual_docs/scaffold-migration.md)
 
 ### See it in motion

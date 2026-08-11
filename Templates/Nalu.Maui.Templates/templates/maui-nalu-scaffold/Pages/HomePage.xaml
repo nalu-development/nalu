@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:pm="clr-namespace:MauiNaluApp.PageModels"
+             x:Class="MauiNaluApp.Pages.HomePage"
+             x:DataType="pm:HomePageModel"
+             nalu:Scaffold.ScrollTracker="{x:Reference HomeScroll}"
+             nalu:Scaffold.ScrollRampStart="40"
+             nalu:Scaffold.ScrollRampEnd="160"
+             SafeAreaEdges="None"
+             Title="Home">
+
+    <!-- Scroll-driven chrome, fully declarative: the page declares its interpolation ramp
+         ONCE (ScrollRampStart/ScrollRampEnd above) and every {ScrollValue}/{ThemeScrollValue}
+         below rides it. Here the nav bar rests blended with the page background and
+         materializes into a card surface as content scrolls under it. -->
+    <nalu:Scaffold.NavBarAppearance>
+        <nalu:ScaffoldNavBarAppearance
+            Background="{nalu:ThemeScrollValue FromLight={StaticResource BackgroundLight},
+                                               ToLight={StaticResource CardLight},
+                                               FromDark={StaticResource BackgroundDark},
+                                               ToDark={StaticResource CardDark}}" />
+    </nalu:Scaffold.NavBarAppearance>
+
+    <ScrollView x:Name="HomeScroll">
+        <VerticalStackLayout Padding="24,32" Spacing="24">
+
+            <!-- Shared element AND parallax layer in one: the same TransitionName on the
+                 DetailPage's logo makes this image FLY between the two pages, while the
+                 ScrollValue on TranslationY moves it at HALF scroll speed (a range mapping
+                 with Extrapolate=Extend is a speed factor: To/RampEnd = 0.5) so the content
+                 below slides over it — and the Opacity ramp gently fades it away. -->
+            <Image nalu:Scaffold.TransitionName="nalu-logo"
+                   Source="nalu_logo.png"
+                   HeightRequest="96"
+                   WidthRequest="96"
+                   HorizontalOptions="Center"
+                   TranslationY="{nalu:ScrollValue RampStart=0, RampEnd=100, From=0, To=50, Extrapolate=Extend}"
+                   Opacity="{nalu:ScrollValue RampStart=0, RampEnd=220, From=1, To=0}" />
+
+            <Label Text="Hello from Nalu!"
+                   Style="{StaticResource SectionTitle}"
+                   FontSize="28"
+                   HorizontalOptions="Center" />
+
+            <Label Text="This page is hosted by the Nalu Scaffold: the tab bar, the nav bar and the page transitions are all MAUI views drawn by Nalu."
+                   Style="{StaticResource Muted}"
+                   HorizontalTextAlignment="Center" />
+
+            <Button Text="{Binding CounterLabel}"
+                    Command="{Binding IncrementCounterCommand}"
+                    HorizontalOptions="Center" />
+
+            <Button Text="Open detail page"
+                    Command="{Binding OpenDetailCommand}"
+                    HorizontalOptions="Center" />
+
+            <Label Text="Scroll down for a little magic ↓"
+                   Style="{StaticResource Muted}"
+                   HorizontalOptions="Center"
+                   Margin="0,16,0,0" />
+
+            <!-- Scroll fodder with a purpose: what you get out of the box. Watch the nav bar
+                 materialize and the logo drift away at half speed while these slide over it. -->
+            <Border Style="{StaticResource Card}" Padding="20,16">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="&#xe88a;" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" />
+                    <Label Text="Pure-MAUI chrome" FontFamily="SemiBold" FontSize="16" />
+                    <Label Text="The tab bar and nav bar are ordinary MAUI views: style them with XAML, no platform theming required."
+                           Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="20,16">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="&#xe8df;" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" />
+                    <Label Text="Shared-element transitions" FontFamily="SemiBold" FontSize="16" />
+                    <Label Text="The logo above flies onto the detail page: one attached property on both ends, Nalu animates position and size."
+                           Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="20,16">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="&#xe8b5;" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" />
+                    <Label Text="Predictive back" FontFamily="SemiBold" FontSize="16" />
+                    <Label Text="On Android 14+, the back gesture previews the pop — including the shared element flying home in reverse."
+                           Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="20,16">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="&#xe81a;" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" />
+                    <Label Text="Scroll-driven effects" FontFamily="SemiBold" FontSize="16" />
+                    <Label Text="This nav bar materialization and the logo parallax are plain markup: {ScrollValue} on any numeric, Color or Brush property."
+                           Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="20,16">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="&#xe6b1;" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" />
+                    <Label Text="State-preserving tabs" FontFamily="SemiBold" FontSize="16" />
+                    <Label Text="Each tab hosts its own navigation stack: push a detail here, visit Settings and come back — nothing is lost."
+                           Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="20,16">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="&#xe8b8;" FontFamily="Material" FontSize="22" TextColor="{StaticResource Accent}" />
+                    <Label Text="Type-safe navigation" FontFamily="SemiBold" FontSize="16" />
+                    <Label Text="Nav.Push&lt;DetailPageModel&gt;() resolves pages through dependency injection and drives the model lifecycle for you."
+                           Style="{StaticResource Muted}" />
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
