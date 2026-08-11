@@ -99,6 +99,23 @@ windows included) switches to the new back dispatch and stops receiving the lega
   for non-Shell window content — so the Scaffold pumps the event itself: delegates run first
   (a consumer wins over every Scaffold concern), and when nothing at all consumes, the press is
   re-dispatched below, exactly like MAUI's own handling.
+- **SDKs that capture back with a permanently-enabled callback** (typically analytics/
+  guide SDKs): a callback that is always enabled and only overrides `HandleOnBackPressed`
+  breaks the predictive scrub for the whole app when it happens to sit topmost — so the
+  Scaffold deliberately stays above it, and such an SDK then only receives the presses
+  nothing else consumes. To keep feeding it every back press, bridge it from the app with an
+  observing delegate — the Scaffold invokes these first, on every press, including the ones
+  that pop pages:
+
+  ```csharp
+  builder.ConfigureLifecycleEvents(events => events.AddAndroid(android =>
+      android.OnBackPressed(activity =>
+      {
+          // Forward to your SDK's tracking API here.
+          return false; // observe, never consume
+      })));
+  ```
+
 - **Third-party popups hosted in their own window** (some vendors present popups as separate
   focusable windows): while such a popup is focused, the system delivers back to *that*
   window — if the vendor never registered an `OnBackInvokedCallback` there, back does nothing.
