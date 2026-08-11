@@ -170,17 +170,29 @@ public partial class Scaffold
 
     internal void HandleSystemBack()
     {
-        // The app's OnBackPressed lifecycle delegates get the FIRST chance, exactly as they
-        // do under MAUI's own activity handling: a popup framework that consumes here (e.g.
-        // closing its topmost popup) wins over every Scaffold concern.
+        // A predictive-back preview in flight is a page-back the user ALREADY committed to with
+        // the gesture — it takes priority over every other concern, and deliberately does NOT
+        // consult the lifecycle delegates below. Those delegates model the MAUI "first chance to
+        // intercept back" contract, but a predictive preview only ever exists for an unguarded
+        // page (ILeavingGuard pages never preview) with no Nalu overlay open (StartBackPreview
+        // bails on HasOverlay), and a foreign popup would own its own focused window — so there
+        // is nothing here for a delegate to veto, and letting one (e.g. an analytics SDK that
+        // returns handled) cancel the settle would snap the committed page back instead of
+        // completing the exit. The preview settles forward and dispatches the pop through the
+        // engine with a handoff (the sync adopts the settled state).
+        if (Presenter is ScaffoldPresenter { HasBackPreview: true } previewPresenter)
+        {
+            Dispatcher.Dispatch(() => previewPresenter.CommitBackPreviewAsync().FireAndForget(Handler));
+
+            return;
+        }
+
+        // No preview (button/key back, or a guarded page): the app's OnBackPressed lifecycle
+        // delegates get the FIRST chance, exactly as they do under MAUI's own activity handling —
+        // a popup framework that consumes here (e.g. closing its topmost popup) wins over every
+        // Scaffold concern.
         if (InvokeBackPressedLifecycleDelegates())
         {
-            // A scrub was previewing the page pop that will now not happen: reverse it home.
-            if (Presenter is ScaffoldPresenter { HasBackPreview: true } canceledPresenter)
-            {
-                canceledPresenter.CancelBackPreview();
-            }
-
             return;
         }
 
@@ -189,15 +201,6 @@ public partial class Scaffold
         if (Presenter is { HasOverlay: true } presenter)
         {
             Dispatcher.Dispatch(() => presenter.CloseTopOverlayAsync().FireAndForget(Handler));
-
-            return;
-        }
-
-        // A predictive-back preview settles its own visuals forward and dispatches the pop
-        // through the engine with a handoff (the sync adopts the settled state).
-        if (Presenter is ScaffoldPresenter { HasBackPreview: true } previewPresenter)
-        {
-            Dispatcher.Dispatch(() => previewPresenter.CommitBackPreviewAsync().FireAndForget(Handler));
 
             return;
         }
