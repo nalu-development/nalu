@@ -16,9 +16,9 @@ namespace Nalu;
 // ReSharper disable UnusedParameter.Local
 
 /// <summary>
-/// Locally-defined partial subclass of <see cref="ContentPanel" /> so the CsWinRT source
-/// generator can emit its WinRT ABI code (instantiating the MAUI type directly raises
-/// CsWinRT1030 and would require AllowUnsafeBlocks) — same pattern as <c>ViewBoxPanel</c>.
+/// Locally-defined partial subclass of <see cref="ContentPanel" /> (same pattern as
+/// <c>ViewBoxPanel</c>); the csproj enables AllowUnsafeBlocks on Windows so CsWinRT can
+/// generate the ABI marshalling code for it (CsWinRT1030).
 /// </summary>
 internal partial class ScrollBoxContentPanel : ContentPanel;
 
