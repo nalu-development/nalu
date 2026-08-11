@@ -47,6 +47,17 @@ title, parallax — and the status-bar icons flipping to match. All declarative.
 
 ## Quick Start
 
+The fastest start is the **`dotnet new` template** — a ready-to-run app hosted by the
+Scaffold, with model-first navigation, a tab bar, a shared-element transition and predictive
+back already wired:
+
+```bash
+dotnet new install Nalu.Maui.Templates
+dotnet new maui-nalu-scaffold -n MyApp
+```
+
+To add the Scaffold to an existing app instead, follow the steps below.
+
 ### 1. Installation
 
 ```bash

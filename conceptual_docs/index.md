@@ -74,7 +74,12 @@ that automatically contrast with your UI — identical on iOS and Android, all e
 ```
 
 Available on [NuGet.org](https://www.nuget.org/packages/Nalu.Maui.Scaffold/):
-`dotnet add package Nalu.Maui.Scaffold`.
+`dotnet add package Nalu.Maui.Scaffold` — or start from the ready-to-run template:
+
+```bash
+dotnet new install Nalu.Maui.Templates
+dotnet new maui-nalu-scaffold -n MyApp
+```
 
 **See more on the [Scaffold Wiki](scaffold.md)** — including the
 [NaluShell migration guide](scaffold-migration.md).
