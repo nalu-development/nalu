@@ -1,14 +1,26 @@
 using Microsoft.Maui.Platform;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Nalu.Internals;
+
+// The WinUI controls namespace is deliberately NOT imported wholesale: it makes
+// ScrollBarVisibility and ScrollMode ambiguous with the MAUI types of the same name.
 using PlatformView = Microsoft.UI.Xaml.FrameworkElement;
-using WVisibility = Microsoft.UI.Xaml.Visibility;
+using ScrollViewer = Microsoft.UI.Xaml.Controls.ScrollViewer;
+using ScrollViewerViewChangedEventArgs = Microsoft.UI.Xaml.Controls.ScrollViewerViewChangedEventArgs;
+using WScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility;
+using WScrollMode = Microsoft.UI.Xaml.Controls.ScrollMode;
 
 namespace Nalu;
 
 #pragma warning disable IDE0060
 // ReSharper disable UnusedParameter.Local
+
+/// <summary>
+/// Locally-defined partial subclass of <see cref="ContentPanel" /> so the CsWinRT source
+/// generator can emit its WinRT ABI code (instantiating the MAUI type directly raises
+/// CsWinRT1030 and would require AllowUnsafeBlocks) — same pattern as <c>ViewBoxPanel</c>.
+/// </summary>
+internal partial class ScrollBoxContentPanel : ContentPanel;
 
 /// <summary>
 /// Handler for the <see cref="ScrollBox" /> view on Windows.
@@ -29,7 +41,7 @@ public partial class ScrollBoxHandler
     /// <inheritdoc />
     protected override PlatformView CreatePlatformView()
     {
-        _contentPanel = new ContentPanel
+        _contentPanel = new ScrollBoxContentPanel
         {
             CrossPlatformLayout = VirtualView
         };
@@ -198,8 +210,8 @@ public partial class ScrollBoxHandler
 
         var horizontal = scrollBox.Orientation == ScrollBoxOrientation.Horizontal;
 
-        scrollViewer.VerticalScrollMode = horizontal ? ScrollMode.Disabled : ScrollMode.Enabled;
-        scrollViewer.HorizontalScrollMode = horizontal ? ScrollMode.Enabled : ScrollMode.Disabled;
+        scrollViewer.VerticalScrollMode = horizontal ? WScrollMode.Disabled : WScrollMode.Enabled;
+        scrollViewer.HorizontalScrollMode = horizontal ? WScrollMode.Enabled : WScrollMode.Disabled;
 
         if (!handler.IsConnecting)
         {
@@ -225,13 +237,13 @@ public partial class ScrollBoxHandler
 
         if (scrollBox.IsScrollEnabled)
         {
-            scrollViewer.VerticalScrollMode = horizontal ? ScrollMode.Disabled : ScrollMode.Enabled;
-            scrollViewer.HorizontalScrollMode = horizontal ? ScrollMode.Enabled : ScrollMode.Disabled;
+            scrollViewer.VerticalScrollMode = horizontal ? WScrollMode.Disabled : WScrollMode.Enabled;
+            scrollViewer.HorizontalScrollMode = horizontal ? WScrollMode.Enabled : WScrollMode.Disabled;
         }
         else
         {
-            scrollViewer.VerticalScrollMode = ScrollMode.Disabled;
-            scrollViewer.HorizontalScrollMode = ScrollMode.Disabled;
+            scrollViewer.VerticalScrollMode = WScrollMode.Disabled;
+            scrollViewer.HorizontalScrollMode = WScrollMode.Disabled;
         }
     }
 
@@ -247,14 +259,14 @@ public partial class ScrollBoxHandler
 
         var visibility = scrollBox.ScrollBarVisibility switch
         {
-            ScrollBarVisibility.Always => Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Visible,
-            ScrollBarVisibility.Never => Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Hidden,
-            _ => Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Auto
+            ScrollBarVisibility.Always => WScrollBarVisibility.Visible,
+            ScrollBarVisibility.Never => WScrollBarVisibility.Hidden,
+            _ => WScrollBarVisibility.Auto
         };
 
         var horizontal = scrollBox.Orientation == ScrollBoxOrientation.Horizontal;
-        scrollViewer.VerticalScrollBarVisibility = horizontal ? Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Disabled : visibility;
-        scrollViewer.HorizontalScrollBarVisibility = horizontal ? visibility : Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Disabled;
+        scrollViewer.VerticalScrollBarVisibility = horizontal ? WScrollBarVisibility.Disabled : visibility;
+        scrollViewer.HorizontalScrollBarVisibility = horizontal ? visibility : WScrollBarVisibility.Disabled;
     }
 
     /// <summary>
