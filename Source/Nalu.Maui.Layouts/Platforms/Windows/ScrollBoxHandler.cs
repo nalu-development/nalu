@@ -1,0 +1,382 @@
+using Microsoft.Maui.Platform;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Nalu.Internals;
+using PlatformView = Microsoft.UI.Xaml.FrameworkElement;
+using WVisibility = Microsoft.UI.Xaml.Visibility;
+
+namespace Nalu;
+
+#pragma warning disable IDE0060
+// ReSharper disable UnusedParameter.Local
+
+/// <summary>
+/// Handler for the <see cref="ScrollBox" /> view on Windows.
+/// </summary>
+/// <remarks>
+/// Pull-to-refresh and the fading edge are not supported on Windows: the properties are accepted
+/// but inactive, mirroring Nalu.Maui.VirtualScroll.
+/// </remarks>
+public partial class ScrollBoxHandler
+{
+    private ScrollViewer? _scrollViewer;
+    private ContentPanel? _contentPanel;
+    private bool _wasScrolling;
+    private ScrollBoxScrollToRequest? _pendingScrollToRequest;
+    private ScrollBoxScrollToRequest? _activeScrollToRequest;
+    private bool _scrollEventsEnabled;
+
+    /// <inheritdoc />
+    protected override PlatformView CreatePlatformView()
+    {
+        _contentPanel = new ContentPanel
+        {
+            CrossPlatformLayout = VirtualView
+        };
+
+        _scrollViewer = new ScrollViewer
+        {
+            Content = _contentPanel
+        };
+
+        _scrollViewer.Loaded += OnScrollViewerLoaded;
+        _contentPanel.SizeChanged += OnContentPanelSizeChanged;
+
+        return _scrollViewer;
+    }
+
+    /// <inheritdoc />
+    protected override void DisconnectHandler(PlatformView platformView)
+    {
+        _pendingScrollToRequest?.Complete();
+        _pendingScrollToRequest = null;
+        _activeScrollToRequest?.Complete();
+        _activeScrollToRequest = null;
+
+        if (_scrollViewer is not null)
+        {
+            _scrollViewer.Loaded -= OnScrollViewerLoaded;
+            _scrollViewer.ViewChanged -= OnScrollViewerViewChanged;
+        }
+
+        if (_contentPanel is not null)
+        {
+            _contentPanel.SizeChanged -= OnContentPanelSizeChanged;
+        }
+
+        _contentPanel = null;
+        _scrollViewer = null;
+
+        base.DisconnectHandler(platformView);
+    }
+
+    private void OnScrollViewerLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_scrollViewer is not { } scrollViewer)
+        {
+            return;
+        }
+
+        scrollViewer.Loaded -= OnScrollViewerLoaded;
+        scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.VerticalOffsetProperty, OnScrollOffsetChanged);
+        scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.HorizontalOffsetProperty, OnScrollOffsetChanged);
+        scrollViewer.ViewChanged += OnScrollViewerViewChanged;
+    }
+
+    private (double ScrollX, double ScrollY, double TotalWidth, double TotalHeight) GetScrollValues(ScrollViewer scrollViewer)
+        => (
+            scrollViewer.HorizontalOffset,
+            scrollViewer.VerticalOffset,
+            scrollViewer.ExtentWidth,
+            scrollViewer.ExtentHeight
+        );
+
+    private void OnScrollOffsetChanged(DependencyObject sender, DependencyProperty dp)
+    {
+        if (_scrollViewer is not { } scrollViewer)
+        {
+            return;
+        }
+
+        var (scrollX, scrollY, totalWidth, totalHeight) = GetScrollValues(scrollViewer);
+        var controller = VirtualView as IScrollBoxController;
+
+        if (!_wasScrolling)
+        {
+            _wasScrolling = true;
+            controller?.ScrollStarted(scrollX, scrollY, totalWidth, totalHeight);
+        }
+
+        if (_scrollEventsEnabled)
+        {
+            controller?.Scrolled(scrollX, scrollY, totalWidth, totalHeight);
+        }
+    }
+
+    private void OnScrollViewerViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (_scrollViewer is not { } scrollViewer || e.IsIntermediate)
+        {
+            return;
+        }
+
+        var (scrollX, scrollY, totalWidth, totalHeight) = GetScrollValues(scrollViewer);
+
+        if (_wasScrolling)
+        {
+            _wasScrolling = false;
+            (VirtualView as IScrollBoxController)?.ScrollEnded(scrollX, scrollY, totalWidth, totalHeight);
+        }
+        else
+        {
+            (VirtualView as ScrollBox)?.UpdateScrollPosition(scrollX, scrollY);
+        }
+
+        _activeScrollToRequest?.Complete();
+        _activeScrollToRequest = null;
+    }
+
+    private void OnContentPanelSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        OnContentLaidOut(e.NewSize.Width, e.NewSize.Height);
+
+        if (_pendingScrollToRequest is { } pending && _scrollViewer is { ActualWidth: > 0 })
+        {
+            _pendingScrollToRequest = null;
+            ExecuteScrollToRequest(pending);
+        }
+    }
+
+    internal ScrollBoxGeometry? GetGeometry()
+    {
+        if (_scrollViewer is not { } scrollViewer || _contentPanel is not { } panel)
+        {
+            return null;
+        }
+
+        return new ScrollBoxGeometry(
+            scrollViewer.ActualWidth,
+            scrollViewer.ActualHeight,
+            scrollViewer.ViewportWidth,
+            scrollViewer.ViewportHeight,
+            panel.ActualWidth,
+            panel.ActualHeight,
+            scrollViewer.HorizontalOffset,
+            scrollViewer.VerticalOffset
+        );
+    }
+
+    #region Mappers
+
+    /// <summary>
+    /// Maps the content property from the scroll box to the platform content panel.
+    /// </summary>
+    public static void MapContent(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        if (handler._contentPanel is not { } panel)
+        {
+            return;
+        }
+
+        panel.Children.Clear();
+
+        if (scrollBox.PresentedContent is { } content && handler.MauiContext is { } mauiContext)
+        {
+            panel.Children.Add(content.ToPlatform(mauiContext));
+        }
+    }
+
+    /// <summary>
+    /// Maps the orientation to the platform scroll viewer.
+    /// </summary>
+    public static void MapOrientation(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        if (handler._scrollViewer is not { } scrollViewer)
+        {
+            return;
+        }
+
+        var horizontal = scrollBox.Orientation == ScrollBoxOrientation.Horizontal;
+
+        scrollViewer.VerticalScrollMode = horizontal ? ScrollMode.Disabled : ScrollMode.Enabled;
+        scrollViewer.HorizontalScrollMode = horizontal ? ScrollMode.Enabled : ScrollMode.Disabled;
+
+        if (!handler.IsConnecting)
+        {
+            scrollViewer.ChangeView(0, 0, null, disableAnimation: true);
+            (scrollBox as ScrollBox)?.UpdateScrollPosition(0, 0);
+        }
+
+        MapScrollBarVisibility(handler, scrollBox);
+        MapIsScrollEnabled(handler, scrollBox);
+    }
+
+    /// <summary>
+    /// Maps the scroll gestures enablement to the platform scroll viewer.
+    /// </summary>
+    public static void MapIsScrollEnabled(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        if (handler._scrollViewer is not { } scrollViewer)
+        {
+            return;
+        }
+
+        var horizontal = scrollBox.Orientation == ScrollBoxOrientation.Horizontal;
+
+        if (scrollBox.IsScrollEnabled)
+        {
+            scrollViewer.VerticalScrollMode = horizontal ? ScrollMode.Disabled : ScrollMode.Enabled;
+            scrollViewer.HorizontalScrollMode = horizontal ? ScrollMode.Enabled : ScrollMode.Disabled;
+        }
+        else
+        {
+            scrollViewer.VerticalScrollMode = ScrollMode.Disabled;
+            scrollViewer.HorizontalScrollMode = ScrollMode.Disabled;
+        }
+    }
+
+    /// <summary>
+    /// Maps the scroll bar visibility to the platform scroll viewer.
+    /// </summary>
+    public static void MapScrollBarVisibility(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        if (handler._scrollViewer is not { } scrollViewer)
+        {
+            return;
+        }
+
+        var visibility = scrollBox.ScrollBarVisibility switch
+        {
+            ScrollBarVisibility.Always => Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Visible,
+            ScrollBarVisibility.Never => Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Hidden,
+            _ => Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Auto
+        };
+
+        var horizontal = scrollBox.Orientation == ScrollBoxOrientation.Horizontal;
+        scrollViewer.VerticalScrollBarVisibility = horizontal ? Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Disabled : visibility;
+        scrollViewer.HorizontalScrollBarVisibility = horizontal ? visibility : Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Disabled;
+    }
+
+    /// <summary>
+    /// Not supported on Windows: the fading edge is accepted but inactive.
+    /// </summary>
+    public static void MapFadingEdgeLength(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        // Not supported on Windows.
+    }
+
+    private partial void UpdateFillViewport(IScrollBox scrollBox)
+    {
+        // The WinUI ScrollViewer content presenter already stretches short content to the
+        // viewport; a hugging box is content-sized so no switch is needed.
+    }
+
+    /// <summary>
+    /// Not supported on Windows: pull-to-refresh is accepted but inactive.
+    /// </summary>
+    public static void MapIsRefreshEnabled(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        // Not supported on Windows.
+    }
+
+    /// <summary>
+    /// Not supported on Windows: pull-to-refresh is accepted but inactive.
+    /// </summary>
+    public static void MapIsRefreshing(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        // Not supported on Windows.
+    }
+
+    /// <summary>
+    /// Not supported on Windows: pull-to-refresh is accepted but inactive.
+    /// </summary>
+    public static void MapRefreshAccentColor(ScrollBoxHandler handler, IScrollBox scrollBox)
+    {
+        // Not supported on Windows.
+    }
+
+    /// <summary>
+    /// Maps the ScrollTo command to the platform scroll viewer.
+    /// </summary>
+    public static void MapScrollTo(ScrollBoxHandler handler, IScrollBox scrollBox, object? args)
+    {
+        if (args is not ScrollBoxScrollToRequest request)
+        {
+            return;
+        }
+
+        // A newer request supersedes queued or in-flight ones (their tasks still complete).
+        handler._pendingScrollToRequest?.Complete();
+        handler._pendingScrollToRequest = null;
+        handler._activeScrollToRequest?.Complete();
+        handler._activeScrollToRequest = null;
+
+        if (handler._scrollViewer is not { } scrollViewer)
+        {
+            request.Complete();
+
+            return;
+        }
+
+        if (scrollViewer.ActualWidth <= 0 && scrollViewer.ActualHeight <= 0)
+        {
+            // Before the first layout pass there is nothing to scroll yet: queue the request,
+            // executed from the first content size change.
+            handler._pendingScrollToRequest = request;
+
+            return;
+        }
+
+        handler.ExecuteScrollToRequest(request);
+    }
+
+    private void ExecuteScrollToRequest(ScrollBoxScrollToRequest request)
+    {
+        if (_scrollViewer is not { } scrollViewer)
+        {
+            request.Complete();
+
+            return;
+        }
+
+        var targetX = Math.Clamp(request.X, 0, scrollViewer.ScrollableWidth);
+        var targetY = Math.Clamp(request.Y, 0, scrollViewer.ScrollableHeight);
+
+        if (Math.Abs(scrollViewer.HorizontalOffset - targetX) < 0.5 && Math.Abs(scrollViewer.VerticalOffset - targetY) < 0.5)
+        {
+            request.Complete();
+
+            return;
+        }
+
+        if (request.Animated)
+        {
+            _activeScrollToRequest = request;
+
+            if (!scrollViewer.ChangeView(targetX, targetY, null, disableAnimation: false))
+            {
+                _activeScrollToRequest = null;
+                request.Complete();
+            }
+        }
+        else
+        {
+            scrollViewer.ChangeView(targetX, targetY, null, disableAnimation: true);
+            (VirtualView as ScrollBox)?.UpdateScrollPosition(scrollViewer.HorizontalOffset, scrollViewer.VerticalOffset);
+            request.Complete();
+        }
+    }
+
+    /// <summary>
+    /// Maps the scroll event enabled state to the platform scroll listener.
+    /// </summary>
+    public static void MapSetScrollEventEnabled(ScrollBoxHandler handler, IScrollBox scrollBox, object? args)
+    {
+        if (args is bool enabled)
+        {
+            handler._scrollEventsEnabled = enabled;
+        }
+    }
+
+    #endregion
+}

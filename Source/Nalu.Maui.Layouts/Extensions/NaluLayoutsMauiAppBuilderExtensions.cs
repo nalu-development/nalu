@@ -21,6 +21,9 @@ public static class NaluLayoutsMauiAppBuilderExtensions
             {
                 handlers.AddHandler<IViewBox, ViewBoxHandler>();
                 handlers.AddHandler<SlideBox, SlideBoxHandler>();
+#if IOS || MACCATALYST || ANDROID || WINDOWS
+                handlers.AddHandler<ScrollBox, ScrollBoxHandler>();
+#endif
             }
         );
 
