@@ -119,7 +119,15 @@ windows included) switches to the new back dispatch and stops receiving the lega
           return;
       }
 
-      _popupBackCallback = new PopupBackCallback(() => ClosePopup());
+      _popupBackCallback = new PopupBackCallback(() =>
+      {
+          // Close through your vendor's API — or stay vendor-agnostic and synthesize the
+          // legacy key the popup's window still understands (verified against DevExpress
+          // dropdown windows on Android 16):
+          var now = Android.OS.SystemClock.UptimeMillis();
+          view.DispatchKeyEvent(new(now, now, Android.Views.KeyEventActions.Down, Android.Views.Keycode.Back, 0));
+          view.DispatchKeyEvent(new(now, now, Android.Views.KeyEventActions.Up, Android.Views.Keycode.Back, 0));
+      });
       dispatcher.RegisterOnBackInvokedCallback(0 /* PRIORITY_DEFAULT */, _popupBackCallback);
   }
 
