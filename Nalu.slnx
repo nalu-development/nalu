@@ -57,6 +57,9 @@
     <Project Path="Source/Nalu.Maui.Scaffold.SourceGenerators/Nalu.Maui.Scaffold.SourceGenerators.csproj" />
     <Project Path="Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj" />
   </Folder>
+  <Folder Name="/Templates/">
+    <Project Path="Templates/Nalu.Maui.Templates/Nalu.Maui.Templates.csproj" />
+  </Folder>
   <Folder Name="/Tests/">
     <File Path="Tests/.editorconfig" />
     <File Path="Tests/Directory.Build.props" />

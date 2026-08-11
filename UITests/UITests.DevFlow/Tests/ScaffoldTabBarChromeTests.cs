@@ -240,4 +240,39 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         var finalProbe = await App.WaitForStableBoundsAsync("BottomProbeAlpha");
         (finalProbe.Y + finalProbe.Height).Should().BeLessThanOrEqualTo(barBounds.Y + 1, "the bottom probe must settle above the tab bar");
     }
+
+    [Fact(Skip = "Upstream MAUI Android bug: a Border nested inside a shadowed Border (the bar pill) never repaints "
+                 + "when its Background brush mutates in place, which is what AppThemeBinding does on UserAppTheme changes. "
+                 + "Re-enable when https://github.com/dotnet/maui/issues/37289 is fixed and the MAUI version is bumped.")]
+    public async Task InAppThemeChangeRepaintsSelectionPill()
+    {
+        await WaitDisplayedAsync("TabPageAlpha");
+        await SelectTabAsync("TabBravo", "TabPageBravo");
+
+        try
+        {
+            // Baseline: the selected pill paints the harness style's LIGHT AppThemeBinding
+            // value (the sample point sits inside the pill, left of the centered icon).
+            await App.WaitForPixelColorAsync("TabBravo", 10, 30, c => IsClose(c, 0xE4, 0xEB, 0xFD));
+
+            // App-scope theme change (UserAppTheme): the shared style brush mutates IN PLACE.
+            // Regression: on Android the chrome hosting chain swallowed the child-level damage,
+            // so the pill kept the previous theme's pixels (MAUI state and even the native
+            // drawable paint were correct) until some unrelated global sweep redrew the strip.
+            await App.TapAsync("ToggleThemeBravo");
+            await App.WaitForPixelColorAsync("TabBravo", 10, 30, c => IsClose(c, 0x22, 0x30, 0x50));
+
+            // And back: both directions must repaint live.
+            await App.TapAsync("ToggleThemeBravo");
+            await App.WaitForPixelColorAsync("TabBravo", 10, 30, c => IsClose(c, 0xE4, 0xEB, 0xFD));
+        }
+        finally
+        {
+            // Never leak a forced theme into the next test.
+            await App.TapAsync("ResetThemeBravo");
+        }
+    }
+
+    private static bool IsClose((byte R, byte G, byte B) c, byte r, byte g, byte b)
+        => Math.Abs(c.R - r) < 20 && Math.Abs(c.G - g) < 20 && Math.Abs(c.B - b) < 20;
 }

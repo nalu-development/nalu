@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
+             xmlns:pm="clr-namespace:MauiNaluApp.PageModels"
+             x:Class="MauiNaluApp.Pages.DetailPage"
+             x:DataType="pm:DetailPageModel"
+             Title="Detail">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,32" Spacing="24">
+
+            <!-- The shared-element twin of the HomePage logo: same TransitionName, bigger
+                 size — Nalu animates position AND size during the flight. -->
+            <Image nalu:Scaffold.TransitionName="nalu-logo"
+                   Source="nalu_logo.png"
+                   HeightRequest="160"
+                   WidthRequest="160"
+                   HorizontalOptions="Center" />
+
+            <Label Text="A pushed page"
+                   Style="{StaticResource SectionTitle}"
+                   FontSize="24"
+                   HorizontalOptions="Center" />
+
+            <Label Text="This page was pushed onto the Home tab's navigation stack with Nav.Push. The back button in the nav bar, the iOS edge swipe and the Android predictive back gesture all pop it through the same navigation engine."
+                   Style="{StaticResource Muted}"
+                   HorizontalTextAlignment="Center" />
+
+            <Button Text="Go back"
+                    Command="{Binding GoBackCommand}"
+                    HorizontalOptions="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

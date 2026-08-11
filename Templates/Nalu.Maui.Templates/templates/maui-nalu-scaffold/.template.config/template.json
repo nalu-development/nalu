@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Alberto Aldegheri",
+  "classifications": [ "MAUI", "Android", "iOS", "Mobile", "Nalu" ],
+  "identity": "Nalu.Maui.Scaffold.App.CSharp",
+  "groupIdentity": "Nalu.Maui.Scaffold.App",
+  "precedence": "10000",
+  "name": ".NET MAUI App (Nalu Scaffold)",
+  "description": "A .NET MAUI application for iOS and Android hosted by the Nalu Scaffold (tab bar, nav bar, transitions, overlays) with Nalu model-first navigation.",
+  "shortName": "maui-nalu-scaffold",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "MauiNaluApp",
+  "preferNameDirectory": true,
+  "defaultName": "NaluApp1",
+  "primaryOutputs": [
+    {
+      "path": "MauiNaluApp.csproj"
+    }
+  ],
+  "sources": [
+    {
+      "source": "./",
+      "target": "./",
+      "copyOnly": [ "**/*.svg", "**/*.ttf" ]
+    }
+  ],
+  "symbols": {
+    "applicationId": {
+      "type": "parameter",
+      "description": "Overrides the $(ApplicationId) in the project",
+      "datatype": "string"
+    },
+    "nameToLower": {
+      "type": "generated",
+      "generator": "casing",
+      "parameters": {
+        "source": "name",
+        "toLower": true
+      }
+    },
+    "nameToAppId": {
+      "type": "generated",
+      "generator": "regex",
+      "dataType": "string",
+      "parameters": {
+        "source": "nameToLower",
+        "steps": [
+          {
+            "regex": "[^a-z0-9_\\.]",
+            "replacement": ""
+          }
+        ]
+      }
+    },
+    "XmlEncodedAppNameParam": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "encode",
+      "replaces": "XmlEncodedAppName"
+    },
+    "defaultAppId": {
+      "type": "generated",
+      "generator": "join",
+      "parameters": {
+        "symbols": [
+          {
+            "type": "const",
+            "value": "com.companyname."
+          },
+          {
+            "type": "ref",
+            "value": "nameToAppId"
+          }
+        ]
+      }
+    },
+    "finalAppId": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "applicationId",
+        "fallbackVariableName": "defaultAppId"
+      },
+      "replaces": "com.companyname.naluscaffoldapp"
+    },
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "If specified, skips the automatic restore of the project on create.",
+      "defaultValue": "false"
+    }
+  },
+  "forms": {
+    "encode": {
+      "identifier": "xmlEncode"
+    }
+  },
+  "postActions": [
+    {
+      "id": "restore",
+      "condition": "(!skipRestore)",
+      "description": "Restore NuGet packages required by this project.",
+      "manualInstructions": [
+        {
+          "text": "Run 'dotnet restore'"
+        }
+      ],
+      "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    }
+  ]
+}

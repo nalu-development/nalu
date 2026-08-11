@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pm="clr-namespace:MauiNaluApp.PageModels"
+             x:Class="MauiNaluApp.Pages.SettingsPage"
+             x:DataType="pm:SettingsPageModel"
+             Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="24,32" Spacing="16">
+
+            <Border Style="{StaticResource Card}" Padding="20,4">
+                <Grid ColumnDefinitions="*,Auto" Padding="0,12">
+                    <Label Text="Version" VerticalOptions="Center" />
+                    <Label Grid.Column="1" Text="{Binding AppVersion}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                </Grid>
+            </Border>
+
+            <Label Text="Each tab hosts its own navigation stack: push a detail page on Home, switch here and back — the stack is preserved."
+                   Style="{StaticResource Muted}"
+                   Margin="4,8,4,0" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
