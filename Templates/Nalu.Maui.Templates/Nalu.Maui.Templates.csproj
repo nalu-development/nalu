@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup Label="Package">
+    <PackageId>Nalu.Maui.Templates</PackageId>
+    <PackageType>Template</PackageType>
+    <Product>Nalu.Maui.Templates</Product>
+    <Description>Project templates for Nalu.Maui: `dotnet new maui-nalu-scaffold` creates a .NET MAUI app hosted by the Nalu Scaffold with Nalu model-first navigation.</Description>
+    <PackageTags>MAUI;Nalu;Templates;dotnet-new</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build">
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- Template packages carry content only: no compiled output, no dependencies. -->
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <!-- .template.config folders start with a dot and would be dropped by default excludes. -->
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!-- Template content must never be compiled/embedded into this (empty) assembly. -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="templates\**" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <None Include="..\..\Images\Icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- The template's app csproj references Nalu packages as NALU_PACKAGE_VERSION; stamp the
+       version this repo is being packed as (MinVer), so every release ships a template that
+       pins that same release. -->
+  <!-- BeforeTargets must include _GetPackageFiles: that is where pack snapshots Content items;
+       by GenerateNuspec it is too late to swap the csproj. -->
+  <Target Name="StampNaluPackageVersion" BeforeTargets="_GetPackageFiles;GenerateNuspec" DependsOnTargets="MinVer">
+    <PropertyGroup>
+      <_TemplateAppCsproj>$(MSBuildThisFileDirectory)templates\maui-nalu-scaffold\MauiNaluApp.csproj</_TemplateAppCsproj>
+      <_StampedAppCsproj>$(IntermediateOutputPath)MauiNaluApp.csproj</_StampedAppCsproj>
+    </PropertyGroup>
+    <!-- MSBuild::Escape keeps the ; and % characters in the file content from being interpreted
+         as item separators/escapes, so the csproj is written back byte-for-byte (plus stamp). -->
+    <WriteLinesToFile File="$(_StampedAppCsproj)"
+                      Lines="$([MSBuild]::Escape($([System.IO.File]::ReadAllText('$(_TemplateAppCsproj)').Replace('NALU_PACKAGE_VERSION','$(PackageVersion)'))))"
+                      Overwrite="true" />
+    <ItemGroup>
+      <Content Remove="templates\maui-nalu-scaffold\MauiNaluApp.csproj" />
+      <Content Include="$(_StampedAppCsproj)" PackagePath="content/templates/maui-nalu-scaffold/MauiNaluApp.csproj" />
+    </ItemGroup>
+  </Target>
+
+</Project>

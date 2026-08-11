@@ -62,6 +62,24 @@ public abstract class TabPageBase : ContentPage
         stack.Add(NavPageFactory.MakeButton("Push detail", $"PushTabDetail{name}", model.PushDetail));
         stack.Add(NavPageFactory.MakeButton("Push auto detail", $"PushAutoDetail{name}", model.PushAutoDetail));
 
+        var toggleThemeButton = new Button { Text = "Toggle app theme", AutomationId = $"ToggleTheme{name}", FontSize = 11 };
+        toggleThemeButton.Clicked += (_, _) =>
+        {
+            // The app-scope path (NOT a system theme change): flips UserAppTheme like an
+            // in-app theme switcher would — AppThemeBindings re-resolve live, no activity
+            // recreation.
+            var application = Application.Current!;
+            application.UserAppTheme = (application.UserAppTheme == AppTheme.Unspecified ? application.RequestedTheme : application.UserAppTheme) == AppTheme.Dark
+                ? AppTheme.Light
+                : AppTheme.Dark;
+        };
+        stack.Add(toggleThemeButton);
+
+        var resetThemeButton = new Button { Text = "Reset app theme", AutomationId = $"ResetTheme{name}", FontSize = 11 };
+        resetThemeButton.Clicked += (_, _) => Application.Current!.UserAppTheme = AppTheme.Unspecified;
+        stack.Add(resetThemeButton);
+
+
         var toggleTabBarButton = new Button { Text = "Toggle tab bar", AutomationId = $"ToggleTabBar{name}", FontSize = 11 };
         toggleTabBarButton.Clicked += (_, _) => Scaffold.SetTabBarVisibility(
             this,
@@ -191,6 +209,21 @@ public class TabBarScaffold : Scaffold
     public TabBarScaffold(INavigationService navigationService)
     {
         _ = navigationService;
+
+        // Replicates the DailyHelper/template styling that exposed the UserAppTheme bug:
+        // ONE shared brush instance from an APP-LEVEL implicit style (where real apps put
+        // theming), its Color carrying an AppThemeBinding. Added lazily on first use; the
+        // implicit key guards re-entry when the page is opened again.
+        var appResources = Application.Current!.Resources;
+        if (!appResources.ContainsKey(typeof(ScaffoldTabBarItemView).FullName!))
+        {
+            var pillBrush = new SolidColorBrush();
+            pillBrush.SetAppThemeColor(SolidColorBrush.ColorProperty, Color.FromArgb("#E4EBFD"), Color.FromArgb("#223050"));
+            appResources.Add(new Style(typeof(ScaffoldTabBarItemView))
+            {
+                Setters = { new Setter { Property = ScaffoldTabBarItemView.SelectionPillBackgroundProperty, Value = pillBrush } }
+            });
+        }
 
         var alpha = MakeRoot<TabAlphaPage>("Alpha", "\ue88a"); // home
         var bravo = MakeRoot<TabBravoPage>("Bravo", "\ue8b6"); // search

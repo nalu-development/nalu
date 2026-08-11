@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Color x:Key="Accent">#4C7DF0</Color>
+    <Color x:Key="AccentContrast">#FFFFFF</Color>
+    <Color x:Key="AccentSoftLight">#E4EBFD</Color>
+    <Color x:Key="AccentSoftDark">#223050</Color>
+
+    <Color x:Key="BackgroundLight">#F4F6FA</Color>
+    <Color x:Key="BackgroundDark">#0F1216</Color>
+    <Color x:Key="CardLight">#FFFFFF</Color>
+    <Color x:Key="CardDark">#1B222B</Color>
+
+    <Color x:Key="TextPrimaryLight">#171B21</Color>
+    <Color x:Key="TextPrimaryDark">#ECF1F7</Color>
+    <Color x:Key="TextSecondaryLight">#66707D</Color>
+    <Color x:Key="TextSecondaryDark">#93A0AE</Color>
+
+    <Color x:Key="DividerLight">#E7EBF0</Color>
+    <Color x:Key="DividerDark">#29323D</Color>
+
+    <Color x:Key="TabIcon">#8A8F98</Color>
+    <Color x:Key="Danger">#E5484D</Color>
+
+</ResourceDictionary>
