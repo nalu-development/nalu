@@ -136,6 +136,15 @@ public partial class ScrollBoxHandler : ViewHandler<IScrollBox, PlatformView>
 
         // A single content view is cheap to measure cross-platform (unlike virtualized content),
         // so the hugging modes measure it directly with an unbounded scroll axis.
+        //
+        // This is deliberately not the only measure of the content in a pass: the platform
+        // scroller measures it again from its own layout callback. The two are not
+        // interchangeable — this one has to produce a desired size BEFORE the platform lays
+        // anything out (it is what the parent's Auto slot resolves against), while the platform
+        // pass is what actually positions the content. Caching between them was considered and
+        // rejected: a second cache would have to be invalidated on content, constraint, inset and
+        // orientation changes, and a stale hit shows up as a box frozen at the wrong size —
+        // exactly the failure class this control exists to eliminate.
         var measured = scrollBox.CrossPlatformMeasure(
             horizontal ? double.PositiveInfinity : widthConstraint,
             horizontal ? heightConstraint : double.PositiveInfinity

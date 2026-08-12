@@ -14,6 +14,9 @@ internal sealed class NaluNestedScrollView : AndroidX.Core.Widget.NestedScrollVi
 {
     private readonly ScrollBoxInsetsController _insets;
 
+    /// <summary>Drops the frames of a fling superseded by a programmatic jump (see StopAndJumpToPx).</summary>
+    private bool _suppressAnimatedScrollFrames;
+
     /// <summary>
     /// Activation constructor: Java.Interop calls it when it must materialize the managed peer
     /// from an EXISTING native handle (e.g. while resolving <c>this</c> inside a framework
@@ -49,14 +52,33 @@ internal sealed class NaluNestedScrollView : AndroidX.Core.Widget.NestedScrollVi
 
     public Action? ScrollChangedCallback { get; set; }
 
-    public void SmoothScrollToPx(int x, int y) => SmoothScrollTo(x, y);
+    public void SmoothScrollToPx(int x, int y)
+    {
+        // An animated scroll is driven BY ComputeScroll: it must not be suppressed.
+        _suppressAnimatedScrollFrames = false;
+        SmoothScrollTo(x, y);
+    }
 
     public void StopAndJumpToPx(int x, int y)
     {
-        // A zero-velocity fling supersedes any in-flight fling animation (NestedScrollView has no
-        // public stop API), then the jump lands on a resting scroller.
-        Fling(0);
+        // A programmatic jump WINS over any scrolling already in flight. Simply calling ScrollTo
+        // is not enough: a fling keeps driving the offset from ComputeScroll on later frames and
+        // would drag the content back to where the fling was heading. There is no public API to
+        // abort the internal scroller, so the arbitration lives here — this subclass drops the
+        // fling's remaining frames until the user touches again (or we start an animated scroll,
+        // which needs ComputeScroll to drive it).
+        _suppressAnimatedScrollFrames = true;
         ScrollTo(x, y);
+    }
+
+    public override void ComputeScroll()
+    {
+        if (_suppressAnimatedScrollFrames)
+        {
+            return;
+        }
+
+        base.ComputeScroll();
     }
 
     protected override void OnScrollChanged(int l, int t, int oldl, int oldt)
@@ -78,6 +100,8 @@ internal sealed class NaluNestedScrollView : AndroidX.Core.Widget.NestedScrollVi
         {
             case MotionEventActions.Down:
                 IsUserInteracting = true;
+                // The user is taking over: their gestures drive ComputeScroll again.
+                _suppressAnimatedScrollFrames = false;
 
                 break;
             case MotionEventActions.Up:

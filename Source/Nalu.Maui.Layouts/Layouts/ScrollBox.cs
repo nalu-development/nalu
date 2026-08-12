@@ -80,6 +80,8 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
         if (oldView is VisualElement oldElement)
         {
             oldElement.MeasureInvalidated -= OnContentMeasureInvalidated;
+            oldElement.ChildAdded -= OnContentChildrenChanged;
+            oldElement.ChildRemoved -= OnContentChildrenChanged;
         }
 
         base.OnContentPropertyChanged(oldView, newView);
@@ -87,6 +89,8 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
         if (newView is VisualElement newElement)
         {
             newElement.MeasureInvalidated += OnContentMeasureInvalidated;
+            newElement.ChildAdded += OnContentChildrenChanged;
+            newElement.ChildRemoved += OnContentChildrenChanged;
         }
     }
 
@@ -99,21 +103,23 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
     /// hugging <see cref="SizingStrategy" /> could never grow or shrink) and, on WinUI, the
     /// content panel is never re-measured at all, so the scrollable extent stays stale too.
     /// </remarks>
-    private void OnContentMeasureInvalidated(object? sender, EventArgs e)
+    /// <summary>
+    /// Re-measures the content when its child set changes.
+    /// </summary>
+    /// <remarks>
+    /// Adding a child invalidates the content's measure, but REMOVING one does not: the content
+    /// keeps reporting its previous desired size, so a hugging box measured through it can grow
+    /// and never shrink. Invalidating the content explicitly drops that stale value (it is a
+    /// no-op when the content is already invalid), and the box then re-measures against the real
+    /// content — which is also what refreshes the scrollable extent in Fill mode.
+    /// </remarks>
+    private void OnContentChildrenChanged(object? sender, ElementEventArgs e)
     {
-        if (SizingStrategy.Mode != ScrollBoxSizingMode.Fill)
-        {
-            InvalidateMeasure();
-
-            return;
-        }
-
-        // Filling: this box's size does NOT depend on its content, so propagating every
-        // descendant invalidation to the page would throw away the measure isolation a scroll
-        // container exists to provide. The handler still needs to hear it (WinUI re-measures the
-        // content panel from there, which is what keeps the scrollable extent current).
-        Handler?.Invoke(nameof(IView.InvalidateMeasure));
+        (GetContent() as VisualElement)?.InvalidateMeasure();
+        InvalidateMeasure();
     }
+
+    private void OnContentMeasureInvalidated(object? sender, EventArgs e) => InvalidateMeasure();
 
     #endregion
 

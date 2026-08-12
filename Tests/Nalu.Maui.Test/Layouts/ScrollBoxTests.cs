@@ -92,3 +92,106 @@ public class ScrollBoxSizingStrategyTests
     public void ToStringRoundTrips(string value)
         => ((ScrollBoxSizingStrategy) value).ToString().Should().Be(value);
 }
+
+/// <summary>
+/// Covers the <see cref="ScrollBox.ScrollToAsync(double, double, bool)" /> completion contract at
+/// the control level — the paths that do not need a device: queueing without a handler,
+/// supersession, and teardown while a request is outstanding. A hang here is the failure mode the
+/// contract exists to prevent, so every assertion has a timeout.
+/// </summary>
+public class ScrollBoxScrollToContractTests
+{
+    private static readonly TimeSpan _completionTimeout = TimeSpan.FromSeconds(2);
+
+    private static async Task<bool> CompletedAsync(Task task)
+    {
+#pragma warning disable VSTHRD003 // The task under test is deliberately created by the code under test.
+        var finished = await Task.WhenAny(task, Task.Delay(_completionTimeout)).ConfigureAwait(false);
+#pragma warning restore VSTHRD003
+
+        return ReferenceEquals(finished, task);
+    }
+
+    [Fact(DisplayName = "A request issued without a handler is queued, not completed")]
+    public async Task RequestWithoutHandlerIsQueued()
+    {
+        var scrollBox = new ScrollBox();
+
+        var task = scrollBox.ScrollToAsync(0, 100, animated: false);
+
+        // It must WAIT for the handler (that is the pre-layout queue), not resolve as a no-op.
+        (await CompletedAsync(task)).Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "A request queued before the handler existed is flushed to it on connect")]
+    public void QueuedRequestIsFlushedWhenTheHandlerConnects()
+    {
+        var scrollBox = new ScrollBox();
+        _ = scrollBox.ScrollToAsync(0, 100, animated: false);
+
+        var handler = Substitute.For<IViewHandler>();
+        ((IElement) scrollBox).Handler = handler;
+
+        // The pre-layout queue exists to survive exactly this gap.
+        handler.Received().Invoke("ScrollTo", Arg.Any<object>());
+    }
+
+    [Fact(DisplayName = "Detaching the handler completes a request still awaiting the first layout")]
+    public async Task DetachingTheHandlerCompletesARequestAwaitingLayout()
+    {
+        var content = new VerticalStackLayout();
+        var target = new Label();
+        content.Add(target);
+        var scrollBox = new ScrollBox { Content = content };
+        ((IElement) scrollBox).Handler = Substitute.For<IViewHandler>();
+
+        // No geometry yet, so the descendant target cannot be resolved: the request waits for the
+        // first layout, which will now never come.
+        var task = scrollBox.ScrollToAsync(target);
+
+        (await CompletedAsync(task)).Should().BeFalse();
+
+        ((IElement) scrollBox).Handler = null;
+
+        // Detached: awaiting must return rather than hang the caller forever.
+        (await CompletedAsync(task)).Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "A superseded request completes rather than dangling")]
+    public async Task SupersededRequestsComplete()
+    {
+        var scrollBox = new ScrollBox();
+
+        var first = scrollBox.ScrollToAsync(0, 100, animated: false);
+        _ = scrollBox.ScrollToAsync(0, 200, animated: false);
+
+        // Only the latest target survives, but the abandoned task must not be left dangling.
+        (await CompletedAsync(first)).Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Scrolling to a view that is not a descendant is rejected")]
+    public async Task ScrollingToANonDescendantIsRejected()
+    {
+        var scrollBox = new ScrollBox { Content = new VerticalStackLayout() };
+        var stranger = new Label();
+
+        await ((Func<Task>) (() => scrollBox.ScrollToAsync(stranger))).Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact(DisplayName = "Replacing the content releases the previous content's invalidation subscription")]
+    public void ReplacingContentReleasesThePreviousSubscription()
+    {
+        var scrollBox = new ScrollBox { SizingStrategy = ScrollBoxSizingStrategy.Unbounded };
+        var first = new VerticalStackLayout();
+        scrollBox.Content = first;
+        scrollBox.Content = new VerticalStackLayout();
+
+        // The replaced content must no longer be able to reach the box: a stale MeasureInvalidated
+        // subscription is both a leak and a source of phantom re-measures.
+        var invalidated = false;
+        scrollBox.MeasureInvalidated += (_, _) => invalidated = true;
+        first.Add(new Label { HeightRequest = 40 });
+
+        invalidated.Should().BeFalse();
+    }
+}
