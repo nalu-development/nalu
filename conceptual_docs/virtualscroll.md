@@ -194,7 +194,7 @@ All templates support `DataTemplateSelector` for heterogeneous item types:
 
 ### Layouts
 
-The `ItemsLayout` property controls how items are arranged. `VirtualScroll` supports linear and carousel layouts:
+The `ItemsLayout` property controls how items are arranged. `VirtualScroll` supports linear, grid and carousel layouts:
 
 ```xml
 <!-- Vertical scrolling (default) -->
@@ -203,10 +203,50 @@ The `ItemsLayout` property controls how items are arranged. `VirtualScroll` supp
 <!-- Horizontal scrolling -->
 <nalu:VirtualScroll ItemsLayout="{nalu:HorizontalVirtualScrollLayout}" ... />
 
+<!-- Grid layouts (several items per line) -->
+<nalu:VirtualScroll ItemsLayout="{nalu:VerticalGridVirtualScrollLayout Span=3}" ... />
+<nalu:VirtualScroll ItemsLayout="{nalu:HorizontalGridVirtualScrollLayout Span=2}" ... />
+
 <!-- Carousel layouts (paging + full-size items) -->
 <nalu:VirtualScroll ItemsLayout="{nalu:HorizontalCarouselVirtualScrollLayout}" ... />
 <nalu:VirtualScroll ItemsLayout="{nalu:VerticalCarouselVirtualScrollLayout}" ... />
 ```
+
+#### Grid layouts
+
+A grid arranges items in lines of `Span` cells — rows when scrolling vertically, columns when
+scrolling horizontally:
+
+```xml
+<nalu:VirtualScroll ItemsSource="{Binding Photos}"
+                    ItemsLayout="{nalu:VerticalGridVirtualScrollLayout Span=3, ItemSpacing=8, LineSpacing=8}" ... />
+```
+
+- `Span`: cells per line (default: 2, minimum 1)
+- `ItemSpacing`: gap between cells within a line. It is taken out of the space the cells share, so
+  every cell in a line keeps the same size: `(available - (Span - 1) * ItemSpacing) / Span`
+- `LineSpacing`: gap between lines along the scrolling axis
+
+Grid layouts also accept every `Estimated*Size` property described below, where `EstimatedItemSize`
+is the estimated extent of a *line*.
+
+Rules worth knowing:
+
+- **A line is as long as its longest cell, and every cell keeps its own extent** — cells are not
+  stretched to the line, they sit at its start. Two cells in the same row can therefore have
+  different heights, and their backgrounds and borders will not line up. Give the cells a size of
+  their own — a `HeightRequest`, or an image with a fixed `Aspect` — when you want a row to read as
+  one band.
+- **Headers and footers take a whole line** — the global header and footer, and every section header
+  and footer.
+- **A section never shares a line with another section.** Each section starts on a fresh line, and a
+  trailing partial line is left unfilled rather than being topped up from the next section.
+- **The grid properties are read when the layout is applied.** To change the grid at runtime — a
+  different span on rotation, say — assign a new layout instance to `ItemsLayout` rather than
+  mutating the current one.
+- Per-item span overrides are not supported.
+- **On Windows a grid renders as a single-column list.** The Windows backend has no way to give a
+  header or a section boundary a whole line, so the grid degrades rather than misplacing them.
 
 Carousel layouts:
 - Snap to pages (one item per viewport)

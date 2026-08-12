@@ -156,14 +156,18 @@ public partial class VirtualScrollHandler : ViewHandler<IVirtualScroll, Platform
         }
 
         var sectionCount = adapter.GetSectionCount();
-        var itemCount = 0;
+
+        // A grid stacks lines, not items: counting items would overestimate the extent Span-fold.
+        // Lines are counted per section because a section never shares a line with another.
+        var span = linearLayout is GridVirtualScrollLayout gridLayout ? gridLayout.Span : 1;
+        var lineCount = 0;
 
         for (var section = 0; section < sectionCount; section++)
         {
-            itemCount += adapter.GetItemCount(section);
+            lineCount += (adapter.GetItemCount(section) + span - 1) / span;
         }
 
-        var extent = itemCount * linearLayout.EstimatedItemSize;
+        var extent = lineCount * linearLayout.EstimatedItemSize;
 
         if (virtualScroll.HeaderTemplate is not null)
         {
