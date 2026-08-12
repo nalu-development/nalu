@@ -99,7 +99,21 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
     /// hugging <see cref="SizingStrategy" /> could never grow or shrink) and, on WinUI, the
     /// content panel is never re-measured at all, so the scrollable extent stays stale too.
     /// </remarks>
-    private void OnContentMeasureInvalidated(object? sender, EventArgs e) => InvalidateMeasure();
+    private void OnContentMeasureInvalidated(object? sender, EventArgs e)
+    {
+        if (SizingStrategy.Mode != ScrollBoxSizingMode.Fill)
+        {
+            InvalidateMeasure();
+
+            return;
+        }
+
+        // Filling: this box's size does NOT depend on its content, so propagating every
+        // descendant invalidation to the page would throw away the measure isolation a scroll
+        // container exists to provide. The handler still needs to hear it (WinUI re-measures the
+        // content panel from there, which is what keeps the scrollable extent current).
+        Handler?.Invoke(nameof(IView.InvalidateMeasure));
+    }
 
     #endregion
 
@@ -561,7 +575,10 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
         }
 
         var request = new ScrollBoxScrollToRequest(0, 0, animated);
-        SupersedePendingDescendantScroll();
+
+        // A single pending slot: a queued coordinate request and a queued descendant request must
+        // never both survive, or the later one would be yanked back by the earlier one.
+        CompletePendingRequests();
 
         if (GetGeometryFromHandler() is { ViewportWidth: > 0, ViewportHeight: > 0 } geometry)
         {
@@ -579,19 +596,33 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
 
     private void DispatchScrollToRequest(ScrollBoxScrollToRequest request)
     {
+        // Whatever was queued is superseded either way: only the latest request survives, and a
+        // superseded one still completes (the task must never hang).
+        _pendingHandlerRequest?.Complete();
+        _pendingHandlerRequest = null;
+
         if (Handler is { } handler)
         {
-            _pendingHandlerRequest?.Complete();
-            _pendingHandlerRequest = null;
             handler.Invoke("ScrollTo", request);
         }
         else
         {
             // No handler yet: keep the latest request and dispatch it on connection; the platform
             // then applies its own pre-layout queueing.
-            _pendingHandlerRequest?.Complete();
             _pendingHandlerRequest = request;
         }
+    }
+
+    /// <summary>
+    /// Completes every request this control is still holding. Called when the handler goes away:
+    /// the platform partials complete the requests THEY hold, but a request queued here (no
+    /// handler yet, or a descendant target awaiting the first layout) would otherwise hang.
+    /// </summary>
+    private void CompletePendingRequests()
+    {
+        _pendingHandlerRequest?.Complete();
+        _pendingHandlerRequest = null;
+        SupersedePendingDescendantScroll();
     }
 
     private void SupersedePendingDescendantScroll()
@@ -743,14 +774,12 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
 
         var handled = false;
 
-        if (RefreshCommand is not null)
+        // `handled` must mean "someone took ownership of the completion": a command that cannot
+        // execute has NOT, and treating it as handled leaves the spinner running forever.
+        if (RefreshCommand is { } refreshCommand && refreshCommand.CanExecute(wrappedCompletion))
         {
             handled = true;
-
-            if (RefreshCommand.CanExecute(null))
-            {
-                RefreshCommand.Execute(wrappedCompletion);
-            }
+            refreshCommand.Execute(wrappedCompletion);
         }
 
         if (OnRefresh is not null)
@@ -824,7 +853,15 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
         base.OnHandlerChanged();
         UpdateScrollEventSubscription();
 
-        if (Handler is not null && _pendingHandlerRequest is { } request)
+        if (Handler is null)
+        {
+            // Detached: nothing can execute these any more, and an awaited task must never hang.
+            CompletePendingRequests();
+
+            return;
+        }
+
+        if (_pendingHandlerRequest is { } request)
         {
             _pendingHandlerRequest = null;
             Handler.Invoke("ScrollTo", request);

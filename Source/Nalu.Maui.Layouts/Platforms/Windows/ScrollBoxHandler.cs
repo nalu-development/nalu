@@ -37,6 +37,8 @@ public partial class ScrollBoxHandler
     private ScrollBoxScrollToRequest? _pendingScrollToRequest;
     private ScrollBoxScrollToRequest? _activeScrollToRequest;
     private bool _scrollEventsEnabled;
+    private long _verticalOffsetToken;
+    private long _horizontalOffsetToken;
 
     /// <inheritdoc />
     protected override PlatformView CreatePlatformView()
@@ -69,6 +71,11 @@ public partial class ScrollBoxHandler
         {
             _scrollViewer.Loaded -= OnScrollViewerLoaded;
             _scrollViewer.ViewChanged -= OnScrollViewerViewChanged;
+
+            // Property-changed callbacks are registrations, not events: unregistering them is the
+            // only thing that releases the delegate (and through it this handler).
+            _scrollViewer.UnregisterPropertyChangedCallback(ScrollViewer.VerticalOffsetProperty, _verticalOffsetToken);
+            _scrollViewer.UnregisterPropertyChangedCallback(ScrollViewer.HorizontalOffsetProperty, _horizontalOffsetToken);
         }
 
         if (_contentPanel is not null)
@@ -90,8 +97,8 @@ public partial class ScrollBoxHandler
         }
 
         scrollViewer.Loaded -= OnScrollViewerLoaded;
-        scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.VerticalOffsetProperty, OnScrollOffsetChanged);
-        scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.HorizontalOffsetProperty, OnScrollOffsetChanged);
+        _verticalOffsetToken = scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.VerticalOffsetProperty, OnScrollOffsetChanged);
+        _horizontalOffsetToken = scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.HorizontalOffsetProperty, OnScrollOffsetChanged);
         scrollViewer.ViewChanged += OnScrollViewerViewChanged;
 
         // Requests issued before the viewer was loaded were queued: this is their moment.
@@ -120,7 +127,9 @@ public partial class ScrollBoxHandler
         var (scrollX, scrollY, totalWidth, totalHeight) = GetScrollValues(scrollViewer);
         var controller = VirtualView as IScrollBoxController;
 
-        if (!_wasScrolling)
+        // ScrollStarted/ScrollEnded describe a USER gesture (the other platforms take them from
+        // native drag callbacks): a programmatic scroll must not fake one.
+        if (!_wasScrolling && _activeScrollToRequest is null)
         {
             _wasScrolling = true;
             controller?.ScrollStarted(scrollX, scrollY, totalWidth, totalHeight);

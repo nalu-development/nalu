@@ -35,6 +35,9 @@ public partial class ScrollBoxHandler
     private ScrollBoxScrollToRequest? _pendingScrollToRequest;
     private ScrollBoxScrollToRequest? _activeScrollToRequest;
 
+    /// <summary>Pre-bound so the pending idle check can be REMOVED from the view's queue.</summary>
+    private Java.Lang.IRunnable? _idleCheckRunnable;
+
     /// <inheritdoc />
     protected override AView CreatePlatformView()
     {
@@ -96,21 +99,41 @@ public partial class ScrollBoxHandler
         _activeScrollToRequest?.Complete();
         _activeScrollToRequest = null;
 
+        // Detach the whole tree BEFORE disposing: a disposed managed peer that is still attached
+        // keeps receiving native callbacks (onLayout, insets dispatch) and Java.Interop then has
+        // to resurrect it from the native handle.
+        if (_contentWrapper is not null)
+        {
+            _contentWrapper.LayoutChange -= OnContentWrapperLayoutChange;
+            _contentWrapper.RemoveAllViews();
+            _contentWrapper.CrossPlatformLayout = null;
+        }
+
         if (_scroller is { } scroller)
         {
             scroller.LayoutCallback = null;
             scroller.ScrollChangedCallback = null;
+            scroller.View.RemoveCallbacks(_idleCheckRunnable);
+
+            if (_contentWrapper is not null)
+            {
+                scroller.ViewGroup.RemoveView(_contentWrapper);
+            }
+
+            _swipeRefreshLayout?.RemoveView(scroller.View);
             scroller.View.Dispose();
             _scroller = null;
         }
 
-        if (_contentWrapper is not null)
-        {
-            _contentWrapper.LayoutChange -= OnContentWrapperLayoutChange;
-            _contentWrapper.Dispose();
-        }
-
+        _contentWrapper?.Dispose();
         _contentWrapper = null;
+
+        // Handlers can be reused: leave no state from the previous connection behind.
+        _idleCheckScheduled = false;
+        _scrollSessionActive = false;
+        _scrollEventsEnabled = false;
+        _scrollGeneration = 0;
+        _lastSeenScrollGeneration = 0;
         _swipeRefreshLayout?.Dispose();
         _swipeRefreshLayout = null;
         _rootLayout?.Dispose();
@@ -125,7 +148,8 @@ public partial class ScrollBoxHandler
             ? new NaluHorizontalScrollView(Context)
             : new NaluNestedScrollView(Context);
 
-        scroller.LayoutCallback = OnScrollerLaidOut;
+        // Content-size feedback comes from the wrapper's LayoutChange (see CreatePlatformView):
+        // routing it from here too would run the whole feedback pass twice per layout.
         scroller.ScrollChangedCallback = OnNativeScrollChanged;
 
         return scroller;
@@ -189,7 +213,8 @@ public partial class ScrollBoxHandler
 
         _idleCheckScheduled = true;
         _lastSeenScrollGeneration = _scrollGeneration;
-        _scroller.View.PostDelayed(OnIdleCheck, _idleTimeoutMilliseconds);
+        _idleCheckRunnable ??= new Java.Lang.Runnable(OnIdleCheck);
+        _scroller.View.PostDelayed(_idleCheckRunnable, _idleTimeoutMilliseconds);
     }
 
     private void OnIdleCheck()
@@ -324,8 +349,25 @@ public partial class ScrollBoxHandler
             return;
         }
 
+        // The old scroller carries the in-flight state: its queued idle check would never run
+        // (its view is about to be disposed), leaving _idleCheckScheduled stuck true — after
+        // which no ScrollEnded ever fires again and animated requests never complete.
+        handler._pendingScrollToRequest?.Complete();
+        handler._pendingScrollToRequest = null;
+        handler._activeScrollToRequest?.Complete();
+        handler._activeScrollToRequest = null;
+        handler._idleCheckScheduled = false;
+        handler._scrollGeneration = 0;
+        handler._lastSeenScrollGeneration = 0;
+
         oldScroller.LayoutCallback = null;
         oldScroller.ScrollChangedCallback = null;
+
+        if (handler._idleCheckRunnable is { } idleCheckRunnable)
+        {
+            oldScroller.View.RemoveCallbacks(idleCheckRunnable);
+        }
+
         oldScroller.ViewGroup.RemoveView(wrapper);
         swipeRefreshLayout.RemoveView(oldScroller.View);
 

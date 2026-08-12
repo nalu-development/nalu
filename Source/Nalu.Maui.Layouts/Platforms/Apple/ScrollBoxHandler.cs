@@ -84,6 +84,12 @@ public partial class ScrollBoxHandler
         if (_refreshControl is not null)
         {
             _refreshControl.RemoveTarget(RefreshControlEventHandler, UIControlEvent.ValueChanged);
+
+            if (_scrollView is not null)
+            {
+                _scrollView.RefreshControl = null;
+            }
+
             _refreshControl.RemoveFromSuperview();
             _refreshControl.Dispose();
             _refreshControl = null;
@@ -214,7 +220,25 @@ public partial class ScrollBoxHandler
 
         _scrollSessionActive = false;
         var (scrollX, scrollY, totalWidth, totalHeight) = GetScrollValues(scrollView);
-        (VirtualView as IScrollBoxController)?.ScrollEnded(scrollX, scrollY, totalWidth, totalHeight);
+
+        // After the yield this is a bare async void: an exception thrown by a user handler would
+        // tear the app down instead of surfacing where the app can see it. Re-raise it on the
+        // dispatcher so it follows the normal unhandled-exception path of the host.
+        try
+        {
+            (VirtualView as IScrollBoxController)?.ScrollEnded(scrollX, scrollY, totalWidth, totalHeight);
+        }
+        catch (Exception exception)
+        {
+            var dispatcher = (VirtualView as VisualElement)?.Dispatcher;
+
+            if (dispatcher is null)
+            {
+                throw;
+            }
+
+            dispatcher.Dispatch(() => System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception).Throw());
+        }
     }
 
     internal void OnPlatformScrollAnimationEnded()
