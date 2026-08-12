@@ -784,6 +784,57 @@ public ValueTask OnEnteringAsync()
 }
 ```
 
+### Threading Issues / "Cannot trigger a navigation from within a navigation"
+
+**Symptoms**: `InvalidNavigationException`, random native crashes during navigation, or a `GoToAsync` call that
+silently does nothing and returns `false`.
+
+`GoToAsync` is **UI-thread only**, **serialized** and **non re-entrant** — see
+[Threading and Concurrency](navigation-advanced.md#threading-and-concurrency) for the full contract.
+
+1. ✅ **Navigate on the UI thread**
+
+```csharp
+// ❌ Wrong - the continuation may run on a thread pool thread
+await _api.SubmitAsync().ConfigureAwait(false);
+await _navigationService.GoToAsync(Navigation.Pop());
+
+// ✅ Correct
+await _api.SubmitAsync().ConfigureAwait(false);
+await MainThread.InvokeOnMainThreadAsync(
+    () => _navigationService.GoToAsync(Navigation.Pop())
+);
+```
+
+The same applies to navigations triggered from timers, push-notification handlers, `Task.Run` or any event raised
+by a background service.
+
+2. ✅ **Dispatch navigations triggered from lifecycle events or guards**
+
+```csharp
+// ❌ Wrong - throws InvalidNavigationException
+public async ValueTask OnAppearingAsync()
+    => await _navigationService.GoToAsync(Navigation.Root<LoginPageModel>());
+
+// ✅ Correct - dispatched, and appearing already runs on the committed location
+public async ValueTask OnAppearingAsync()
+{
+    if (!_session.IsAuthenticated)
+    {
+        _ = _dispatcher.DispatchAsync(RedirectAsync);
+    }
+}
+```
+
+Redirect from `OnAppearingAsync` rather than `OnEnteringAsync`: entering runs *before* the navigation is
+committed, so a navigation dispatched from there races the commit and may be ignored.
+
+3. ✅ **Don't assume a `false` result is a bug**
+
+A queued navigation whose starting state no longer matches is intentionally dropped, returning `false` and raising
+the `NavigationIgnored` event. Subscribe to `NaluShell.NavigationEvent` to tell "blocked by a guard"
+(`NavigationCanceled`) from "superseded by a concurrent navigation" (`NavigationIgnored`).
+
 ### ViewModel Not Found in DI
 
 **Symptoms**: Exception about unable to resolve ViewModel type

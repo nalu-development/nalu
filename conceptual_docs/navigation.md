@@ -214,6 +214,11 @@ Navigation behavior varies by hierarchy:
 > 💡 **Inside a `Page` subclass** the inherited `Page.Navigation` property hides the
 > `Navigation` class — alias it once per app: `global using Nav = Nalu.Navigation;` and write
 > `Nav.Push<T>()`.
+>
+> ⚠️ **`GoToAsync` must be called on the UI thread** — it drives the shell directly and does not
+> marshal for you. Concurrent calls are serialized and the queued one is dropped (returns `false`)
+> if the shell moved meanwhile; navigating from *within* a navigation throws. See
+> [Threading and Concurrency](navigation-advanced.md#threading-and-concurrency).
 
 ### Relative Navigation
 
@@ -497,6 +502,8 @@ Each tab maintains its own navigation stack independently.
 6. ✅ Enable leak detection in development
 7. ✅ **Match cleanup to creation**: Constructor → Dispose, Entering → Leaving, Appearing → Disappearing
 8. ✅ **Dispatch navigation from lifecycle events** - use `IDispatcher.DispatchAsync()` to avoid blocking
+9. ✅ **Navigate from the UI thread** - hop back with `MainThread.InvokeOnMainThreadAsync()` after background work
+10. ✅ **Check the `bool` returned by `GoToAsync`** - it is `false` when a guard blocked the navigation or a concurrent one superseded it
 
 ## Learn More
 

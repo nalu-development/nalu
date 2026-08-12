@@ -247,6 +247,102 @@ await _navigationService.GoToAsync(
 );
 ```
 
+## Threading and Concurrency
+
+`INavigationService.GoToAsync` has a precise contract: **UI thread only**, **serialized**, **non re-entrant**.
+
+### Call it on the UI thread
+
+Navigation creates pages, sets binding contexts and drives the shell **directly** — nothing is marshalled for you.
+Calling `GoToAsync` from a background thread is undefined behavior and usually crashes on iOS/Android.
+
+```csharp
+// ❌ Wrong - continuation may resume on a thread pool thread
+await _repository.SaveAsync().ConfigureAwait(false);
+await _navigationService.GoToAsync(Navigation.Pop());
+
+// ✅ Correct - hop back to the UI thread first
+await _repository.SaveAsync().ConfigureAwait(false);
+await MainThread.InvokeOnMainThreadAsync(
+    () => _navigationService.GoToAsync(Navigation.Pop())
+);
+```
+
+Inside a page model you normally already are on the UI thread (lifecycle events and commands are invoked there),
+so an explicit hop is only needed after `ConfigureAwait(false)`, `Task.Run`, timers or event callbacks raised by
+background services.
+
+### Concurrent calls are serialized — and the loser is dropped
+
+Two overlapping `GoToAsync` calls never interleave: the second one waits for the first to complete.
+When it resumes, it is re-validated against the shell location it was computed on. If the shell moved in the
+meantime, the queued navigation is **not** applied to the new state — it is ignored:
+
+- `GoToAsync` returns `false`
+- a `NavigationIgnored` lifecycle event is raised (see [Monitoring Navigation Events](#monitoring-navigation-events))
+
+That is what protects you from double-taps pushing the same page twice, or from a "pop" queued behind a "push"
+landing somewhere unexpected. The consequence: **honor the return value**, don't assume the navigation happened.
+
+```csharp
+if (!await _navigationService.GoToAsync(Navigation.Push<DetailPageModel>()))
+{
+    // Blocked by a guard, or superseded by a concurrent navigation
+    return;
+}
+```
+
+> 💡 A navigation that was canceled by a guard leaves the location untouched, so a call waiting behind it still
+> runs normally. Only an *effective* state change invalidates the queued navigation.
+
+### Navigating from within a navigation throws
+
+Triggering a navigation while one is in progress on the same asynchronous flow — typically from `OnEnteringAsync`,
+`OnAppearingAsync` or an `ILeavingGuard` — throws `InvalidNavigationException`:
+
+> Cannot trigger a navigation from within a navigation, try to use IDispatcher.DispatchDelayed.
+
+The guard travels with the asynchronous flow, so work started during the navigation (including `Task.Run`)
+inherits it too. Dispatch the call instead of awaiting it inline:
+
+```csharp
+public async ValueTask OnAppearingAsync(StartupIntent intent)
+{
+    await LoadDataAsync();
+
+    // ✅ Dispatched navigation - runs outside the current one
+    _ = _dispatcher.DispatchAsync(RedirectToHomeAsync);
+}
+
+private Task RedirectToHomeAsync()
+    => _navigationService.GoToAsync(
+        Navigation.Absolute(NavigationBehavior.Immediate).Root<HomePageModel>()
+    );
+```
+
+### Why redirecting from `OnAppearingAsync` is never dropped
+
+The two rules above could look like they conflict: if a dispatched navigation may run while the outer one is still
+unwinding, couldn't it be ignored as "superseded"?
+
+No — and the reason is the order in which the engine works. **The navigation is committed *before* the appearing
+event is sent**: the location is already the final one when `OnAppearingAsync` runs, so a navigation dispatched
+from there starts from that same location and there is nothing left to invalidate it.
+
+This holds for both engines, since they share the same navigation engine and only differ in the proxy that applies
+the commit:
+
+- **Shell**: the commit calls `Shell.GoToAsync`, which moves `Shell.CurrentState.Location`
+- **Scaffold**: the commit applies the pending pushes/pops to the stack model and updates the location before
+  running the presenter animation
+
+Pushes and pops are batched until that commit, which is why `OnEnteringAsync` is different: it runs **before** the
+commit, on the still-current location. A navigation dispatched from `OnEnteringAsync` may or may not observe the
+commit depending on timing, and if it doesn't it will be ignored. Prefer redirecting from `OnAppearingAsync`.
+
+See [Navigation Within Lifecycle Events](navigation-lifecycle.md#navigation-within-lifecycle-events) for the
+full picture.
+
 ## Navigation-Scoped Services
 
 Share data between a page and all its nested child pages.
