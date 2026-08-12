@@ -93,6 +93,13 @@ public partial class ScrollBoxHandler
         scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.VerticalOffsetProperty, OnScrollOffsetChanged);
         scrollViewer.RegisterPropertyChangedCallback(ScrollViewer.HorizontalOffsetProperty, OnScrollOffsetChanged);
         scrollViewer.ViewChanged += OnScrollViewerViewChanged;
+
+        // Requests issued before the viewer was loaded were queued: this is their moment.
+        if (_pendingScrollToRequest is { } pending)
+        {
+            _pendingScrollToRequest = null;
+            ExecuteScrollToRequest(pending);
+        }
     }
 
     private (double ScrollX, double ScrollY, double TotalWidth, double TotalHeight) GetScrollValues(ScrollViewer scrollViewer)
@@ -152,7 +159,7 @@ public partial class ScrollBoxHandler
     {
         OnContentLaidOut(e.NewSize.Width, e.NewSize.Height);
 
-        if (_pendingScrollToRequest is { } pending && _scrollViewer is { ActualWidth: > 0 })
+        if (_pendingScrollToRequest is { } pending && _scrollViewer is { IsLoaded: true, ActualWidth: > 0 })
         {
             _pendingScrollToRequest = null;
             ExecuteScrollToRequest(pending);
@@ -277,6 +284,20 @@ public partial class ScrollBoxHandler
         // Not supported on Windows.
     }
 
+    private partial void MeasurePlatformScroller(double widthConstraint, double heightConstraint)
+    {
+        if (_scrollViewer is not { } scrollViewer)
+        {
+            return;
+        }
+
+        scrollViewer.Measure(new global::Windows.Foundation.Size(
+                double.IsNaN(widthConstraint) ? double.PositiveInfinity : widthConstraint,
+                double.IsNaN(heightConstraint) ? double.PositiveInfinity : heightConstraint
+            )
+        );
+    }
+
     private partial void UpdateFillViewport(IScrollBox scrollBox)
     {
         // The WinUI ScrollViewer content presenter already stretches short content to the
@@ -330,10 +351,11 @@ public partial class ScrollBoxHandler
             return;
         }
 
-        if (scrollViewer.ActualWidth <= 0 && scrollViewer.ActualHeight <= 0)
+        if (!scrollViewer.IsLoaded || (scrollViewer.ActualWidth <= 0 && scrollViewer.ActualHeight <= 0))
         {
-            // Before the first layout pass there is nothing to scroll yet: queue the request,
-            // executed from the first content size change.
+            // ChangeView is silently ignored until the ScrollViewer is loaded and laid out:
+            // queue the request; the Loaded event (or the first content size change after it)
+            // flushes the queue.
             handler._pendingScrollToRequest = request;
 
             return;
@@ -351,6 +373,10 @@ public partial class ScrollBoxHandler
             return;
         }
 
+        // ScrollableWidth/Height lag the content's SizeChanged by a layout pass: without this,
+        // a request arriving right after a content change clamps a legitimate target to 0.
+        scrollViewer.UpdateLayout();
+
         var targetX = Math.Clamp(request.X, 0, scrollViewer.ScrollableWidth);
         var targetY = Math.Clamp(request.Y, 0, scrollViewer.ScrollableHeight);
 
@@ -361,22 +387,33 @@ public partial class ScrollBoxHandler
             return;
         }
 
-        if (request.Animated)
-        {
-            _activeScrollToRequest = request;
+        // ChangeView applies asynchronously even with disableAnimation; on a LOADED viewer it is
+        // reliable, and completion comes from ViewChanged (IsIntermediate=false). The not-loaded
+        // case never reaches this method: HandleScrollToRequest queues it and the Loaded event
+        // flushes the queue.
+        _activeScrollToRequest = request;
 
-            if (!scrollViewer.ChangeView(targetX, targetY, null, disableAnimation: false))
-            {
-                _activeScrollToRequest = null;
-                request.Complete();
-            }
-        }
-        else
+        if (!scrollViewer.ChangeView(targetX, targetY, null, disableAnimation: !request.Animated))
         {
-            scrollViewer.ChangeView(targetX, targetY, null, disableAnimation: true);
-            (VirtualView as ScrollBox)?.UpdateScrollPosition(scrollViewer.HorizontalOffset, scrollViewer.VerticalOffset);
+            _activeScrollToRequest = null;
             request.Complete();
         }
+    }
+
+    /// <summary>
+    /// Invalidates the measure of the scroll viewer AND of its content panel.
+    /// </summary>
+    /// <remarks>
+    /// WinUI invalidation does not travel from a parent to its children: invalidating only the
+    /// ScrollViewer (what the default mapper does) leaves the content panel holding the measure
+    /// it computed for its previous content, so <c>CrossPlatformMeasure</c> never re-runs and a
+    /// hugging <see cref="ScrollBox.SizingStrategy" /> can neither grow nor shrink. MAUI's own
+    /// ScrollViewHandler overrides this command for the same reason.
+    /// </remarks>
+    public static void MapInvalidateMeasure(ScrollBoxHandler handler, IScrollBox scrollBox, object? args)
+    {
+        handler.PlatformView?.InvalidateMeasure(scrollBox);
+        handler._contentPanel?.InvalidateMeasure();
     }
 
     /// <summary>

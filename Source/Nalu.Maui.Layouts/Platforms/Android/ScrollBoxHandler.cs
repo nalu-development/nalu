@@ -416,6 +416,11 @@ public partial class ScrollBoxHandler
         }
     }
 
+    private partial void MeasurePlatformScroller(double widthConstraint, double heightConstraint)
+    {
+        // The scroller measures its content from its own layout callback.
+    }
+
     private partial void UpdateFillViewport(IScrollBox scrollBox)
     {
         var fill = scrollBox.SizingStrategy.Mode == ScrollBoxSizingMode.Fill;

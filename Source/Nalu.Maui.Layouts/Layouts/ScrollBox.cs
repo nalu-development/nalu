@@ -24,9 +24,11 @@ namespace Nalu;
 /// </para>
 /// <para>
 /// Known v1 limitations: no <c>Both</c> orientation; on Windows pull-to-refresh and
-/// <see cref="FadingEdgeLength" /> are accepted but inactive; with <c>FlowDirection=RightToLeft</c>
-/// horizontal offsets remain left-based (descendant-targeting
-/// <see cref="ScrollToAsync(IView, ScrollToPosition, bool)" /> is position-correct regardless).
+/// <see cref="FadingEdgeLength" /> are accepted but inactive, and the hugging
+/// <see cref="SizingStrategy" /> modes size correctly at first layout but do not yet re-measure
+/// on later content changes; with <c>FlowDirection=RightToLeft</c> horizontal offsets remain
+/// left-based (descendant-targeting <see cref="ScrollToAsync(IView, ScrollToPosition, bool)" />
+/// is position-correct regardless).
 /// </para>
 /// </remarks>
 /// <example>
@@ -73,6 +75,33 @@ public class ScrollBox : ViewBoxBase, IScrollBox, IScrollBoxController
 
     /// <inheritdoc />
     protected override void SetContent(IView? content) => SetValue(ContentProperty, content);
+
+    /// <inheritdoc />
+    protected override void OnContentPropertyChanged(IView? oldView, IView? newView)
+    {
+        if (oldView is VisualElement oldElement)
+        {
+            oldElement.MeasureInvalidated -= OnContentMeasureInvalidated;
+        }
+
+        base.OnContentPropertyChanged(oldView, newView);
+
+        if (newView is VisualElement newElement)
+        {
+            newElement.MeasureInvalidated += OnContentMeasureInvalidated;
+        }
+    }
+
+    /// <summary>
+    /// Content-driven measure changes must invalidate THIS view's measure.
+    /// </summary>
+    /// <remarks>
+    /// A scroll container is not a <see cref="Layout" />, so nothing subscribes to the content's
+    /// invalidations on its behalf: without this, the parent keeps the cached desired size (a
+    /// hugging <see cref="SizingStrategy" /> could never grow or shrink) and, on WinUI, the
+    /// content panel is never re-measured at all, so the scrollable extent stays stale too.
+    /// </remarks>
+    private void OnContentMeasureInvalidated(object? sender, EventArgs e) => InvalidateMeasure();
 
     #endregion
 

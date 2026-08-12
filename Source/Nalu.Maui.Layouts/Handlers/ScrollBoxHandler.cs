@@ -42,6 +42,13 @@ public partial class ScrollBoxHandler : ViewHandler<IScrollBox, PlatformView>
         {
             ["ScrollTo"] = MapScrollTo,
             ["SetScrollEventEnabled"] = MapSetScrollEventEnabled,
+#if WINDOWS
+            // WinUI does not propagate a measure invalidation from a parent down to its content:
+            // invalidating only the ScrollViewer (the default mapper) leaves the content panel
+            // measured with its previous content, so hugging never re-measures. MAUI's own
+            // ScrollViewHandler carries the same override for the same reason.
+            [nameof(IView.InvalidateMeasure)] = MapInvalidateMeasure,
+#endif
         };
 
     /// <summary>
@@ -134,16 +141,26 @@ public partial class ScrollBoxHandler : ViewHandler<IScrollBox, PlatformView>
             horizontal ? heightConstraint : double.PositiveInfinity
         );
 
+        // Platforms whose scroller drives the content measure through its OWN measure pass need
+        // that pass to actually happen: this override replaces the base one, which is where a
+        // handler normally measures its platform view.
+        MeasurePlatformScroller(
+            horizontal ? double.PositiveInfinity : widthConstraint,
+            horizontal ? heightConstraint : double.PositiveInfinity
+        );
+
         var contentExtent = horizontal ? measured.Width : measured.Height;
         var extent = ClampExtent(contentExtent, strategy, scrollConstraint);
         _lastDesiredExtent = extent;
 
-        var cross = horizontal ? measured.Height : measured.Width;
-
-        if (!double.IsInfinity(crossConstraint) && !double.IsNaN(crossConstraint))
-        {
-            cross = Math.Min(cross, crossConstraint);
-        }
+        // Hugging applies to the SCROLL axis only: the cross axis fills what the parent offered
+        // (a vertical ScrollBox is as wide as its slot, not as wide as its content). Reporting
+        // the content's natural cross size instead makes WinUI measure the content panel with
+        // that width — and a narrower panel then re-measures the content, so the extent never
+        // settles. Only an unbounded cross constraint falls back to the measured size.
+        var cross = double.IsInfinity(crossConstraint) || double.IsNaN(crossConstraint)
+            ? horizontal ? measured.Height : measured.Width
+            : crossConstraint;
 
         return horizontal ? new Size(extent, cross) : new Size(cross, extent);
     }
@@ -204,6 +221,18 @@ public partial class ScrollBoxHandler : ViewHandler<IScrollBox, PlatformView>
     /// shrink-detection path. Platform partials implement the switch.
     /// </summary>
     private partial void UpdateFillViewport(IScrollBox scrollBox);
+
+    /// <summary>
+    /// Measures the platform scroller with the hugging constraints (scroll axis unbounded).
+    /// </summary>
+    /// <remarks>
+    /// Only WinUI needs this: there the content panel is measured by the ScrollViewer's own
+    /// measure pass, and this handler's <see cref="GetDesiredSize" /> override replaces the base
+    /// implementation that would normally have measured the platform view — leaving the panel
+    /// constrained to zero. The Apple and Android scrollers measure their content from their own
+    /// layout callbacks, so their implementations are intentionally empty.
+    /// </remarks>
+    private partial void MeasurePlatformScroller(double widthConstraint, double heightConstraint);
 
     #endregion
 }
