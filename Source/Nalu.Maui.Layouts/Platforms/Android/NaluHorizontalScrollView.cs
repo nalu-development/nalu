@@ -1,4 +1,5 @@
 using Android.Content;
+using Android.Runtime;
 using Android.Views;
 using AView = Android.Views.View;
 using AViewGroup = Android.Views.ViewGroup;
@@ -17,6 +18,15 @@ namespace Nalu;
 internal sealed class NaluHorizontalScrollView : Android.Widget.HorizontalScrollView, IScrollBoxScroller
 {
     private readonly ScrollBoxInsetsController _insets;
+
+    /// <summary>
+    /// Activation constructor — see <see cref="NaluNestedScrollView(IntPtr, JniHandleOwnership)" />.
+    /// </summary>
+    public NaluHorizontalScrollView(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+        _insets = new ScrollBoxInsetsController(this);
+    }
 
     public NaluHorizontalScrollView(Context context)
         : base(context)

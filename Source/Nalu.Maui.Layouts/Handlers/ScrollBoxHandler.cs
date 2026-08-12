@@ -153,6 +153,7 @@ public partial class ScrollBoxHandler : ViewHandler<IScrollBox, PlatformView>
         var extent = ClampExtent(contentExtent, strategy, scrollConstraint);
         _lastDesiredExtent = extent;
 
+
         // Hugging applies to the SCROLL axis only: the cross axis fills what the parent offered
         // (a vertical ScrollBox is as wide as its slot, not as wide as its content). Reporting
         // the content's natural cross size instead makes WinUI measure the content panel with
@@ -183,6 +184,7 @@ public partial class ScrollBoxHandler : ViewHandler<IScrollBox, PlatformView>
         var horizontal = scrollBox.Orientation == ScrollBoxOrientation.Horizontal;
         var contentExtent = horizontal ? contentWidth : contentHeight;
         var extent = ClampExtent(contentExtent, scrollBox.SizingStrategy, _lastMeasureConstraint);
+
 
         if (_lastDesiredExtent is { } last && Math.Abs(last - extent) <= _sizeToContentEpsilon)
         {

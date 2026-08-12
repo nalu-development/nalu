@@ -46,6 +46,12 @@ public partial class ScrollBoxHandler
         };
         _contentWrapper.SetClipChildren(false);
 
+        // Content-size feedback must observe the CONTENT, not the scroller: Android skips
+        // onLayout for a child whose bounds did not change, and the scroller's bounds stay put
+        // while its content grows or shrinks (the Apple/WinUI equivalents are LayoutSubviews and
+        // the panel's SizeChanged).
+        _contentWrapper.LayoutChange += OnContentWrapperLayoutChange;
+
         _scroller = CreateScroller(VirtualView.Orientation);
         AttachScroller(_scroller);
 
@@ -98,7 +104,12 @@ public partial class ScrollBoxHandler
             _scroller = null;
         }
 
-        _contentWrapper?.Dispose();
+        if (_contentWrapper is not null)
+        {
+            _contentWrapper.LayoutChange -= OnContentWrapperLayoutChange;
+            _contentWrapper.Dispose();
+        }
+
         _contentWrapper = null;
         _swipeRefreshLayout?.Dispose();
         _swipeRefreshLayout = null;
@@ -234,6 +245,8 @@ public partial class ScrollBoxHandler
     #endregion
 
     #region Layout feedback
+
+    private void OnContentWrapperLayoutChange(object? sender, AView.LayoutChangeEventArgs e) => OnScrollerLaidOut();
 
     private void OnScrollerLaidOut()
     {

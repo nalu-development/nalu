@@ -1,4 +1,5 @@
 using Android.Content;
+using Android.Runtime;
 using Android.Views;
 using AView = Android.Views.View;
 using AViewGroup = Android.Views.ViewGroup;
@@ -12,6 +13,18 @@ namespace Nalu;
 internal sealed class NaluNestedScrollView : AndroidX.Core.Widget.NestedScrollView, IScrollBoxScroller
 {
     private readonly ScrollBoxInsetsController _insets;
+
+    /// <summary>
+    /// Activation constructor: Java.Interop calls it when it must materialize the managed peer
+    /// from an EXISTING native handle (e.g. while resolving <c>this</c> inside a framework
+    /// layout callback). Without it the runtime throws "Unable to activate instance of type …
+    /// from native handle" mid-layout.
+    /// </summary>
+    public NaluNestedScrollView(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+        _insets = new ScrollBoxInsetsController(this);
+    }
 
     public NaluNestedScrollView(Context context)
         : base(context)

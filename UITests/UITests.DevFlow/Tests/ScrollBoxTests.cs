@@ -17,6 +17,15 @@ public class ScrollBoxTests(NaluApp app) : BaseUiTest(app)
 {
     private const string PageName = "Scroll Box Tests";
 
+    /// <summary>Parses the harness label's <c>done Y:&lt;y&gt; X:&lt;x&gt;</c> text.</summary>
+    private static (double X, double Y) ParseScrollResult(string? text)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(text ?? string.Empty, @"Y:(-?\d+)\s+X:(-?\d+)");
+        match.Success.Should().BeTrue($"the scroll result label should report a position, but was '{text}'");
+
+        return (double.Parse(match.Groups[2].Value), double.Parse(match.Groups[1].Value));
+    }
+
     // The page hosts 40 items, each exactly 44 units tall, in a vertical ScrollBox.
 
     [Fact]
@@ -51,8 +60,10 @@ public class ScrollBoxTests(NaluApp app) : BaseUiTest(app)
 
         await App.TapAsync("Item5StartButton");
 
-        // Item5 starts at 4 * 44 = 176 in content coordinates.
-        await App.WaitForTextAsync("ScrollResultLabel", "done Y:176 X:0");
+        // Item5 starts at 4 * 44 = 176 in content coordinates. Asserted with a 1-unit tolerance:
+        // Android rounds every dp↔px conversion, so the landing offset can differ by a pixel.
+        var result = await App.WaitForTextMatchAsync("ScrollResultLabel", text => text?.StartsWith("done") == true);
+        ParseScrollResult(result).Y.Should().BeApproximately(176, 1.5);
 
         // And it must now sit at the top of the viewport (same Y as Item1 had at rest).
         var item5 = await App.WaitForStableBoundsAsync("Item5");
