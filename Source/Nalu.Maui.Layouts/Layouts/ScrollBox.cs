@@ -24,11 +24,9 @@ namespace Nalu;
 /// </para>
 /// <para>
 /// Known v1 limitations: no <c>Both</c> orientation; on Windows pull-to-refresh and
-/// <see cref="FadingEdgeLength" /> are accepted but inactive, and the hugging
-/// <see cref="SizingStrategy" /> modes size correctly at first layout but do not yet re-measure
-/// on later content changes; with <c>FlowDirection=RightToLeft</c> horizontal offsets remain
-/// left-based (descendant-targeting <see cref="ScrollToAsync(IView, ScrollToPosition, bool)" />
-/// is position-correct regardless).
+/// <see cref="FadingEdgeLength" /> are accepted but inactive; with
+/// <c>FlowDirection=RightToLeft</c> horizontal offsets remain left-based (descendant-targeting
+/// <see cref="ScrollToAsync(IView, ScrollToPosition, bool)" /> is position-correct regardless).
 /// </para>
 /// </remarks>
 /// <example>
