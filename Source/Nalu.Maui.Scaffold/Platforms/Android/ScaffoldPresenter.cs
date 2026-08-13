@@ -1746,22 +1746,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             case ScaffoldOverlayKind.Flyout:
             {
-                var options = scaffold.GetEffectiveFlyoutOptions(request.FlyoutSide);
-                var containerWidthDp = context.FromPixels(platformView.Width);
-                var widthDp = options.ComputeWidth(containerWidthDp);
-                var widthPx = (int)context.ToPixels(widthDp);
-                var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
-
                 panel = request.Content.ToPlatform(mauiContext);
                 (panel.Parent as AViewGroup)?.RemoveView(panel);
 
-                panel.LayoutParameters = new Android.Widget.FrameLayout.LayoutParams(widthPx, AViewGroup.LayoutParams.MatchParent)
-                {
-                    Gravity = onLeft ? GravityFlags.Left : GravityFlags.Right
-                };
-
                 // Entrance offset rides the MAUI translation (dp), applied after mounting.
-                flyoutOffscreen = onLeft ? -widthDp : widthDp;
+                flyoutOffscreen = LayoutFlyout(request, panel, platformView, context);
                 platformView.AddView(panel);
 
                 // The flyout covers the status-bar region: its surface drives the icon style
@@ -1773,58 +1762,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             case ScaffoldOverlayKind.Popup:
             {
-                var systemInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
-
-                var presentation = request.PopupPresentation!;
-                var margin = presentation.Margin;
-
-                var area = new Rect(
-                    context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
-                    context.FromPixels(systemInsets?.Top ?? 0) + margin.Top,
-                    Math.Max(0, context.FromPixels(platformView.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)) - margin.HorizontalThickness),
-                    Math.Max(0, context.FromPixels(platformView.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0)) - margin.VerticalThickness)
-                );
-
                 panel = request.Content.ToPlatform(mauiContext);
                 (panel.Parent as AViewGroup)?.RemoveView(panel);
-
-                panel.Measure(
-                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Width), MeasureSpecMode.AtMost),
-                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Height), MeasureSpecMode.AtMost)
-                );
-
-                var contentSize = new Size(
-                    Math.Min(context.FromPixels(panel.MeasuredWidth), area.Width),
-                    Math.Min(context.FromPixels(panel.MeasuredHeight), area.Height)
-                );
-
-                Rect? anchorBounds = null;
-
-                if (presentation.Anchor is { Handler.PlatformView: AView anchorView })
-                {
-                    var anchorLocation = new int[2];
-                    var containerLocation = new int[2];
-                    anchorView.GetLocationInWindow(anchorLocation);
-                    platformView.GetLocationInWindow(containerLocation);
-
-                    anchorBounds = new Rect(
-                        context.FromPixels(anchorLocation[0] - containerLocation[0]),
-                        context.FromPixels(anchorLocation[1] - containerLocation[1]),
-                        context.FromPixels(anchorView.Width),
-                        context.FromPixels(anchorView.Height)
-                    );
-                }
-
-                var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
-
-                var popupLayoutParams = new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(rect.Width), (int)context.ToPixels(rect.Height))
-                {
-                    Gravity = GravityFlags.Left | GravityFlags.Top,
-                    LeftMargin = (int)context.ToPixels(rect.X),
-                    TopMargin = (int)context.ToPixels(rect.Y)
-                };
-
-                platformView.AddView(panel, popupLayoutParams);
+                platformView.AddView(panel, LayoutPopup(request, panel, platformView, context));
 
                 break;
             }
@@ -1880,6 +1820,80 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         await ScaffoldOverlayAnimations.EnterAsync(request, scrimView);
 
         return true;
+    }
+
+    /// <summary>
+    /// Sizes and pins a flyout against the CURRENT window — its configured width (typically a
+    /// fraction of the window's), full height, on its edge — and returns the offscreen
+    /// translation that side implies. Leaves TranslationX alone, so an open flyout stays open.
+    /// </summary>
+    private double LayoutFlyout(ScaffoldOverlayRequest request, AView panel, AView container, Android.Content.Context context)
+    {
+        var options = scaffold.GetEffectiveFlyoutOptions(request.FlyoutSide);
+        var widthDp = options.ComputeWidth(context.FromPixels(container.Width));
+        var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
+
+        panel.LayoutParameters = new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(widthDp), AViewGroup.LayoutParams.MatchParent)
+        {
+            Gravity = onLeft ? GravityFlags.Left : GravityFlags.Right
+        };
+
+        return onLeft ? -widthDp : widthDp;
+    }
+
+    /// <summary>
+    /// Resolves a popup's placement against the CURRENT window: the available area is the window
+    /// minus its system insets and the popup's margin, and an anchored popup follows wherever its
+    /// anchor now sits. Returns the layout params to mount (or re-mount) it with.
+    /// </summary>
+    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, AView panel, AView container, Android.Content.Context context)
+    {
+        var systemInsets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+        var presentation = request.PopupPresentation!;
+        var margin = presentation.Margin;
+
+        var area = new Rect(
+            context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
+            context.FromPixels(systemInsets?.Top ?? 0) + margin.Top,
+            Math.Max(0, context.FromPixels(container.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)) - margin.HorizontalThickness),
+            Math.Max(0, context.FromPixels(container.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0)) - margin.VerticalThickness)
+        );
+
+        panel.Measure(
+            AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Width), MeasureSpecMode.AtMost),
+            AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Height), MeasureSpecMode.AtMost)
+        );
+
+        var contentSize = new Size(
+            Math.Min(context.FromPixels(panel.MeasuredWidth), area.Width),
+            Math.Min(context.FromPixels(panel.MeasuredHeight), area.Height)
+        );
+
+        Rect? anchorBounds = null;
+
+        if (presentation.Anchor is { Handler.PlatformView: AView anchorView })
+        {
+            var anchorLocation = new int[2];
+            var containerLocation = new int[2];
+            anchorView.GetLocationInWindow(anchorLocation);
+            container.GetLocationInWindow(containerLocation);
+
+            anchorBounds = new Rect(
+                context.FromPixels(anchorLocation[0] - containerLocation[0]),
+                context.FromPixels(anchorLocation[1] - containerLocation[1]),
+                context.FromPixels(anchorView.Width),
+                context.FromPixels(anchorView.Height)
+            );
+        }
+
+        var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+
+        return new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(rect.Width), (int)context.ToPixels(rect.Height))
+        {
+            Gravity = GravityFlags.Left | GravityFlags.Top,
+            LeftMargin = (int)context.ToPixels(rect.X),
+            TopMargin = (int)context.ToPixels(rect.Y)
+        };
     }
 
     /// <summary>
@@ -1941,9 +1955,27 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     {
         foreach (var entry in _overlays)
         {
-            if (entry is { Closing: false, Request.Content: ScaffoldBottomSheetView sheet } && entry.ContentPlatform is { } panel)
+            if (entry.Closing || entry.ContentPlatform is not { } panel)
             {
-                panel.LayoutParameters = LayoutBottomSheet(sheet, panel, container, context, initial: false);
+                continue;
+            }
+
+            switch (entry.Request)
+            {
+                case { Content: ScaffoldBottomSheetView sheet }:
+                    panel.LayoutParameters = LayoutBottomSheet(sheet, panel, container, context, initial: false);
+
+                    break;
+
+                case { Kind: ScaffoldOverlayKind.Popup }:
+                    panel.LayoutParameters = LayoutPopup(entry.Request, panel, container, context);
+
+                    break;
+
+                case { Kind: ScaffoldOverlayKind.Flyout }:
+                    LayoutFlyout(entry.Request, panel, container, context);
+
+                    break;
             }
         }
     }

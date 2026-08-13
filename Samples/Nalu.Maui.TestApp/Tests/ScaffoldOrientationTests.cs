@@ -76,6 +76,46 @@ public class OrRootPage : OrPageBase
         );
     }
 
+    private Button? _dropdownAnchor;
+
+    /// <summary>A CENTERED popup: its placement is resolved against the window, so a resize must re-resolve it.</summary>
+    private async Task ShowCenterPopupAsync()
+    {
+        var content = new Border
+        {
+            AutomationId = "OrPopupContent",
+            BackgroundColor = Colors.White,
+            WidthRequest = 240,
+            HeightRequest = 180,
+            Content = new Label { Text = "OrPopup", HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
+        };
+
+        await this.GetScaffold().ShowPopupAsync(content);
+    }
+
+    /// <summary>An ANCHORED popup: it must follow its anchor when the window changes shape.</summary>
+    private async Task ShowDropdownAsync()
+    {
+        var content = new Border
+        {
+            AutomationId = "OrDropdownContent",
+            BackgroundColor = Colors.White,
+            WidthRequest = 200,
+            HeightRequest = 120,
+            Content = new Label { Text = "OrDropdown", HorizontalOptions = LayoutOptions.Center }
+        };
+
+        await this.GetScaffold().ShowPopupAsync(
+            content,
+            new ScaffoldPopupOptions
+            {
+                Placement = ScaffoldPopupPlacement.AnchorBelow,
+                Anchor = _dropdownAnchor,
+                Scrim = new SolidColorBrush(Colors.Transparent)
+            }
+        );
+    }
+
     /// <summary>
     /// A sheet resting at a FRACTION of the available height: the detent a rotation must re-resolve,
     /// since landscape leaves a fraction of the vertical space portrait had.
@@ -113,6 +153,18 @@ public class OrRootPage : OrPageBase
             var tallSheetButton = new Button { Text = "Show tall sheet", AutomationId = "ShowOrTallSheet", FontSize = 11 };
             tallSheetButton.Clicked += async (_, _) => await ShowTallSheetAsync();
             stack.Insert(5, tallSheetButton);
+
+            var popupButton = new Button { Text = "Show popup", AutomationId = "ShowOrPopup", FontSize = 11 };
+            popupButton.Clicked += async (_, _) => await ShowCenterPopupAsync();
+            stack.Insert(6, popupButton);
+
+            _dropdownAnchor = new Button { Text = "Show dropdown", AutomationId = "ShowOrDropdown", FontSize = 11 };
+            _dropdownAnchor.Clicked += async (_, _) => await ShowDropdownAsync();
+            stack.Insert(7, _dropdownAnchor);
+
+            var flyoutButton = new Button { Text = "Open flyout", AutomationId = "OpenOrFlyout", FontSize = 11 };
+            flyoutButton.Clicked += async (_, _) => await this.GetScaffold().OpenFlyoutAsync(ScaffoldFlyoutSide.Start);
+            stack.Insert(8, flyoutButton);
         }
     }
 }
@@ -198,6 +250,17 @@ public class OrientationScaffold : Scaffold
     public OrientationScaffold(INavigationService navigationService)
     {
         _ = navigationService;
+
+        // Fractional width on purpose: it is a function of the window width, so a shape change
+        // must recompute it — the flyout equivalent of the sheet's fraction detents.
+        SetFlyoutStartMode(this, ScaffoldFlyoutMode.Flyout);
+        FlyoutStartOptions = new ScaffoldFlyoutOptions { WidthRatio = 0.6, MaximumWidth = 2000 };
+
+        FlyoutStart = new ScaffoldFlyoutMenuView
+        {
+            AutomationId = "OrFlyoutMenu",
+            HeaderView = new Label { Text = "OrFlyoutHeader", AutomationId = "OrFlyoutHeader", FontSize = 16 }
+        };
 
         Areas.Add(
             new ScaffoldTabBar

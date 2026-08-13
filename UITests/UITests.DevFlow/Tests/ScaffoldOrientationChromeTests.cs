@@ -144,6 +144,58 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
     }
 
     /// <summary>
+    /// A CENTERED popup is placed against the window: a shape change must re-resolve that
+    /// placement, or the popup stays where the old window's centre used to be.
+    /// </summary>
+    [Fact]
+    public async Task CenteredPopupRecentersOnTheNewWindow()
+    {
+        await App.TapAsync("ShowOrPopup");
+
+        var portrait = await App.WaitForStableBoundsAsync("OrPopupContent");
+        var (portraitWidth, _) = await App.GetWindowSizeAsync();
+        portrait.CenterX.Should().BeApproximately(portraitWidth / 2, 2, "a centered popup starts centered");
+
+        await App.SetOrientationAsync(landscape: true);
+
+        var (landscapeWidth, landscapeHeight) = await App.GetWindowSizeAsync();
+        var landscape = await App.WaitForStableBoundsAsync("OrPopupContent");
+
+        landscape.CenterX.Should().BeApproximately(landscapeWidth / 2, 2, "and must re-center on the window it now sits in");
+        landscape.CenterY.Should().BeApproximately(landscapeHeight / 2, 20, "vertically too, allowing for the safe-area area it is centered within");
+
+        await App.TapAsync("PopupScrim");
+        await App.SetOrientationAsync(landscape: false);
+    }
+
+    /// <summary>
+    /// A flyout's width is a FRACTION of the window's and it is pinned to an edge over the full
+    /// height: a shape change must recompute both, or it keeps the old window's proportions.
+    /// </summary>
+    [Fact]
+    public async Task OpenFlyoutResizesToTheNewWindow()
+    {
+        const double widthRatio = 0.6;
+
+        await App.TapAsync("OpenOrFlyout");
+
+        var portrait = await App.WaitForStableBoundsAsync("OrFlyoutMenu");
+        var (portraitWidth, portraitHeight) = await App.GetWindowSizeAsync();
+        portrait.Width.Should().BeApproximately(portraitWidth * widthRatio, 2, "the flyout takes its share of the window");
+        portrait.Height.Should().BeApproximately(portraitHeight, 2, "over its full height");
+
+        await App.SetOrientationAsync(landscape: true);
+
+        var (landscapeWidth, landscapeHeight) = await App.GetWindowSizeAsync();
+        var landscape = await App.WaitForStableBoundsAsync("OrFlyoutMenu");
+
+        landscape.Width.Should().BeApproximately(landscapeWidth * widthRatio, 2, "the share is re-taken from the new window");
+        landscape.Height.Should().BeApproximately(landscapeHeight, 2, "and it still spans the full height");
+
+        await App.SetOrientationAsync(landscape: false);
+    }
+
+    /// <summary>
     /// Landscape brings side insets into play (the notch edge). The page must keep clear of them:
     /// content starting at x = 0 would sit under the cutout.
     /// </summary>

@@ -426,50 +426,54 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         var newView = newController.View!;
 
         // A remounted page keeps the transform its unmount animation left behind (covered pages
-        // are detached, never destroyed) — setting Frame under an active transform corrupts the
-        // geometry (the page lands offscreen). Always clear before framing; the depth dim from
-        // a previous departure clears with it.
+        // are detached, never destroyed) — every choreography below starts from identity, so a
+        // survivor would offset the page for its whole entrance (it lands offscreen). Always
+        // clear before staging; the depth dim from a previous departure clears with it.
         ResetMotion(newView);
         ScaffoldPageDepth.RemoveDim(newView);
-        newView.Frame = container.Bounds;
-        newView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
 
         var width = container.Bounds.Width;
 
-        // THE mount step, shared by every choreography below: stage the page, complete
-        // containment, and settle its layout. Kept as one helper on purpose — each branch used to
-        // repeat the three calls, and a branch that forgot the last one shipped the scale-in bug
-        // (a tab switch and a cross-area switch each missed it independently).
-        //
-        // The settle arranges the page's CONTENT explicitly outside any animation, once the view
-        // is IN the hierarchy — a detached view has no meaningful layout to force. It matters
-        // because the chrome show/hide accompanying a navigation runs its own layout pass inside
-        // an animation block (the page INSET relayout is meant to animate with the strip), and
-        // UIKit animates every frame change such a pass produces: a page whose content is arranged
-        // for the first time in there has each child interpolated from its never-arranged zero
-        // frame into place, so the page appears to SCALE IN instead of sliding in already laid
-        // out. Same hazard, same remedy, as the strip's own PerformWithoutAnimation guard —
-        // SetNeedsLayout first, since LayoutIfNeeded alone is a no-op when nothing is pending.
-        void Mount(UIView? below = null)
+        // THE mount step, shared by every choreography below: stage the page and complete
+        // containment. One helper on purpose — each branch used to repeat these calls, and a
+        // branch that got them wrong shipped a visual bug of its own.
+        void Mount()
         {
-            if (below is null)
-            {
-                container.AddSubview(newView);
-            }
-            else
-            {
-                container.InsertSubviewBelow(newView, below);
-            }
+            container.AddSubview(newView);
+            UIView.PerformWithoutAnimation(CompleteMount);
+        }
+        
+        void MountBelow()
+        {
+            container.InsertSubviewBelow(newView, previousController.View!);
+            UIView.PerformWithoutAnimation(CompleteMount);
+        }
 
+        void CompleteMount()
+        {
+            // Size the page to the container EXPLICITLY: nothing else does it (the controller
+            // frames its content host, never the page), and the autoresizing mask below only
+            // reacts to LATER container resizes — it cannot correct a wrong starting size. Left
+            // implicit, a fresh page would arrive at whatever size UIKit loaded its controller's
+            // view at, which happens to match only while the container fills the window.
+            //
+            // Bounds+Center rather than Frame: under a non-identity transform the frame is
+            // undefined, and every page here is moved by transform — the slides, the
+            // shared-element flights, the interactive peek.
+            var bounds = container.Bounds;
+            newView.Bounds = new CGRect(CGPoint.Empty, bounds.Size);
+            newView.Center = new CGPoint(bounds.GetMidX(), bounds.GetMidY());
+
+            newView.TranslatesAutoresizingMaskIntoConstraints = true;
+            newView.AutoresizingMask = UIViewAutoresizing.FlexibleDimensions;
             newController.DidMoveToParentViewController(parentController);
 
-            UIView.PerformWithoutAnimation(
-                () =>
-                {
-                    newView.SetNeedsLayout();
-                    newView.LayoutIfNeeded();
-                }
-            );
+            // Arranges the page's content from the CONTAINER as layout root, outside any
+            // animation. The chrome show/hide accompanying a navigation runs its own layout pass
+            // inside an animation block, and UIKit animates every frame change it produces: a
+            // page first arranged in there has each child interpolated from a never-arranged zero
+            // frame, so it appears to SCALE IN instead of sliding in already laid out.
+            container.LayoutIfNeeded();
         }
 
         switch (hint)
@@ -493,7 +497,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             case ScaffoldPresentationHint.Pop when previousController?.View is { } previousView:
             {
-                Mount(below: previousView);
+                MountBelow();
                 await PlayPopAsync(container, mauiContext, previousPage, targetPage, previousView, newView);
 
                 break;
@@ -505,7 +509,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // fades out ON TOP of the new one (a symmetric double fade would show the
                 // window through both of them at the midpoint).
                 Mount();
-
                 await PlayCrossAreaFadeAsync(container, previousController);
 
                 break;
@@ -1139,18 +1142,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             case ScaffoldOverlayKind.Flyout:
             {
-                var options = scaffold.GetEffectiveFlyoutOptions(request.FlyoutSide);
-                var width = options.ComputeWidth(bounds.Width);
-                var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
-
                 // Arranged VIRTUALLY at the OPEN position (the MAUI frame must be valid or the
                 // iOS transform mapper skips translations); the entrance offset rides the MAUI
                 // translation, applied after the arrange.
                 panel = request.Content.ToPlatform(mauiContext);
-                var flyoutView = (IView)request.Content;
-                flyoutView.Measure(width, bounds.Height);
-                flyoutView.Arrange(new Rect(onLeft ? 0 : bounds.Width - width, 0, width, bounds.Height));
-                flyoutOffscreen = onLeft ? -width : width;
+                flyoutOffscreen = LayoutFlyout(request, container);
                 container.AddSubview(panel);
 
                 // The flyout covers the status-bar region: its surface drives the icon style
@@ -1162,34 +1158,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             case ScaffoldOverlayKind.Popup:
             {
-                var insets = controller.View!.SafeAreaInsets;
-
-                var presentation = request.PopupPresentation!;
-                var margin = presentation.Margin;
-
-                var area = new Rect(
-                    bounds.X + insets.Left + margin.Left,
-                    bounds.Y + insets.Top + margin.Top,
-                    Math.Max(0, bounds.Width - insets.Left - insets.Right - margin.HorizontalThickness),
-                    Math.Max(0, bounds.Height - insets.Top - insets.Bottom - margin.VerticalThickness)
-                );
-
                 panel = request.Content.ToPlatform(mauiContext);
-
-                var popupView = (IView)request.Content;
-                var fitted = popupView.Measure(area.Width, area.Height);
-                var contentSize = new Size(Math.Min(fitted.Width, area.Width), Math.Min(fitted.Height, area.Height));
-
-                Rect? anchorBounds = null;
-
-                if (presentation.Anchor is { Handler.PlatformView: UIView anchorView })
-                {
-                    var frame = anchorView.ConvertRectToView(anchorView.Bounds, container);
-                    anchorBounds = new Rect(frame.X, frame.Y, frame.Width, frame.Height);
-                }
-
-                var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
-                popupView.Arrange(rect);
+                LayoutPopup(request, controller, container);
                 container.AddSubview(panel);
 
                 break;
@@ -1235,6 +1205,63 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
+    /// Arranges a flyout against the CURRENT window — full height, its configured width, pinned to
+    /// its edge — and returns the offscreen translation that side implies.
+    /// </summary>
+    /// <remarks>
+    /// The width is a function of the window width (a fraction, typically), and the END side is
+    /// positioned from the right edge: a window that changes shape moves both. The arrange leaves
+    /// TranslationX alone, so an open flyout stays open and a closing one keeps animating.
+    /// </remarks>
+    private double LayoutFlyout(ScaffoldOverlayRequest request, UIView container)
+    {
+        var bounds = container.Bounds;
+        var options = scaffold.GetEffectiveFlyoutOptions(request.FlyoutSide);
+        var width = options.ComputeWidth(bounds.Width);
+        var onLeft = IsFlyoutOnLeft(request.FlyoutSide);
+
+        var flyoutView = (IView)request.Content;
+        flyoutView.Measure(width, bounds.Height);
+        flyoutView.Arrange(new Rect(onLeft ? 0 : bounds.Width - width, 0, width, bounds.Height));
+
+        return onLeft ? -width : width;
+    }
+
+    /// <summary>
+    /// Resolves a popup's placement against the CURRENT window: the available area is the window
+    /// minus its safe-area insets and the popup's margin, and an anchored popup follows wherever
+    /// its anchor now sits.
+    /// </summary>
+    private void LayoutPopup(ScaffoldOverlayRequest request, ScaffoldViewController controller, UIView container)
+    {
+        var bounds = container.Bounds;
+        var insets = controller.View!.SafeAreaInsets;
+        var presentation = request.PopupPresentation!;
+        var margin = presentation.Margin;
+
+        var area = new Rect(
+            bounds.X + insets.Left + margin.Left,
+            bounds.Y + insets.Top + margin.Top,
+            Math.Max(0, bounds.Width - insets.Left - insets.Right - margin.HorizontalThickness),
+            Math.Max(0, bounds.Height - insets.Top - insets.Bottom - margin.VerticalThickness)
+        );
+
+        var popupView = (IView)request.Content;
+        var fitted = popupView.Measure(area.Width, area.Height);
+        var contentSize = new Size(Math.Min(fitted.Width, area.Width), Math.Min(fitted.Height, area.Height));
+
+        Rect? anchorBounds = null;
+
+        if (presentation.Anchor is { Handler.PlatformView: UIView anchorView })
+        {
+            var frame = anchorView.ConvertRectToView(anchorView.Bounds, container);
+            anchorBounds = new Rect(frame.X, frame.Y, frame.Width, frame.Height);
+        }
+
+        popupView.Arrange(ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft));
+    }
+
+    /// <summary>
     /// Frames a bottom sheet against the CURRENT window: capped width, centered, bottom-anchored,
     /// with its detents resolved against the height available above the top inset.
     /// </summary>
@@ -1272,20 +1299,37 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// Re-lays out presented overlays after the window changed shape (rotation, split view).
     /// </summary>
     /// <remarks>
-    /// Overlay geometry is computed at presentation from the window of that moment. A rotation
-    /// leaves a bottom sheet at its portrait width and portrait detent heights — off the side of
-    /// the screen, and taller than the window it now sits in — while its scrim, which autoresizes,
-    /// still dims everything: the user is left staring at a dimmed screen with no sheet on it.
-    /// Only the sheet is re-laid out here; anchored popups and panels have the same exposure and
-    /// are not covered yet.
+    /// Overlay geometry is computed at presentation from the window of that moment. A window that
+    /// changes shape — a rotation, but equally an iPad or tablet window the user simply drags to a
+    /// new size — leaves a bottom sheet at its old width and old detent heights (off the side of
+    /// the screen, taller than the window it now sits in) and a popup wherever it was centered or
+    /// anchored, while their scrims, which autoresize, go on dimming everything.
     /// </remarks>
     private void RelayoutOverlays(ScaffoldViewController controller, UIView container)
     {
         foreach (var entry in _overlays)
         {
-            if (entry is { Closing: false, Request.Content: ScaffoldBottomSheetView sheet })
+            if (entry.Closing)
             {
-                LayoutBottomSheet(sheet, controller, container, initial: false);
+                continue;
+            }
+
+            switch (entry.Request)
+            {
+                case { Content: ScaffoldBottomSheetView sheet }:
+                    LayoutBottomSheet(sheet, controller, container, initial: false);
+
+                    break;
+
+                case { Kind: ScaffoldOverlayKind.Popup }:
+                    LayoutPopup(entry.Request, controller, container);
+
+                    break;
+
+                case { Kind: ScaffoldOverlayKind.Flyout }:
+                    LayoutFlyout(entry.Request, container);
+
+                    break;
             }
         }
     }
