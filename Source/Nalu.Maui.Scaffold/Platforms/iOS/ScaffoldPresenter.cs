@@ -432,6 +432,42 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var width = container.Bounds.Width;
 
+        // THE mount step, shared by every choreography below: stage the page, complete
+        // containment, and settle its layout. Kept as one helper on purpose — each branch used to
+        // repeat the three calls, and a branch that forgot the last one shipped the scale-in bug
+        // (a tab switch and a cross-area switch each missed it independently).
+        //
+        // The settle arranges the page's CONTENT explicitly outside any animation, once the view
+        // is IN the hierarchy — a detached view has no meaningful layout to force. It matters
+        // because the chrome show/hide accompanying a navigation runs its own layout pass inside
+        // an animation block (the page INSET relayout is meant to animate with the strip), and
+        // UIKit animates every frame change such a pass produces: a page whose content is arranged
+        // for the first time in there has each child interpolated from its never-arranged zero
+        // frame into place, so the page appears to SCALE IN instead of sliding in already laid
+        // out. Same hazard, same remedy, as the strip's own PerformWithoutAnimation guard —
+        // SetNeedsLayout first, since LayoutIfNeeded alone is a no-op when nothing is pending.
+        void Mount(UIView? below = null)
+        {
+            if (below is null)
+            {
+                container.AddSubview(newView);
+            }
+            else
+            {
+                container.InsertSubviewBelow(newView, below);
+            }
+
+            newController.DidMoveToParentViewController(parentController);
+
+            UIView.PerformWithoutAnimation(
+                () =>
+                {
+                    newView.SetNeedsLayout();
+                    newView.LayoutIfNeeded();
+                }
+            );
+        }
+
         switch (hint)
         {
             case ScaffoldPresentationHint.Pop when interactivelySettled:
@@ -445,109 +481,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             case ScaffoldPresentationHint.Push:
             {
-                container.AddSubview(newView);
-                newController.DidMoveToParentViewController(parentController);
-
-                var pushSpec = scaffold.ResolvePageTransition(targetPage);
-                var coveredView = previousController?.View;
-
-                // Depth cue spans any animated push: the covered page dims beneath the
-                // incoming one.
-                var pushAnimates = coveredView is not null
-                    && (pushSpec.IsAnimated
-                        || (previousPage is not null
-                            && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0));
-
-                Task? coverDim = null;
-
-                if (pushAnimates)
-                {
-                    ScaffoldPageDepth.SetDim(coveredView!, 0f);
-                    coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, _transitionDurationSeconds);
-                }
-
-                // Shared elements (§8): matching Scaffold.TransitionName pairs fly between the
-                // pages while the standard slide plays (the flight math assumes it); pages
-                // without pairs play their resolved ScaffoldPageTransition spec (§8.2).
-                var handled = previousPage is not null && previousController?.View is { } prevPushView
-                    && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, _transitionDurationSeconds);
-
-                if (!handled && pushSpec.IsAnimated)
-                {
-                    var previousView = previousController?.View;
-                    ApplyMotion(newView, pushSpec.Enter, container.Bounds);
-
-                    await UIView.AnimateAsync(pushSpec.DurationSeconds, () =>
-                    {
-                        ResetMotion(newView);
-
-                        if (previousView is not null)
-                        {
-                            ApplyMotion(previousView, pushSpec.Behind, container.Bounds);
-                        }
-                    });
-                }
-
-                if (pushAnimates)
-                {
-                    if (coverDim is not null)
-                    {
-                        await coverDim;
-                    }
-
-                    // The covered page (detached, kept alive) keeps no dim for its next
-                    // reveal.
-                    ScaffoldPageDepth.RemoveDim(coveredView!);
-                }
+                Mount();
+                await PlayPushAsync(container, mauiContext, previousPage, targetPage, previousController, newView);
 
                 break;
             }
 
             case ScaffoldPresentationHint.Pop when previousController?.View is { } previousView:
             {
-                container.InsertSubviewBelow(newView, previousView);
-                newController.DidMoveToParentViewController(parentController);
-
-                // The POPPED page's own spec, reversed: it leaves the way it entered.
-                var popSpec = previousPage is not null ? scaffold.ResolvePageTransition(previousPage) : ScaffoldPageTransition.Default;
-
-                // Depth cue spans any animated pop: the revealed page starts dimmed and
-                // brightens as the departing one goes.
-                var popAnimates = popSpec.IsAnimated
-                    || (previousPage is not null
-                        && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0);
-
-                Task? revealDim = null;
-
-                if (popAnimates)
-                {
-                    ScaffoldPageDepth.SetDim(newView, 1f);
-                    revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, _transitionDurationSeconds);
-                }
-
-                var handled = previousPage is not null
-                    && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, _transitionDurationSeconds);
-
-                if (!handled && popSpec.IsAnimated)
-                {
-                    ApplyMotion(newView, popSpec.Behind, container.Bounds);
-
-                    await UIView.AnimateAsync(popSpec.DurationSeconds, () =>
-                    {
-                        ResetMotion(newView);
-                        ApplyMotion(previousView, popSpec.Enter, container.Bounds);
-                    });
-                }
-
-                if (popAnimates)
-                {
-                    if (revealDim is not null)
-                    {
-                        await revealDim;
-                    }
-
-                    ScaffoldPageDepth.RemoveDim(newView);
-                }
+                Mount(below: previousView);
+                await PlayPopAsync(container, mauiContext, previousPage, targetPage, previousView, newView);
 
                 break;
             }
@@ -557,15 +500,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // Cross-area root switch: no strip to travel along, so the outgoing content
                 // fades out ON TOP of the new one (a symmetric double fade would show the
                 // window through both of them at the midpoint).
-                container.AddSubview(newView);
-                newController.DidMoveToParentViewController(parentController);
+                Mount();
 
-                if (previousController?.View is { } fadingView)
-                {
-                    container.BringSubviewToFront(fadingView);
-
-                    await UIView.AnimateAsync(scaffold.ResolveRootSwitchTransition().DurationSeconds, () => fadingView.Alpha = 0);
-                }
+                await PlayCrossAreaFadeAsync(container, previousController);
 
                 break;
             }
@@ -576,46 +513,193 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // travel. Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
                 var fromX = hint == ScaffoldPresentationHint.SlideEnd ? width : -width;
 
-                container.AddSubview(newView);
-                newController.DidMoveToParentViewController(parentController);
-                newView.Transform = CGAffineTransform.MakeTranslation(fromX, 0);
-
-                var previousView = previousController?.View;
-
-                await UIView.AnimateAsync(scaffold.ResolveRootSwitchTransition().DurationSeconds, () =>
-                {
-                    newView.Transform = CGAffineTransform.MakeIdentity();
-
-                    if (previousView is not null)
-                    {
-                        previousView.Transform = CGAffineTransform.MakeTranslation(-fromX, 0);
-                    }
-                });
+                Mount();
+                await PlaySwitchSlideAsync(previousController, newView, fromX);
 
                 break;
             }
 
             default:
-                container.AddSubview(newView);
-                newController.DidMoveToParentViewController(parentController);
+                Mount();
 
                 break;
         }
 
-        if (previousController is not null)
+        DetachPreviousPage(previousController);
+    }
+
+    /// <summary>Unmounts the page left behind, motion-clean for its next appearance.</summary>
+    private static void DetachPreviousPage(UIViewController? previousController)
+    {
+        if (previousController is null)
         {
-            previousController.WillMoveToParentViewController(null);
+            return;
+        }
 
-            if (previousController.View is { } previousView)
+        previousController.WillMoveToParentViewController(null);
+
+        if (previousController.View is { } previousView)
+        {
+            previousView.RemoveFromSuperview();
+
+            ResetMotion(previousView);
+        }
+
+        previousController.RemoveFromParentViewController();
+    }
+
+    /// <summary>
+    /// The stock push: the covered page dims beneath the incoming one, shared-element pairs fly
+    /// if the two pages declare matching names, otherwise both play the resolved §8.2 spec.
+    /// </summary>
+    private async Task PlayPushAsync(
+        UIView container,
+        IMauiContext mauiContext,
+        Page? previousPage,
+        Page targetPage,
+        UIViewController? previousController,
+        UIView newView)
+    {
+        var pushSpec = scaffold.ResolvePageTransition(targetPage);
+        var coveredView = previousController?.View;
+
+        // Depth cue spans any animated push: the covered page dims beneath the
+        // incoming one.
+        var pushAnimates = coveredView is not null
+            && (pushSpec.IsAnimated
+                || (previousPage is not null
+                    && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0));
+
+        Task? coverDim = null;
+
+        if (pushAnimates)
+        {
+            ScaffoldPageDepth.SetDim(coveredView!, 0f);
+            coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, _transitionDurationSeconds);
+        }
+
+        // Shared elements (§8): matching Scaffold.TransitionName pairs fly between the
+        // pages while the standard slide plays (the flight math assumes it); pages
+        // without pairs play their resolved ScaffoldPageTransition spec (§8.2).
+        var handled = previousPage is not null && previousController?.View is { } prevPushView
+            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, _transitionDurationSeconds);
+
+        if (!handled && pushSpec.IsAnimated)
+        {
+            var previousView = previousController?.View;
+            ApplyMotion(newView, pushSpec.Enter, container.Bounds);
+
+            await UIView.AnimateAsync(pushSpec.DurationSeconds, () =>
             {
-                previousView.RemoveFromSuperview();
+                ResetMotion(newView);
 
-                // Leave the detached view motion-clean for its next mount.
-                ResetMotion(previousView);
+                if (previousView is not null)
+                {
+                    ApplyMotion(previousView, pushSpec.Behind, container.Bounds);
+                }
+            });
+        }
+
+        if (pushAnimates)
+        {
+            if (coverDim is not null)
+            {
+                await coverDim;
             }
 
-            previousController.RemoveFromParentViewController();
+            // The covered page (detached, kept alive) keeps no dim for its next
+            // reveal.
+            ScaffoldPageDepth.RemoveDim(coveredView!);
         }
+    }
+
+    /// <summary>
+    /// The stock pop: the revealed page starts dimmed and brightens while the departing page
+    /// leaves the way it entered — its OWN spec, reversed.
+    /// </summary>
+    private async Task PlayPopAsync(
+        UIView container,
+        IMauiContext mauiContext,
+        Page? previousPage,
+        Page targetPage,
+        UIView previousView,
+        UIView newView)
+    {
+        // The POPPED page's own spec, reversed: it leaves the way it entered.
+        var popSpec = previousPage is not null ? scaffold.ResolvePageTransition(previousPage) : ScaffoldPageTransition.Default;
+
+        // Depth cue spans any animated pop: the revealed page starts dimmed and
+        // brightens as the departing one goes.
+        var popAnimates = popSpec.IsAnimated
+            || (previousPage is not null
+                && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0);
+
+        Task? revealDim = null;
+
+        if (popAnimates)
+        {
+            ScaffoldPageDepth.SetDim(newView, 1f);
+            revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, _transitionDurationSeconds);
+        }
+
+        var handled = previousPage is not null
+            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, _transitionDurationSeconds);
+
+        if (!handled && popSpec.IsAnimated)
+        {
+            ApplyMotion(newView, popSpec.Behind, container.Bounds);
+
+            await UIView.AnimateAsync(popSpec.DurationSeconds, () =>
+            {
+                ResetMotion(newView);
+                ApplyMotion(previousView, popSpec.Enter, container.Bounds);
+            });
+        }
+
+        if (popAnimates)
+        {
+            if (revealDim is not null)
+            {
+                await revealDim;
+            }
+
+            ScaffoldPageDepth.RemoveDim(newView);
+        }
+    }
+
+    /// <summary>
+    /// Cross-area root switch: no strip to travel along, so the outgoing content fades out ON TOP
+    /// of the new one (a symmetric double fade would show the window through both at the midpoint).
+    /// </summary>
+    private async Task PlayCrossAreaFadeAsync(UIView container, UIViewController? previousController)
+    {
+        if (previousController?.View is { } fadingView)
+        {
+            container.BringSubviewToFront(fadingView);
+
+            await UIView.AnimateAsync(scaffold.ResolveRootSwitchTransition().DurationSeconds, () => fadingView.Alpha = 0);
+        }
+    }
+
+    /// <summary>
+    /// Tab or root switch within an area: both pages travel together in the direction of the
+    /// switch. Logical Start/End mapped LTR for now (RTL mapping arrives with the engine).
+    /// </summary>
+    private async Task PlaySwitchSlideAsync(UIViewController? previousController, UIView newView, nfloat fromX)
+    {
+        newView.Transform = CGAffineTransform.MakeTranslation(fromX, 0);
+
+        var previousView = previousController?.View;
+
+        await UIView.AnimateAsync(scaffold.ResolveRootSwitchTransition().DurationSeconds, () =>
+        {
+            newView.Transform = CGAffineTransform.MakeIdentity();
+
+            if (previousView is not null)
+            {
+                previousView.Transform = CGAffineTransform.MakeTranslation(-fromX, 0);
+            }
+        });
     }
 
     /// <summary>Applies a §8.2 motion state: scale about center + fractional translation + opacity.</summary>
