@@ -850,6 +850,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             // A freshly appearing strip starts above the edge and slides in.
             controller.MountNavBar(host.ToPlatform(mauiContext), startHidden: animated);
         }
+        else
+        {
+            // The strip keeps the same platform host across swaps, so its measure still describes
+            // the PREVIOUS bar: a shorter custom bar would be centered inside the taller strip it
+            // replaced. MAUI's own measure invalidation stops at the native strip, so ask here.
+            controller.InvalidateNavBarMeasure();
+        }
 
         // The element tree reflects presented chrome: attached while visible, detached while
         // hidden (the strip and platform view stay alive offscreen either way).

@@ -1,8 +1,74 @@
 using CoreFoundation;
 using CoreGraphics;
+using Microsoft.Maui.Platform;
 using UIKit;
 
 namespace Nalu;
+
+/// <summary>
+/// Measurement shared by the chrome strips hosting a MAUI bar view (nav bar, tab bar).
+/// </summary>
+/// <remarks>
+/// <para>
+/// The bar decides how much room it needs, INCLUDING whatever system inset it chooses to consume
+/// through its own safe-area behavior — the strip never second-guesses that declaration. It cannot:
+/// the behavior comes from <c>SafeAreaEdges</c> on layouts, from <c>ISafeAreaView.IgnoreSafeArea</c>
+/// on plain views (a Nalu <c>ViewBox</c> lands here and consumes by default), and from MAUI's own
+/// per-type defaults, whose meaning is still moving upstream (dotnet/maui#34872). Reading any of
+/// that from the host would encode an interpretation that breaks the moment MAUI changes it.
+/// </para>
+/// <para>
+/// What the host DOES have to guarantee is that the answer is current: MAUI folds the consumed
+/// inset into the size in <c>CrossPlatformMeasure</c>, but only arms that fold while laying out
+/// (<c>ValidateSafeArea</c> runs in <c>LayoutSubviews</c>; <c>SizeThatFits</c> replies from cache),
+/// and it propagates the resulting invalidation to the host only when the bar's superview is a
+/// cross-platform layout backing — which a native strip is not. Without settling the layout first,
+/// a bar that consumes the inset on its ROOT keeps the height it reported before placement, when
+/// no inset had reached it yet, and nothing ever asks again.
+/// </para>
+/// </remarks>
+internal static class ScaffoldChromeBar
+{
+    /// <summary>The bar's height, including whatever system inset it chose to consume.</summary>
+    internal static nfloat MeasureHeight(UIView bar, nfloat width)
+        => bar.SizeThatFits(new CGSize(width, nfloat.MaxValue)).Height;
+
+    /// <summary>
+    /// A strip's page-facing contribution: its part ABOVE the system inset it extends under. The
+    /// page already receives that inset from the system safe area, so only the surplus is added —
+    /// and never a negative value, which an edge-to-edge bar SHORTER than the inset would
+    /// otherwise produce, pulling page content under the system bar.
+    /// </summary>
+    internal static nfloat FootprintAboveInset(nfloat measured, nfloat systemInset)
+        => (nfloat)Math.Max(0, measured - systemInset);
+
+    /// <summary>
+    /// Lays the bar out at the frame it has just been given, so its safe-area state is current,
+    /// and drops the cached measure taken before the insets reached it.
+    /// </summary>
+    /// <remarks>
+    /// MAUI folds the consumed system inset into the bar's size in <c>CrossPlatformMeasure</c>, but
+    /// arms that fold only while the bar lays out (<c>ValidateSafeArea</c> runs in
+    /// <c>LayoutSubviews</c>; <c>SizeThatFits</c> replies from cache), and it reports the resulting
+    /// change to the host only when the bar's superview is a cross-platform layout backing — which
+    /// a native strip is not. Running the bar's layout here, AFTER its final frame is assigned, is
+    /// what makes the following measure meaningful.
+    /// </remarks>
+    internal static void SettleBarAtCurrentFrame(UIView bar)
+    {
+        bar.SetNeedsLayout();
+        bar.LayoutIfNeeded();
+
+        if (bar is MauiView { View: { } crossPlatformView })
+        {
+            crossPlatformView.InvalidateMeasure();
+        }
+        else
+        {
+            (bar as IPlatformMeasureInvalidationController)?.InvalidateMeasure();
+        }
+    }
+}
 
 /// <summary>
 /// Root view controller of a scaffold-hosted app. Hosts two layers:
@@ -62,7 +128,7 @@ internal sealed class ScaffoldViewController : UIViewController
     /// contribution is the measured height minus the system inset. Zero when no bar is mounted.
     /// </summary>
     public nfloat BarHeight => _tabBarStrip is { } strip
-        ? (nfloat)Math.Max(0, strip.BarHeight - (View?.SafeAreaInsets.Bottom ?? 0))
+        ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View?.SafeAreaInsets.Bottom ?? 0)
         : 0;
 
     /// <summary>
@@ -209,6 +275,12 @@ internal sealed class ScaffoldViewController : UIViewController
         _navBarPresented = !startHidden;
     }
 
+    /// <summary>
+    /// Re-measures the nav bar strip after a VIRTUAL bar swap (the platform host stays mounted, so
+    /// nothing else tells the strip its content changed).
+    /// </summary>
+    public void InvalidateNavBarMeasure() => _navBarStrip?.InvalidateBarMeasure();
+
     /// <summary>Removes the nav bar strip entirely (nav bar view swap / teardown).</summary>
     public void UnmountNavBar()
     {
@@ -218,8 +290,8 @@ internal sealed class ScaffoldViewController : UIViewController
         View!.SetNeedsLayout();
     }
 
-    /// <summary>Full strip height: bar content + the system top inset the bar extends under.</summary>
-    private nfloat NavStripHeight(ScaffoldNavBarStrip strip) => strip.ContentHeight + View!.SafeAreaInsets.Top;
+    /// <summary>Full strip height: whatever the bar measured, system inset region included.</summary>
+    private nfloat NavStripHeight(ScaffoldNavBarStrip strip) => strip.BarHeight;
 
     private void PositionNavStrip(ScaffoldNavBarStrip strip, CGRect containerBounds)
     {
@@ -365,7 +437,9 @@ internal sealed class ScaffoldViewController : UIViewController
 
     /// <summary>The nav bar's top inset contribution above the system inset: the bar's content height.</summary>
     private nfloat NavBarInsetContribution
-        => _navBarStrip is { } strip && _navBarPresented ? strip.ContentHeight : 0;
+        => _navBarStrip is { } strip && _navBarPresented
+            ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View!.SafeAreaInsets.Top)
+            : 0;
 
     /// <summary>Applies the current page's chrome inset contributions to its own controller.</summary>
     public void ApplyCurrentPageInsets()
@@ -444,6 +518,8 @@ internal sealed class ScaffoldTabBarStrip : UIView
 
     internal bool NeedsMeasure { get; private set; } = true;
 
+    private bool _barNeedsRemeasure;
+
     internal nfloat BarHeight { get; private set; }
 
     public ScaffoldTabBarStrip(UIView bar)
@@ -457,7 +533,7 @@ internal sealed class ScaffoldTabBarStrip : UIView
 
     internal void Measure(nfloat width)
     {
-        BarHeight = Bar.SizeThatFits(new CGSize(width, nfloat.MaxValue)).Height;
+        BarHeight = ScaffoldChromeBar.MeasureHeight(Bar, width);
         NeedsMeasure = false;
     }
 
@@ -472,6 +548,10 @@ internal sealed class ScaffoldTabBarStrip : UIView
     {
         base.SafeAreaInsetsDidChange();
         NeedsMeasure = true;
+
+        // The bar's cached measure predates these insets. It can only re-fold them once it lays
+        // out at its final frame, which happens in OUR layout pass — flag it for there.
+        _barNeedsRemeasure = true;
     }
 
     public override void LayoutSubviews()
@@ -483,6 +563,18 @@ internal sealed class ScaffoldTabBarStrip : UIView
         // default template's Auto-row root keeps its pill above the inset (Auto rows
         // top-align at their measured height).
         Bar.Frame = Bounds;
+
+        if (_barNeedsRemeasure)
+        {
+            _barNeedsRemeasure = false;
+
+            // The bar now has its final frame, so laying it out validates its safe area and
+            // re-folds the inset. Dirty the host afterwards: its next pass re-measures a bar
+            // whose answer has become current.
+            ScaffoldChromeBar.SettleBarAtCurrentFrame(Bar);
+            NeedsMeasure = true;
+            Superview?.SetNeedsLayout();
+        }
     }
 
     public override UIView? HitTest(CGPoint point, UIEvent? uievent)
@@ -508,8 +600,10 @@ internal sealed class ScaffoldNavBarStrip : UIView
 
     internal bool NeedsMeasure { get; private set; } = true;
 
-    /// <summary>The bar's content height, EXCLUDING any safe-area padding it consumed.</summary>
-    internal nfloat ContentHeight { get; private set; }
+    private bool _barNeedsRemeasure;
+
+    /// <summary>The bar's height, INCLUDING any safe-area padding it chose to consume.</summary>
+    internal nfloat BarHeight { get; private set; }
 
     public ScaffoldNavBarStrip(UIView bar)
     {
@@ -522,9 +616,19 @@ internal sealed class ScaffoldNavBarStrip : UIView
 
     internal void Measure(nfloat width)
     {
-        var measured = Bar.SizeThatFits(new CGSize(width, nfloat.MaxValue)).Height;
-        ContentHeight = measured - Bar.SafeAreaInsets.Top;
+        BarHeight = ScaffoldChromeBar.MeasureHeight(Bar, width);
         NeedsMeasure = false;
+    }
+
+    /// <summary>
+    /// The hosted bar's CONTENT changed — a virtual bar swap, which keeps this strip's platform
+    /// view and so raises no inset callback. The measure still describes the previous bar, and the
+    /// incoming one has not laid out yet, so it goes through the same settle-then-measure path.
+    /// </summary>
+    internal void InvalidateBarMeasure()
+    {
+        _barNeedsRemeasure = true;
+        SetNeedsLayout();
     }
 
     public override void SetNeedsLayout()
@@ -538,12 +642,28 @@ internal sealed class ScaffoldNavBarStrip : UIView
     {
         base.SafeAreaInsetsDidChange();
         NeedsMeasure = true;
+
+        // The bar's cached measure predates these insets. It can only re-fold them once it lays
+        // out at its final frame, which happens in OUR layout pass — flag it for there.
+        _barNeedsRemeasure = true;
     }
 
     public override void LayoutSubviews()
     {
         base.LayoutSubviews();
         Bar.Frame = Bounds;
+
+        if (_barNeedsRemeasure)
+        {
+            _barNeedsRemeasure = false;
+
+            // The bar now has its final frame, so laying it out validates its safe area and
+            // re-folds the inset. Dirty the host afterwards: its next pass re-measures a bar
+            // whose answer has become current.
+            ScaffoldChromeBar.SettleBarAtCurrentFrame(Bar);
+            NeedsMeasure = true;
+            Superview?.SetNeedsLayout();
+        }
     }
 
     public override UIView? HitTest(CGPoint point, UIEvent? uievent)

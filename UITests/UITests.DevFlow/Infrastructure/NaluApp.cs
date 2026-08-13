@@ -552,6 +552,43 @@ public sealed class NaluApp : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Reads the PLATFORM window system insets (DIPs) through the harness page's safe-area probe
+    /// (<c>SafeAreaProbe</c> in the TestApp): taps its refresh button and parses the value label.
+    /// </summary>
+    /// <remarks>
+    /// Insets are ground truth for safe-area assertions — without them a test can only assert
+    /// inequalities that a dropped inset contribution still satisfies. A zero inset is a legal
+    /// answer (inset-less devices): the CALLER decides whether to skip.
+    /// </remarks>
+    public async Task<(double Left, double Top, double Right, double Bottom)> GetSafeAreaInsetsAsync()
+    {
+        await TapAsync("SafeAreaProbeButton").ConfigureAwait(false);
+
+        return await ReadProbeAsync("SafeAreaProbeValue").ConfigureAwait(false);
+    }
+
+    private async Task<(double Left, double Top, double Right, double Bottom)> ReadProbeAsync(string automationId)
+    {
+        var raw = await WaitForTextMatchAsync(
+                          automationId,
+                          text => text is not null && text.StartsWith("L:", StringComparison.Ordinal)
+                      )
+                      .ConfigureAwait(false);
+
+        // "L:0 T:47 R:0 B:34" — whole DIPs, invariant by construction (the probe rounds before
+        // formatting precisely so the agent's device-locale number serialization cannot mangle it).
+        var parts = raw!.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        double Component(string prefix)
+            => parts.FirstOrDefault(p => p.StartsWith(prefix, StringComparison.Ordinal)) is { } part
+               && int.TryParse(part[prefix.Length..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : throw new InvalidOperationException($"Malformed safe-area probe value '{raw}'.");
+
+        return (Component("L:"), Component("T:"), Component("R:"), Component("B:"));
+    }
+
     /// <summary>Reads a property of the underlying MAUI element (e.g. "Text", "IsVisible").</summary>
     public async Task<string?> GetPropertyAsync(string automationId, string propertyName, TimeSpan? timeout = null)
     {

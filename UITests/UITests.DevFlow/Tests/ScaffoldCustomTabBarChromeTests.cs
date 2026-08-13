@@ -32,11 +32,20 @@ public class ScaffoldCustomTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAs
         // at the top of the system inset, leaving the inset region empty).
         (container.Y + container.Height).Should().BeApproximately(windowHeight, 1.5, "the custom bar must cover the bottom system inset");
 
-        // The bar spans content + system inset (inset may be 0 on inset-less devices).
-        container.Height.Should().BeGreaterThanOrEqualTo(content.Height - 0.5);
-
         // The 80dp content band keeps its size, anchored at the top of the bar.
         content.Height.Should().BeApproximately(80, 1.5);
         content.Y.Should().BeApproximately(container.Y, 1.5);
+
+        // EXACT inset contribution against platform ground truth. A relative check
+        // ("the bar is at least as tall as its content") also passes when the inset
+        // contribution is dropped entirely, and is vacuous on an inset-less device.
+        var insets = await App.GetSafeAreaInsetsAsync();
+        Assert.SkipWhen(insets.Bottom <= 0, "The device reports no bottom system inset: nothing to consume.");
+
+        container.Height.Should().BeApproximately(
+            content.Height + insets.Bottom,
+            1.5,
+            "the bar spans its content band PLUS exactly the bottom system inset it declares (Bottom=Container)"
+        );
     }
 }

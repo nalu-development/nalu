@@ -11,6 +11,8 @@ public partial class NavBarHomePageModel(INavigationService navigationService) :
     public Task PushDrawerDetail() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarDrawerDetailPageModel>());
 
     public Task PushCustomBar() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarCustomPageModel>());
+
+    public Task PushEdgeToEdgeBar() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarEdgeToEdgePageModel>());
 }
 
 [UsedImplicitly]
@@ -31,13 +33,29 @@ public partial class NavBarCustomPageModel(INavigationService navigationService)
     public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
 }
 
+[UsedImplicitly]
+public partial class NavBarEdgeToEdgePageModel(INavigationService navigationService) : ObservableObject
+{
+    public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
+}
+
+
+
 file static class NavBarPageFactory
 {
-    public static View BuildContent(string marker, params View[] extraViews)
+    public static View BuildContent(string marker, VisualElement? probeAnchor, params View[] extraViews)
     {
         var stack = new VerticalStackLayout { Spacing = 6, Padding = 16 };
 
         stack.Add(new Label { Text = marker, AutomationId = marker, FontSize = 22, FontAttributes = FontAttributes.Bold });
+
+        // Platform ground truth for the inset assertions (see SafeAreaProbe). ONLY the harness
+        // root page carries it: its AutomationIds are reserved, and scaffold-hosted pages stay in
+        // the element tree once visited, so a probe per page would duplicate them.
+        if (probeAnchor is not null)
+        {
+            stack.Add(SafeAreaProbe.CreateProbe(probeAnchor));
+        }
 
         foreach (var view in extraViews)
         {
@@ -48,10 +66,30 @@ file static class NavBarPageFactory
         exitButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
         stack.Add(exitButton);
 
-        return new ScrollView
+        var scroll = new ScrollView { Content = stack };
+
+        if (probeAnchor is null)
         {
-            Content = stack
-        };
+            return scroll;
+        }
+
+        // Bottom-anchored marker: where the page's content actually ends is the platform-agnostic
+        // witness that the page received the system bottom inset (no reading of anyone's
+        // SafeAreaEdges interpretation involved).
+        var grid = new Grid();
+        grid.Add(scroll);
+
+        grid.Add(
+            new BoxView
+            {
+                Color = Colors.MediumPurple,
+                HeightRequest = 4,
+                VerticalOptions = LayoutOptions.End,
+                AutomationId = "NavBarBottomProbe"
+            }
+        );
+
+        return grid;
     }
 }
 
@@ -69,9 +107,11 @@ public class NavBarHomePage : ContentPage
 
         Content = NavBarPageFactory.BuildContent(
             "NavBarPageHome",
+            probeAnchor: this,
             NavPageFactory.MakeButton("Push detail", "PushNavBarDetail", model.PushDetail),
             NavPageFactory.MakeButton("Push drawer detail", "PushNavBarDrawerDetail", model.PushDrawerDetail),
             NavPageFactory.MakeButton("Push custom bar", "PushNavBarCustom", model.PushCustomBar),
+            NavPageFactory.MakeButton("Push edge-to-edge bar", "PushNavBarEdgeToEdge", model.PushEdgeToEdgeBar),
             toggleButton
         );
     }
@@ -88,6 +128,7 @@ public class NavBarDetailPage : ContentPage
 
         Content = NavBarPageFactory.BuildContent(
             "NavBarPageDetail",
+            probeAnchor: null,
             NavPageFactory.MakeButton("Pop", "PopNavBarDetail", model.Pop)
         );
     }
@@ -109,6 +150,7 @@ public class NavBarDrawerDetailPage : ContentPage
 
         Content = NavBarPageFactory.BuildContent(
             "NavBarPageDrawerDetail",
+            probeAnchor: null,
             NavPageFactory.MakeButton("Pop", "PopNavBarDrawerDetail", model.Pop)
         );
     }
@@ -154,7 +196,40 @@ public class NavBarCustomPage : ContentPage
 
         Content = NavBarPageFactory.BuildContent(
             "NavBarPageCustom",
+            probeAnchor: null,
             NavPageFactory.MakeButton("Pop", "PopNavBarCustom", model.Pop)
+        );
+    }
+}
+
+
+/// <summary>
+/// Pushed page installing an EDGE-TO-EDGE custom nav bar: a short bar declaring
+/// <c>SafeAreaEdges.None</c>, i.e. an author who wants their own chrome to start at the very top
+/// of the screen and paint under the status bar themselves.
+/// </summary>
+[UsedImplicitly]
+public class NavBarEdgeToEdgePage : ContentPage
+{
+    public NavBarEdgeToEdgePage(NavBarEdgeToEdgePageModel model)
+    {
+        BindingContext = model;
+        Title = "Edge To Edge";
+
+        var customBar = new Grid
+        {
+            SafeAreaEdges = SafeAreaEdges.None,
+            BackgroundColor = Colors.DarkOrange,
+            HeightRequest = 20,
+            AutomationId = "EdgeToEdgeNavBarMarker"
+        };
+
+        Scaffold.SetNavBarView(this, customBar);
+
+        Content = NavBarPageFactory.BuildContent(
+            "NavBarPageEdgeToEdge",
+            probeAnchor: null,
+            NavPageFactory.MakeButton("Pop", "PopNavBarEdgeToEdge", model.Pop)
         );
     }
 }

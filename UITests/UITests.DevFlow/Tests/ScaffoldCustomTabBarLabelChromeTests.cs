@@ -37,7 +37,16 @@ public class ScaffoldCustomTabBarLabelChromeTests(NaluApp app) : BaseUiTest(app)
         label.Height.Should().BeLessThan(40, "a single-line label must not be inflated by the system inset");
         label.Y.Should().BeApproximately(outer.Y, 1.5);
 
-        // Bar = label + the inset consumed by the inner container (>= 0 on inset-less devices).
-        outer.Height.Should().BeGreaterThanOrEqualTo(label.Height - 0.5);
+        // Bar = label + EXACTLY the inset consumed by the inner container, against platform
+        // ground truth: the double-count regression this guards against is an inset arithmetic
+        // error, so the assertion has to know the real inset rather than tolerate any value.
+        var insets = await App.GetSafeAreaInsetsAsync();
+        Assert.SkipWhen(insets.Bottom <= 0, "The device reports no bottom system inset: nothing to consume.");
+
+        outer.Height.Should().BeApproximately(
+            label.Height + insets.Bottom,
+            1.5,
+            "the bar spans the label's natural height PLUS exactly the bottom system inset — counted once"
+        );
     }
 }

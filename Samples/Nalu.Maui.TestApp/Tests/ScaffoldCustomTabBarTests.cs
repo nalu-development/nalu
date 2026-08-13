@@ -17,11 +17,55 @@ public class CustomTabBarHomePage : ContentPage
         var stack = new VerticalStackLayout { Spacing = 6, Padding = 16 };
         stack.Add(new Label { Text = "Custom TabBar Home", AutomationId = "CustomTabBarHomePage", FontSize = 22, FontAttributes = FontAttributes.Bold });
 
+        // Ground truth for the bar-vs-inset assertions: both custom-bar suites assert the bar
+        // spans its content PLUS the real bottom system inset, which needs the actual value.
+        stack.Add(SafeAreaProbe.CreateProbe(this));
+
         var exitButton = new Button { Text = "Exit", AutomationId = "ExitCustomTabBar", FontSize = 11, BackgroundColor = Colors.IndianRed };
         exitButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
         stack.Add(exitButton);
 
         Content = stack;
+    }
+}
+
+/// <summary>
+/// Scaffold harness for an EDGE-TO-EDGE custom <see cref="ScaffoldTabBar.TabBarViewProperty"/>:
+/// the bar root declares <c>SafeAreaEdges.None</c>, so it consumes nothing and the strip is
+/// exactly its content — the bar deliberately paints over the home indicator region. The
+/// counterpart of <see cref="CustomTabBarScaffold"/>: together they pin BOTH branches of the
+/// contract "the bar decides, the strip is its settled measure".
+/// </summary>
+[UsedImplicitly]
+[TestPage("Scaffold Custom TabBar EdgeToEdge Tests")]
+public class CustomTabBarEdgeToEdgeScaffold : Scaffold
+{
+    public CustomTabBarEdgeToEdgeScaffold(INavigationService navigationService)
+    {
+        _ = navigationService;
+
+        var container = new Grid
+        {
+            SafeAreaEdges = SafeAreaEdges.None,
+            BackgroundColor = Colors.Blue,
+            HeightRequest = 80,
+            AutomationId = "EdgeToEdgeTabBarContainer"
+        };
+
+        Areas.Add(
+            new ScaffoldTabBar
+            {
+                TabBarView = container,
+                Roots =
+                {
+                    new ScaffoldRoot
+                    {
+                        Title = "Home",
+                        PageType = typeof(CustomTabBarHomePage)
+                    }
+                }
+            }
+        );
     }
 }
 
