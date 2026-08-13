@@ -305,14 +305,17 @@ public sealed class NaluApp : IAsyncLifetime
 
     private double? _androidDisplayScale;
 
-    private static async Task<string> RunAdbAsync(string arguments)
+    private static Task<string> RunAdbAsync(string arguments) => RunProcessAsync("adb", arguments);
+
+    /// <summary>Runs a host-side tool and returns its stdout (adb, xcrun, axe…).</summary>
+    private static async Task<string> RunProcessAsync(string fileName, string arguments)
     {
-        using var process = Process.Start(new ProcessStartInfo("adb", arguments)
+        using var process = Process.Start(new ProcessStartInfo(fileName, arguments)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
-        }) ?? throw new InvalidOperationException("Failed to start adb.");
+        }) ?? throw new InvalidOperationException($"Failed to start {fileName}.");
 
         var output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
         await process.WaitForExitAsync().ConfigureAwait(false);
@@ -341,6 +344,73 @@ public sealed class NaluApp : IAsyncLifetime
         }
 
         throw new TimeoutException($"Android soft keyboard did not become {(visible ? "visible" : "hidden")} within {timeout ?? _defaultTimeout}.");
+    }
+
+    /// <summary>
+    /// Whether the soft keyboard is up, on either platform: host-side <c>dumpsys</c> on Android,
+    /// the harness's in-app <c>SoftKeyboardProbe</c> label on Apple platforms (UIKit exposes no
+    /// host-side channel).
+    /// </summary>
+    public async Task<bool> IsSoftKeyboardVisibleAsync(string appleProbeAutomationId)
+        => await IsAppleAsync().ConfigureAwait(false)
+            ? (await FindElementAsync(appleProbeAutomationId).ConfigureAwait(false))?.Text == "keyboard:visible"
+            : await IsAndroidSoftKeyboardVisibleAsync().ConfigureAwait(false);
+
+    /// <summary>Waits until the soft keyboard reaches the expected visibility, on either platform.</summary>
+    public async Task WaitForSoftKeyboardAsync(bool visible, string appleProbeAutomationId, TimeSpan? timeout = null)
+    {
+        if (!await IsAppleAsync().ConfigureAwait(false))
+        {
+            await WaitForAndroidSoftKeyboardAsync(visible, timeout).ConfigureAwait(false);
+
+            return;
+        }
+
+        await WaitForTextAsync(
+                appleProbeAutomationId,
+                visible ? "keyboard:visible" : "keyboard:hidden",
+                timeout
+            )
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A REAL input tap on either platform: adb <c>input tap</c> on Android, <c>axe tap</c> against
+    /// the booted simulator on Apple platforms. Required for behaviors listening to raw window
+    /// touches (e.g. <c>Page.HideSoftInputOnTapped</c>) — agent taps invoke handlers in-process and
+    /// never travel the platform input pipeline, so they cannot exercise them.
+    /// </summary>
+    public async Task RealTapAsync(string automationId)
+    {
+        if (!await IsAppleAsync().ConfigureAwait(false))
+        {
+            await AndroidRealTapAsync(automationId).ConfigureAwait(false);
+
+            return;
+        }
+
+        // axe resolves the element by accessibilityIdentifier (MAUI's AutomationId), so no
+        // coordinate math — and no exposure to the decimal-comma mangling coordinates suffer.
+        await RunProcessAsync("axe", $"tap --id {automationId} --udid {await GetBootedSimulatorUdidAsync().ConfigureAwait(false)}").ConfigureAwait(false);
+    }
+
+    private string? _bootedSimulatorUdid;
+
+    /// <summary>The booted simulator's UDID, for host-side tools (axe) that require an explicit target.</summary>
+    private async Task<string> GetBootedSimulatorUdidAsync()
+    {
+        if (_bootedSimulatorUdid is not null)
+        {
+            return _bootedSimulatorUdid;
+        }
+
+        var output = await RunProcessAsync("xcrun", "simctl list devices booted").ConfigureAwait(false);
+
+        var match = System.Text.RegularExpressions.Regex.Match(output, @"\(([0-9A-F-]{36})\)\s+\(Booted\)");
+
+        return _bootedSimulatorUdid = match.Success
+            ? match.Groups[1].Value
+            : throw new InvalidOperationException($"No booted simulator found. simctl said:\n{output}");
     }
 
     /// <summary>

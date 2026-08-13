@@ -8,19 +8,26 @@ namespace Nalu.Maui.UITests.Tests;
 /// <c>HideSoftInputOnTapped</c> is gated on <c>Page.HasNavigatedTo</c>, which MAUI's own hosts
 /// raise via internal navigation events — the Scaffold must raise them too
 /// (ScaffoldPageNavigationEvents), or the feature silently dies on every scaffold page.
-/// Android-only: keyboard state via adb, and the feature reacts only to REAL input taps.
 /// </summary>
+/// <remarks>
+/// Runs on BOTH platforms. The two Android-specific pieces have platform-agnostic wrappers:
+/// keyboard state comes from <c>dumpsys</c> on Android and from the harness's in-app
+/// <c>SoftKeyboardProbe</c> on Apple platforms, and the REAL input taps the feature requires (agent
+/// taps run in-process and never reach the platform input pipeline) are injected with <c>adb</c>
+/// and <c>axe</c> respectively. Both presenters implement the navigation events under test
+/// separately, so skipping iOS left its half unguarded.
+/// </remarks>
 public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
     private const string PageName = "Scaffold IME Tests";
 
-    private async Task<bool> IsAndroidAsync()
-        => (await App.GetPlatformAsync()).Contains("android", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Keyboard probe of the page a test is currently observing (Apple platforms).</summary>
+    private const string HomeKeyboardProbe = "ScaffoldImeKeyboardHome";
+
+    private const string EntriesKeyboardProbe = "ScaffoldImeKeyboardEntries";
 
     public async ValueTask InitializeAsync()
     {
-        Assert.SkipWhen(!await IsAndroidAsync(), "Android-only: soft-keyboard state is asserted via adb.");
-
         await App.OpenTestPageAsync(PageName);
         await App.WaitForBoundsAsync("ScaffoldImeHome", b => b.Y > 0);
     }
@@ -31,15 +38,9 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         await App.WaitForBoundsAsync("ScaffoldImeItemEntry1", b => b.Y > 0);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (await IsAndroidAsync())
-        {
-            await App.ResetAsync();
-        }
-    }
+    public async ValueTask DisposeAsync() => await App.ResetAsync();
 
-    private async Task FocusEntryRaisingKeyboardAsync(string automationId)
+    private async Task FocusEntryRaisingKeyboardAsync(string automationId, string keyboardProbe)
     {
         for (var attempt = 0; ; attempt++)
         {
@@ -47,7 +48,7 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 
             try
             {
-                await App.WaitForAndroidSoftKeyboardAsync(visible: true, TimeSpan.FromSeconds(3));
+                await App.WaitForSoftKeyboardAsync(visible: true, keyboardProbe, TimeSpan.FromSeconds(3));
 
                 return;
             }
@@ -62,11 +63,11 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     {
         // The ROOT page presented by the scaffold on startup must receive NavigatedTo too:
         // no push involved, HideSoftInputOnTapped must already be armed.
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry");
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry", HomeKeyboardProbe);
 
-        await App.AndroidRealTapAsync("ScaffoldImeHomeTapTarget");
+        await App.RealTapAsync("ScaffoldImeHomeTapTarget");
 
-        await App.WaitForAndroidSoftKeyboardAsync(visible: false);
+        await App.WaitForSoftKeyboardAsync(visible: false, HomeKeyboardProbe);
     }
 
     [Fact]
@@ -75,37 +76,47 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         // A PLAIN entry (not virtualized): Android never dismisses the IME when the focused
         // hierarchy is torn down, so a push must hide it explicitly or it orphans over the
         // incoming page. (The programmatic push does not travel the tap-to-hide path.)
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry");
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry", HomeKeyboardProbe);
 
         await PushEntriesPageAsync();
 
-        await App.WaitForAndroidSoftKeyboardAsync(visible: false);
+        await App.WaitForSoftKeyboardAsync(visible: false, EntriesKeyboardProbe);
     }
 
     [Fact]
     public async Task HideSoftInputOnTappedWorksOnScaffoldPushedPages()
     {
         await PushEntriesPageAsync();
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2");
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2", EntriesKeyboardProbe);
 
         // A real tap on the page must dismiss the keyboard: this only works when the pushed
         // page received NavigatedTo from the scaffold host.
-        await App.AndroidRealTapAsync("ScaffoldImeTapTarget");
+        await App.RealTapAsync("ScaffoldImeTapTarget");
 
-        await App.WaitForAndroidSoftKeyboardAsync(visible: false);
+        await App.WaitForSoftKeyboardAsync(visible: false, EntriesKeyboardProbe);
     }
 
+    /// <summary>
+    /// Android-only for now, and NOT because of tooling: the behavior itself differs. On iOS the
+    /// focused cell survives scrolling far out of view — verified by hand at 490dp above the
+    /// viewport, still attached, still first responder, keyboard still up — so recycling never
+    /// dismisses it. That is a VirtualScroll-on-iOS question (the same harness shape as
+    /// VirtualScrollImeTests, also Android-only) rather than a Scaffold one; asserting the current
+    /// iOS behavior here would enshrine it.
+    /// </summary>
     [Fact]
     public async Task KeyboardHidesWhenFocusedItemIsRecycledInScaffold()
     {
-        await PushEntriesPageAsync();
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2");
+        Assert.SkipWhen(await App.IsAppleAsync(), "iOS keeps the focused cell alive while scrolling: recycling does not dismiss the keyboard there.");
 
-        for (var i = 0; i < 5 && await App.IsAndroidSoftKeyboardVisibleAsync(); i++)
+        await PushEntriesPageAsync();
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2", EntriesKeyboardProbe);
+
+        for (var i = 0; i < 5 && await App.IsSoftKeyboardVisibleAsync(EntriesKeyboardProbe); i++)
         {
             await App.SwipeAsync("ScaffoldImeList", "up");
         }
 
-        await App.WaitForAndroidSoftKeyboardAsync(visible: false);
+        await App.WaitForSoftKeyboardAsync(visible: false, EntriesKeyboardProbe);
     }
 }

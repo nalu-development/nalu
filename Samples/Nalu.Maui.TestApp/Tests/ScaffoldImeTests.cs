@@ -65,6 +65,7 @@ public class ScaffoldImeHomePage : ContentPage
             Children =
             {
                 new Label { Text = "ScaffoldImeHome", AutomationId = "ScaffoldImeHome", FontSize = 22, FontAttributes = FontAttributes.Bold },
+                SoftKeyboardProbe.CreateLabel("ScaffoldImeKeyboardHome"),
                 new Entry { AutomationId = "ScaffoldImeHomeEntry", Placeholder = "type here", FontSize = 14 },
                 tapTarget,
                 NavPageFactory.MakeButton("Push entries", "PushScaffoldIme", model.PushEntries),
@@ -136,7 +137,8 @@ public class ScaffoldImeEntryPage : ContentPage
             Children =
             {
                 NavPageFactory.MakeButton("Pop", "PopScaffoldIme", model.Pop),
-                ScaffoldImeFactory.MakeExitButton("ScaffoldImeEntries")
+                ScaffoldImeFactory.MakeExitButton("ScaffoldImeEntries"),
+                SoftKeyboardProbe.CreateLabel("ScaffoldImeKeyboardEntries")
             }
         };
 
