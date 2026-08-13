@@ -71,6 +71,114 @@ internal static class ScaffoldChromeBar
 }
 
 /// <summary>
+/// Bounds the strips' settle-then-remeasure cycle, which is a feedback loop by construction: the
+/// settle invalidates the bar's measure, that invalidation travels back up through the strip, and
+/// the strip answers by dirtying its host — from inside a layout pass.
+/// </summary>
+/// <remarks>
+/// Unbounded, the cycle can wedge the main thread outright. Chrome animations lay the tree out
+/// through <c>LayoutIfNeeded</c> inside an animation block, and UIKit drains every dirty view
+/// before that call returns: a cycle that re-dirties the host on each pass never lets the drain
+/// finish, and the app freezes with the strip's <c>LayoutSubviews</c> on the stack. A bar whose
+/// measured height keeps changing across passes — templated cells realizing, an image source
+/// resolving — is enough to sustain it.
+/// <para>
+/// Two bounds, both of which leave a genuine settle intact. A settle is skipped when the geometry
+/// it would run for is the one it already ran for, since that settle is provably a no-op; and at
+/// most one settle happens per runloop turn, so any cycle that survives the first bound advances
+/// one pass per turn instead of spinning inside a single drain. A request that arrives while the
+/// latch is closed is not lost — it is re-raised on the next turn.
+/// </para>
+/// </remarks>
+internal sealed class ScaffoldBarSettleGuard(UIView strip)
+{
+    private bool _needed;
+    private bool _settling;
+    private bool _latched;
+    private bool _hasSettled;
+    private CGRect _settledFrame;
+    private UIEdgeInsets _settledInsets;
+
+    /// <summary>
+    /// Records that the bar's measure no longer describes it. Invalidations raised BY a settle are
+    /// ignored: they are its own echo, not a new reason to run another one.
+    /// </summary>
+    internal void Invalidate()
+    {
+        if (!_settling)
+        {
+            _needed = true;
+        }
+    }
+
+    /// <summary>
+    /// Settles the bar if it needs it, at the frame it now has.
+    /// </summary>
+    /// <returns><c>true</c> when a settle ran, and so the host must re-measure.</returns>
+    internal bool SettleIfNeeded(UIView bar)
+    {
+        if (!_needed)
+        {
+            return false;
+        }
+
+        var frame = bar.Frame;
+        var insets = strip.SafeAreaInsets;
+
+        if (_hasSettled && frame == _settledFrame && SameInsets(insets, _settledInsets))
+        {
+            // Same geometry as the last settle: re-running it would produce the same answer.
+            _needed = false;
+
+            return false;
+        }
+
+        if (_latched)
+        {
+            // Already settled this turn. Keep the request and re-raise it on the next one.
+            return false;
+        }
+
+        _needed = false;
+        _latched = true;
+        _settling = true;
+
+        try
+        {
+            ScaffoldChromeBar.SettleBarAtCurrentFrame(bar);
+        }
+        finally
+        {
+            _settling = false;
+        }
+
+        _hasSettled = true;
+        _settledFrame = frame;
+        _settledInsets = insets;
+
+        DispatchQueue.MainQueue.DispatchAsync(
+            () =>
+            {
+                _latched = false;
+
+                if (_needed)
+                {
+                    strip.SetNeedsLayout();
+                }
+            }
+        );
+
+        return true;
+    }
+
+    private static bool SameInsets(UIEdgeInsets left, UIEdgeInsets right)
+        => left.Top == right.Top
+           && left.Bottom == right.Bottom
+           && left.Left == right.Left
+           && left.Right == right.Right;
+}
+
+/// <summary>
 /// Root view controller of a scaffold-hosted app. Hosts two layers:
 /// the content host (a child controller the presenter mounts page controllers onto) and the
 /// bottom tab bar strip. The chrome's safe-area contribution (§5.4) is applied PER PAGE
@@ -529,13 +637,14 @@ internal sealed class ScaffoldTabBarStrip : UIView
 
     internal bool NeedsMeasure { get; private set; } = true;
 
-    private bool _barNeedsRemeasure;
+    private readonly ScaffoldBarSettleGuard _settle;
 
     internal nfloat BarHeight { get; private set; }
 
     public ScaffoldTabBarStrip(UIView bar)
     {
         Bar = bar;
+        _settle = new ScaffoldBarSettleGuard(this);
         BackgroundColor = UIColor.Clear;
         (bar.Superview as UIView)?.WillRemoveSubview(bar);
         bar.RemoveFromSuperview();
@@ -562,7 +671,7 @@ internal sealed class ScaffoldTabBarStrip : UIView
 
         // The bar's cached measure predates these insets. It can only re-fold them once it lays
         // out at its final frame, which happens in OUR layout pass — flag it for there.
-        _barNeedsRemeasure = true;
+        _settle.Invalidate();
     }
 
     public override void LayoutSubviews()
@@ -575,16 +684,21 @@ internal sealed class ScaffoldTabBarStrip : UIView
         // top-align at their measured height).
         Bar.Frame = Bounds;
 
-        if (_barNeedsRemeasure)
+        // The bar now has its final frame, so laying it out validates its safe area and re-folds
+        // the inset. Dirty the host only if that CHANGED the bar's answer: a settle that leaves the
+        // height where it was gives the host nothing to do, and asking anyway is what let this pass
+        // feed itself. A bar that consumes nothing (SafeAreaEdges.None) answers the same every
+        // time, so it now costs one settle and stops.
+        if (_settle.SettleIfNeeded(Bar))
         {
-            _barNeedsRemeasure = false;
+            var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
 
-            // The bar now has its final frame, so laying it out validates its safe area and
-            // re-folds the inset. Dirty the host afterwards: its next pass re-measures a bar
-            // whose answer has become current.
-            ScaffoldChromeBar.SettleBarAtCurrentFrame(Bar);
-            NeedsMeasure = true;
-            Superview?.SetNeedsLayout();
+            if (settled != BarHeight)
+            {
+                BarHeight = settled;
+                NeedsMeasure = true;
+                Superview?.SetNeedsLayout();
+            }
         }
     }
 
@@ -611,7 +725,7 @@ internal sealed class ScaffoldNavBarStrip : UIView
 
     internal bool NeedsMeasure { get; private set; } = true;
 
-    private bool _barNeedsRemeasure;
+    private readonly ScaffoldBarSettleGuard _settle;
 
     /// <summary>The bar's height, INCLUDING any safe-area padding it chose to consume.</summary>
     internal nfloat BarHeight { get; private set; }
@@ -619,6 +733,7 @@ internal sealed class ScaffoldNavBarStrip : UIView
     public ScaffoldNavBarStrip(UIView bar)
     {
         Bar = bar;
+        _settle = new ScaffoldBarSettleGuard(this);
         BackgroundColor = UIColor.Clear;
         (bar.Superview as UIView)?.WillRemoveSubview(bar);
         bar.RemoveFromSuperview();
@@ -638,7 +753,7 @@ internal sealed class ScaffoldNavBarStrip : UIView
     /// </summary>
     internal void InvalidateBarMeasure()
     {
-        _barNeedsRemeasure = true;
+        _settle.Invalidate();
         SetNeedsLayout();
     }
 
@@ -656,7 +771,7 @@ internal sealed class ScaffoldNavBarStrip : UIView
 
         // The bar's cached measure predates these insets. It can only re-fold them once it lays
         // out at its final frame, which happens in OUR layout pass — flag it for there.
-        _barNeedsRemeasure = true;
+        _settle.Invalidate();
     }
 
     public override void LayoutSubviews()
@@ -664,16 +779,18 @@ internal sealed class ScaffoldNavBarStrip : UIView
         base.LayoutSubviews();
         Bar.Frame = Bounds;
 
-        if (_barNeedsRemeasure)
+        // Same settle-then-remeasure contract as the tab bar strip, and the same two bounds on it:
+        // see ScaffoldTabBarStrip.LayoutSubviews and ScaffoldBarSettleGuard.
+        if (_settle.SettleIfNeeded(Bar))
         {
-            _barNeedsRemeasure = false;
+            var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
 
-            // The bar now has its final frame, so laying it out validates its safe area and
-            // re-folds the inset. Dirty the host afterwards: its next pass re-measures a bar
-            // whose answer has become current.
-            ScaffoldChromeBar.SettleBarAtCurrentFrame(Bar);
-            NeedsMeasure = true;
-            Superview?.SetNeedsLayout();
+            if (settled != BarHeight)
+            {
+                BarHeight = settled;
+                NeedsMeasure = true;
+                Superview?.SetNeedsLayout();
+            }
         }
     }
 
