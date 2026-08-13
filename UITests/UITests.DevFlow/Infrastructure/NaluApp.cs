@@ -659,6 +659,45 @@ public sealed class NaluApp : IAsyncLifetime
         return (Component("L:"), Component("T:"), Component("R:"), Component("B:"));
     }
 
+    /// <summary>
+    /// Rotates the device through the harness's <c>OrientationProbe</c> and waits until the window
+    /// has actually flipped.
+    /// </summary>
+    /// <remarks>
+    /// Rotation is driven from INSIDE the app because no host-side tool can rotate an iOS
+    /// simulator (simctl has no command, axe has no rotation subcommand, and the Simulator's own
+    /// shortcut needs Accessibility trust the test host lacks). The wait is on the WINDOW's own
+    /// geometry rather than the probe's label: a rotation request returns long before the window
+    /// flips, and the label depends on a platform display-changed event that Android does not
+    /// raise dependably when the activity handles the configuration change itself.
+    /// </remarks>
+    public async Task SetOrientationAsync(bool landscape, TimeSpan? timeout = null)
+    {
+        await TapAsync(landscape ? "OrientationLandscapeButton" : "OrientationPortraitButton").ConfigureAwait(false);
+
+        var stopwatch = Stopwatch.StartNew();
+        var effectiveTimeout = timeout ?? _defaultTimeout;
+        (double Width, double Height) size = default;
+
+        while (true)
+        {
+            size = await GetWindowSizeAsync().ConfigureAwait(false);
+
+            if (size.Width > size.Height == landscape)
+            {
+                return;
+            }
+
+            if (stopwatch.Elapsed >= effectiveTimeout)
+            {
+                throw new TimeoutException(
+                    $"The window did not rotate to {(landscape ? "landscape" : "portrait")} within {effectiveTimeout.TotalSeconds:0.#}s (last size {size.Width:0}x{size.Height:0}).");
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Reads a property of the underlying MAUI element (e.g. "Text", "IsVisible").</summary>
     public async Task<string?> GetPropertyAsync(string automationId, string propertyName, TimeSpan? timeout = null)
     {
