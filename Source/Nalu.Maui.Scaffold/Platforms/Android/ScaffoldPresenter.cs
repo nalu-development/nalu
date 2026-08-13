@@ -110,6 +110,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         await CloseAllOverlaysAsync();
 
         var container = EnsureContainer(platformView);
+        // Presented overlays keep the geometry of the window they were shown in: re-lay them out
+        // when it changes shape.
+        platformView.WindowGeometryChanged ??= () => RelayoutOverlays(platformView, platformView.Context!);
+
         var stack = root.NavigationStack;
         var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
 
@@ -1828,38 +1832,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             case ScaffoldOverlayKind.BottomSheet:
             {
                 var sheet = (ScaffoldBottomSheetView)request.Content;
-                var sheetInsets = ViewCompat.GetRootWindowInsets(platformView)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
-                var availableHeight = context.FromPixels(platformView.Height - (sheetInsets?.Top ?? 0));
-
-                // Padding first (it affects the natural height), then measure, then geometry.
-                sheet.PrepareForMeasure(context.FromPixels(sheetInsets?.Bottom ?? 0));
                 panel = request.Content.ToPlatform(mauiContext);
                 (panel.Parent as AViewGroup)?.RemoveView(panel);
 
-                var sheetWidthPx = (int)Math.Min(platformView.Width, context.ToPixels(sheet.MaxWidth));
-
-                panel.Measure(
-                    AView.MeasureSpec.MakeMeasureSpec(sheetWidthPx, MeasureSpecMode.Exactly),
-                    AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(availableHeight), MeasureSpecMode.AtMost)
-                );
-
-                var natural = Math.Min(context.FromPixels(panel.MeasuredHeight), availableHeight);
-                var sheetHeight = sheet.InitializeGeometry(availableHeight, natural);
-
-                // Bottom-anchored, centered at the (possibly capped) width; the sheet's own
-                // TranslationY does the rest. The nested host between the container and the
-                // sheet provides the drag/scroll cooperative hand-off (expand-then-scroll,
-                // pull-down at scroll top) — see ScaffoldBottomSheetNestedHost.
-                var sheetLayoutParams = new Android.Widget.FrameLayout.LayoutParams(sheetWidthPx, (int)context.ToPixels(sheetHeight))
-                {
-                    Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal
-                };
-
+                // The nested host between the container and the sheet provides the drag/scroll
+                // cooperative hand-off (expand-then-scroll, pull-down at scroll top) — see
+                // ScaffoldBottomSheetNestedHost.
                 var nestedHost = new ScaffoldBottomSheetNestedHost(context, sheet);
                 nestedHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
                 panel = nestedHost;
 
-                platformView.AddView(panel, sheetLayoutParams);
+                platformView.AddView(panel, LayoutBottomSheet(sheet, panel, platformView, context, initial: true));
 
                 break;
             }
@@ -1897,6 +1880,72 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         await ScaffoldOverlayAnimations.EnterAsync(request, scrimView);
 
         return true;
+    }
+
+    /// <summary>
+    /// Frames a bottom sheet against the CURRENT window: capped width, centered, bottom-anchored,
+    /// with its detents resolved against the height available above the top inset. Returns the
+    /// layout params to mount (or re-mount) it with.
+    /// </summary>
+    /// <param name="sheet">The presented sheet.</param>
+    /// <param name="panel">The sheet's platform view (the nested host).</param>
+    /// <param name="container">The overlay container the sheet is framed against.</param>
+    /// <param name="context">The Android context, for pixel conversions.</param>
+    /// <param name="initial">
+    /// True on presentation (geometry is being established); false on a re-layout, where the sheet
+    /// keeps the detent it rests on while its heights are re-derived for the new window.
+    /// </param>
+    private static Android.Widget.FrameLayout.LayoutParams LayoutBottomSheet(
+        ScaffoldBottomSheetView sheet,
+        AView panel,
+        AView container,
+        Android.Content.Context context,
+        bool initial)
+    {
+        var insets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+        var availableHeight = context.FromPixels(container.Height - (insets?.Top ?? 0));
+
+        // Padding first (it affects the natural height), then measure, then geometry.
+        sheet.PrepareForMeasure(context.FromPixels(insets?.Bottom ?? 0));
+
+        var sheetWidthPx = (int)Math.Min(container.Width, context.ToPixels(sheet.MaxWidth));
+
+        panel.Measure(
+            AView.MeasureSpec.MakeMeasureSpec(sheetWidthPx, MeasureSpecMode.Exactly),
+            AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(availableHeight), MeasureSpecMode.AtMost)
+        );
+
+        var natural = Math.Min(context.FromPixels(panel.MeasuredHeight), availableHeight);
+
+        var sheetHeight = initial
+            ? sheet.InitializeGeometry(availableHeight, natural)
+            : sheet.UpdateGeometry(availableHeight, natural);
+
+        return new Android.Widget.FrameLayout.LayoutParams(sheetWidthPx, (int)context.ToPixels(sheetHeight))
+        {
+            Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal
+        };
+    }
+
+    /// <summary>
+    /// Re-lays out presented overlays after the window changed shape (rotation, split view).
+    /// </summary>
+    /// <remarks>
+    /// Overlay geometry is computed at presentation from the window of that moment: a rotation
+    /// otherwise leaves a bottom sheet at its portrait width and portrait detent heights — off the
+    /// side of the screen and taller than the window it now sits in — while its scrim still dims
+    /// everything. Only the sheet is re-laid out here; anchored popups and panels have the same
+    /// exposure and are not covered yet.
+    /// </remarks>
+    private void RelayoutOverlays(AView container, Android.Content.Context context)
+    {
+        foreach (var entry in _overlays)
+        {
+            if (entry is { Closing: false, Request.Content: ScaffoldBottomSheetView sheet } && entry.ContentPlatform is { } panel)
+            {
+                panel.LayoutParameters = LayoutBottomSheet(sheet, panel, container, context, initial: false);
+            }
+        }
     }
 
     /// <summary>

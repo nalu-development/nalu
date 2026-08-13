@@ -56,6 +56,94 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
     }
 
     /// <summary>
+    /// A tab bar hidden by the current page is translated offscreen, not torn down. A rotation
+    /// re-lays out the strip against a window of different proportions: it must stay offscreen,
+    /// and come back at its resting frame once the page that hid it is popped.
+    /// </summary>
+    [Fact]
+    public async Task HiddenTabBarStaysOffscreenAcrossRotation()
+    {
+        var resting = await App.WaitForStableBoundsAsync("TabOne");
+
+        await App.TapAsync("PushOrDetail");
+        await App.WaitForBoundsAsync("OrDetailPage", b => b.Y > 0);
+        await App.WaitForElementGoneAsync("TabOne");
+
+        await App.SetOrientationAsync(landscape: true);
+        (await App.FindElementAsync("TabOne")).Should().BeNull("a strip hidden by the current page must not reappear when the window changes shape");
+
+        await App.SetOrientationAsync(landscape: false);
+        (await App.FindElementAsync("TabOne")).Should().BeNull("nor on the way back");
+
+        // Popping the page that hid it brings it back where it was.
+        await App.TapAsync("PopOrDetail");
+        await App.WaitForBoundsAsync("OrRootPage", b => b.Y > 0);
+
+        await App.WaitForBoundsAsync(
+            "TabOne",
+            b => Math.Abs(b.Y - resting.Y) <= 1 && Math.Abs(b.Height - resting.Height) <= 1
+        );
+    }
+
+    /// <summary>
+    /// A sheet with a MaxWidth spans the window while it is narrower than the cap, and floats
+    /// CENTERED at the cap once rotation makes the window wider — still bottom-anchored.
+    /// </summary>
+    [Fact]
+    public async Task CappedSheetFloatsCenteredOnceTheWindowIsWiderThanTheCap()
+    {
+        const double maxWidth = 500;
+
+        await App.TapAsync("ShowOrSheet");
+        var portraitSheet = await App.WaitForStableBoundsAsync("ScaffoldBottomSheet");
+        var (portraitWidth, _) = await App.GetWindowSizeAsync();
+
+        Assert.SkipWhen(portraitWidth > maxWidth, "This device is already wider than the cap in portrait: the two states would be identical.");
+        portraitSheet.Width.Should().BeApproximately(portraitWidth, 2, "a window narrower than the cap gives the sheet its full width");
+
+        await App.SetOrientationAsync(landscape: true);
+
+        var (landscapeWidth, _) = await App.GetWindowSizeAsync();
+        var landscapeSheet = await App.WaitForStableBoundsAsync("ScaffoldBottomSheet");
+
+        landscapeSheet.Width.Should().BeApproximately(maxWidth, 2, "past the cap the sheet stops growing");
+        landscapeSheet.CenterX.Should().BeApproximately(landscapeWidth / 2, 2, "and floats centered rather than hugging an edge");
+
+        await App.TapAsync("SheetScrim");
+        await App.SetOrientationAsync(landscape: false);
+    }
+
+    /// <summary>
+    /// A sheet resting at a FRACTION detent must re-resolve that fraction when the window loses
+    /// most of its height: keeping the portrait height would leave the sheet taller than the
+    /// landscape window it now sits in.
+    /// </summary>
+    [Fact]
+    public async Task ExpandedSheetShrinksToTheLandscapeHeight()
+    {
+        await App.TapAsync("ShowOrTallSheet");
+
+        var portraitSheet = await App.WaitForStableBoundsAsync("ScaffoldBottomSheet");
+        var (_, portraitHeight) = await App.GetWindowSizeAsync();
+        portraitSheet.Height.Should().BeLessThanOrEqualTo(portraitHeight, "a sheet never exceeds the window it opens in");
+
+        await App.SetOrientationAsync(landscape: true);
+
+        var (_, landscapeHeight) = await App.GetWindowSizeAsync();
+        var landscapeSheet = await App.WaitForStableBoundsAsync("ScaffoldBottomSheet");
+
+        landscapeSheet.Height.Should().BeLessThanOrEqualTo(
+            landscapeHeight,
+            $"the fraction detent must be re-resolved against the shorter window (portrait {portraitSheet.Height:0} in {portraitHeight:0}, landscape {landscapeSheet.Height:0} in {landscapeHeight:0})"
+        );
+
+        landscapeSheet.Y.Should().BeGreaterThanOrEqualTo(-1, "and the sheet must not be pushed off the top of the screen");
+
+        await App.TapAsync("SheetScrim");
+        await App.SetOrientationAsync(landscape: false);
+    }
+
+    /// <summary>
     /// Landscape brings side insets into play (the notch edge). The page must keep clear of them:
     /// content starting at x = 0 would sit under the cutout.
     /// </summary>

@@ -389,6 +389,55 @@ public sealed class ScaffoldBottomSheetView : Border
         return _sheetHeight;
     }
 
+    /// <summary>
+    /// Re-derives the geometry for a NEW available height — a rotation, a split-view resize — while
+    /// keeping the sheet on the detent it currently rests on.
+    /// </summary>
+    /// <remarks>
+    /// Detent heights are resolved against the available height (a Fraction detent literally is a
+    /// fraction of it), so a window that loses most of its height must shrink them: a sheet that
+    /// keeps its portrait geometry in landscape is taller than the screen it sits in, and the one
+    /// that keeps its portrait WIDTH is no longer where the presenter framed it.
+    /// </remarks>
+    internal double UpdateGeometry(double availableHeight, double naturalHeight)
+    {
+        var restingDetent = NearestDetentIndex();
+        var height = InitializeGeometry(availableHeight, naturalHeight);
+
+        // Re-anchor on the same detent, now resolved against the new available height.
+        TranslationY = Math.Clamp(_sheetHeight - ResolveDetentHeight(restingDetent), 0, _sheetHeight);
+
+        return height;
+    }
+
+    /// <summary>The detent the sheet currently rests on (or is closest to), by translation.</summary>
+    private int NearestDetentIndex()
+    {
+        if (_detentOffsets.Length == 0)
+        {
+            return Math.Clamp(_presentation.InitialDetent, 0, Math.Max(0, _presentation.Detents.Length - 1));
+        }
+
+        // _detentOffsets is ordered largest-detent-first; detent indices follow the configured
+        // order, so map through the resolved heights rather than assuming the two line up.
+        var currentHeight = _sheetHeight - TranslationY;
+        var best = 0;
+        var bestDistance = double.MaxValue;
+
+        for (var i = 0; i < _presentation.Detents.Length; i++)
+        {
+            var distance = Math.Abs(ResolveDetentHeight(i) - currentHeight);
+
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = i;
+            }
+        }
+
+        return best;
+    }
+
     private double _availableHeight;
     private double _naturalHeight;
 

@@ -71,6 +71,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         EnsureEdgeGesture(controller);
 
+        // Presented overlays keep the geometry of the window they were shown in: re-lay them out
+        // when it changes shape.
+        controller.WindowGeometryChanged ??= () => RelayoutOverlays(controller, controller.ContentContainer);
+
         // A navigation arriving while a finger is still scrubbing (programmatic push, tab
         // selection) invalidates the preview: cancel the recognizer — its Cancelled callback
         // reverses the session and unmounts the peek before we proceed.
@@ -1194,21 +1198,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             case ScaffoldOverlayKind.BottomSheet:
             {
                 var sheet = (ScaffoldBottomSheetView)request.Content;
-                var insets = controller.View!.SafeAreaInsets;
-                var availableHeight = bounds.Height - insets.Top;
-
-                // Padding first (it affects the natural height), then measure, then geometry.
-                sheet.PrepareForMeasure(insets.Bottom);
                 panel = request.Content.ToPlatform(mauiContext);
-                var sheetView = (IView)request.Content;
-                var sheetWidth = Math.Min((double)bounds.Width, sheet.MaxWidth);
-                var natural = sheetView.Measure(sheetWidth, (double)availableHeight).Height;
-                var sheetHeight = sheet.InitializeGeometry((double)availableHeight, Math.Min(natural, (double)availableHeight));
-
-                // Bottom-anchored, centered at the (possibly capped) width; the sheet's own
-                // TranslationY does the rest. Virtual arrange: a valid MAUI frame is required
-                // for translations to apply.
-                sheetView.Arrange(new Rect((bounds.Width - sheetWidth) / 2, bounds.Height - sheetHeight, sheetWidth, sheetHeight));
+                LayoutBottomSheet(sheet, controller, container, initial: true);
                 container.AddSubview(panel);
 
                 // Native cooperative drag: the MAUI pan is skipped on iOS (it would beat the
@@ -1241,6 +1232,62 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         await ScaffoldOverlayAnimations.EnterAsync(request, scrimView);
 
         return true;
+    }
+
+    /// <summary>
+    /// Frames a bottom sheet against the CURRENT window: capped width, centered, bottom-anchored,
+    /// with its detents resolved against the height available above the top inset.
+    /// </summary>
+    /// <param name="sheet">The presented sheet.</param>
+    /// <param name="controller">The scaffold controller, for the window insets.</param>
+    /// <param name="container">The overlay container whose bounds the sheet is framed against.</param>
+    /// <param name="initial">
+    /// True on presentation (geometry is being established); false on a re-layout, where the sheet
+    /// keeps the detent it rests on while its heights are re-derived for the new window.
+    /// </param>
+    private static void LayoutBottomSheet(ScaffoldBottomSheetView sheet, ScaffoldViewController controller, UIView container, bool initial)
+    {
+        var bounds = container.Bounds;
+        var insets = controller.View!.SafeAreaInsets;
+        var availableHeight = (double)(bounds.Height - insets.Top);
+
+        // Padding first (it affects the natural height), then measure, then geometry.
+        sheet.PrepareForMeasure(insets.Bottom);
+
+        var sheetView = (IView)sheet;
+        var sheetWidth = Math.Min((double)bounds.Width, sheet.MaxWidth);
+        var natural = sheetView.Measure(sheetWidth, availableHeight).Height;
+        var naturalHeight = Math.Min(natural, availableHeight);
+
+        var sheetHeight = initial
+            ? sheet.InitializeGeometry(availableHeight, naturalHeight)
+            : sheet.UpdateGeometry(availableHeight, naturalHeight);
+
+        // Bottom-anchored, centered at the (possibly capped) width; the sheet's own TranslationY
+        // does the rest. Virtual arrange: a valid MAUI frame is required for translations to apply.
+        sheetView.Arrange(new Rect((bounds.Width - sheetWidth) / 2, bounds.Height - sheetHeight, sheetWidth, sheetHeight));
+    }
+
+    /// <summary>
+    /// Re-lays out presented overlays after the window changed shape (rotation, split view).
+    /// </summary>
+    /// <remarks>
+    /// Overlay geometry is computed at presentation from the window of that moment. A rotation
+    /// leaves a bottom sheet at its portrait width and portrait detent heights — off the side of
+    /// the screen, and taller than the window it now sits in — while its scrim, which autoresizes,
+    /// still dims everything: the user is left staring at a dimmed screen with no sheet on it.
+    /// Only the sheet is re-laid out here; anchored popups and panels have the same exposure and
+    /// are not covered yet.
+    /// </remarks>
+    private void RelayoutOverlays(ScaffoldViewController controller, UIView container)
+    {
+        foreach (var entry in _overlays)
+        {
+            if (entry is { Closing: false, Request.Content: ScaffoldBottomSheetView sheet })
+            {
+                LayoutBottomSheet(sheet, controller, container, initial: false);
+            }
+        }
     }
 
     /// <summary>

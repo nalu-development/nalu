@@ -60,10 +60,31 @@ public sealed class ScaffoldLayout : FrameLayout
         SetClipChildren(false);
     }
 
+    /// <summary>
+    /// Raised when the container changed SHAPE (rotation, split view, multi-window resize).
+    /// Presented overlays compute their geometry from the window of the moment they were shown,
+    /// so they need to hear about it.
+    /// </summary>
+    public Action? WindowGeometryChanged { get; set; }
+
+    private int _lastWidth = -1;
+    private int _lastHeight = -1;
+
     /// <inheritdoc />
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
     {
         base.OnLayout(changed, left, top, right, bottom);
+
+        var width = right - left;
+        var height = bottom - top;
+
+        if (width != _lastWidth || height != _lastHeight)
+        {
+            _lastWidth = width;
+            _lastHeight = height;
+
+            WindowGeometryChanged?.Invoke();
+        }
 
         // The strips' heights are only known after layout: on the first (or a re-)measure while
         // the chrome is desired, publish the footprints and re-dispatch insets to the page layer

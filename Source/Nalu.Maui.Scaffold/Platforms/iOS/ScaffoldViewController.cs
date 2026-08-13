@@ -143,6 +143,12 @@ internal sealed class ScaffoldViewController : UIViewController
     /// </summary>
     public UIView? ChromeBottomLayer => _tabBarStrip;
 
+    /// <summary>
+    /// Raised after the container changed shape (rotation, split view). Presented overlays compute
+    /// their geometry from the window of the moment they were shown, so they need to hear about it.
+    /// </summary>
+    public Action? WindowGeometryChanged { get; set; }
+
     public override void ViewDidLoad()
     {
         base.ViewDidLoad();
@@ -494,6 +500,11 @@ internal sealed class ScaffoldViewController : UIViewController
             {
                 navStrip.Transform = CGAffineTransform.MakeTranslation(0, -NavStripHeight(navStrip));
             }
+        }
+
+        if (boundsOrInsetsChanged)
+        {
+            WindowGeometryChanged?.Invoke();
         }
 
         _lastBounds = bounds;

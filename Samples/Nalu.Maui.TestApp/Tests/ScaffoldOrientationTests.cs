@@ -57,6 +57,43 @@ public abstract class OrPageBase : ContentPage
 [UsedImplicitly]
 public class OrRootPage : OrPageBase
 {
+    private async Task ShowCappedSheetAsync()
+    {
+        var content = new VerticalStackLayout
+        {
+            Padding = 16,
+            Spacing = 8,
+            Children =
+            {
+                new Label { Text = "OrSheetContent", AutomationId = "OrSheetContent", FontSize = 16 },
+                new BoxView { Color = Colors.MediumPurple, HeightRequest = 40, AutomationId = "OrSheetBand" }
+            }
+        };
+
+        await this.GetScaffold().ShowBottomSheetAsync(
+            content,
+            new ScaffoldBottomSheetOptions { MaxWidth = OrSheet.MaxWidth }
+        );
+    }
+
+    /// <summary>
+    /// A sheet resting at a FRACTION of the available height: the detent a rotation must re-resolve,
+    /// since landscape leaves a fraction of the vertical space portrait had.
+    /// </summary>
+    private async Task ShowTallSheetAsync()
+    {
+        var content = new VerticalStackLayout
+        {
+            Padding = 16,
+            Children = { new Label { Text = "OrTallSheetContent", AutomationId = "OrTallSheetContent", FontSize = 16 } }
+        };
+
+        await this.GetScaffold().ShowBottomSheetAsync(
+            content,
+            new ScaffoldBottomSheetOptions { Detents = [ScaffoldSheetDetent.Fraction(OrSheet.TallFraction)] }
+        );
+    }
+
     public OrRootPage(OrRootPageModel model)
         : base("OrRootPage")
     {
@@ -68,16 +105,43 @@ public class OrRootPage : OrPageBase
             stack.Insert(1, OrientationProbe.CreateControls());
             stack.Insert(2, SafeAreaProbe.CreateProbe(this));
             stack.Insert(3, NavPageFactory.MakeButton("Push detail", "PushOrDetail", model.PushDetail));
+
+            var sheetButton = new Button { Text = "Show sheet", AutomationId = "ShowOrSheet", FontSize = 11 };
+            sheetButton.Clicked += async (_, _) => await ShowCappedSheetAsync();
+            stack.Insert(4, sheetButton);
+
+            var tallSheetButton = new Button { Text = "Show tall sheet", AutomationId = "ShowOrTallSheet", FontSize = 11 };
+            tallSheetButton.Clicked += async (_, _) => await ShowTallSheetAsync();
+            stack.Insert(5, tallSheetButton);
         }
     }
 }
 
+/// <summary>
+/// Pushed page that HIDES the tab bar: the strip is translated offscreen rather than torn down,
+/// and a size change must not bring it back into view.
+/// </summary>
 [UsedImplicitly]
 public class OrDetailPage : OrPageBase
 {
     public OrDetailPage(OrDetailPageModel model)
-        : base("OrDetailPage")
-        => BindingContext = model;
+        : base("OrDetailPage", NavPageFactory.MakeButton("Pop", "PopOrDetail", model.Pop), OrientationProbe.CreateControls())
+    {
+        BindingContext = model;
+        Scaffold.SetTabBarVisibility(this, ScaffoldTabBarVisibility.Hidden);
+    }
+}
+
+file static class OrSheet
+{
+    /// <summary>
+    /// Wider than a portrait phone window and narrower than a landscape one: the sheet spans the
+    /// window in portrait and floats capped in landscape, so one rotation shows both states.
+    /// </summary>
+    public const double MaxWidth = 500;
+
+    /// <summary>The tall sheet's single detent, as a fraction of the height available above the top inset.</summary>
+    public const double TallFraction = 0.8;
 }
 
 [UsedImplicitly]
