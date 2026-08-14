@@ -30,6 +30,22 @@ public partial class OrFifthPageModel : ObservableObject;
 [UsedImplicitly]
 public partial class OrSixthPageModel : ObservableObject;
 
+// Roots seven through ten exist so that SOMETHING still overflows in landscape. Six roots all fit
+// a landscape phone bar, which empties the overflow set — and an emptied set is already reported
+// by the bar and closes the panel on its own. Testing that a shape change closes the panel needs
+// the other case: a rotation that leaves the partition alone.
+[UsedImplicitly]
+public partial class OrSeventhPageModel : ObservableObject;
+
+[UsedImplicitly]
+public partial class OrEighthPageModel : ObservableObject;
+
+[UsedImplicitly]
+public partial class OrNinthPageModel : ObservableObject;
+
+[UsedImplicitly]
+public partial class OrTenthPageModel : ObservableObject;
+
 /// <summary>Shared shape of the orientation harness pages: the probes a rotation test reads.</summary>
 public abstract class OrPageBase : ContentPage
 {
@@ -236,10 +252,44 @@ public class OrSixthPage : OrPageBase
         => BindingContext = model;
 }
 
+[UsedImplicitly]
+public class OrSeventhPage : OrPageBase
+{
+    public OrSeventhPage(OrSeventhPageModel model)
+        : base("OrSeventhPage")
+        => BindingContext = model;
+}
+
+[UsedImplicitly]
+public class OrEighthPage : OrPageBase
+{
+    public OrEighthPage(OrEighthPageModel model)
+        : base("OrEighthPage")
+        => BindingContext = model;
+}
+
+[UsedImplicitly]
+public class OrNinthPage : OrPageBase
+{
+    public OrNinthPage(OrNinthPageModel model)
+        : base("OrNinthPage")
+        => BindingContext = model;
+}
+
+[UsedImplicitly]
+public class OrTenthPage : OrPageBase
+{
+    public OrTenthPage(OrTenthPageModel model)
+        : base("OrTenthPage")
+        => BindingContext = model;
+}
+
 /// <summary>
-/// Harness for what ROTATION does to the scaffold. Six roots on the default tab bar: in portrait
-/// some of them overflow into the "More" panel, and a wider window must re-partition them — the
-/// per-layout-pass overflow computation is the code under test. The root page also carries the
+/// Harness for what ROTATION does to the scaffold. TEN roots on the default tab bar: in portrait
+/// most of them overflow into the "More" panel, and a wider window must re-partition them — the
+/// per-layout-pass overflow computation is the code under test. The count is deliberate: a
+/// landscape phone bar takes several roots BACK but still cannot fit ten, so rotation exercises
+/// both a repartition and a shape change that leaves something overflowed. The root page also carries the
 /// safe-area probe, so a test can assert the LANDSCAPE side insets (the notch edge) that no
 /// portrait test can see, and the rotation controls themselves.
 /// </summary>
@@ -272,7 +322,11 @@ public class OrientationScaffold : Scaffold
                     new ScaffoldRoot { Title = "Three", PageType = typeof(OrThirdPage) },
                     new ScaffoldRoot { Title = "Four", PageType = typeof(OrFourthPage) },
                     new ScaffoldRoot { Title = "Five", PageType = typeof(OrFifthPage) },
-                    new ScaffoldRoot { Title = "Six", PageType = typeof(OrSixthPage) }
+                    new ScaffoldRoot { Title = "Six", PageType = typeof(OrSixthPage) },
+                    new ScaffoldRoot { Title = "Seven", PageType = typeof(OrSeventhPage) },
+                    new ScaffoldRoot { Title = "Eight", PageType = typeof(OrEighthPage) },
+                    new ScaffoldRoot { Title = "Nine", PageType = typeof(OrNinthPage) },
+                    new ScaffoldRoot { Title = "Ten", PageType = typeof(OrTenthPage) }
                 }
             }
         );

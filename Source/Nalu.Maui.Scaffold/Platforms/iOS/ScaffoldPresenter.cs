@@ -934,6 +934,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
+
+        // Bar-subtree measure changes reach the strip through the host's Controls-layer bubble —
+        // the platform invalidation walk dies inside the host chain (see BarMeasureInvalidated).
+        host.BarMeasureInvalidated = controller.InvalidateNavBarMeasure;
+
         var freshMount = host.Bar is null;
         host.SetBar(navBarView);
         host.UpdateSources(targetPage);
@@ -1307,9 +1312,27 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// the screen, taller than the window it now sits in) and a popup wherever it was centered or
     /// anchored, while their scrims, which autoresize, go on dimming everything.
     /// </remarks>
+    /// <summary>
+    /// Re-places the presented overlays for a window that changed shape.
+    /// </summary>
+    /// <remarks>
+    /// UNANIMATED, and that is not cosmetic. This runs from the host's layout pass, and a rotation
+    /// runs its layout passes inside UIKit's rotation animation block — where every frame written
+    /// here would enrol in the running animation. Each enrolment makes UIKit walk the layer's
+    /// accumulated animation list, so re-placing overlays pass after pass grows that list until the
+    /// walk eats the main thread: the app freezes deep in _shouldAnimateAdditivelyForKey with the
+    /// rotation transition on the stack. An overlay being re-placed for a new window should snap to
+    /// it anyway — it is not a movement the user should watch.
+    /// </remarks>
     private void RelayoutOverlays(ScaffoldViewController controller, UIView container)
+        => UIView.PerformWithoutAnimation(() => RelayoutOverlaysCore(controller, container));
+
+    private void RelayoutOverlaysCore(ScaffoldViewController controller, UIView container)
     {
-        foreach (var entry in _overlays)
+        var closePanel = false;
+
+        // Snapshot: closing the panel mutates the list.
+        foreach (var entry in _overlays.ToArray())
         {
             if (entry.Closing)
             {
@@ -1332,7 +1355,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     LayoutFlyout(entry.Request, container);
 
                     break;
+
+                // The tab bar panel is DISMISSED by a shape change rather than re-laid out: it is
+                // a transient menu hanging off the bar, and the set it lists is repartitioned for
+                // the new window. Closing also settles what an open overflow panel should show
+                // once a wider window has taken its items back — nothing, because it is gone.
+                // The set-changed path (ScaffoldTabBar.OpenOverflowAsync) already closes it; this
+                // covers the shape change that leaves the partition alone.
+                case { Kind: ScaffoldOverlayKind.TabBarPanel }:
+                    closePanel = true;
+
+                    break;
             }
+        }
+
+        if (closePanel)
+        {
+            scaffold.CloseTabBarPanelAsync().FireAndForget(scaffold.Handler);
         }
     }
 

@@ -154,6 +154,13 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
 
         var portrait = await App.WaitForStableBoundsAsync("OrPopupContent");
         var (portraitWidth, _) = await App.GetWindowSizeAsync();
+
+        // Size FIRST: a wrap-content-collapsed popup can still be perfectly centered, so the
+        // center assertions alone once passed while the popup rendered label-sized (Android
+        // measured the platform view natively, bypassing WidthRequest/HeightRequest).
+        portrait.Width.Should().BeApproximately(240, 2, "the popup takes its requested width");
+        portrait.Height.Should().BeApproximately(180, 2, "and its requested height");
+
         portrait.CenterX.Should().BeApproximately(portraitWidth / 2, 2, "a centered popup starts centered");
 
         await App.SetOrientationAsync(landscape: true);
@@ -165,6 +172,34 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
         landscape.CenterY.Should().BeApproximately(landscapeHeight / 2, 20, "vertically too, allowing for the safe-area area it is centered within");
 
         await App.TapAsync("PopupScrim");
+        await App.SetOrientationAsync(landscape: false);
+    }
+
+    /// <summary>
+    /// The overflow panel is DISMISSED by a shape change, not re-laid out: it is a transient menu
+    /// hanging off the bar, and the set it lists is repartitioned for the new window.
+    /// </summary>
+    /// <remarks>
+    /// The already-covered path is the set CHANGING (a wider window takes items back), which the
+    /// bar reports and the panel closes on. This is the other one: a shape change that leaves the
+    /// partition alone still has to close it, or the panel survives at the old window's geometry.
+    /// Landscape here keeps at least one root overflowed, so the panel would have something to
+    /// show and no reason to close by the existing path.
+    /// </remarks>
+    [Fact]
+    public async Task RotatingClosesTheOverflowPanel()
+    {
+        await App.TapAsync("TabMore");
+        await App.WaitForElementAsync("TabBarOverflowPanel");
+
+        await App.SetOrientationAsync(landscape: true);
+
+        await App.WaitForElementGoneAsync("TabBarOverflowPanel");
+
+        // …and the bar is left usable: the panel can be opened again in the new orientation
+        // (a close that tore down more than the panel would show up here).
+        (await App.WaitForElementAsync("TabMore")).IsVisible.Should().BeTrue();
+
         await App.SetOrientationAsync(landscape: false);
     }
 
@@ -185,6 +220,12 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
 
         var anchor = await App.WaitForStableBoundsAsync("ShowOrDropdown");
         var dropdown = await App.WaitForStableBoundsAsync("OrDropdownContent");
+
+        // Size first, for the same reason as the centered popup: adjacency holds for a collapsed
+        // dropdown too.
+        dropdown.Width.Should().BeApproximately(200, 2, "the dropdown takes its requested width");
+        dropdown.Height.Should().BeApproximately(120, 2, "and its requested height");
+
         AssertAnchored(dropdown, anchor, "portrait");
 
         await App.SetOrientationAsync(landscape: true);

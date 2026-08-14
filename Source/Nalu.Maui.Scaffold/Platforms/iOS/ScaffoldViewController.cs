@@ -71,30 +71,32 @@ internal static class ScaffoldChromeBar
 }
 
 /// <summary>
-/// Bounds the strips' settle-then-remeasure cycle, which is a feedback loop by construction: the
-/// settle invalidates the bar's measure, that invalidation travels back up through the strip, and
-/// the strip answers by dirtying its host — from inside a layout pass.
+/// Coalesces and DEFERS the strips' settle-then-remeasure cycle out of the layout pass that
+/// requested it.
 /// </summary>
 /// <remarks>
-/// Unbounded, the cycle can wedge the main thread outright. Chrome animations lay the tree out
-/// through <c>LayoutIfNeeded</c> inside an animation block, and UIKit drains every dirty view
-/// before that call returns: a cycle that re-dirties the host on each pass never lets the drain
-/// finish, and the app freezes with the strip's <c>LayoutSubviews</c> on the stack. A bar whose
-/// measured height keeps changing across passes — templated cells realizing, an image source
-/// resolving — is enough to sustain it.
+/// The settle (<see cref="ScaffoldChromeBar.SettleBarAtCurrentFrame"/>) drains the whole MAUI bar
+/// subtree through <c>LayoutIfNeeded</c>, and that call does not return until the subtree is
+/// CLEAN. Run inline from the strip's own <c>LayoutSubviews</c> — nested inside the window
+/// rotation's layout drain — the bar's safe-area validation keeps re-invalidating against
+/// geometry that is still mid-transition, the subtree never comes clean, and the single nested
+/// drain wedges the main thread outright (observed: the app frozen with ONE strip layout pass on
+/// the stack, grinding the bar's measure forever).
 /// <para>
-/// Two bounds, both of which leave a genuine settle intact. A settle is skipped when the geometry
-/// it would run for is the one it already ran for, since that settle is provably a no-op; and at
-/// most one settle happens per runloop turn, so any cycle that survives the first bound advances
-/// one pass per turn instead of spinning inside a single drain. A request that arrives while the
-/// latch is closed is not lost — it is re-raised on the next turn.
+/// Deferring to the next runloop turn dissolves that by construction: by the time the settle
+/// runs, the transition's geometry is final and the drain is not nested inside anyone else's.
+/// The one-turn-stale window is invisible — the settle exists to re-fold the safe-area inset
+/// into the bar's measure, and the host re-measures right after it lands. Requests are
+/// coalesced (many invalidations during a rotation, one settle), skipped when the geometry
+/// they would run for is the one already settled, and the invalidation echo raised BY the
+/// settle itself does not re-arm it.
 /// </para>
 /// </remarks>
-internal sealed class ScaffoldBarSettleGuard(UIView strip)
+internal sealed class ScaffoldBarSettleGuard(UIView strip, UIView bar, Action onSettled)
 {
     private bool _needed;
     private bool _settling;
-    private bool _latched;
+    private bool _scheduled;
     private bool _hasSettled;
     private CGRect _settledFrame;
     private UIEdgeInsets _settledInsets;
@@ -112,40 +114,47 @@ internal sealed class ScaffoldBarSettleGuard(UIView strip)
     }
 
     /// <summary>
-    /// Settles the bar if it needs it, at the frame it now has.
+    /// Called from the strip's layout pass: schedules the deferred settle when one is due.
+    /// Never settles inline — see the class remarks.
     /// </summary>
-    /// <returns><c>true</c> when a settle ran, and so the host must re-measure.</returns>
-    internal bool SettleIfNeeded(UIView bar)
+    internal void SettleSoonIfNeeded()
     {
-        if (!_needed)
+        if (!_needed || _scheduled)
         {
-            return false;
+            return;
         }
 
-        var frame = bar.Frame;
-        var insets = strip.SafeAreaInsets;
-
-        if (_hasSettled && frame == _settledFrame && SameInsets(insets, _settledInsets))
+        if (_hasSettled && bar.Frame == _settledFrame && SameInsets(strip.SafeAreaInsets, _settledInsets))
         {
             // Same geometry as the last settle: re-running it would produce the same answer.
             _needed = false;
 
-            return false;
+            return;
         }
 
-        if (_latched)
+        _scheduled = true;
+        DispatchQueue.MainQueue.DispatchAsync(SettleNow);
+    }
+
+    private void SettleNow()
+    {
+        _scheduled = false;
+
+        // The request may have been satisfied or invalidated meanwhile; a detached strip has
+        // nothing to settle against (it re-arms on remount via SafeAreaInsetsDidChange).
+        if (!_needed || strip.Window is null)
         {
-            // Already settled this turn. Keep the request and re-raise it on the next one.
-            return false;
+            return;
         }
 
         _needed = false;
-        _latched = true;
         _settling = true;
 
         try
         {
-            ScaffoldChromeBar.SettleBarAtCurrentFrame(bar);
+            // Unanimated: the settle arranges the bar subtree, and this turn may still be inside
+            // an animation block someone else opened.
+            UIView.PerformWithoutAnimation(() => ScaffoldChromeBar.SettleBarAtCurrentFrame(bar));
         }
         finally
         {
@@ -153,22 +162,10 @@ internal sealed class ScaffoldBarSettleGuard(UIView strip)
         }
 
         _hasSettled = true;
-        _settledFrame = frame;
-        _settledInsets = insets;
+        _settledFrame = bar.Frame;
+        _settledInsets = strip.SafeAreaInsets;
 
-        DispatchQueue.MainQueue.DispatchAsync(
-            () =>
-            {
-                _latched = false;
-
-                if (_needed)
-                {
-                    strip.SetNeedsLayout();
-                }
-            }
-        );
-
-        return true;
+        onSettled();
     }
 
     private static bool SameInsets(UIEdgeInsets left, UIEdgeInsets right)
@@ -410,8 +407,12 @@ internal sealed class ScaffoldViewController : UIViewController
     private void PositionNavStrip(ScaffoldNavBarStrip strip, CGRect containerBounds)
     {
         var stripHeight = NavStripHeight(strip);
-        strip.Bounds = new CGRect(0, 0, containerBounds.Width, stripHeight);
-        strip.Center = new CGPoint(containerBounds.Width / 2, stripHeight / 2);
+
+        PositionChromeStrip(
+            strip,
+            new CGRect(0, 0, containerBounds.Width, stripHeight),
+            new CGPoint(containerBounds.Width / 2, stripHeight / 2)
+        );
     }
 
     /// <summary>
@@ -495,10 +496,60 @@ internal sealed class ScaffoldViewController : UIViewController
     /// (layout passes run INSIDE the animation block via LayoutIfNeeded).
     /// </summary>
     private static void PositionStrip(ScaffoldTabBarStrip strip, CGRect containerBounds, nfloat stripHeight)
+        => PositionChromeStrip(
+            strip,
+            new CGRect(0, 0, containerBounds.Width, stripHeight),
+            new CGPoint(containerBounds.Width / 2, containerBounds.Height - (stripHeight / 2))
+        );
+
+    /// <summary>
+    /// Writes a strip's resting geometry, and ONLY when it actually moved.
+    /// </summary>
+    /// <remarks>
+    /// This runs from every layout pass, and rotation runs its passes inside UIKit's rotation
+    /// animation block — where each write to an animatable property enrolls in the running
+    /// animation. The strips animate ADDITIVELY (see SetTabBarPresentedAsync), so UIKit walks the
+    /// layer's accumulated animation list on every enrolment: re-writing an unchanged Center each
+    /// pass grows that list until the walk eats the main thread, observed as a freeze deep in
+    /// _shouldAnimateAdditivelyForKey. Writing only real changes keeps the list short, and
+    /// PerformWithoutAnimation keeps resting geometry out of the animation entirely — the slide
+    /// itself rides on Transform, not on these.
+    /// </remarks>
+    private static void PositionChromeStrip(UIView strip, CGRect bounds, CGPoint center)
     {
-        strip.Bounds = new CGRect(0, 0, containerBounds.Width, stripHeight);
-        strip.Center = new CGPoint(containerBounds.Width / 2, containerBounds.Height - (stripHeight / 2));
+        if (strip.Bounds == bounds && strip.Center == center)
+        {
+            return;
+        }
+
+        UIView.PerformWithoutAnimation(
+            () =>
+            {
+                strip.Bounds = bounds;
+                strip.Center = center;
+            }
+        );
     }
+
+    /// <summary>
+    /// Runs chrome layout work with implicit animations OFF.
+    /// </summary>
+    /// <remarks>
+    /// Chrome layout passes can run INSIDE an animation block: the window ROTATION animation drives
+    /// them through LayoutIfNeeded (in-app geometry updates ride the same rotation controller), and
+    /// the chrome's own show/hide does so deliberately. Inside such a block every write to an
+    /// animatable property enrolls an ADDITIVE animation — and a strip settle re-arranges the whole
+    /// MAUI bar subtree, so each pass stacks one more animation on every bar layer. UIKit walks the
+    /// accumulated stack on each enrolment (_shouldAnimateAdditivelyForKey), so repeated passes turn
+    /// the walk quadratic until the main thread never returns from the drain: the freeze observed on
+    /// device rotation with a scaffold on screen, and absent from any scaffold-free page.
+    /// <para>
+    /// The rule this encodes: chrome MOTION rides exclusively on Transform (the slide animations);
+    /// chrome GEOMETRY — strip frames, bar frames, bar-subtree arrangement — always snaps. A bar
+    /// re-placed for a new window shape is not a movement the user should watch.
+    /// </para>
+    /// </remarks>
+    internal static void PerformChromeLayout(Action layout) => UIView.PerformWithoutAnimation(layout);
 
     /// <summary>
     /// Slides the mounted strip in or out. INTERRUPTIBLE: a call while the opposite animation
@@ -562,11 +613,22 @@ internal sealed class ScaffoldViewController : UIViewController
         {
             var bottom = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null ? BarHeight : 0;
             var top = CurrentPageWantsNavBarInset ? NavBarInsetContribution : 0;
-            pageController.AdditionalSafeAreaInsets = new UIEdgeInsets(top, 0, bottom, 0);
+            var insets = new UIEdgeInsets(top, 0, bottom, 0);
+
+            // Only on change: writing AdditionalSafeAreaInsets re-dirties the page subtree even
+            // when the value is identical, and this runs on EVERY host layout pass.
+            if (pageController.AdditionalSafeAreaInsets != insets)
+            {
+                pageController.AdditionalSafeAreaInsets = insets;
+            }
         }
     }
 
+    // Chrome geometry snaps — never animates implicitly; see PerformChromeLayout.
     public override void ViewDidLayoutSubviews()
+        => PerformChromeLayout(ViewDidLayoutSubviewsCore);
+
+    private void ViewDidLayoutSubviewsCore()
     {
         base.ViewDidLayoutSubviews();
 
@@ -644,11 +706,29 @@ internal sealed class ScaffoldTabBarStrip : UIView
     public ScaffoldTabBarStrip(UIView bar)
     {
         Bar = bar;
-        _settle = new ScaffoldBarSettleGuard(this);
+        _settle = new ScaffoldBarSettleGuard(this, bar, OnBarSettled);
         BackgroundColor = UIColor.Clear;
-        (bar.Superview as UIView)?.WillRemoveSubview(bar);
+        bar.Superview?.WillRemoveSubview(bar);
         bar.RemoveFromSuperview();
         AddSubview(bar);
+    }
+
+    /// <summary>
+    /// The deferred settle landed: re-measure a bar whose answer has become current, and dirty
+    /// the host only if that CHANGED it — a settle that leaves the height where it was gives the
+    /// host nothing to do, and a bar that consumes nothing (SafeAreaEdges.None) answers the same
+    /// every time, so it costs one settle and stops.
+    /// </summary>
+    private void OnBarSettled()
+    {
+        var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
+
+        if (settled != BarHeight)
+        {
+            BarHeight = settled;
+            NeedsMeasure = true;
+            SetNeedsLayout();
+        }
     }
 
     internal void Measure(nfloat width)
@@ -674,7 +754,14 @@ internal sealed class ScaffoldTabBarStrip : UIView
         _settle.Invalidate();
     }
 
+    // The ENTIRE pass is unanimated — see ScaffoldViewController.PerformChromeLayout: this can
+    // run inside the window rotation animation block, and the settle below re-arranges the
+    // whole MAUI bar subtree, whose every frame write would otherwise stack an additive
+    // animation per pass until walking them consumes the main thread.
     public override void LayoutSubviews()
+        => ScaffoldViewController.PerformChromeLayout(LayoutSubviewsCore);
+
+    private void LayoutSubviewsCore()
     {
         base.LayoutSubviews();
 
@@ -684,22 +771,9 @@ internal sealed class ScaffoldTabBarStrip : UIView
         // top-align at their measured height).
         Bar.Frame = Bounds;
 
-        // The bar now has its final frame, so laying it out validates its safe area and re-folds
-        // the inset. Dirty the host only if that CHANGED the bar's answer: a settle that leaves the
-        // height where it was gives the host nothing to do, and asking anyway is what let this pass
-        // feed itself. A bar that consumes nothing (SafeAreaEdges.None) answers the same every
-        // time, so it now costs one settle and stops.
-        if (_settle.SettleIfNeeded(Bar))
-        {
-            var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
-
-            if (settled != BarHeight)
-            {
-                BarHeight = settled;
-                NeedsMeasure = true;
-                Superview?.SetNeedsLayout();
-            }
-        }
+        // The bar now has its final frame; a DEFERRED settle re-folds its safe area into the
+        // measure once this pass's geometry is final (never inline — see ScaffoldBarSettleGuard).
+        _settle.SettleSoonIfNeeded();
     }
 
     public override UIView? HitTest(CGPoint point, UIEvent? uievent)
@@ -719,7 +793,7 @@ internal sealed class ScaffoldTabBarStrip : UIView
 /// is subtracted back (the NaluShellItemRenderer net10 pattern) — the controller adds the
 /// system inset deterministically.
 /// </summary>
-internal sealed class ScaffoldNavBarStrip : UIView
+internal sealed class ScaffoldNavBarStrip : UIView, IPlatformMeasureInvalidationController
 {
     public UIView Bar { get; }
 
@@ -733,9 +807,9 @@ internal sealed class ScaffoldNavBarStrip : UIView
     public ScaffoldNavBarStrip(UIView bar)
     {
         Bar = bar;
-        _settle = new ScaffoldBarSettleGuard(this);
+        _settle = new ScaffoldBarSettleGuard(this, bar, OnBarSettled);
         BackgroundColor = UIColor.Clear;
-        (bar.Superview as UIView)?.WillRemoveSubview(bar);
+        bar.Superview?.WillRemoveSubview(bar);
         bar.RemoveFromSuperview();
         AddSubview(bar);
     }
@@ -754,14 +828,36 @@ internal sealed class ScaffoldNavBarStrip : UIView
     internal void InvalidateBarMeasure()
     {
         _settle.Invalidate();
+        NeedsMeasure = true;
         SetNeedsLayout();
+        Superview?.SetNeedsLayout();
     }
 
-    public override void SetNeedsLayout()
+    private bool _invalidateOnWindow;
+
+    /// <summary>Same typed invalidation channel as the tab bar strip; see there.</summary>
+    /// <returns><c>false</c>: propagation stops here — the strip owns what happens above it.</returns>
+    bool IPlatformMeasureInvalidationController.InvalidateMeasure(bool isPropagating)
     {
-        base.SetNeedsLayout();
         NeedsMeasure = true;
+        SetNeedsLayout();
         Superview?.SetNeedsLayout();
+
+        return false;
+    }
+
+    void IPlatformMeasureInvalidationController.InvalidateAncestorsMeasuresWhenMovedToWindow()
+        => _invalidateOnWindow = true;
+
+    public override void MovedToWindow()
+    {
+        base.MovedToWindow();
+
+        if (_invalidateOnWindow && Window is not null)
+        {
+            _invalidateOnWindow = false;
+            ((IPlatformMeasureInvalidationController)this).InvalidateMeasure(isPropagating: true);
+        }
     }
 
     public override void SafeAreaInsetsDidChange()
@@ -774,23 +870,30 @@ internal sealed class ScaffoldNavBarStrip : UIView
         _settle.Invalidate();
     }
 
+    // Unanimated as a whole — same hazard as the tab bar strip; see its LayoutSubviews.
     public override void LayoutSubviews()
+        => ScaffoldViewController.PerformChromeLayout(LayoutSubviewsCore);
+
+    private void LayoutSubviewsCore()
     {
         base.LayoutSubviews();
         Bar.Frame = Bounds;
 
-        // Same settle-then-remeasure contract as the tab bar strip, and the same two bounds on it:
-        // see ScaffoldTabBarStrip.LayoutSubviews and ScaffoldBarSettleGuard.
-        if (_settle.SettleIfNeeded(Bar))
-        {
-            var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
+        // Same deferred settle contract as the tab bar strip; see ScaffoldBarSettleGuard.
+        _settle.SettleSoonIfNeeded();
+    }
 
-            if (settled != BarHeight)
-            {
-                BarHeight = settled;
-                NeedsMeasure = true;
-                Superview?.SetNeedsLayout();
-            }
+    /// <summary>Same post-settle re-measure contract as the tab bar strip.</summary>
+    private void OnBarSettled()
+    {
+        var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
+
+        if (settled != BarHeight)
+        {
+            BarHeight = settled;
+            NeedsMeasure = true;
+            SetNeedsLayout();
+            Superview?.SetNeedsLayout();
         }
     }
 

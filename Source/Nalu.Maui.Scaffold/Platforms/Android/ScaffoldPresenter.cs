@@ -1764,7 +1764,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             {
                 panel = request.Content.ToPlatform(mauiContext);
                 (panel.Parent as AViewGroup)?.RemoveView(panel);
-                platformView.AddView(panel, LayoutPopup(request, panel, platformView, context));
+                platformView.AddView(panel, LayoutPopup(request, platformView, context));
 
                 break;
             }
@@ -1846,7 +1846,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// minus its system insets and the popup's margin, and an anchored popup follows wherever its
     /// anchor now sits. Returns the layout params to mount (or re-mount) it with.
     /// </summary>
-    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, AView panel, AView container, Android.Content.Context context)
+    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, AView container, Android.Content.Context context)
     {
         var systemInsets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
         var presentation = request.PopupPresentation!;
@@ -1859,14 +1859,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             Math.Max(0, context.FromPixels(container.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0)) - margin.VerticalThickness)
         );
 
-        panel.Measure(
-            AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Width), MeasureSpecMode.AtMost),
-            AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(area.Height), MeasureSpecMode.AtMost)
-        );
+        // VIRTUAL measure, not a native one: measuring the platform view directly bypasses the
+        // cross-platform pass, so the content wraps its native children and Width/HeightRequest
+        // are silently ignored — a 240dp popup came out label-sized. Same contract as the flyout.
+        var popupView = (IView)request.Content;
+        var desired = popupView.Measure(area.Width, area.Height);
 
         var contentSize = new Size(
-            Math.Min(context.FromPixels(panel.MeasuredWidth), area.Width),
-            Math.Min(context.FromPixels(panel.MeasuredHeight), area.Height)
+            Math.Min(desired.Width, area.Width),
+            Math.Min(desired.Height, area.Height)
         );
 
         Rect? anchorBounds = null;
@@ -1887,6 +1888,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
+
+        // Virtual arrange gives the content a valid MAUI frame at its resolved size (the platform
+        // margins below position the slot); without it the transform mappers have no frame to
+        // apply against and the virtual bounds stay invalid.
+        popupView.Arrange(new Rect(0, 0, rect.Width, rect.Height));
 
         return new Android.Widget.FrameLayout.LayoutParams((int)context.ToPixels(rect.Width), (int)context.ToPixels(rect.Height))
         {
@@ -1953,7 +1959,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// </remarks>
     private void RelayoutOverlays(AView container, Android.Content.Context context)
     {
-        foreach (var entry in _overlays)
+        var closePanel = false;
+
+        // Snapshot: closing the panel mutates the list.
+        foreach (var entry in _overlays.ToArray())
         {
             if (entry.Closing || entry.ContentPlatform is not { } panel)
             {
@@ -1968,7 +1977,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     break;
 
                 case { Kind: ScaffoldOverlayKind.Popup }:
-                    panel.LayoutParameters = LayoutPopup(entry.Request, panel, container, context);
+                    panel.LayoutParameters = LayoutPopup(entry.Request, container, context);
 
                     break;
 
@@ -1976,7 +1985,19 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     LayoutFlyout(entry.Request, panel, container, context);
 
                     break;
+
+                // Dismissed by a shape change rather than re-laid out — same contract as iOS; see
+                // the note there.
+                case { Kind: ScaffoldOverlayKind.TabBarPanel }:
+                    closePanel = true;
+
+                    break;
             }
+        }
+
+        if (closePanel)
+        {
+            scaffold.CloseTabBarPanelAsync().FireAndForget(scaffold.Handler);
         }
     }
 
