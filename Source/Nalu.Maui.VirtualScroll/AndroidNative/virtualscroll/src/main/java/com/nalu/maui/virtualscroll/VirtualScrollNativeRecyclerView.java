@@ -312,9 +312,19 @@ public abstract class VirtualScrollNativeRecyclerView extends RecyclerView
         int right = left + getWidth();
         int bottom = top + getHeight();
 
-        restLeft = Math.max(0, size.left - left);
-        restTop = Math.max(0, size.top - top);
-        restRight = Math.max(0, right - (root.getWidth() - size.right));
-        restBottom = Math.max(0, bottom - (root.getHeight() - size.bottom));
+        // How deep the rest footprint reaches into each inset BAND. Clamped to the band's own
+        // thickness: a footprint lying outside the root entirely — pager-style hosts lay their
+        // pages out side by side, so page N rests at N*pageWidth, far past the root's right
+        // edge — otherwise yields a padding of whole screen widths and collapses the content
+        // box to nothing (github.com/nalu-development/nalu/issues/187). An inset band can
+        // never cost more padding than the inset itself.
+        restLeft = clampToBand(size.left - left, size.left);
+        restTop = clampToBand(size.top - top, size.top);
+        restRight = clampToBand(right - (root.getWidth() - size.right), size.right);
+        restBottom = clampToBand(bottom - (root.getHeight() - size.bottom), size.bottom);
+    }
+
+    private static int clampToBand(int overlap, int band) {
+        return overlap <= 0 ? 0 : Math.min(overlap, band);
     }
 }
