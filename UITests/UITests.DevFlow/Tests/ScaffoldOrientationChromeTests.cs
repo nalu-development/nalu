@@ -169,6 +169,46 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
     }
 
     /// <summary>
+    /// An ANCHORED popup is placed against its anchor, not the window: a shape change moves the
+    /// anchor, so the dropdown has to be re-placed or it stays where the anchor USED to be.
+    /// </summary>
+    /// <remarks>
+    /// The contract is start-aligned and vertically adjacent — below by default, flipping above
+    /// when it does not fit. Landscape is exactly where that flip becomes likely (the window keeps
+    /// a fraction of its height), so the assertion allows either side rather than pinning "below"
+    /// and calling a documented flip a failure.
+    /// </remarks>
+    [Fact]
+    public async Task AnchoredDropdownFollowsItsAnchorAcrossRotation()
+    {
+        await App.TapAsync("ShowOrDropdown");
+
+        var anchor = await App.WaitForStableBoundsAsync("ShowOrDropdown");
+        var dropdown = await App.WaitForStableBoundsAsync("OrDropdownContent");
+        AssertAnchored(dropdown, anchor, "portrait");
+
+        await App.SetOrientationAsync(landscape: true);
+
+        var rotatedAnchor = await App.WaitForStableBoundsAsync("ShowOrDropdown");
+        var rotatedDropdown = await App.WaitForStableBoundsAsync("OrDropdownContent");
+        AssertAnchored(rotatedDropdown, rotatedAnchor, "landscape");
+
+        await App.TapAsync("PopupScrim");
+        await App.SetOrientationAsync(landscape: false);
+
+        static void AssertAnchored(ElementBounds dropdown, ElementBounds anchor, string orientation)
+        {
+            dropdown.X.Should().BeApproximately(anchor.X, 2, $"the dropdown is start-aligned with its anchor ({orientation})");
+
+            var below = dropdown.Y >= anchor.Bottom - 1;
+            var above = dropdown.Bottom <= anchor.Y + 1;
+
+            (below || above).Should()
+                            .BeTrue($"the dropdown must sit against its anchor in {orientation} — anchor {anchor}, dropdown {dropdown}");
+        }
+    }
+
+    /// <summary>
     /// A flyout's width is a FRACTION of the window's and it is pinned to an edge over the full
     /// height: a shape change must recompute both, or it keeps the old window's proportions.
     /// </summary>

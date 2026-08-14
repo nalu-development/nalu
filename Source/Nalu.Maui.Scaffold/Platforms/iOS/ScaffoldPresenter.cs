@@ -443,9 +443,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             UIView.PerformWithoutAnimation(CompleteMount);
         }
         
-        void MountBelow()
+        // The caller has already matched the view it wants the page staged under — take it, rather
+        // than reaching back through the controller for a nullable that was checked elsewhere.
+        void MountBelow(UIView below)
         {
-            container.InsertSubviewBelow(newView, previousController.View!);
+            container.InsertSubviewBelow(newView, below);
             UIView.PerformWithoutAnimation(CompleteMount);
         }
 
@@ -497,7 +499,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             case ScaffoldPresentationHint.Pop when previousController?.View is { } previousView:
             {
-                MountBelow();
+                MountBelow(previousView);
                 await PlayPopAsync(container, mauiContext, previousPage, targetPage, previousView, newView);
 
                 break;
