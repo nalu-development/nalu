@@ -394,14 +394,53 @@ public sealed class NaluApp : IAsyncLifetime
         await RunProcessAsync("axe", $"tap --id {automationId} --udid {await GetBootedSimulatorUdidAsync().ConfigureAwait(false)}").ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// A REAL left-edge swipe on the simulator (axe HID injection), which is how the scaffold's
+    /// INTERACTIVE POP is driven on Apple platforms — the iOS counterpart of Android's predictive
+    /// back. The agent cannot stand in for it: the pop is a platform gesture recognizer reading raw
+    /// touches, so nothing in-process reaches it.
+    /// </summary>
+    /// <remarks>
+    /// The returned task tracks the gesture, and is deliberately NOT awaited internally: the peek
+    /// page and the shared elements in flight only exist while the finger is down, so a test that
+    /// wants to assert on them has to look while this runs. Await it to let the gesture finish.
+    /// The default travel commits the pop (well past the presenter's 0.35 progress threshold);
+    /// the duration is slow on purpose, to leave a window wide enough to observe.
+    /// </remarks>
+    public async Task<Task> BeginAppleEdgeSwipeBackAsync(double durationSeconds = 2.5, double travelRatio = 0.9)
+    {
+        var (width, height) = await GetWindowSizeAsync().ConfigureAwait(false);
+        var udid = await GetBootedSimulatorUdidAsync().ConfigureAwait(false);
+
+        // Start INSIDE the edge zone the recognizer gates on, and travel across the window.
+        var arguments = FormattableString.Invariant(
+            $"swipe --start-x 2 --start-y {height / 2:0} --end-x {width * travelRatio:0} --end-y {height / 2:0} --duration {durationSeconds:0.##} --udid {udid}"
+        );
+
+        return RunProcessAsync("axe", arguments);
+    }
+
     private string? _bootedSimulatorUdid;
 
-    /// <summary>The booted simulator's UDID, for host-side tools (axe) that require an explicit target.</summary>
+    /// <summary>
+    /// The booted simulator's UDID, for host-side tools (axe) that require an explicit target.
+    /// </summary>
+    /// <remarks>
+    /// Discovery takes the first booted device, which is ambiguous the moment a second simulator is
+    /// up — a real situation when another run (or another agent) holds one. Set DEVFLOW_SIM_UDID to
+    /// name the target explicitly; pair it with DEVFLOW_PORT, since a second app instance binds the
+    /// +1000 fallback port rather than the platform one.
+    /// </remarks>
     private async Task<string> GetBootedSimulatorUdidAsync()
     {
         if (_bootedSimulatorUdid is not null)
         {
             return _bootedSimulatorUdid;
+        }
+
+        if (Environment.GetEnvironmentVariable("DEVFLOW_SIM_UDID") is { Length: > 0 } configured)
+        {
+            return _bootedSimulatorUdid = configured;
         }
 
         var output = await RunProcessAsync("xcrun", "simctl list devices booted").ConfigureAwait(false);

@@ -78,6 +78,58 @@ public class ScaffoldTransitionChromeTests(NaluApp app) : BaseUiTest(app), IAsyn
         );
     }
 
+    /// <summary>
+    /// The iOS counterpart of <see cref="PredictiveBackRestoresSharedElementRendering"/>: the
+    /// interactive pop peek-mounts the page below and scrubs the pop choreography against the
+    /// finger. What must hold WHILE the finger is down is that the peek is a real, laid-out page —
+    /// the shared-element flights measure against its geometry, so a peek that arrives unsized
+    /// sends them somewhere else entirely.
+    /// </summary>
+    /// <remarks>
+    /// This covers a regression that reached a real app: the presenter mounted pages by constraint,
+    /// and a page detached after such a mount lost its pins, coming back for the peek owned by Auto
+    /// Layout with nothing to size it. Nothing caught it, for the plain reason that no test drove
+    /// the interactive pop at all — the pop coverage above all taps POP, which is a different path.
+    /// <para>
+    /// Verified to fail against that mount, and WHERE it fails is worth keeping: the peek still
+    /// reports a plausible size mid-gesture, and it is the committed pop that leaves the page at
+    /// the wrong Y. Both assertions stay — the mid-gesture one states what a peek must be, the
+    /// post-commit one is what actually trips.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task EdgeSwipePopPeeksTheRevealedPageAtItsRealGeometry()
+    {
+        Assert.SkipUnless(await App.IsAppleAsync(), "The interactive pop is driven by a simulator edge swipe.");
+
+        await WaitDisplayedAsync("TransitionGridPage");
+        var gridImage = await App.WaitForStableBoundsAsync("GridHeroImage");
+
+        await App.TapAsync("PushTransitionDetail");
+        await WaitDisplayedAsync("TransitionDetailPage");
+
+        var gesture = await App.BeginAppleEdgeSwipeBackAsync();
+
+        // Mid-gesture: the revealed page is peek-mounted and must already carry its own layout.
+        // Its X travels with the finger, so the invariant to assert is the SIZE.
+        await App.WaitForBoundsAsync(
+            "GridHeroImage",
+            b => Math.Abs(b.Width - gridImage.Width) <= 1 && Math.Abs(b.Height - gridImage.Height) <= 1
+        );
+
+        await gesture;
+
+        // …and the committed pop leaves the page exactly where a programmatic pop would.
+        await WaitDisplayedAsync("TransitionGridPage");
+
+        await App.WaitForBoundsAsync(
+            "GridHeroImage",
+            b => Math.Abs(b.X - gridImage.X) <= 1 && Math.Abs(b.Y - gridImage.Y) <= 1 && Math.Abs(b.Width - gridImage.Width) <= 1
+        );
+
+        (await App.WaitForElementAsync("GridHeroTitle")).IsVisible.Should().BeTrue("the flight must restore the source views it hid");
+    }
+
     [Fact]
     public async Task RepeatedRoundTripsStayStable()
     {
