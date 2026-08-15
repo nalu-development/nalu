@@ -56,6 +56,11 @@ dotnet new install Nalu.Maui.Templates
 dotnet new maui-nalu-scaffold -n MyApp
 ```
 
+The generated app also ships **agent skills** for AI coding assistants (`AGENTS.md`, `CLAUDE.md`
+and `.claude/skills/nalu-*` — navigation, lifecycle, scaffold structure, transitions, overlays,
+keyboard): concise, verified references an agent loads on demand instead of guessing Nalu APIs
+from Shell habits.
+
 To add the Scaffold to an existing app instead, follow the steps below.
 
 ### 1. Installation
