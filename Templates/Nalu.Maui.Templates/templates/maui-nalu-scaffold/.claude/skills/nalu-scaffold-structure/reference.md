@@ -181,12 +181,15 @@ Primitives (public, style directly; the same styles apply inside custom bars):
 | `ScaffoldNavBarTitle` (`Grid`) | `TextColor` (#1C1C1E), `FontFamily`, `FontSize` (17), `FontAttributes` (Bold) | Shows `TitleView` when set, else `Title`. |
 
 Color precedence for title/buttons: explicitly set `TextColor`/`IconColor` (style or instance) →
-effective `ScaffoldNavBarAppearance.Foreground` (via `ScaffoldNavBarContext.Foreground`) → built-in
-default. The template pins neither, so page-level `Foreground` recolors title and buttons together;
-a styled `TextColor`/`IconColor` would pin that primitive's color.
+appearance chain via the context (title: level-wise `TitleForeground` ?? `Foreground` — the first level
+setting either wins; buttons: `Foreground`) →
+built-in default. The template pins neither primitive (scaffold-level `Foreground` = accent,
+`TitleForeground` = text-primary), so page-level appearances recolor title and buttons — together with
+`Foreground` alone, or separately with both; a styled `TextColor`/`IconColor` would pin that primitive.
 
 `ScaffoldNavBarAppearance` (`BindableObject`, inherits the `BindingContext` of the element it is attached
-to): `Background` (Brush, default #F7FFFFFF), `Foreground` (Color), `Opacity` (1), `OffsetY` (0). Each
+to): `Background` (Brush, default #F7FFFFFF), `Foreground` (Color), `TitleForeground` (Color, title only; per level
+falls back to that level's `Foreground`), `Opacity` (1), `OffsetY` (0). Each
 property resolves independently page → area → scaffold → defaults. Bind or animate `Opacity`/`OffsetY`
 (hide-on-scroll) or a `SolidColorBrush.Color` inside `Background`; changes apply per frame.
 
@@ -196,7 +199,7 @@ page-specific state through `CurrentPage.BindingContext.X` (reflection binding) 
 `PageBindingContext` is what the title slot hands to `TitleView` content.
 
 `ScaffoldNavBarContext` members: `Title`, `TitleView`, `CurrentPage`, `PageBindingContext`,
-`Foreground`, `ScrollOffset`, `IsScrolledUnder`, `ScrollRampStart`, `ScrollRampEnd`, `CanNavigateBack`,
+`Foreground`, `TitleForeground`, `ScrollOffset`, `IsScrolledUnder`, `ScrollRampStart`, `ScrollRampEnd`, `CanNavigateBack`,
 `IsFlyoutStartButtonVisible`, `IsFlyoutEndButtonVisible`, `IsModal`, `IsCloseButtonVisible`,
 `BackCommand` (pop through the engine; disabled while a pop is in flight), `OpenFlyoutStartCommand`,
 `OpenFlyoutEndCommand`.

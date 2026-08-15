@@ -72,6 +72,18 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Gets the effective title color from the appearance chain: level by level, the first
+    /// appearance setting <see cref="ScaffoldNavBarAppearance.TitleForeground"/> or
+    /// <see cref="ScaffoldNavBarAppearance.Foreground"/> wins (its title color first). Null when
+    /// no appearance sets either — the title then uses its built-in default.
+    /// </summary>
+    public Color? TitleForeground
+    {
+        get;
+        internal set => SetField(ref field, value);
+    }
+
+    /// <summary>
     /// Gets the tracked scrollable's vertical offset in dp (see
     /// <see cref="Scaffold.ScrollTrackerProperty"/>): 0 at rest, negative while
     /// over-scrolling at the top. Updates per frame — bind chrome transforms to it

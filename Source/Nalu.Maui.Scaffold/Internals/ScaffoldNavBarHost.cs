@@ -239,6 +239,8 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         _scaffold.NavBarContext.Foreground = ScaffoldNavBarAppearance.Resolve<Color?>(
             ScaffoldNavBarAppearance.ForegroundProperty, _pageAppearance, _areaAppearance, _scaffoldAppearance, null);
 
+        _scaffold.NavBarContext.TitleForeground = ScaffoldNavBarAppearance.ResolveTitleForeground(_pageAppearance, _areaAppearance, _scaffoldAppearance);
+
         // The system-bar icon style tracks the LIVE bar surface (this runs per-frame during
         // scroll-driven appearance animation — the icons flip exactly when the bar materializes).
         _scaffold.SystemBars.UpdateBar(_page, _content.Background, _content.Opacity);

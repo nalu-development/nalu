@@ -68,9 +68,9 @@
          (background/opacity/offset) is not a component property: it is the scaffold-level
          ScaffoldNavBarAppearance set in AppScaffold.xaml (pages override per property).
          Title/icon COLOR is deliberately NOT styled here: an explicit TextColor/IconColor would
-         win over the appearance Foreground and pin the color, so a page setting its own
-         NavBarAppearance Foreground (photo headers, scroll-driven recolor) could no longer
-         recolor the bar. Foreground in AppScaffold.xaml is the single source of both. -->
+         win over the appearance colors and pin them, so a page setting its own NavBarAppearance
+         (photo headers, scroll-driven recolor) could no longer recolor the bar. The scaffold-level
+         appearance in AppScaffold.xaml (Foreground = buttons, TitleForeground = title) is the source. -->
 
     <Style TargetType="nalu:ScaffoldNavBarTitle">
         <Setter Property="FontFamily" Value="SemiBold" />

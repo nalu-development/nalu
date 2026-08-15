@@ -165,4 +165,21 @@ public class ScaffoldNavBarAppearanceTests(NaluApp app) : BaseUiTest(app), IAsyn
         await WaitDisplayedAsync("AppearancePageHome");
         await App.WaitForTextAsync("NavBarTitleLabel", "Appearance Home");
     }
+
+    [Fact]
+    public async Task TitleForegroundIsASeparateChannelFromForeground()
+    {
+        await WaitDisplayedAsync("AppearancePageHome");
+
+        await App.TapAsync("PushAppearanceOverlap");
+        await App.WaitForTextAsync("NavBarTitleLabel", "Overlap Title");
+
+        // The overlap page sets Foreground = White (buttons) and TitleForeground = Gold (title):
+        // both resolve through the context independently — the probes read the effective values.
+        await App.WaitForTextAsync("AppearanceOverlapForeground", "#FFFFFF");
+        await App.WaitForTextAsync("AppearanceOverlapTitleForeground", "#FFD700");
+
+        await App.TapAsync("PopAppearanceOverlap");
+        await WaitDisplayedAsync("AppearancePageHome");
+    }
 }

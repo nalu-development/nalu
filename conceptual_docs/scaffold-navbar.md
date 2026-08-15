@@ -46,7 +46,9 @@ replacement:
 ```xml
 <!-- Scaffold-wide surface -->
 <nalu:Scaffold.NavBarAppearance>
-    <nalu:ScaffoldNavBarAppearance Foreground="{StaticResource Accent}">
+    <nalu:ScaffoldNavBarAppearance Foreground="{StaticResource Accent}"
+                                   TitleForeground="{AppThemeBinding Light={StaticResource TextPrimaryLight},
+                                                                     Dark={StaticResource TextPrimaryDark}}">
         <nalu:ScaffoldNavBarAppearance.Background>
             <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight},
                                                      Dark={StaticResource BackgroundDark}}" />
@@ -58,9 +60,16 @@ replacement:
 | Property | Effect |
 |----------|--------|
 | `Background` | The strip surface brush. |
-| `Foreground` | Flows to the default primitives (title, chevron, flyout icon) via the context. |
+| `Foreground` | Flows to the default primitives (chevron, flyout/close icons — and the title unless `TitleForeground` is set) via the context. |
+| `TitleForeground` | Title-only color (`ScaffoldNavBarTitle`). Resolved level by level with `Foreground`: the first appearance (page → area → scaffold) that sets either wins, its `TitleForeground` beating its `Foreground`. So the scaffold can give buttons and title different colors, and a page still recolors the whole bar with `Foreground` alone (or the two apart by setting both). |
 | `Opacity` | Whole-surface opacity. |
 | `OffsetY` | Vertical offset (hide-on-scroll effects). |
+
+Color precedence on a primitive: an explicit (or styled) `TextColor` / `IconColor` on the
+primitive itself → the appearance chain (title: level-wise `TitleForeground` ?? `Foreground`;
+buttons: `Foreground`) → the built-in default. Prefer the appearance channels over styling
+`TextColor`/`IconColor`: a styled color is pinned and no longer follows page-level appearances
+(photo headers, scroll-driven recolor).
 
 Appearance objects are live: mutating a property (or animating it via bindings) applies
 immediately, per frame. Careful with shared `Style`s: an appearance declared in a style is ONE
@@ -124,7 +133,7 @@ bar becomes opaque, status-bar icons flip to contrast with it.
 ## Custom nav bars
 
 Replace the bar per scaffold, area, or page with `Scaffold.NavBarView`. Custom bars bind the
-`ScaffoldNavBarContext` — `Title`, `Foreground`, `CanNavigateBack`, `BackCommand`,
+`ScaffoldNavBarContext` — `Title`, `Foreground`, `TitleForeground`, `CanNavigateBack`, `BackCommand`,
 `ScrollOffset`, `IsScrolledUnder`, `IsModal`/`IsCloseButtonVisible`, flyout-button visibility
 and commands — and can reuse the public primitives. The bar view owns its top safe-area
 behavior (the default bar consumes the status-bar inset itself).

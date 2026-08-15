@@ -64,7 +64,7 @@ half scroll speed, forever), independent of the page ramp above:
 </Grid>
 ```
 
-Full-bleed photo header (transparent bar over the photo, materializes on scroll, icons/title recolor):
+Full-bleed photo header (transparent bar over the photo, materializes on scroll; buttons and title recolor through their own channels; a page `Foreground` alone recolors both):
 
 ```xml
 <ContentPage nalu:Scaffold.NavBarOverlapsContent="True"
@@ -74,7 +74,8 @@ Full-bleed photo header (transparent bar over the photo, materializes on scroll,
     <nalu:Scaffold.NavBarAppearance>
         <nalu:ScaffoldNavBarAppearance
             Background="{nalu:ThemeScrollValue FromLight=Transparent, ToLight={StaticResource BackgroundLight}, ToDark={StaticResource BackgroundDark}}"
-            Foreground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource TextPrimaryLight}, ToDark={StaticResource TextPrimaryDark}}" />
+            Foreground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource Accent}, ToDark={StaticResource Accent}}"
+            TitleForeground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource TextPrimaryLight}, ToDark={StaticResource TextPrimaryDark}}" />
     </nalu:Scaffold.NavBarAppearance>
     <ScrollView x:Name="Scroll" SafeAreaEdges="None,None,None,Default">
         <VerticalStackLayout>
