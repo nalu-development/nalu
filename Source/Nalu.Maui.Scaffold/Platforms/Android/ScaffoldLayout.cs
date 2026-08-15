@@ -97,6 +97,69 @@ public sealed class ScaffoldLayout : FrameLayout
         }
     }
 
+    /// <summary>
+    /// The caret of a multi-line input moves as the user types (an auto-sizing editor grows under
+    /// it) without any focus or IME change: after each layout pass while the keyboard is up, the
+    /// caret's window position is compared with the last one, and a change re-places the Pan
+    /// surfaces. Only Pan owners are re-applied (Resize is handled by the platform: the resized
+    /// scroll containers reveal the caret themselves). Idempotent by construction — a re-placement
+    /// moves the caret once, the next pass sees no change.
+    /// </summary>
+    private sealed class CaretFollowListener(ScaffoldLayout owner) : Java.Lang.Object, ViewTreeObserver.IOnGlobalLayoutListener
+    {
+        private readonly WeakReference<ScaffoldLayout> _owner = new(owner);
+        private int? _lastCaretBottomPx;
+
+        public void OnGlobalLayout()
+        {
+            if (!_owner.TryGetTarget(out var layout))
+            {
+                return;
+            }
+
+            if (layout.ImeBottomInsetPx <= 0)
+            {
+                _lastCaretBottomPx = null;
+
+                return;
+            }
+
+            var caretBottom = ScaffoldFocusedInput.CaretBottomInWindowPx(layout.Context!);
+
+            if (caretBottom == _lastCaretBottomPx)
+            {
+                return;
+            }
+
+            var first = _lastCaretBottomPx is null;
+            _lastCaretBottomPx = caretBottom;
+
+            // The first reading after the keyboard came up is the geometry the focus/IME paths already handled.
+            if (first || caretBottom is null)
+            {
+                return;
+            }
+
+            var overlayOwns = layout.OverlayOwnsKeyboard?.Invoke() == true;
+
+            if (!overlayOwns && layout.PageKeyboardMode?.Invoke() != ScaffoldKeyboardMode.Pan)
+            {
+                return;
+            }
+
+            if (overlayOwns)
+            {
+                layout.KeyboardInsetsChanged?.Invoke();
+            }
+            else
+            {
+                (layout.PageLayer as ScaffoldPageLayerLayout)?.ApplyKeyboard();
+            }
+        }
+    }
+
+    private CaretFollowListener? _caretFollowListener;
+
     /// <inheritdoc />
     protected override void OnAttachedToWindow()
     {
@@ -119,6 +182,8 @@ public sealed class ScaffoldLayout : FrameLayout
         {
             _focusChangeListener ??= new FocusChangeListener(this);
             observer.AddOnGlobalFocusChangeListener(_focusChangeListener);
+            _caretFollowListener ??= new CaretFollowListener(this);
+            observer.AddOnGlobalLayoutListener(_caretFollowListener);
         }
     }
 
@@ -131,9 +196,17 @@ public sealed class ScaffoldLayout : FrameLayout
             _imeAnimationHost = null;
         }
 
-        if (_focusChangeListener is { } focusListener && ViewTreeObserver is { IsAlive: true } observer)
+        if (ViewTreeObserver is { IsAlive: true } observer)
         {
-            observer.RemoveOnGlobalFocusChangeListener(focusListener);
+            if (_focusChangeListener is { } focusListener)
+            {
+                observer.RemoveOnGlobalFocusChangeListener(focusListener);
+            }
+
+            if (_caretFollowListener is { } caretListener)
+            {
+                observer.RemoveOnGlobalLayoutListener(caretListener);
+            }
         }
 
         _imeAnimating = false;

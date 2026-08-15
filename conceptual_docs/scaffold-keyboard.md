@@ -37,6 +37,27 @@ and requires MAUI **10.0.90+**.
 > events it is gated on), and navigating away hides the keyboard before the page swap on both
 > platforms.
 
+### Focused inputs inside scrollable content
+
+The scaffold moves *surfaces*; revealing the focused input inside a `ScrollView`, a
+`VirtualScroll` or a `CollectionView` is the platform's job, and it does it once the surface has
+been resized:
+
+- **Android** — `EditText` asks its ancestors to bring the caret on screen every time the caret
+  moves (`adjustResize` semantics): entries and editors, single- or multi-line, are revealed and
+  the caret line follows typing in any scroll container.
+- **iOS** — UIKit reveals a `UITextField` (`Entry`) through its ancestor scroll views by itself. A
+  `UITextView` (`Editor`) only gets the same treatment when it cannot scroll on its own; MAUI leaves
+  `scrollEnabled` on for auto-sizing editors, so UIKit "scrolls the caret into view" inside the
+  editor and never scrolls the page. `UseNaluScaffold()` appends an `Editor` mapper that turns
+  `scrollEnabled` off for `AutoSize="TextChanges"` editors without a `MaximumHeightRequest`
+  (those can still overflow and keep scrolling) — after which the caret line of a growing editor is
+  kept above the keyboard exactly like an entry.
+
+Under `Pan`, the scaffold itself follows the caret: the surface slides for the **caret line** of a
+multi-line editor (not the editor's whole height, which may exceed the room above the keyboard) and
+re-pans as lines are added.
+
 ## The vocabulary: `Scaffold.KeyboardMode`
 
 ```csharp
@@ -84,7 +105,7 @@ closes while the keyboard is up (the new owner reacts, the previous one goes bac
 | Mode | Behavior | Use it for |
 |---|---|---|
 | `Resize` (default) | The keyboard becomes the page's **bottom safe-area inset** — iOS: the page controller's `AdditionalSafeAreaInsets`; Android: the keyboard is folded into the page's system-bars inset. The page lays out above the keyboard the way it lays out above the home indicator / navigation bar; the tab bar footprint and the keyboard replace each other rather than adding up. `ScrollView`s shrink and keep the focused entry reachable, `Grid` star rows shrink, bottom-docked toolbars rise above the keyboard. Animated. | Forms, chat-like layouts, anything with a docked bottom bar — the mainstream behavior. |
-| `Pan` | The whole page **slides up** by the *least* that keeps the focused input above the keyboard (its own overlap when no focused input can be located), never resizing anything; it follows the focus (tab to the next field re-pans) and slides back when the keyboard hides. Content at the top goes under the nav bar / status bar — Android's `adjustPan` semantics. | Fixed layouts whose upper part must not reflow (a full-bleed map with a search field, a canvas with a caption). |
+| `Pan` | The whole page **slides up** by the *least* that keeps the focused input — the caret line of a multi-line editor — above the keyboard (its own overlap when no focused input can be located), never resizing anything; it follows the focus (tab to the next field re-pans) and the caret (typing into a growing editor re-pans), and slides back when the keyboard hides. Content at the top goes under the nav bar / status bar — Android's `adjustPan` semantics. | Fixed layouts whose upper part must not reflow (a full-bleed map with a search field, a canvas with a caption). |
 | `None` | The scaffold does nothing. On Android the IME window insets reach the page untouched, on iOS MAUI's own keyboard observers run — i.e. **MAUI semantics apply** (see next section). | Pages that manage the keyboard themselves. |
 
 ### `None` + MAUI's `SafeAreaEdges="SoftInput"`
@@ -170,7 +191,10 @@ Popups over sheets: the popup, being topmost, owns the keyboard — the sheet st
 - The TestApp harness page **"Scaffold Keyboard Overlay Tests"** exercises every combination
   (page Resize/Pan/None, sheets, tall sheets, centered/anchored/pan popups) and the
   `ScaffoldKeyboardOverlayChromeTests` suite asserts the geometry against a platform probe of the
-  keyboard's real overlap (`SoftKeyboardProbe.CreateHeightLabel`).
+  keyboard's real overlap (`SoftKeyboardProbe.CreateHeightLabel`). **"Scaffold Keyboard Content
+  Tests"** + `ScaffoldKeyboardContentTests` cover entries and growing multi-line editors inside a
+  `ScrollView` and a `VirtualScroll` under Resize and Pan (caret line stays above the keyboard
+  while typing).
 - **iOS simulator shows only a 44pt bar**: "Connect Hardware Keyboard" is on (⇧⌘K). The scaffold
   still treats that bar as the keyboard.
 - **Android: nothing reacts and the whole window pans**: the window is not in `adjustResize` —

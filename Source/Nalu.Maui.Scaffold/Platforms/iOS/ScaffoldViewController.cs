@@ -319,6 +319,7 @@ internal sealed class ScaffoldViewController : UIViewController
     {
         _textFieldBeganEditingToken = UITextField.Notifications.ObserveTextDidBeginEditing((_, _) => OnEditingFocusChanged());
         _textViewBeganEditingToken = UITextView.Notifications.ObserveTextDidBeginEditing((_, _) => OnEditingFocusChanged());
+        _textViewChangedToken = UITextView.Notifications.ObserveTextDidChange((_, _) => OnEditingTextChanged());
     }
 
     private void OnEditingFocusChanged()
@@ -330,6 +331,42 @@ internal sealed class ScaffoldViewController : UIViewController
         }
     }
 
+    /// <summary>
+    /// The caret of a multi-line text view moves as the user types (an auto-sizing editor grows
+    /// under it): a Pan surface must follow it, or the caret walks under the keyboard. The text view
+    /// re-lays out (and MAUI re-measures an auto-sizing editor) after the notification, so the
+    /// re-pan waits one runloop turn and is animated — a short glide instead of a per-line snap.
+    /// </summary>
+    private void OnEditingTextChanged()
+    {
+        if (_lastKeyboardOverlap <= 0 || _caretFollowScheduled)
+        {
+            return;
+        }
+
+        _caretFollowScheduled = true;
+
+        CoreFoundation.DispatchQueue.MainQueue.DispatchAsync(() =>
+        {
+            _caretFollowScheduled = false;
+
+            if (_lastKeyboardOverlap <= 0)
+            {
+                return;
+            }
+
+            UIView.Animate(0.15, 0, UIViewAnimationOptions.CurveEaseOut | UIViewAnimationOptions.BeginFromCurrentState, () =>
+            {
+                ApplyCurrentPageKeyboard();
+                KeyboardOverlapChanged?.Invoke();
+                View?.LayoutIfNeeded();
+            }, () => { });
+        });
+    }
+
+    private bool _caretFollowScheduled;
+    private NSObject? _textViewChangedToken;
+
     /// <inheritdoc />
     protected override void Dispose(bool disposing)
     {
@@ -337,8 +374,10 @@ internal sealed class ScaffoldViewController : UIViewController
         {
             _textFieldBeganEditingToken?.Dispose();
             _textViewBeganEditingToken?.Dispose();
+            _textViewChangedToken?.Dispose();
             _textFieldBeganEditingToken = null;
             _textViewBeganEditingToken = null;
+            _textViewChangedToken = null;
         }
 
         base.Dispose(disposing);
