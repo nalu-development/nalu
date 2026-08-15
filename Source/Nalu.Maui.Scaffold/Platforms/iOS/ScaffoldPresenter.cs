@@ -428,7 +428,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         controller.CurrentPageController = newController;
         controller.CurrentPageWantsBarInset = barVisible;
         controller.CurrentPageWantsNavBarInset = wantsNavBarInset;
-        controller.CurrentPageKeyboardMode = () => scaffold.ResolvePageKeyboardMode(targetPage);
+        controller.CurrentPageKeyboardMode ??= () => scaffold.ResolvePageKeyboardMode(_currentPage);
         controller.ApplyCurrentPageInsets();
 
         parentController.AddChildViewController(newController);

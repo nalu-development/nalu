@@ -73,11 +73,25 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
         : base(context)
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToWindow()
+    {
+        base.OnAttachedToWindow();
 
         // The page subtree gets its OWN MAUI inset listener: the window root's is gated for the
         // whole IME animation, which would hold the keyboard fold below (per frame) until the
-        // keyboard has stopped moving. See ScaffoldMauiInsetListenerBridge.
+        // keyboard has stopped moving. See ScaffoldMauiInsetListenerBridge. Registered per
+        // attachment (the registry is static; the listener must not outlive the layer's life).
         ScaffoldMauiInsetListenerBridge.RegisterParent(this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromWindow()
+    {
+        ScaffoldMauiInsetListenerBridge.UnregisterParent(this);
+        base.OnDetachedFromWindow();
     }
 
     /// <summary>

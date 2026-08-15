@@ -169,7 +169,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
         platformView.ChromeTopDesired = navBarInsets;
         platformView.PageTopInsetPx = navBarInsets ? _lastNavStripHeight : 0;
-        platformView.PageKeyboardMode = () => scaffold.ResolvePageKeyboardMode(targetPage);
+        platformView.PageKeyboardMode ??= () => scaffold.ResolvePageKeyboardMode(_currentPage);
 
         // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
         // page slides in (and back in sync on pop).

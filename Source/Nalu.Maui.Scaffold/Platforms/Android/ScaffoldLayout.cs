@@ -83,12 +83,16 @@ public sealed class ScaffoldLayout : FrameLayout
     /// </summary>
     private sealed class FocusChangeListener(ScaffoldLayout owner) : Java.Lang.Object, ViewTreeObserver.IOnGlobalFocusChangeListener
     {
+        // WEAK: registered on the window's ViewTreeObserver, which outlives any scaffold — a strong
+        // owner would root the layout (and, through it, the presented page) past its life.
+        private readonly WeakReference<ScaffoldLayout> _owner = new(owner);
+
         public void OnGlobalFocusChanged(AView? oldFocus, AView? newFocus)
         {
-            if (owner.ImeBottomInsetPx > 0)
+            if (_owner.TryGetTarget(out var layout) && layout.ImeBottomInsetPx > 0)
             {
-                (owner.PageLayer as ScaffoldPageLayerLayout)?.ApplyKeyboard();
-                owner.KeyboardInsetsChanged?.Invoke();
+                (layout.PageLayer as ScaffoldPageLayerLayout)?.ApplyKeyboard();
+                layout.KeyboardInsetsChanged?.Invoke();
             }
         }
     }
@@ -187,6 +191,9 @@ public sealed class ScaffoldLayout : FrameLayout
 
     private sealed class ImeAnimationCallback(ScaffoldLayout owner) : WindowInsetsAnimationCompat.Callback(DispatchModeContinueOnSubtree)
     {
+        // WEAK: installed on the DecorView, which outlives any scaffold (see FocusChangeListener).
+        private readonly WeakReference<ScaffoldLayout> _owner = new(owner);
+
         private static bool IsIme(WindowInsetsAnimationCompat? animation)
             => animation is not null && (animation.TypeMask & WindowInsetsCompat.Type.Ime()) != 0;
 
@@ -194,17 +201,17 @@ public sealed class ScaffoldLayout : FrameLayout
         {
             base.OnPrepare(animation);
 
-            if (IsIme(animation))
+            if (IsIme(animation) && _owner.TryGetTarget(out var layout))
             {
-                owner._imeAnimating = true;
+                layout._imeAnimating = true;
             }
         }
 
         public override WindowInsetsCompat? OnProgress(WindowInsetsCompat? insets, IList<WindowInsetsAnimationCompat>? runningAnimations)
         {
-            if (owner._imeAnimating && runningAnimations is not null && runningAnimations.Any(IsIme))
+            if (_owner.TryGetTarget(out var layout) && layout._imeAnimating && runningAnimations is not null && runningAnimations.Any(IsIme))
             {
-                owner.UpdateImeInset(insets);
+                layout.UpdateImeInset(insets);
             }
 
             return insets;
@@ -214,10 +221,10 @@ public sealed class ScaffoldLayout : FrameLayout
         {
             base.OnEnd(animation);
 
-            if (IsIme(animation))
+            if (IsIme(animation) && _owner.TryGetTarget(out var layout))
             {
-                owner._imeAnimating = false;
-                owner.UpdateImeInset(ViewCompat.GetRootWindowInsets(owner));
+                layout._imeAnimating = false;
+                layout.UpdateImeInset(ViewCompat.GetRootWindowInsets(layout));
             }
         }
     }

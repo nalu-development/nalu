@@ -28,16 +28,19 @@ internal static class ScaffoldMauiInsetListenerBridge
 {
     private const string _listenerTypeName = "Microsoft.Maui.Platform.MauiWindowInsetListener, Microsoft.Maui";
     private const string _registerMethodName = "RegisterParentForChildViews";
+    private const string _unregisterMethodName = "UnregisterView";
 
-    private static readonly MethodInfo? _register = Resolve();
+    private static readonly MethodInfo? _register = Resolve(_registerMethodName);
+    private static readonly MethodInfo? _unregister = Resolve(_unregisterMethodName);
 
     [DynamicDependency(_registerMethodName, "Microsoft.Maui.Platform.MauiWindowInsetListener", "Microsoft.Maui")]
-    [UnconditionalSuppressMessage("Trimming", "IL2075:UnrecognizedReflectionPattern", Justification = "The member is rooted through DynamicDependency.")]
-    private static MethodInfo? Resolve()
+    [DynamicDependency(_unregisterMethodName, "Microsoft.Maui.Platform.MauiWindowInsetListener", "Microsoft.Maui")]
+    [UnconditionalSuppressMessage("Trimming", "IL2075:UnrecognizedReflectionPattern", Justification = "The members are rooted through DynamicDependency.")]
+    private static MethodInfo? Resolve(string name)
     {
         var type = Type.GetType(_listenerTypeName, throwOnError: false);
 
-        return type?.GetMethod(_registerMethodName, BindingFlags.Static | BindingFlags.NonPublic);
+        return type?.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic);
     }
 
     /// <summary>Registers the host as the inset-listener parent of its MAUI descendants (call BEFORE they attach).</summary>
@@ -50,6 +53,21 @@ internal static class ScaffoldMauiInsetListenerBridge
         catch (TargetInvocationException)
         {
             // Fall back to the shared listener.
+        }
+    }
+
+    /// <summary>
+    /// Forgets the host's registration (and its listener, whose tracked-views set would otherwise keep
+    /// the host's last MAUI content alive through MAUI's static registry — a page leak).
+    /// </summary>
+    public static void UnregisterParent(AView host)
+    {
+        try
+        {
+            _unregister?.Invoke(null, [host]);
+        }
+        catch (TargetInvocationException)
+        {
         }
     }
 }
