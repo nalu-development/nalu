@@ -37,6 +37,10 @@ internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScroll
         _touchSlop = Android.Views.ViewConfiguration.Get(context)!.ScaledTouchSlop;
     }
 
+    /// <summary>The sheet is placed above the keyboard by the presenter: its subtree never sees the IME (see <see cref="ScaffoldOverlayImeIsolation"/>).</summary>
+    public override Android.Views.WindowInsets? DispatchApplyWindowInsets(Android.Views.WindowInsets? insets)
+        => base.DispatchApplyWindowInsets(ScaffoldOverlayImeIsolation.StripIme(this, insets));
+
     // --- Raw-touch drag for NON-scrollable surfaces (handle, plain content) ---
     //
     // Scrollable children own their gestures through the nested-scroll session (started on

@@ -77,9 +77,11 @@ builder
     .UseNaluScaffold();
 ```
 
-`UseNaluScaffold()` is **required** (it registers the scaffold handler). Page registration,
-view models, intents and lifecycle are standard Nalu navigation — see the
-[Navigation docs](navigation.md).
+`UseNaluScaffold()` is **required** (it registers the scaffold handler and the platform
+keyboard wiring: MAUI's iOS keyboard manager is disconnected, Android goes edge-to-edge with
+`adjustResize` — see [Overlays › Soft keyboard](scaffold-overlays.md#soft-keyboard); do **not**
+combine it with `UseNaluSoftKeyboardManager`). Page registration, view models, intents and
+lifecycle are standard Nalu navigation — see the [Navigation docs](navigation.md).
 
 > **No MVVM? No problem.** Page models are optional: register plain pages with
 > `AddPage<TodayPage>()`, navigate with `Push<DetailPage>()`, and implement lifecycle
@@ -161,8 +163,9 @@ point to see everything working together.
 
 ## Platform support
 
-- Scaffold **hosting** (the chrome, transitions, gestures): **iOS** 12.2+ and **Android**
-  API 21+.
+- Scaffold **hosting** (the chrome, transitions, gestures): **iOS** 15+ and **Android**
+  API 30+ (keyboard-aware overlays ride `UIView.keyboardLayoutGuide` and edge-to-edge IME
+  window insets — see [Overlays › Soft keyboard](scaffold-overlays.md#soft-keyboard)).
 - The **package** is referencable from every platform (Windows/Mac Catalyst pick the neutral
   `net10.0` assembly): `UseNaluScaffold()` is callable everywhere and always registers
   `IOverlayService` and `IScaffoldFlyoutController`, so shared page models keep injecting

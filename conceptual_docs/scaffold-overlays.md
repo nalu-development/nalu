@@ -70,6 +70,38 @@ Sheets are draggable between detents with native-feeling physics; the sheet hand
 bottom safe-area padding. The same `ScaffoldBottomSheet.*` attached properties exist for
 declaring options on the sheet view.
 
+## Soft keyboard
+
+Sheets and popups hosting text input are **keyboard-aware** out of the box — no MAUI
+`SafeAreaEdges` tweak, no keyboard manager:
+
+- A **bottom sheet** treats the keyboard as a (much) bigger bottom safe-area inset: the sheet
+  surface stays anchored to the window's bottom edge — continuous behind the keyboard — while its
+  content is padded up to the keyboard's top edge. Detents keep resolving against the window
+  height, so a `Fraction`/`Height` sheet keeps its size and its *content area* shrinks; a
+  `Content` sheet grows by the keyboard. Put scrollable forms in a `ScrollView`: the shrunken
+  content area then scrolls, and the platform brings the focused entry into view.
+- A **popup** is re-placed in the area **above** the keyboard: a centered popup re-centers in what
+  is left, an anchored one flips/clamps into it (an `IScaffoldPopupPlacer` simply receives the
+  smaller area).
+
+Both move **with** the keyboard animation and go back where they were when it hides. The
+keyboard geometry comes from `UIView.keyboardLayoutGuide` on iOS and from the IME window insets
+on Android — which is why the scaffold configures the app for it at startup
+(`UseNaluScaffold()`):
+
+- **iOS**: MAUI's built-in `KeyboardAutoManagerScroll` is disconnected (it pans/scrolls the
+  presented view controller under the keyboard and fights the scaffold's overlay layer).
+- **Android**: the activity goes edge-to-edge (`EdgeToEdge.enable()`) and its window is forced
+  to `adjustResize` — the only mode in which the framework reports IME insets. MAUI's
+  `Application.On<Android>().WindowSoftInputModeAdjust` (default `Pan`) is overridden. Page
+  content keeps MAUI's own `SafeAreaEdges` behavior (`SoftInput` is part of the default).
+
+`Nalu.Maui.Core`'s `UseNaluSoftKeyboardManager` is **not supported** alongside the scaffold (it
+re-pads the page controller / rewrites the soft-input mode); the scaffold's analyzer reports it as
+an error (`NALU0104`). Because of these mechanisms the scaffold package targets **iOS 15+ and
+Android API 30+**.
+
 ## Tab bar panels
 
 `Scaffold.ShowTabBarPanelAsync(View, Brush? scrim, bool closeIfOpened)` presents a panel

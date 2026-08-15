@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Runtime;
+using Android.Views;
 using Android.Widget;
 using AndroidX.Core.View;
 using AView = Android.Views.View;
@@ -58,6 +59,127 @@ public sealed class ScaffoldLayout : FrameLayout
         : base(context)
     {
         SetClipChildren(false);
+
+    }
+
+    private ImeAnimationCallback? _imeAnimationCallback;
+    private AView? _imeAnimationHost;
+
+    /// <inheritdoc />
+    protected override void OnAttachedToWindow()
+    {
+        base.OnAttachedToWindow();
+
+        // Per-frame IME tracking: while the keyboard animates, the running IME insets are
+        // delivered through the window-insets ANIMATION callback, and overlays re-placed against
+        // them travel with the keyboard. The callback must sit on the DECOR view: MAUI's own
+        // callback on the window's root CoordinatorLayout is DISPATCH_MODE_STOP, so nothing
+        // below it (this layout included) ever hears an animation frame. CONTINUE_ON_SUBTREE
+        // leaves MAUI's dispatch exactly as it was.
+        if (RootView is { } decor && !ReferenceEquals(decor, this))
+        {
+            _imeAnimationCallback ??= new ImeAnimationCallback(this);
+            _imeAnimationHost = decor;
+            ViewCompat.SetWindowInsetsAnimationCallback(decor, _imeAnimationCallback);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromWindow()
+    {
+        if (_imeAnimationHost is { } host)
+        {
+            ViewCompat.SetWindowInsetsAnimationCallback(host, null);
+            _imeAnimationHost = null;
+        }
+
+        _imeAnimating = false;
+        base.OnDetachedFromWindow();
+    }
+
+    /// <summary>
+    /// The soft keyboard's overlap with this layout (px), measured from its bottom edge; 0 while
+    /// hidden. Read from the IME window insets — the scaffold-hosted activity is edge-to-edge under
+    /// <c>adjustResize</c> (see <c>ScaffoldKeyboardSupport</c>), so the keyboard is an inset, not
+    /// a window resize. During the keyboard animation this follows the running value.
+    /// </summary>
+    internal int ImeBottomInsetPx { get; private set; }
+
+    /// <summary>
+    /// Raised when <see cref="ImeBottomInsetPx"/> changed — at the insets dispatch that carries the
+    /// keyboard's final state and, while it animates, on every animation frame. Overlays whose
+    /// geometry depends on the keyboard (bottom sheets, popups) re-place themselves.
+    /// </summary>
+    internal Action? KeyboardInsetsChanged { get; set; }
+
+    private bool _imeAnimating;
+
+    private void UpdateImeInset(WindowInsetsCompat? insets)
+    {
+        if (insets is null)
+        {
+            return;
+        }
+
+        var ime = insets.GetInsets(WindowInsetsCompat.Type.Ime());
+        var value = insets.IsVisible(WindowInsetsCompat.Type.Ime()) || _imeAnimating ? ime?.Bottom ?? 0 : 0;
+
+        if (value != ImeBottomInsetPx)
+        {
+            ImeBottomInsetPx = value;
+            KeyboardInsetsChanged?.Invoke();
+        }
+    }
+
+    /// <inheritdoc />
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+    {
+        // The dispatch preceding an IME animation carries the keyboard's END state; while an
+        // animation runs, the frames come from the animation callback instead (the dispatched
+        // value would jump ahead of the moving keyboard).
+        if (!_imeAnimating && insets is not null)
+        {
+            UpdateImeInset(WindowInsetsCompat.ToWindowInsetsCompat(insets, this));
+        }
+
+        return base.DispatchApplyWindowInsets(insets);
+    }
+
+    private sealed class ImeAnimationCallback(ScaffoldLayout owner) : WindowInsetsAnimationCompat.Callback(DispatchModeContinueOnSubtree)
+    {
+        private static bool IsIme(WindowInsetsAnimationCompat? animation)
+            => animation is not null && (animation.TypeMask & WindowInsetsCompat.Type.Ime()) != 0;
+
+        public override void OnPrepare(WindowInsetsAnimationCompat? animation)
+        {
+            base.OnPrepare(animation);
+
+            if (IsIme(animation))
+            {
+                owner._imeAnimating = true;
+            }
+        }
+
+        public override WindowInsetsCompat? OnProgress(WindowInsetsCompat? insets, IList<WindowInsetsAnimationCompat>? runningAnimations)
+        {
+            if (owner._imeAnimating && runningAnimations is not null && runningAnimations.Any(IsIme))
+            {
+                owner.UpdateImeInset(insets);
+            }
+
+            return insets;
+        }
+
+        public override void OnEnd(WindowInsetsAnimationCompat? animation)
+        {
+            base.OnEnd(animation);
+
+            if (IsIme(animation))
+            {
+                owner._imeAnimating = false;
+                owner.UpdateImeInset(ViewCompat.GetRootWindowInsets(owner));
+            }
+        }
     }
 
     /// <summary>

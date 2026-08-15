@@ -17,10 +17,10 @@
     <SingleProject>true</SingleProject>
     <OutputType>Library</OutputType>
 
-    <!-- Low floor on purpose (repo policy). v2 native sheets (UISheetPresentationController, iOS 15+)
-         would be runtime-guarded rather than raising this. -->
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
-    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    <!-- Higher floors than the rest of the repo, on purpose: keyboard-aware overlays ride
+         UIView.keyboardLayoutGuide (iOS 15) and edge-to-edge IME window insets (API 30). -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">30.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -114,6 +114,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // when it changes shape.
         platformView.WindowGeometryChanged ??= () => RelayoutOverlays(platformView, platformView.Context!);
 
+        // ...and when the soft keyboard changes its overlap (per animation frame while it moves):
+        // sheets and popups are re-placed against the area ABOVE it.
+        platformView.KeyboardInsetsChanged ??= () => RelayoutKeyboardAwareOverlays(platformView, platformView.Context!);
+
         var stack = root.NavigationStack;
         var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
 
@@ -1764,6 +1768,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             {
                 panel = request.Content.ToPlatform(mauiContext);
                 (panel.Parent as AViewGroup)?.RemoveView(panel);
+
+                // The host is the popup's IME isolation boundary (the presenter keeps the popup
+                // above the keyboard) — see ScaffoldPopupHost.
+                var popupHost = new ScaffoldPopupHost(context);
+                popupHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+                panel = popupHost;
+
                 platformView.AddView(panel, LayoutPopup(request, platformView, context));
 
                 break;
@@ -1846,17 +1857,21 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// minus its system insets and the popup's margin, and an anchored popup follows wherever its
     /// anchor now sits. Returns the layout params to mount (or re-mount) it with.
     /// </summary>
-    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, AView container, Android.Content.Context context)
+    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, ScaffoldLayout container, Android.Content.Context context)
     {
         var systemInsets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
         var presentation = request.PopupPresentation!;
         var margin = presentation.Margin;
 
+        // The soft keyboard is a bottom inset for placement purposes: an anchored popup that no
+        // longer fits below flips above, a centered one centers in what is left.
+        var bottomInsetPx = ScaffoldOverlayGeometry.BottomInset(systemInsets?.Bottom ?? 0, container.ImeBottomInsetPx);
+
         var area = new Rect(
             context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
             context.FromPixels(systemInsets?.Top ?? 0) + margin.Top,
             Math.Max(0, context.FromPixels(container.Width - (systemInsets?.Left ?? 0) - (systemInsets?.Right ?? 0)) - margin.HorizontalThickness),
-            Math.Max(0, context.FromPixels(container.Height - (systemInsets?.Top ?? 0) - (systemInsets?.Bottom ?? 0)) - margin.VerticalThickness)
+            Math.Max(0, context.FromPixels(container.Height - (systemInsets?.Top ?? 0) - bottomInsetPx) - margin.VerticalThickness)
         );
 
         // VIRTUAL measure, not a native one: measuring the platform view directly bypasses the
@@ -1918,15 +1933,21 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private static Android.Widget.FrameLayout.LayoutParams LayoutBottomSheet(
         ScaffoldBottomSheetView sheet,
         AView panel,
-        AView container,
+        ScaffoldLayout container,
         Android.Content.Context context,
         bool initial)
     {
         var insets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+
         var availableHeight = context.FromPixels(container.Height - (insets?.Top ?? 0));
 
+        // A visible keyboard is a bigger bottom inset: the sheet surface stays anchored to the
+        // bottom edge while its content is padded up to the keyboard's top edge — see
+        // ScaffoldOverlayGeometry.
+        var bottomPaddingPx = ScaffoldOverlayGeometry.SheetBottomPadding(insets?.Bottom ?? 0, container.ImeBottomInsetPx);
+
         // Padding first (it affects the natural height), then measure, then geometry.
-        sheet.PrepareForMeasure(context.FromPixels(insets?.Bottom ?? 0));
+        sheet.PrepareForMeasure(context.FromPixels(bottomPaddingPx));
 
         var sheetWidthPx = (int)Math.Min(container.Width, context.ToPixels(sheet.MaxWidth));
 
@@ -1948,6 +1969,34 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
+    /// Re-places the overlays whose geometry depends on the soft keyboard (sheets, popups) after
+    /// its overlap changed — per animation frame while it moves.
+    /// </summary>
+    private void RelayoutKeyboardAwareOverlays(ScaffoldLayout container, Android.Content.Context context)
+    {
+        foreach (var entry in _overlays.ToArray())
+        {
+            if (entry.Closing || entry.ContentPlatform is not { } panel)
+            {
+                continue;
+            }
+
+            switch (entry.Request)
+            {
+                case { Content: ScaffoldBottomSheetView sheet }:
+                    panel.LayoutParameters = LayoutBottomSheet(sheet, panel, container, context, initial: false);
+
+                    break;
+
+                case { Kind: ScaffoldOverlayKind.Popup }:
+                    panel.LayoutParameters = LayoutPopup(entry.Request, container, context);
+
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
     /// Re-lays out presented overlays after the window changed shape (rotation, split view).
     /// </summary>
     /// <remarks>
@@ -1957,7 +2006,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// everything. Only the sheet is re-laid out here; anchored popups and panels have the same
     /// exposure and are not covered yet.
     /// </remarks>
-    private void RelayoutOverlays(AView container, Android.Content.Context context)
+    private void RelayoutOverlays(ScaffoldLayout container, Android.Content.Context context)
     {
         var closePanel = false;
 

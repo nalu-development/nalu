@@ -1,0 +1,54 @@
+using Android.Content;
+using Android.Views;
+using Android.Widget;
+using AndroidX.Core.View;
+using Insets = AndroidX.Core.Graphics.Insets;
+
+namespace Nalu;
+
+/// <summary>
+/// IME isolation for keyboard-aware overlay subtrees (bottom sheets, popups): the presenter
+/// positions the overlay ABOVE the keyboard, so nothing inside it must react to the IME insets
+/// on its own. MAUI's net10 inset listener would otherwise pad the overlay's content by the
+/// keyboard's overlap with the view's on-screen position (<c>SafeAreaEdges</c> defaults include
+/// SoftInput) — evaluated at dispatch time, i.e. BEFORE the overlay has moved out of the way, and
+/// kept until the next dispatch. Same isolation pattern as the VirtualScroll safe-area layer.
+/// </summary>
+internal static class ScaffoldOverlayImeIsolation
+{
+    /// <summary>Returns the insets with the IME zeroed and hidden; the same instance when there is no IME.</summary>
+    public static WindowInsets? StripIme(Android.Views.View host, WindowInsets? insets)
+    {
+        if (insets is null)
+        {
+            return null;
+        }
+
+        var compat = WindowInsetsCompat.ToWindowInsetsCompat(insets, host);
+        var imeType = WindowInsetsCompat.Type.Ime();
+
+        if (compat is null || (!compat.IsVisible(imeType) && (compat.GetInsets(imeType)?.Bottom ?? 0) == 0))
+        {
+            return insets;
+        }
+
+        return new WindowInsetsCompat.Builder(compat)
+               .SetInsets(imeType, Insets.None)!
+               .SetVisible(imeType, false)!
+               .Build()?
+               .ToWindowInsets()
+               ?? insets;
+    }
+}
+
+/// <summary>
+/// Android host of a popup's platform view: a match-parent slot the presenter positions with
+/// layout params, and the IME isolation boundary of the popup subtree
+/// (<see cref="ScaffoldOverlayImeIsolation"/>).
+/// </summary>
+internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context)
+{
+    /// <inheritdoc />
+    public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+        => base.DispatchApplyWindowInsets(ScaffoldOverlayImeIsolation.StripIme(this, insets));
+}

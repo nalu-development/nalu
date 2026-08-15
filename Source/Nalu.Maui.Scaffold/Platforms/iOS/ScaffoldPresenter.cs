@@ -75,6 +75,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // when it changes shape.
         controller.WindowGeometryChanged ??= () => RelayoutOverlays(controller, controller.ContentContainer);
 
+        // ...and when the soft keyboard changes its overlap: sheets and popups are re-placed against
+        // the area ABOVE it. Animated (unlike a shape change): the pass raising this typically runs
+        // inside UIKit's keyboard animation, and a sheet stepping out of the keyboard's way should
+        // travel with it. Only the sheet and popup slots depend on the keyboard, so this is not the
+        // full RelayoutOverlays (which also dismisses the tab bar panel).
+        controller.KeyboardOverlapChanged ??= () => RelayoutKeyboardAwareOverlays(controller, controller.ContentContainer);
+
         // A navigation arriving while a finger is still scrubbing (programmatic push, tab
         // selection) invalidates the preview: cancel the recognizer — its Cancelled callback
         // reverses the session and unmounts the peek before we proceed.
@@ -1236,13 +1243,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     /// <summary>
     /// Resolves a popup's placement against the CURRENT window: the available area is the window
-    /// minus its safe-area insets and the popup's margin, and an anchored popup follows wherever
+    /// minus its safe-area insets, minus the soft keyboard's overlap (a keyboard is a bottom inset
+    /// for placement purposes: an anchored popup that no longer fits below flips above, a centered
+    /// one centers in what is left), minus the popup's margin; an anchored popup follows wherever
     /// its anchor now sits.
     /// </summary>
     private void LayoutPopup(ScaffoldOverlayRequest request, ScaffoldViewController controller, UIView container)
     {
         var bounds = container.Bounds;
         var insets = controller.View!.SafeAreaInsets;
+        var bottomInset = ScaffoldOverlayGeometry.BottomInset(insets.Bottom, controller.KeyboardOverlap);
         var presentation = request.PopupPresentation!;
         var margin = presentation.Margin;
 
@@ -1250,7 +1260,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             bounds.X + insets.Left + margin.Left,
             bounds.Y + insets.Top + margin.Top,
             Math.Max(0, bounds.Width - insets.Left - insets.Right - margin.HorizontalThickness),
-            Math.Max(0, bounds.Height - insets.Top - insets.Bottom - margin.VerticalThickness)
+            Math.Max(0, bounds.Height - insets.Top - bottomInset - margin.VerticalThickness)
         );
 
         var popupView = (IView)request.Content;
@@ -1283,10 +1293,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     {
         var bounds = container.Bounds;
         var insets = controller.View!.SafeAreaInsets;
+
         var availableHeight = (double)(bounds.Height - insets.Top);
 
+        // A visible keyboard is a bigger bottom inset: the sheet surface stays anchored to the
+        // bottom edge (continuous behind the keyboard) while its content is padded up to the
+        // keyboard's top edge — see ScaffoldOverlayGeometry.
+        var bottomPadding = ScaffoldOverlayGeometry.SheetBottomPadding(insets.Bottom, controller.KeyboardOverlap);
+
         // Padding first (it affects the natural height), then measure, then geometry.
-        sheet.PrepareForMeasure(insets.Bottom);
+        sheet.PrepareForMeasure(bottomPadding);
 
         var sheetView = (IView)sheet;
         var sheetWidth = Math.Min((double)bounds.Width, sheet.MaxWidth);
@@ -1300,6 +1316,34 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Bottom-anchored, centered at the (possibly capped) width; the sheet's own TranslationY
         // does the rest. Virtual arrange: a valid MAUI frame is required for translations to apply.
         sheetView.Arrange(new Rect((bounds.Width - sheetWidth) / 2, bounds.Height - sheetHeight, sheetWidth, sheetHeight));
+    }
+
+    /// <summary>
+    /// Re-places the overlays whose geometry depends on the soft keyboard (sheets, popups) after
+    /// its overlap changed. Animated by design — see <see cref="ScaffoldViewController.KeyboardOverlapChanged"/>.
+    /// </summary>
+    private void RelayoutKeyboardAwareOverlays(ScaffoldViewController controller, UIView container)
+    {
+        foreach (var entry in _overlays.ToArray())
+        {
+            if (entry.Closing)
+            {
+                continue;
+            }
+
+            switch (entry.Request)
+            {
+                case { Content: ScaffoldBottomSheetView sheet }:
+                    LayoutBottomSheet(sheet, controller, container, initial: false);
+
+                    break;
+
+                case { Kind: ScaffoldOverlayKind.Popup }:
+                    LayoutPopup(entry.Request, controller, container);
+
+                    break;
+            }
+        }
     }
 
     /// <summary>

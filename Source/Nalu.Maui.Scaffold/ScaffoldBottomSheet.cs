@@ -351,7 +351,7 @@ public sealed class ScaffoldBottomSheetView : Border
     /// <summary>The configured maximum sheet width (presenters clamp the window width by it).</summary>
     internal double MaxWidth => _presentation.MaxWidth;
 
-    /// <summary>Applies the bottom system inset as content padding BEFORE the natural-height measure.</summary>
+    /// <summary>Applies the bottom inset (system bar — or the soft keyboard's overlap, which replaces it) as content padding BEFORE the natural-height measure.</summary>
     internal void PrepareForMeasure(double bottomInset)
         => Padding = new Thickness(0, 0, 0, bottomInset);
 
