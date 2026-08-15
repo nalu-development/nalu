@@ -117,15 +117,85 @@ public class ItemsPageModel(IOverlayService overlays)
 }
 ```
 
-The overlay model can receive an intent, and closes itself through its `IOverlayRef`
-(injected), optionally with a result. Options can still be passed per call, or declared on the
-view via the attached properties.
+Options can still be passed per call, or declared on the view via the attached properties.
 
-Contract notes: keep ONE public constructor per model/view (multi-constructor selection is not
-service-aware); `ILeavingAware` and `IAsyncDisposable`/`IDisposable` run on close, in one DI
-scope per presentation. While the app is not scaffold-hosted (a non-scaffold navigation host,
-or a platform without scaffold hosting — see [platform support](scaffold.md#platform-support)),
-every call is a graceful no-op returning `default` immediately.
+### Closing: `IOverlayRef`
+
+The ref the model (or the view — it is resolvable throughout the presentation scope) injects is
+exactly two methods, both non-generic:
+
+```csharp
+public interface IOverlayRef
+{
+    Task CloseAsync();               // caller's task completes with default
+    Task CloseAsync(object? result); // caller's task completes with the result
+}
+```
+
+- the result is passed as `object?` and validated at close time against the `TResult` the
+  overlay was shown with: a mismatch throws `InvalidOperationException`, and so does reporting
+  any result at all when the overlay was shown through a **resultless** overload
+  (`Show*Async<TModel>()`) — the result-carrying overload is the only one that accepts one;
+- `CloseAsync(null)` on a `TResult` presentation completes the caller with `default`, which is
+  also what every DISMISSAL produces (scrim tap, pull-down, system back, navigation). A model
+  that must distinguish "dismissed" from an explicit empty answer needs a reference `TResult`
+  wrapper — a `bool` result cannot tell `false` apart from a dismissal;
+- closing is legal BEFORE the overlay is presented: a close requested from `OnEnteringAsync` is
+  buffered and skips the presentation entirely — the caller's task completes without the
+  overlay ever appearing, and `ILeavingAware`/disposal still run.
+
+### Intents: `OnEnteringAsync`, not the constructor
+
+The intent is NOT a constructor parameter — the model is built by DI first (it can only see
+`IOverlayRef` and registered services), then the intent is delivered exactly as the navigation
+engine delivers it to page models:
+
+- a single-parameter method named `OnEnteringAsync` returning `ValueTask`, whose parameter type
+  the intent is assignable to, is found by reflection and invoked — implementing
+  `IEnteringAware<TIntent>` is the typed way to declare it (explicit interface implementations
+  match too);
+- when no such overload fits — or no intent was passed — the parameterless `IEnteringAware`
+  hook runs instead, if implemented;
+- `ILeavingAware` runs when the overlay closes, then `IAsyncDisposable`/`IDisposable`.
+
+```csharp
+public partial class DurationSheetModel(IOverlayRef overlay) : IEnteringAware<DurationSheetIntent>
+{
+    public ValueTask OnEnteringAsync(DurationSheetIntent intent) { ... }
+
+    private Task Done() => overlay.CloseAsync(new DurationSheetResult(Duration));
+}
+```
+
+### Scopes
+
+`IOverlayService` is registered **scoped** (page models inject it like `INavigationService`),
+over a **singleton** registry built once inside `UseNaluScaffold` — the `AddOverlay*` calls are
+evaluated at startup, never per presentation. Each presentation then creates its **own** DI
+scope for the model/view pair, disposed when the overlay closes: it is a fresh scope, not a
+child of the page's, so page-scoped services are not shared with the overlay — the intent is
+the channel for what the overlay needs to know.
+
+Keep ONE public constructor per model/view: multi-constructor selection is not service-aware.
+
+While the app is not scaffold-hosted (a non-scaffold navigation host, or a platform without
+scaffold hosting — see [platform support](scaffold.md#platform-support)), every call is a
+graceful no-op returning `default` immediately.
+
+### Options resolution order (popups vs sheets)
+
+Both kinds resolve each option as *call-site value ?? the content's attached value ?? default*,
+but they read the attached values at a different moment:
+
+- a **popup** is attached to the scaffold's element tree FIRST (when the view has no parent
+  yet) and read AFTER — attached values produced by styles or resources resolved on parenting
+  are seen;
+- a **sheet**'s GEOMETRY options (`Detents`, `InitialDetent`, `AllowPullDownToClose`,
+  `ShowDragHandle`, `MaxWidth`) are read BEFORE the content is wrapped in the sheet chrome and
+  attached — they must be literal on the view; only `Scrim`, `CloseOnScrimTap` and
+  `CloseOnBack` are read after attachment.
+
+Pass `ScaffoldBottomSheetOptions` at the call site when a geometry value is not a literal.
 
 ## Stack semantics
 

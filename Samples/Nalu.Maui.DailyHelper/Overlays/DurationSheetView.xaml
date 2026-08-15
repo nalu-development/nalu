@@ -7,8 +7,8 @@
              x:Class="Nalu.Maui.DailyHelper.Overlays.DurationSheetView"
              x:DataType="overlays:DurationSheetModel">
 
-    <!-- Sheet presentation declared ON the view (§7.2 attached options): natural height,
-         standard grabber, pull-down dismissal. The wheel maps one revolution to an hour. -->
+    <!-- Sheet presentation is all defaults: natural height, standard grabber, pull-down
+         dismissal. The wheel maps one revolution to an hour. -->
     <VerticalStackLayout Padding="24,8,24,16" Spacing="14"
                          Background="{AppThemeBinding Light={StaticResource CardLight}, Dark={StaticResource CardDark}}">
 
