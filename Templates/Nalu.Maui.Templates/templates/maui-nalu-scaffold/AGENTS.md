@@ -15,7 +15,8 @@ Nalu APIs from Shell/NavigationPage habits.
 |---|---|
 | Navigate between pages, pass data (intents), register pages, tab/root switching | `nalu-navigation` |
 | Where to put load/save/cleanup code; lifecycle order; guards; state restoration; testing page models | `nalu-navigation-lifecycle` |
-| Tab bar / roots / flyout, nav bar (title, buttons, appearance), safe areas & system bars, scroll-driven chrome | `nalu-scaffold-structure` |
+| Tab bar / roots / flyout, nav bar (title, buttons, appearance), safe areas & system bars | `nalu-scaffold-structure` |
+| Parallax headers, materializing nav bar, anything driven by the scroll offset (`{nalu:ScrollValue}`) | `nalu-scaffold-scroll` |
 | Page transitions, shared elements, modal pages, predictive back, migrating Shell/NavigationPage code | `nalu-scaffold-transitions` |
 | Popups, bottom sheets, tab bar panels, `IOverlayService` (MVVM overlays) | `nalu-scaffold-overlays` |
 | Anything involving the soft keyboard (entries under the keyboard, `Scaffold.KeyboardMode`) | `nalu-scaffold-keyboard` |

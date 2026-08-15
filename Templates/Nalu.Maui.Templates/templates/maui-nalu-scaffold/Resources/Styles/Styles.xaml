@@ -66,12 +66,15 @@
     <!-- Scaffold chrome. Every styling property of the default components carries a real
          default value, so plain implicit styles override it. The nav bar STRIP surface
          (background/opacity/offset) is not a component property: it is the scaffold-level
-         ScaffoldNavBarAppearance set in AppScaffold.xaml (pages override per property). -->
+         ScaffoldNavBarAppearance set in AppScaffold.xaml (pages override per property).
+         Title/icon COLOR is deliberately NOT styled here: an explicit TextColor/IconColor would
+         win over the appearance Foreground and pin the color, so a page setting its own
+         NavBarAppearance Foreground (photo headers, scroll-driven recolor) could no longer
+         recolor the bar. Foreground in AppScaffold.xaml is the single source of both. -->
 
     <Style TargetType="nalu:ScaffoldNavBarTitle">
         <Setter Property="FontFamily" Value="SemiBold" />
         <Setter Property="FontSize" Value="20" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
     </Style>
 
     <!-- The bar itself: pill container only. -->

@@ -182,8 +182,8 @@ Primitives (public, style directly; the same styles apply inside custom bars):
 
 Color precedence for title/buttons: explicitly set `TextColor`/`IconColor` (style or instance) →
 effective `ScaffoldNavBarAppearance.Foreground` (via `ScaffoldNavBarContext.Foreground`) → built-in
-default. The template styles `ScaffoldNavBarTitle.TextColor`, so page-level `Foreground` recolors the
-buttons but not the title unless that setter is removed.
+default. The template pins neither, so page-level `Foreground` recolors title and buttons together;
+a styled `TextColor`/`IconColor` would pin that primitive's color.
 
 `ScaffoldNavBarAppearance` (`BindableObject`, inherits the `BindingContext` of the element it is attached
 to): `Background` (Brush, default #F7FFFFFF), `Foreground` (Color), `Opacity` (1), `OffsetY` (0). Each
@@ -207,28 +207,9 @@ converterParameter, stringFormat)` (string path, "." = the context) or typed
 `SetBinding(prop, static (Scaffold s) => s.NavBarContext.ScrollOffset, source: NavBarBindings.ScaffoldAncestor)`
 (trimming/AOT-safe).
 
-## 6. Scroll channel details
+## 6. Scroll channel
 
-- `Scaffold.ScrollTracker` observes the NATIVE scroller (KVO on iOS, scroll listeners on Android) found
-  at most 3 levels below the referenced view. Publishes `ScrollOffset` (dip) and `IsScrolledUnder`.
-- Each page has its own channel: navigating away and back rebinds; a page without a tracker reads 0.
-- Ramp resolution: `RampStart`/`RampEnd` on the extension → page `ScrollRampStart`/`ScrollRampEnd` →
-  area → scaffold → 0 / 100. `RampStart == RampEnd` = step at that offset.
-- `Extrapolate`: `Clamp` holds endpoints outside the window; `Extend` keeps the linear mapping going
-  (numeric targets only — `Color`/`Brush` always clamp). `Easing` shapes the interior only; extrapolated
-  values stay linear.
-- Endpoint types: numeric, `Color`, solid `Brush` (`SolidColorBrush`, or a `Color`/string that converts).
-  `ThemeScrollValue`: `FromDark`/`ToDark` fall back to the light values; theme changes re-evaluate.
-- Targets: any bindable property of an element inside the scaffold tree, and `ScaffoldNavBarAppearance`
-  properties. Not usable inside `Style` setters. Applied per scroll frame through bindings — prefer
-  `TranslationY`, `Opacity`, colors over size-affecting properties.
-- Parallax speed factor: `To / (RampEnd - RampStart)` with `Extend` (`0→100` mapped to `0→50` = half
-  speed; `To=0` pins; equal = moves with the viewport). Bleed the layer with a negative top margin so iOS
-  bounce/upward drift never reveals a gap; stack layers with different ratios for depth.
-- Android recycler-backed trackers (`CollectionView`, `VirtualScroll`) accumulate deltas (no absolute
-  offset): thresholds reliable, tight pixel parallax may drift with variable item heights.
-- Materializing bar + `SystemBarStyle`: as the bar becomes opaque enough, status-bar icons flip to
-  contrast with its actual luminance automatically.
+Moved to skill `nalu-scaffold-scroll` (tracker, ramps, `ScrollValue`/`ThemeScrollValue`, parallax, materializing bar).
 
 ## 7. Safe areas & system bars
 
