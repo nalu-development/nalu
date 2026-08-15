@@ -72,66 +72,12 @@ declaring options on the sheet view.
 
 ## Soft keyboard
 
-Sheets and popups hosting text input are **keyboard-aware** out of the box — no MAUI
-`SafeAreaEdges` tweak, no keyboard manager:
-
-- A **bottom sheet** treats the keyboard as a (much) bigger bottom safe-area inset: the sheet
-  surface stays anchored to the window's bottom edge — continuous behind the keyboard — while its
-  content is padded up to the keyboard's top edge. Detents keep resolving against the window
-  height, so a `Fraction`/`Height` sheet keeps its size and its *content area* shrinks; a
-  `Content` sheet grows by the keyboard. Put scrollable forms in a `ScrollView`: the shrunken
-  content area then scrolls, and the platform brings the focused entry into view.
-- A **popup** is re-placed in the area **above** the keyboard: a centered popup re-centers in what
-  is left, an anchored one flips/clamps into it (an `IScaffoldPopupPlacer` simply receives the
-  smaller area).
-
-Both move **with** the keyboard animation and go back where they were when it hides.
-
-That is the default **`Resize`** mode — and the same policy applies to **pages**: out of the
-box every scaffold page treats the keyboard as a bottom inset too (MAUI alone does nothing unless
-you set `SafeAreaEdges="SoftInput"` on every page). One attached property drives all of it,
-`Scaffold.KeyboardMode`, declared on a page (or on the `Scaffold` itself as the app-wide default)
-and on sheet/popup content (call-site options `KeyboardMode` win over it):
-
-```xml
-<!-- a page that must not react to the keyboard (a full-bleed map) -->
-<ContentPage nalu:Scaffold.KeyboardMode="None" ...>
-
-<!-- popup / sheet content that slides instead of resizing -->
-<VerticalStackLayout nalu:Scaffold.KeyboardMode="Pan">
-    <Entry ... />
-</VerticalStackLayout>
-```
-
-| `ScaffoldKeyboardMode` | Bottom sheet | Popup | Page |
-|---|---|---|---|
-| `Resize` (default) | Surface anchored, content padded above the keyboard, detents unchanged | Re-placed in the area above the keyboard (may get shorter) | The keyboard becomes the page's bottom safe-area inset (iOS `AdditionalSafeAreaInsets`, Android system-bar inset fold): the page lays out above it exactly as it does above the home indicator / navigation bar |
-| `Pan` | Keeps its size; slides up by the **least** that keeps the *focused* input above the keyboard (its own overlap when no focused input is found), never past the top inset; follows focus changes | Same — minimal slide, no re-placement, no resize | The whole page slides up by the same rule (under the chrome, `adjustPan`-like) |
-| `None` | Ignores the keyboard | Ignores the keyboard | Ignores the keyboard (on Android the IME insets reach the page, so MAUI's own `SafeAreaEdges="SoftInput"` still works there) |
-
-**One surface owns the keyboard at a time**: the topmost presented sheet or popup when there is
-one, the page otherwise. Only the owner resizes/pans; a page never moves under an overlay's
-keyboard, and the keyboard hands over when an overlay opens or closes.
-
-`Pan` is Android's `adjustPan` semantics: content below the focused input may end up under the
-keyboard — use it for fixed-size surfaces whose upper part must not move (a map with a search
-field, a picker with a caption); forms are better served by `Resize`.
-
-The keyboard geometry comes from `UIView.keyboardLayoutGuide` on iOS and from the IME window insets
-on Android — which is why the scaffold configures the app for it at startup
-(`UseNaluScaffold()`):
-
-- **iOS**: MAUI's built-in `KeyboardAutoManagerScroll` is disconnected (it pans/scrolls the
-  presented view controller under the keyboard and fights the scaffold's overlay layer).
-- **Android**: the activity goes edge-to-edge (`EdgeToEdge.enable()`) and its window is forced
-  to `adjustResize` — the only mode in which the framework reports IME insets. MAUI's
-  `Application.On<Android>().WindowSoftInputModeAdjust` (default `Pan`) is overridden. Page
-  content keeps MAUI's own `SafeAreaEdges` behavior (`SoftInput` is part of the default).
-
-`Nalu.Maui.Core`'s `UseNaluSoftKeyboardManager` is **not supported** alongside the scaffold (it
-re-pads the page controller / rewrites the soft-input mode); the scaffold's analyzer reports it as
-an error (`NALU0104`). Because of these mechanisms the scaffold package targets **iOS 15+ and
-Android API 30+**.
+Sheets and popups hosting text input are keyboard-aware out of the box: by default the keyboard
+takes room away from the topmost presented sheet or popup (`Resize` — the sheet pads its content
+above the keyboard, the popup is re-placed above it), and `Scaffold.KeyboardMode` on the content
+(or `KeyboardMode` in the options) switches to `Pan` or `None`. The whole story — pages, sheets,
+popups, who owns the keyboard, `None` + MAUI's `SafeAreaEdges` — lives in
+[Scaffold & the Soft Keyboard](scaffold-keyboard.md).
 
 ## Tab bar panels
 

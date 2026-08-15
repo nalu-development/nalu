@@ -51,6 +51,8 @@
       href: scaffold-flyout.md
     - name: Popups & Sheets
       href: scaffold-overlays.md
+    - name: Soft Keyboard
+      href: scaffold-keyboard.md
     - name: Transitions & Modals
       href: scaffold-transitions.md
     - name: System Bars

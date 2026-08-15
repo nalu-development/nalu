@@ -7,7 +7,7 @@ The core library is intended to provide a set of common use utilities.
 An alternative soft keyboard management for iOS and Android mobile platforms in order to standardize the UX.
 
 - **DO NOT** use this with MAUI's CollectionView containing input fields: more info down below
-- **DO NOT** use this in a [Scaffold](scaffold.md)-hosted app: the scaffold owns the soft-keyboard handling (keyboard-aware sheets and popups) and reports `UseNaluSoftKeyboardManager` as a build error (`NALU0104`)
+- **DO NOT** use this in a [Scaffold](scaffold.md)-hosted app: the scaffold owns the soft-keyboard handling for pages, sheets and popups (see [Scaffold & the Soft Keyboard](scaffold-keyboard.md)) and reports `UseNaluSoftKeyboardManager` as a build error (`NALU0104`)
 - **DO** use this with Nalu's **VirtualScroll** (Nalu.Maui.VirtualScroll) for lists with input fields, as we do not interfere with its internal insets
 
 This can be enabled via `builder.UseNaluSoftKeyboardManager(defaultAdjustMode: SoftKeyboardAdjustMode.Resize)`.

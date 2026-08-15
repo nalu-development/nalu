@@ -1,17 +1,19 @@
 namespace Nalu;
 
 /// <summary>
-/// How a scaffold-hosted surface reacts to the soft keyboard. Declared per bottom sheet / popup
-/// through <see cref="Scaffold.KeyboardModeProperty"/> on the content (or the call-site options);
-/// the same vocabulary is meant to describe pages next.
+/// How a scaffold-hosted surface — a page, a bottom sheet, a popup — reacts to the soft keyboard.
+/// Declared through <see cref="Scaffold.KeyboardModeProperty"/> (on a page, on the scaffold as the
+/// app-wide page default, on sheet/popup content) or the sheet/popup call-site options. Exactly one
+/// surface reacts at a time: the topmost presented sheet or popup, otherwise the page.
 /// </summary>
 public enum ScaffoldKeyboardMode
 {
     /// <summary>
-    /// The keyboard takes room away from the surface (the default): a bottom sheet treats it as
-    /// a bigger bottom inset — surface anchored to the bottom edge, content padded above the
-    /// keyboard, detents unchanged — and a popup is re-placed in the area above it (a centered
-    /// popup re-centers, an anchored one flips/clamps; it may get shorter to fit).
+    /// The keyboard takes room away from the surface (the default): a page gets it as its bottom
+    /// safe-area inset (it lays out above the keyboard as it does above the home indicator), a
+    /// bottom sheet treats it as a bigger bottom inset — surface anchored to the bottom edge,
+    /// content padded above the keyboard, detents unchanged — and a popup is re-placed in the area
+    /// above it (a centered popup re-centers, an anchored one flips/clamps; it may get shorter to fit).
     /// </summary>
     Resize,
 
@@ -23,6 +25,9 @@ public enum ScaffoldKeyboardMode
     /// </summary>
     Pan,
 
-    /// <summary>The surface ignores the keyboard entirely (its content may be covered).</summary>
+    /// <summary>
+    /// The surface ignores the keyboard entirely (its content may be covered). On a page this hands
+    /// the keyboard back to MAUI: layouts with <c>SafeAreaEdges</c> <c>SoftInput</c> pad themselves.
+    /// </summary>
     None
 }
