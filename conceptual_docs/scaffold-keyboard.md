@@ -56,7 +56,8 @@ been resized:
 
 Under `Pan`, the scaffold itself follows the caret: the surface slides for the **caret line** of a
 multi-line editor (not the editor's whole height, which may exceed the room above the keyboard) and
-re-pans as lines are added.
+re-pans as lines are added (iOS reacts to text changes; moving the caret by tapping inside a
+tall editor does not re-pan on iOS — UIKit offers no selection-change notification).
 
 ## The vocabulary: `Scaffold.KeyboardMode`
 
@@ -152,7 +153,7 @@ exactly one region to react.
 | Mode | Behavior |
 |---|---|
 | `Resize` (default) | The keyboard is treated as a **bigger bottom inset** of the sheet: the sheet surface stays anchored to the window's bottom edge (continuous behind the keyboard — no gap, no floating), its content is padded up to the keyboard's top edge. **Detents keep resolving against the window height**: a `Fraction`/`Height` detent keeps its size and its *content area* shrinks; a `Content` detent grows by the keyboard. Animated, both ways. |
-| `Pan` | The sheet keeps its size and detent geometry, and slides up by the least that keeps the focused input above the keyboard, clamped so its top edge never passes the top inset. Follows focus changes. Detent drags still work on the slid sheet. |
+| `Pan` | The sheet keeps its size and detent geometry, and slides up by the least that keeps the focused input (the caret line of a multi-line editor) above the keyboard, clamped so its top edge never passes the top inset. Follows focus changes and the caret while typing. Detent drags still work on the slid sheet. |
 | `None` | The sheet ignores the keyboard (its content may be covered). |
 
 Practical notes:
@@ -172,7 +173,7 @@ Practical notes:
 | Mode | Behavior |
 |---|---|
 | `Resize` (default) | The placement area's bottom is the keyboard's top edge: a **centered** popup re-centers in what is left, an **anchored** popup flips/clamps into it (an anchor that ended up under the keyboard is still respected — the popup lands right above the keyboard), and a popup taller than the area gets shorter. An `IScaffoldPopupPlacer` simply receives the smaller area. Animated. |
-| `Pan` | The popup is placed as if there were no keyboard, then slides up by the least that keeps the focused input above it (never resizing, never re-placing); slides back when the keyboard hides. |
+| `Pan` | The popup is placed as if there were no keyboard, then slides up by the least that keeps the focused input (the caret line of a multi-line editor) above it (never resizing, never re-placing); follows focus and the caret while typing; slides back when the keyboard hides. |
 | `None` | The popup ignores the keyboard. |
 
 Popups over sheets: the popup, being topmost, owns the keyboard — the sheet stays put.
