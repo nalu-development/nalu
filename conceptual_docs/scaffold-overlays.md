@@ -70,6 +70,15 @@ Sheets are draggable between detents with native-feeling physics; the sheet hand
 bottom safe-area padding. The same `ScaffoldBottomSheet.*` attached properties exist for
 declaring options on the sheet view.
 
+## Soft keyboard
+
+Sheets and popups hosting text input are keyboard-aware out of the box: by default the keyboard
+takes room away from the topmost presented sheet or popup (`Resize` — the sheet pads its content
+above the keyboard, the popup is re-placed above it), and `Scaffold.KeyboardMode` on the content
+(or `KeyboardMode` in the options) switches to `Pan` or `None`. The whole story — pages, sheets,
+popups, who owns the keyboard, `None` + MAUI's `SafeAreaEdges` — lives in
+[Scaffold & the Soft Keyboard](scaffold-keyboard.md).
+
 ## Tab bar panels
 
 `Scaffold.ShowTabBarPanelAsync(View, Brush? scrim, bool closeIfOpened)` presents a panel

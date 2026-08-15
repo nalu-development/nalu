@@ -1,5 +1,6 @@
 using CoreFoundation;
 using CoreGraphics;
+using Foundation;
 using Microsoft.Maui.Platform;
 using UIKit;
 
@@ -227,6 +228,22 @@ internal sealed class ScaffoldViewController : UIViewController
     public bool CurrentPageWantsNavBarInset { get; set; }
 
     /// <summary>
+    /// The current page's soft-keyboard policy (resolved by the presenter, live: the attached
+    /// value may change while the page is presented).
+    /// </summary>
+    public Func<ScaffoldKeyboardMode>? CurrentPageKeyboardMode { get; set; }
+
+    /// <summary>
+    /// Whether a presented sheet/popup OWNS the keyboard (set by the presenter). The keyboard inset
+    /// goes to ONE surface: the topmost sheet or popup when one is presented, the page otherwise —
+    /// so a page never resizes/pans under an overlay's keyboard.
+    /// </summary>
+    public Func<bool>? OverlayOwnsKeyboard { get; set; }
+
+    /// <summary>The keyboard overlap the CURRENT PAGE reacts to: 0 while an overlay owns the keyboard.</summary>
+    private double PageKeyboardOverlap => OverlayOwnsKeyboard?.Invoke() == true ? 0 : (double)_lastKeyboardOverlap;
+
+    /// <summary>
     /// Bar footprint (points) above the system inset — the page-facing inset contribution.
     /// The strip's measured height INCLUDES any bottom inset the bar consumed (SafeAreaEdges),
     /// and the page already receives the system inset from the system safe area, so the
@@ -265,6 +282,275 @@ internal sealed class ScaffoldViewController : UIViewController
         contentView.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
         container.AddSubview(contentView);
         _contentHost.DidMoveToParentViewController(this);
+
+        // Keyboard tracking through UIKit's own guide (iOS 15+): a hidden, input-transparent
+        // view pinned between the guide's top edge and the container's bottom edge. Whenever the
+        // keyboard's frame changes, the guide's constraints change and the tracker is re-framed
+        // — its height IS the keyboard overlap, and its geometry change (which UIKit applies
+        // INSIDE the keyboard animation) is what syncs the overlays, so they travel with the
+        // keyboard. No notifications, no window-coordinate math.
+        var tracker = new KeyboardTrackerView(OnKeyboardTrackerGeometryChanged);
+        container.AddSubview(tracker);
+        _keyboardTracker = tracker;
+        ObserveEditingFocus();
+
+        var keyboardGuide = container.KeyboardLayoutGuide;
+
+        NSLayoutConstraint.ActivateConstraints(
+        [
+            tracker.TopAnchor.ConstraintEqualTo(keyboardGuide.TopAnchor),
+            tracker.BottomAnchor.ConstraintEqualTo(container.BottomAnchor),
+            tracker.LeadingAnchor.ConstraintEqualTo(container.LeadingAnchor),
+            tracker.TrailingAnchor.ConstraintEqualTo(container.TrailingAnchor)
+        ]);
+    }
+
+    private KeyboardTrackerView? _keyboardTracker;
+    private NSObject? _textFieldBeganEditingToken;
+    private NSObject? _textViewBeganEditingToken;
+
+    /// <summary>
+    /// A Pan-mode surface follows the FOCUSED input, and focus can move without the keyboard
+    /// moving (tab to the next field): the begin-editing notifications re-raise
+    /// <see cref="KeyboardOverlapChanged"/> so presenters re-place their Pan surfaces. (These are
+    /// text-input notifications, not keyboard geometry — the geometry stays with the guide.)
+    /// </summary>
+    private void ObserveEditingFocus()
+    {
+        _textFieldBeganEditingToken = UITextField.Notifications.ObserveTextDidBeginEditing((_, _) => OnEditingFocusChanged());
+        _textViewBeganEditingToken = UITextView.Notifications.ObserveTextDidBeginEditing((_, _) => OnEditingFocusChanged());
+        _textViewChangedToken = UITextView.Notifications.ObserveTextDidChange((_, _) => OnEditingTextChanged());
+    }
+
+    private void OnEditingFocusChanged()
+    {
+        if (_lastKeyboardOverlap > 0)
+        {
+            ApplyCurrentPageKeyboard();
+            KeyboardOverlapChanged?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// The caret of a multi-line text view moves as the user types (an auto-sizing editor grows
+    /// under it): a Pan surface must follow it, or the caret walks under the keyboard. The text view
+    /// re-lays out (and MAUI re-measures an auto-sizing editor) after the notification, so the
+    /// re-pan waits one runloop turn and is animated — a short glide instead of a per-line snap.
+    /// </summary>
+    private void OnEditingTextChanged()
+    {
+        if (_lastKeyboardOverlap <= 0 || _caretFollowScheduled)
+        {
+            return;
+        }
+
+        _caretFollowScheduled = true;
+
+        CoreFoundation.DispatchQueue.MainQueue.DispatchAsync(() =>
+        {
+            _caretFollowScheduled = false;
+
+            if (_lastKeyboardOverlap <= 0)
+            {
+                return;
+            }
+
+            UIView.Animate(0.15, 0, UIViewAnimationOptions.CurveEaseOut | UIViewAnimationOptions.BeginFromCurrentState, () =>
+            {
+                ApplyCurrentPageKeyboard();
+                KeyboardOverlapChanged?.Invoke();
+                View?.LayoutIfNeeded();
+            }, () => { });
+        });
+    }
+
+    private bool _caretFollowScheduled;
+    private NSObject? _textViewChangedToken;
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _textFieldBeganEditingToken?.Dispose();
+            _textViewBeganEditingToken?.Dispose();
+            _textViewChangedToken?.Dispose();
+            _textFieldBeganEditingToken = null;
+            _textViewBeganEditingToken = null;
+            _textViewChangedToken = null;
+        }
+
+        base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// The height (points) of the docked soft keyboard's overlap with the container, measured from
+    /// the container's bottom edge; 0 while the keyboard is hidden or undocked. Read LIVE from the
+    /// tracker (an overlay presented while the keyboard is already up must see it).
+    /// </summary>
+    public nfloat KeyboardOverlap => ReadKeyboardOverlap();
+
+    private nfloat _lastKeyboardOverlap;
+
+    /// <summary>
+    /// Raised from the keyboard tracker's geometry change when <see cref="KeyboardOverlap"/> changed
+    /// (and when the editing focus moves while the keyboard is up — Pan surfaces follow the focused
+    /// input). Unlike <see cref="WindowGeometryChanged"/> the pass that raises it is NOT unanimated:
+    /// it runs inside UIKit's keyboard animation, and overlays re-placed against the keyboard travel
+    /// with it.
+    /// </summary>
+    public Action? KeyboardOverlapChanged { get; set; }
+
+    private bool _keyboardRecheckScheduled;
+
+    private void OnKeyboardTrackerGeometryChanged()
+    {
+        EvaluateKeyboardOverlap();
+
+        // The geometry change and the responder change are not simultaneous: dismissing the
+        // keyboard re-frames the guide while the text input is STILL first responder (observed:
+        // the guide's dismissed rest arrives before the resign completes), and the resign itself
+        // moves no frame. Re-evaluate once the current turn is over, so the settled responder
+        // state is what gates the settled geometry.
+        if (!_keyboardRecheckScheduled)
+        {
+            _keyboardRecheckScheduled = true;
+
+            DispatchQueue.MainQueue.DispatchAsync(() =>
+            {
+                _keyboardRecheckScheduled = false;
+                EvaluateKeyboardOverlap();
+            });
+        }
+    }
+
+    private void EvaluateKeyboardOverlap()
+    {
+        var overlap = ReadKeyboardOverlap();
+
+        if (overlap != _lastKeyboardOverlap)
+        {
+            _lastKeyboardOverlap = overlap;
+            ApplyCurrentPageKeyboard();
+            KeyboardOverlapChanged?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// The current page's reaction to the keyboard: Resize re-applies its insets (see
+    /// <see cref="ApplyCurrentPageInsets"/>); Pan slides the page's view by the least that keeps
+    /// the focused input above the keyboard (never more than the keyboard's overlap); None leaves it
+    /// alone. Runs inside the keyboard animation (KVO) — the page travels with it.
+    /// </summary>
+    private void ApplyCurrentPageKeyboard()
+    {
+        if (CurrentPageController?.View is not { } pageView)
+        {
+            return;
+        }
+
+        var mode = CurrentPageKeyboardMode?.Invoke() ?? ScaffoldKeyboardMode.Resize;
+        var overlap = PageKeyboardOverlap;
+
+        double pan = 0;
+
+        if (mode == ScaffoldKeyboardMode.Pan && overlap > 0 && View is { } container)
+        {
+            var keyboardTop = (double)container.Bounds.Height - overlap;
+            var focused = ScaffoldFocusedInput.BottomIn(pageView);
+            var needed = focused is { } focusedBottom ? focusedBottom + ScaffoldOverlayGeometry.PanGap - keyboardTop : overlap;
+            pan = Math.Clamp(needed, 0, overlap);
+        }
+
+        _currentPagePan = pan;
+        pageView.Transform = pan > 0 ? CGAffineTransform.MakeTranslation(0, (nfloat)(-pan)) : CGAffineTransform.MakeIdentity();
+
+        ApplyCurrentPageInsets();
+    }
+
+    private double _currentPagePan;
+
+    /// <summary>Re-applies the current page's keyboard reaction (the presenter calls it after a page swap).</summary>
+    public void RefreshCurrentPageKeyboard() => ApplyCurrentPageKeyboard();
+
+    /// <summary>
+    /// The guide is a keyboard only while something is being edited. When the keyboard is dismissed
+    /// the guide rests on the bottom safe area — but with a text input accessory view (MAUI's
+    /// "Done" band) it has been observed to settle at the ACCESSORY's height instead (44pt on iOS
+    /// 26), which is not a keyboard either: without a first responder there is nothing docked, so
+    /// the overlap is 0 whatever the guide reads. With a first responder (a hardware keyboard
+    /// showing only the accessory band, for instance) the guide is trusted as is.
+    /// </summary>
+    private nfloat ReadKeyboardOverlap()
+    {
+        if (_keyboardTracker is not { } tracker || View is not { } container)
+        {
+            return 0;
+        }
+
+        var height = tracker.Frame.Height;
+
+        if (height <= container.SafeAreaInsets.Bottom + 0.5f)
+        {
+            return 0;
+        }
+
+        return container.Window is { } window && HasFirstResponder(window) ? height : 0;
+    }
+
+    private static bool HasFirstResponder(UIView view)
+    {
+        if (view.IsFirstResponder)
+        {
+            return true;
+        }
+
+        foreach (var subview in view.Subviews)
+        {
+            if (HasFirstResponder(subview))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The keyboard tracker: hidden, input-transparent, its only job is to report changes of its
+    /// own geometry (its frame follows the keyboard layout guide it is constrained to). Observed
+    /// through KVO on <c>bounds</c>: UIKit applies constraint results through its
+    /// internal geometry setters, so neither the managed <c>Frame</c>/<c>Bounds</c> setter
+    /// overrides nor <c>LayoutSubviews</c> (a leaf view) see them — KVO does.
+    /// </summary>
+    private sealed class KeyboardTrackerView : UIView
+    {
+        private readonly Action _geometryChanged;
+        private readonly IDisposable _boundsObserver;
+
+        public KeyboardTrackerView(Action geometryChanged)
+        {
+            _geometryChanged = geometryChanged;
+            Hidden = true;
+            UserInteractionEnabled = false;
+            TranslatesAutoresizingMaskIntoConstraints = false;
+
+            // Only bounds: the tracker spans from the guide's top edge to the container's bottom
+            // edge, so its HEIGHT is the overlap — the position carries no extra information.
+            _boundsObserver = AddObserver("bounds", NSKeyValueObservingOptions.New, _ => _geometryChanged());
+        }
+
+        public override UIView? HitTest(CGPoint point, UIEvent? uievent) => null;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _boundsObserver.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
     private bool? _lightSystemBars;
@@ -606,13 +892,36 @@ internal sealed class ScaffoldViewController : UIViewController
             ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View!.SafeAreaInsets.Top)
             : 0;
 
-    /// <summary>Applies the current page's chrome inset contributions to its own controller.</summary>
+    /// <summary>
+    /// Applies the current page's chrome inset contributions to its own controller — and, under
+    /// <see cref="ScaffoldKeyboardMode.Resize"/>, the soft keyboard: the keyboard becomes the page's
+    /// bottom safe-area inset (it covers the bar and the system inset, so it REPLACES their
+    /// contribution rather than adding to it), and the page lays out above it exactly as it does
+    /// above the home indicator.
+    /// </summary>
     public void ApplyCurrentPageInsets()
     {
         if (CurrentPageController is { } pageController)
         {
             var bottom = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null ? BarHeight : 0;
             var top = CurrentPageWantsNavBarInset ? NavBarInsetContribution : 0;
+            var systemBottom = View?.SafeAreaInsets.Bottom ?? 0;
+
+            if (CurrentPageKeyboardMode?.Invoke() == ScaffoldKeyboardMode.Resize && PageKeyboardOverlap is var keyboard && keyboard > 0)
+            {
+                bottom = (nfloat)Math.Max((double)bottom, keyboard - systemBottom);
+            }
+
+            // Pan: the page's view is translated up by the pan, and UIKit derives a view's safe
+            // area from where it IS — the bottom inset shrinks by the pan (the top one stays: UIKit
+            // does not extend a safe area past a view's own edge, and additional insets clamp at
+            // 0), which would reflow the content instead of sliding it. Compensate, so the page's
+            // safe area is exactly what it was at rest.
+            if (_currentPagePan > 0)
+            {
+                bottom += (nfloat)Math.Min(_currentPagePan, (double)systemBottom);
+            }
+
             var insets = new UIEdgeInsets(top, 0, bottom, 0);
 
             // Only on change: writing AdditionalSafeAreaInsets re-dirties the page subtree even

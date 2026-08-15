@@ -71,6 +71,13 @@ public sealed class ScaffoldBottomSheetOptions
     public bool? CloseOnBack { get; init; }
 
     /// <summary>
+    /// Gets or sets how the sheet reacts to the soft keyboard (see <see cref="ScaffoldKeyboardMode"/>).
+    /// Defaults to <see cref="ScaffoldKeyboardMode.Resize"/>; the content's
+    /// <see cref="Scaffold.KeyboardModeProperty"/> is the attached counterpart.
+    /// </summary>
+    public ScaffoldKeyboardMode? KeyboardMode { get; init; }
+
+    /// <summary>
     /// Gets or sets the maximum sheet width. Defaults to unbounded (full window width); when
     /// the window is wider (tablets, landscape), the sheet floats centered at this width,
     /// still bottom-anchored.
@@ -351,7 +358,7 @@ public sealed class ScaffoldBottomSheetView : Border
     /// <summary>The configured maximum sheet width (presenters clamp the window width by it).</summary>
     internal double MaxWidth => _presentation.MaxWidth;
 
-    /// <summary>Applies the bottom system inset as content padding BEFORE the natural-height measure.</summary>
+    /// <summary>Applies the bottom inset (system bar — or the soft keyboard's overlap, which replaces it) as content padding BEFORE the natural-height measure.</summary>
     internal void PrepareForMeasure(double bottomInset)
         => Padding = new Thickness(0, 0, 0, bottomInset);
 

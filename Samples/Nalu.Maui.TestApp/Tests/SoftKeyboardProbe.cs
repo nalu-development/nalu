@@ -89,4 +89,104 @@ internal static class SoftKeyboardProbe
             }
         }
     }
+
+    #region Keyboard height probe
+
+    /// <summary>Text prefix of a height probe label: <c>kb:&lt;height in dp&gt;</c>.</summary>
+    public const string HeightPrefix = "kb:";
+
+    private static readonly List<WeakReference<Label>> _heightLabels = [];
+    private static bool _observingHeight;
+    private static double _height;
+
+    /// <summary>
+    /// A label reporting the soft keyboard's live overlap with the app window (device-independent
+    /// units, 0 while hidden) — PLATFORM ground truth, read outside the library under test: the
+    /// UIKit keyboard frame notifications on Apple platforms, the root IME window insets on
+    /// Android (polled — the DecorView is the only place they are always current).
+    /// </summary>
+    public static Label CreateHeightLabel(string automationId)
+    {
+        EnsureObservingHeight();
+
+        var label = new Label
+        {
+            Text = FormatHeight(_height),
+            AutomationId = automationId,
+            FontSize = 11
+        };
+
+        _heightLabels.Add(new WeakReference<Label>(label));
+
+        return label;
+    }
+
+    private static string FormatHeight(double height) => $"{HeightPrefix}{height:0}";
+
+    private static void EnsureObservingHeight()
+    {
+        if (_observingHeight)
+        {
+            return;
+        }
+
+        _observingHeight = true;
+
+#if IOS || MACCATALYST
+        _frameToken = UIKit.UIKeyboard.Notifications.ObserveWillChangeFrame((_, args) =>
+        {
+            var window = UIKit.UIApplication.SharedApplication.ConnectedScenes
+                                .OfType<UIKit.UIWindowScene>()
+                                .SelectMany(scene => scene.Windows)
+                                .FirstOrDefault(candidate => candidate.IsKeyWindow);
+
+            var overlap = window is null ? 0 : Math.Max(0, (double)(window.Bounds.Bottom - args.FrameEnd.Top));
+            SetHeight(overlap);
+        });
+
+        _willHideToken2 = UIKit.UIKeyboard.Notifications.ObserveWillHide((_, _) => SetHeight(0));
+#elif ANDROID
+        Application.Current!.Dispatcher.StartTimer(TimeSpan.FromMilliseconds(100), () =>
+        {
+            if (Microsoft.Maui.ApplicationModel.Platform.CurrentActivity?.Window?.DecorView is { } decor
+                && AndroidX.Core.View.ViewCompat.GetRootWindowInsets(decor) is { } insets)
+            {
+                var ime = insets.GetInsets(AndroidX.Core.View.WindowInsetsCompat.Type.Ime());
+                SetHeight(Microsoft.Maui.Platform.ContextExtensions.FromPixels(decor.Context!, ime?.Bottom ?? 0));
+            }
+
+            return true;
+        });
+#endif
+    }
+
+#if IOS || MACCATALYST
+    private static Foundation.NSObject? _frameToken;
+    private static Foundation.NSObject? _willHideToken2;
+#endif
+
+    private static void SetHeight(double height)
+    {
+        if (Math.Abs(height - _height) < 0.5)
+        {
+            return;
+        }
+
+        _height = height;
+        var text = FormatHeight(height);
+
+        for (var i = _heightLabels.Count - 1; i >= 0; i--)
+        {
+            if (_heightLabels[i].TryGetTarget(out var label))
+            {
+                label.Text = text;
+            }
+            else
+            {
+                _heightLabels.RemoveAt(i);
+            }
+        }
+    }
+
+    #endregion
 }

@@ -26,6 +26,16 @@ internal static class Diagnostics
         true
     );
 
+    /// <summary>Error: Nalu.Maui.Core's SoftKeyboardManager is enabled in a scaffold-hosted app.</summary>
+    public static readonly DiagnosticDescriptor SoftKeyboardManagerUnsupported = new(
+        "NALU0104",
+        "UseNaluSoftKeyboardManager is not supported with Nalu.Maui.Scaffold",
+        "UseNaluSoftKeyboardManager is not supported alongside Nalu.Maui.Scaffold: the scaffold owns the soft-keyboard handling (keyboard-aware bottom sheets and popups; MAUI's iOS keyboard manager is disconnected, Android runs edge-to-edge with adjustResize). Remove the call.",
+        _category,
+        DiagnosticSeverity.Error,
+        true
+    );
+
     /// <summary>Warning: [AutoOverlay(typeof(...))] named a type that is not a source-declared View.</summary>
     public static readonly DiagnosticDescriptor InvalidExplicitView = new(
         "NALU0103",

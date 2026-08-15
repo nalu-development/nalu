@@ -49,6 +49,7 @@ internal static class ScaffoldChromeLayoutHelpers
 internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.IOnApplyWindowInsetsListener
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
+    private static readonly int _imeInsetsType = WindowInsetsCompat.Type.Ime();
 
     /// <summary>The last insets the window dispatched, BEFORE the chrome rewrite (see <see cref="ApplyInsetsTo"/>).</summary>
     private WindowInsetsCompat? _lastRawInsets;
@@ -72,6 +73,61 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
         : base(context)
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnAttachedToWindow()
+    {
+        base.OnAttachedToWindow();
+
+        // The page subtree gets its OWN MAUI inset listener: the window root's is gated for the
+        // whole IME animation, which would hold the keyboard fold below (per frame) until the
+        // keyboard has stopped moving. See ScaffoldMauiInsetListenerBridge. Registered per
+        // attachment (the registry is static; the listener must not outlive the layer's life).
+        ScaffoldMauiInsetListenerBridge.RegisterParent(this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnDetachedFromWindow()
+    {
+        ScaffoldMauiInsetListenerBridge.UnregisterParent(this);
+        base.OnDetachedFromWindow();
+    }
+
+    /// <summary>
+    /// Applies the current page's soft-keyboard policy (<see cref="ScaffoldLayout.PageKeyboardMode"/>)
+    /// against the running IME value (<see cref="ScaffoldLayout.ImeBottomInsetPx"/>) — called by
+    /// the scaffold layout on every change, per animation frame:
+    /// <see cref="ScaffoldKeyboardMode.Resize"/> re-dispatches the insets (the rewrite folds the
+    /// keyboard into the bottom system inset, MAUI pads the page above it),
+    /// <see cref="ScaffoldKeyboardMode.Pan"/> slides the whole layer by the least that keeps the
+    /// focused input above the keyboard, <see cref="ScaffoldKeyboardMode.None"/> leaves the page alone.
+    /// </summary>
+    public void ApplyKeyboard()
+    {
+        if (Parent is not ScaffoldLayout scaffoldLayout || Context is not { } context)
+        {
+            return;
+        }
+
+        var mode = scaffoldLayout.PageKeyboardMode?.Invoke() ?? ScaffoldKeyboardMode.Resize;
+        var overlap = context.FromPixels(scaffoldLayout.PageKeyboardOverlapPx);
+        double pan = 0;
+
+        if (mode == ScaffoldKeyboardMode.Pan && overlap > 0)
+        {
+            var keyboardTop = context.FromPixels(Height) - overlap;
+            var focused = ScaffoldFocusedInput.BottomIn(this, context);
+            var needed = focused is { } focusedBottom ? focusedBottom + ScaffoldOverlayGeometry.PanGap - keyboardTop : overlap;
+            pan = Math.Clamp(needed, 0, overlap);
+        }
+
+        TranslationY = (float)-context.ToPixels(pan);
+
+        if (mode == ScaffoldKeyboardMode.Resize && _lastRawInsets is { } raw)
+        {
+            ViewCompat.DispatchApplyWindowInsets(this, raw);
+        }
     }
 
     /// <summary>
@@ -137,6 +193,31 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     }
 
     public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
+    {
+        // A Pan-mode layer is translated: MAUI derives padding from on-screen positions, so the
+        // layer sits at rest for the length of the (synchronous) dispatch — same idea as the
+        // transition parking below.
+        var pan = TranslationY;
+
+        if (pan != 0)
+        {
+            TranslationY = 0;
+        }
+
+        try
+        {
+            return DispatchApplyWindowInsetsAtRest(insets);
+        }
+        finally
+        {
+            if (pan != 0)
+            {
+                TranslationY = pan;
+            }
+        }
+    }
+
+    private WindowInsets? DispatchApplyWindowInsetsAtRest(WindowInsets? insets)
     {
         if (!TransitionInFlight)
         {
@@ -271,7 +352,50 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
             ? Rewrite(insets, scaffoldLayout.PageTopInsetPx, scaffoldLayout.PageBottomInsetPx)
             : insets;
 
-    private static WindowInsetsCompat Rewrite(WindowInsetsCompat insets, int topInsetPx, int bottomInsetPx)
+    /// <summary>
+    /// The chrome rewrite (§5.4), plus the soft keyboard per the page's policy: under Resize the
+    /// keyboard's running overlap is folded into the bottom system inset (it covers the bar and the
+    /// system inset alike, so it REPLACES them: max), and the IME inset itself is zeroed so MAUI's
+    /// own SoftInput handling does not double-pad; under Pan the IME is zeroed (the layer slides
+    /// instead); under None the insets pass through untouched (MAUI's SoftInput semantics apply).
+    /// </summary>
+    private WindowInsetsCompat Rewrite(WindowInsetsCompat insets, int topInsetPx, int bottomInsetPx)
+    {
+        var scaffoldLayout = Parent as ScaffoldLayout;
+        var mode = scaffoldLayout?.PageKeyboardMode?.Invoke() ?? ScaffoldKeyboardMode.Resize;
+        var keyboardPx = scaffoldLayout?.PageKeyboardOverlapPx ?? 0;
+
+        if (mode == ScaffoldKeyboardMode.None)
+        {
+            return RewriteChrome(insets, topInsetPx, bottomInsetPx);
+        }
+
+        var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
+        var bottom = bottomInsetPx > 0 ? bottomInsetPx : systemBarInsets.Bottom;
+
+        if (mode == ScaffoldKeyboardMode.Resize)
+        {
+            bottom = Math.Max(bottom, keyboardPx);
+        }
+
+        var modifiedSystemBarInsets = Insets.Of(
+            systemBarInsets.Left,
+            topInsetPx > 0 ? topInsetPx : systemBarInsets.Top,
+            systemBarInsets.Right,
+            bottom
+        )!;
+
+        using var builder = new WindowInsetsCompat.Builder(insets);
+
+        return builder
+               .SetInsets(_systemBarsInsetsType, modifiedSystemBarInsets)!
+               .SetInsets(_imeInsetsType, Insets.None!)!
+               .SetVisible(_imeInsetsType, false)!
+               .Build()
+               ?? insets;
+    }
+
+    private static WindowInsetsCompat RewriteChrome(WindowInsetsCompat insets, int topInsetPx, int bottomInsetPx)
     {
         if (topInsetPx > 0 || bottomInsetPx > 0)
         {

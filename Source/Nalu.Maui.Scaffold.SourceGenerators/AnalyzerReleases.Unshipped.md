@@ -8,3 +8,4 @@ Rule ID | Category | Severity | Notes
 NALU0101 | NaluScaffold | Warning | Overlay model has no resolvable view
 NALU0102 | NaluScaffold | Warning | Overlay model matches multiple views
 NALU0103 | NaluScaffold | Warning | AutoOverlay view type is not a valid overlay view
+NALU0104 | NaluScaffold | Error | UseNaluSoftKeyboardManager is not supported with Nalu.Maui.Scaffold

@@ -26,6 +26,14 @@ public static class ScaffoldAppBuilderExtensions
         ScaffoldScrollToFix.Apply();
 #endif
 
+#if IOS || ANDROID
+        // Keyboard-aware overlays own the soft-keyboard geometry (see ScaffoldKeyboardSupport):
+        // iOS drops MAUI's KeyboardAutoManagerScroll, Android goes edge-to-edge and receives the
+        // IME as window insets. Nalu.Maui.Core's SoftKeyboardManager is NOT supported alongside
+        // (analyzer NALU0104).
+        ScaffoldKeyboardSupport.Configure(builder);
+#endif
+
         // Page-scope drawer control: page models open/close the ambient scaffold's flyouts
         // without a scaffold reference.
         builder.Services.AddScoped<IScaffoldFlyoutController, ScaffoldFlyoutController>();
