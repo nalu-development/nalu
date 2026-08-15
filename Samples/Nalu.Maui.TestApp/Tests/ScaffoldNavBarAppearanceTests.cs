@@ -124,7 +124,9 @@ public class AppearanceOverlapPage : ContentPage
             new ScaffoldNavBarAppearance
             {
                 Background = new SolidColorBrush(Colors.Transparent),
-                Foreground = Colors.White
+                Foreground = Colors.White,
+                // Title-only channel: buttons follow Foreground (white), the title goes gold.
+                TitleForeground = Colors.Gold
             }
         );
 
@@ -139,11 +141,19 @@ public class AppearanceOverlapPage : ContentPage
             VerticalOptions = LayoutOptions.Start
         };
 
+        // Probes of the resolved context colors (hex), so tests can assert the two channels apart.
+        var foregroundProbe = new Label { AutomationId = "AppearanceOverlapForeground", FontSize = 11 };
+        foregroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.Foreground), converter: new ColorHexConverter()));
+        var titleForegroundProbe = new Label { AutomationId = "AppearanceOverlapTitleForeground", FontSize = 11 };
+        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
+
         var body = new VerticalStackLayout
         {
             Padding = new Thickness(16, 240, 16, 16),
             Children =
             {
+                foregroundProbe,
+                titleForegroundProbe,
                 NavPageFactory.MakeButton("Pop", "PopAppearanceOverlap", model.Pop),
                 AppearancePageFactory.MakeExitButton("AppearanceOverlap")
             }
@@ -296,4 +306,12 @@ public class NavBarAppearanceScaffold : Scaffold
             }
         );
     }
+}
+
+file sealed class ColorHexConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
+        => value is Color color ? color.ToArgbHex() : "null";
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => throw new NotSupportedException();
 }

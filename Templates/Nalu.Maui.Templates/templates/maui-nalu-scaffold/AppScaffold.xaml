@@ -11,9 +11,13 @@
          navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->
 
     <!-- Global nav bar strip surface; any page can override per property with its own
-         nalu:Scaffold.NavBarAppearance (a delta — unset properties inherit this one). -->
+         nalu:Scaffold.NavBarAppearance (a delta — unset properties inherit this one).
+         Foreground tints the bar buttons, TitleForeground the title (nothing in Styles.xaml pins
+         them). A page's own Foreground recolors the whole bar (e.g. Foreground="White" over a
+         photo header); set TitleForeground on the page too when the two must differ. -->
     <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance Foreground="{StaticResource Accent}">
+        <nalu:ScaffoldNavBarAppearance Foreground="{StaticResource Accent}"
+                                       TitleForeground="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}">
             <nalu:ScaffoldNavBarAppearance.Background>
                 <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
             </nalu:ScaffoldNavBarAppearance.Background>

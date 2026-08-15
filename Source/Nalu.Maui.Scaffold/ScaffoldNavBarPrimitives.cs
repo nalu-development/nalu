@@ -341,7 +341,8 @@ public sealed class ScaffoldNavBarTitle : Grid
 
     /// <summary>
     /// Gets or sets the title color. When not set (directly or via style), the effective
-    /// <see cref="ScaffoldNavBarContext.Foreground"/> applies, then the built-in default.
+    /// <see cref="ScaffoldNavBarContext.TitleForeground"/> applies, then
+    /// <see cref="ScaffoldNavBarContext.Foreground"/>, then the built-in default.
     /// </summary>
     public Color TextColor
     {
@@ -410,7 +411,7 @@ public sealed class ScaffoldNavBarTitle : Grid
 
         _label.TextColor = IsSet(TextColorProperty)
             ? TextColor
-            : _observedContext?.Foreground ?? ScaffoldNavBarDefaults.Foreground;
+            : _observedContext?.TitleForeground ?? _observedContext?.Foreground ?? ScaffoldNavBarDefaults.Foreground;
     }
 
     /// <inheritdoc />
@@ -449,6 +450,7 @@ public sealed class ScaffoldNavBarTitle : Grid
                 break;
 
             case nameof(ScaffoldNavBarContext.Foreground):
+            case nameof(ScaffoldNavBarContext.TitleForeground):
                 ApplyEffectiveTextColor();
 
                 break;
