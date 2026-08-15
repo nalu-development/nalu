@@ -157,6 +157,7 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
         var enabled = true;
         var hasAttribute = false;
         string? explicitViewFqn = null;
+        var explicitViewIsView = false;
         var hasInvalidExplicitView = false;
 
         foreach (var attribute in symbol.GetAttributes())
@@ -170,9 +171,13 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
 
             if (attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is INamedTypeSymbol viewType)
             {
-                if (viewType is { IsAbstract: false, IsGenericType: false } && DerivesFromView(viewType))
+                if (viewType is { IsAbstract: false, IsGenericType: false })
                 {
+                    // View-ness is NOT decided here: a XAML view's base lives in a generated
+                    // partial this generator cannot see. Emit re-checks against the XAML-
+                    // discovered view set.
                     explicitViewFqn = Fqn(viewType);
+                    explicitViewIsView = DerivesFromView(viewType);
                 }
                 else
                 {
@@ -204,6 +209,7 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
             symbol.Name,
             DerivesFromView(symbol),
             explicitViewFqn,
+            explicitViewIsView,
             hasInvalidExplicitView,
             LocationInfo.From(declaration)
         );
@@ -476,6 +482,15 @@ public sealed class ScaffoldOverlayGenerator : IIncrementalGenerator
 
             if (anchor.ExplicitViewFqn is { } explicitView)
             {
+                // The named type is a view when the symbol says so, or when only its .xaml
+                // file proves it (source-gen inflator: the base-carrying partial is invisible).
+                if (!anchor.ExplicitViewIsView && !knownViewFqns.Contains(explicitView))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(Diagnostics.InvalidExplicitView, anchor.Location.ToLocation(), anchor.Name));
+
+                    continue;
+                }
+
                 registrations.Add(new Registration(anchor.Fqn, explicitView));
 
                 continue;
