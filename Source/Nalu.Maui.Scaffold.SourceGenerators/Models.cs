@@ -7,13 +7,17 @@ namespace Nalu.Maui.Scaffold.SourceGenerators;
 /// <c>[AutoOverlay]</c> attribute. A <c>View</c>-derived anchor is a VIEW-ONLY overlay; any
 /// other anchor is an overlay MODEL whose view is resolved against the view candidates.
 /// </summary>
-/// <param name="ExplicitViewFqn">[AutoOverlay(typeof(...))] view, already validated as a View.</param>
-/// <param name="HasInvalidExplicitView">[AutoOverlay(typeof(...))] named a non-View type.</param>
+/// <param name="ExplicitViewFqn">[AutoOverlay(typeof(...))] view: concrete and non-generic.</param>
+/// <param name="ExplicitViewIsView">The explicit view derives from View at the SYMBOL level. When
+/// false it may still be a view whose base is only visible through its .xaml file, so the final
+/// verdict is taken at emit time against the discovered view set.</param>
+/// <param name="HasInvalidExplicitView">[AutoOverlay(typeof(...))] named an abstract or generic type.</param>
 internal sealed record OverlayAnchor(
     string Fqn,
     string Name,
     bool IsView,
     string? ExplicitViewFqn,
+    bool ExplicitViewIsView,
     bool HasInvalidExplicitView,
     LocationInfo Location
 );

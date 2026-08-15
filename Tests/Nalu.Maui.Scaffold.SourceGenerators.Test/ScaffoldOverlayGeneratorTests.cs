@@ -201,6 +201,41 @@ public class ScaffoldOverlayGeneratorTests
         result.GeneratedText.Should().Contain("scaffold.AddOverlay<global::MyApp.SilentModel, global::MyApp.SpecialView>();");
     }
 
+    [Fact(DisplayName = "XAML source-gen mode: AutoOverlay can name a view whose base is only in its .xaml")]
+    public void SourceGenModeAutoOverlayExplicitXamlView()
+    {
+        // The named view is a View only through its .xaml root: the generated x:Class partial
+        // carrying the base is invisible here, so View-ness is settled at emit time.
+        var result = ScaffoldGeneratorTestHarness.Run(
+            """
+            using Nalu;
+
+            namespace MyApp;
+
+            [AutoOverlay(typeof(SpecialView))]
+            public class SilentModel;
+
+            public partial class SpecialView;
+            """,
+            xamlFiles:
+            [
+                new ScaffoldGeneratorTestHarness.XamlFile(
+                    "SpecialView.xaml",
+                    """
+                    <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                                 x:Class="MyApp.SpecialView" />
+                    """
+                )
+            ]
+        );
+
+        // Missing MAUI partial ⇒ the TView constraint is the only acceptable output error.
+        result.OutputCompilationErrors.Should().OnlyContain(static d => d.Id == "CS0311");
+        result.GeneratorDiagnostics.Should().NotContain(static d => d.Id == "NALU0103");
+        result.GeneratedText.Should().Contain("scaffold.AddOverlay<global::MyApp.SilentModel, global::MyApp.SpecialView>();");
+    }
+
     [Fact(DisplayName = "AutoOverlay(Enabled = false) excludes a discovered overlay")]
     public void AutoOverlayOptOut()
     {
