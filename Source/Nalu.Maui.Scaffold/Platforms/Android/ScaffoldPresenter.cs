@@ -1793,7 +1793,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 nestedHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
                 panel = nestedHost;
 
-                platformView.AddView(panel, LayoutBottomSheet(sheet, panel, platformView, context, initial: true));
+                platformView.AddView(panel, LayoutBottomSheet(sheet, request.KeyboardMode, panel, platformView, context, initial: true));
 
                 break;
             }
@@ -1863,9 +1863,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         var presentation = request.PopupPresentation!;
         var margin = presentation.Margin;
 
-        // The soft keyboard is a bottom inset for placement purposes: an anchored popup that no
-        // longer fits below flips above, a centered one centers in what is left.
-        var bottomInsetPx = ScaffoldOverlayGeometry.BottomInset(systemInsets?.Bottom ?? 0, container.ImeBottomInsetPx);
+        // Resize: the keyboard is a bottom inset for placement purposes (an anchored popup that no
+        // longer fits below flips above, a centered one centers in what is left). Pan / None: the
+        // popup is placed as if there were no keyboard (Pan then slides it — below).
+        var keyboardOverlap = context.FromPixels(container.ImeBottomInsetPx);
+        var bottomInsetPx = request.KeyboardMode == ScaffoldKeyboardMode.Resize
+            ? ScaffoldOverlayGeometry.BottomInset(systemInsets?.Bottom ?? 0, container.ImeBottomInsetPx)
+            : systemInsets?.Bottom ?? 0;
 
         var area = new Rect(
             context.FromPixels(systemInsets?.Left ?? 0) + margin.Left,
@@ -1904,6 +1908,19 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var rect = ScaffoldPopupPlacementResolver.Resolve(presentation, area, contentSize, anchorBounds, scaffold.IsRightToLeft);
 
+        if (request.KeyboardMode == ScaffoldKeyboardMode.Pan && keyboardOverlap > 0)
+        {
+            var focusedBottom = request.Content.Handler?.PlatformView is AView panel ? FocusedInputBottom(panel, context) : null;
+
+            rect.Y -= ScaffoldOverlayGeometry.Pan(
+                context.FromPixels(container.Height) - keyboardOverlap,
+                rect.Top,
+                rect.Bottom,
+                focusedBottom is { } inPanel ? rect.Top + inPanel : null,
+                context.FromPixels(systemInsets?.Top ?? 0) + margin.Top
+            );
+        }
+
         // Virtual arrange gives the content a valid MAUI frame at its resolved size (the platform
         // margins below position the slot); without it the transform mappers have no frame to
         // apply against and the virtual bounds stay invalid.
@@ -1918,11 +1935,45 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
+    /// The bottom edge (dp, relative to <paramref name="panel"/>'s top edge as laid out — its
+    /// children's translations included) of the focused text input inside the panel — what a
+    /// Pan-mode surface keeps above the keyboard; null when the window focus is elsewhere.
+    /// </summary>
+    private static double? FocusedInputBottom(AView panel, Android.Content.Context context)
+    {
+        if (context.GetActivity()?.CurrentFocus is not { } focus || !IsDescendantOf(focus, panel))
+        {
+            return null;
+        }
+
+        var focusLocation = new int[2];
+        var panelLocation = new int[2];
+        focus.GetLocationInWindow(focusLocation);
+        panel.GetLocationInWindow(panelLocation);
+
+        return context.FromPixels(focusLocation[1] - panelLocation[1] + focus.Height);
+    }
+
+    private static bool IsDescendantOf(AView view, AView ancestor)
+    {
+        for (var parent = view.Parent; parent is not null; parent = parent.Parent)
+        {
+            if (ReferenceEquals(parent, ancestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Frames a bottom sheet against the CURRENT window: capped width, centered, bottom-anchored,
     /// with its detents resolved against the height available above the top inset. Returns the
     /// layout params to mount (or re-mount) it with.
     /// </summary>
     /// <param name="sheet">The presented sheet.</param>
+    /// <param name="keyboardMode">How the sheet reacts to the soft keyboard.</param>
     /// <param name="panel">The sheet's platform view (the nested host).</param>
     /// <param name="container">The overlay container the sheet is framed against.</param>
     /// <param name="context">The Android context, for pixel conversions.</param>
@@ -1932,19 +1983,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// </param>
     private static Android.Widget.FrameLayout.LayoutParams LayoutBottomSheet(
         ScaffoldBottomSheetView sheet,
+        ScaffoldKeyboardMode keyboardMode,
         AView panel,
         ScaffoldLayout container,
         Android.Content.Context context,
         bool initial)
     {
         var insets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
+        var keyboardOverlap = context.FromPixels(container.ImeBottomInsetPx);
 
         var availableHeight = context.FromPixels(container.Height - (insets?.Top ?? 0));
 
-        // A visible keyboard is a bigger bottom inset: the sheet surface stays anchored to the
-        // bottom edge while its content is padded up to the keyboard's top edge — see
-        // ScaffoldOverlayGeometry.
-        var bottomPaddingPx = ScaffoldOverlayGeometry.SheetBottomPadding(insets?.Bottom ?? 0, container.ImeBottomInsetPx);
+        // Resize: a visible keyboard is a bigger bottom inset — the sheet surface stays anchored
+        // to the bottom edge while its content is padded up to the keyboard's top edge (see
+        // ScaffoldOverlayGeometry). Pan / None: system inset only.
+        var bottomPaddingPx = keyboardMode == ScaffoldKeyboardMode.Resize
+            ? ScaffoldOverlayGeometry.SheetBottomPadding(insets?.Bottom ?? 0, container.ImeBottomInsetPx)
+            : insets?.Bottom ?? 0;
 
         // Padding first (it affects the natural height), then measure, then geometry.
         sheet.PrepareForMeasure(context.FromPixels(bottomPaddingPx));
@@ -1962,9 +2017,29 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             ? sheet.InitializeGeometry(availableHeight, natural)
             : sheet.UpdateGeometry(availableHeight, natural);
 
+        // Pan: the whole sheet slides up by the least that keeps the focused input above the
+        // keyboard (its resting detent translation still applies on top of the frame).
+        double pan = 0;
+
+        if (keyboardMode == ScaffoldKeyboardMode.Pan && keyboardOverlap > 0)
+        {
+            var containerHeight = context.FromPixels(container.Height);
+            var visibleTop = containerHeight - sheetHeight + sheet.TranslationY;
+            var focusedBottom = FocusedInputBottom(panel, context);
+
+            pan = ScaffoldOverlayGeometry.Pan(
+                containerHeight - keyboardOverlap,
+                visibleTop,
+                containerHeight,
+                focusedBottom is { } inPanel ? containerHeight - sheetHeight + inPanel : null,
+                context.FromPixels(insets?.Top ?? 0)
+            );
+        }
+
         return new Android.Widget.FrameLayout.LayoutParams(sheetWidthPx, (int)context.ToPixels(sheetHeight))
         {
-            Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal
+            Gravity = GravityFlags.Bottom | GravityFlags.CenterHorizontal,
+            BottomMargin = (int)context.ToPixels(pan)
         };
     }
 
@@ -1984,7 +2059,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             switch (entry.Request)
             {
                 case { Content: ScaffoldBottomSheetView sheet }:
-                    panel.LayoutParameters = LayoutBottomSheet(sheet, panel, container, context, initial: false);
+                    panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false);
 
                     break;
 
@@ -2021,7 +2096,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             switch (entry.Request)
             {
                 case { Content: ScaffoldBottomSheetView sheet }:
-                    panel.LayoutParameters = LayoutBottomSheet(sheet, panel, container, context, initial: false);
+                    panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false);
 
                     break;
 

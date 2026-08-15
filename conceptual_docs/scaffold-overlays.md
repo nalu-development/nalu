@@ -85,8 +85,29 @@ Sheets and popups hosting text input are **keyboard-aware** out of the box — n
   is left, an anchored one flips/clamps into it (an `IScaffoldPopupPlacer` simply receives the
   smaller area).
 
-Both move **with** the keyboard animation and go back where they were when it hides. The
-keyboard geometry comes from `UIView.keyboardLayoutGuide` on iOS and from the IME window insets
+Both move **with** the keyboard animation and go back where they were when it hides.
+
+That is the default **`Resize`** mode. The mode is per overlay — `Scaffold.KeyboardMode`
+attached to the content (or `KeyboardMode` in the popup/sheet options), the same vocabulary
+meant to describe pages next:
+
+```xml
+<VerticalStackLayout nalu:Scaffold.KeyboardMode="Pan">
+    <Entry ... />
+</VerticalStackLayout>
+```
+
+| `ScaffoldKeyboardMode` | Bottom sheet | Popup |
+|---|---|---|
+| `Resize` (default) | Surface anchored, content padded above the keyboard, detents unchanged | Re-placed in the area above the keyboard (may get shorter) |
+| `Pan` | Keeps its size; slides up by the **least** that keeps the *focused* input above the keyboard (its own overlap when no focused input is found), never past the top inset; follows focus changes | Same — minimal slide, no re-placement, no resize |
+| `None` | Ignores the keyboard | Ignores the keyboard |
+
+`Pan` is Android's `adjustPan` semantics: content below the focused input may end up under the
+keyboard — use it for fixed-size surfaces whose upper part must not move (a map with a search
+field, a picker with a caption); forms are better served by `Resize`.
+
+The keyboard geometry comes from `UIView.keyboardLayoutGuide` on iOS and from the IME window insets
 on Android — which is why the scaffold configures the app for it at startup
 (`UseNaluScaffold()`):
 

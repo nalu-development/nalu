@@ -202,6 +202,15 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         BindableProperty.CreateAttached("NavBarOverlapsContent", typeof(bool), typeof(Scaffold), false);
 
     /// <summary>
+    /// Attached property declaring how a surface reacts to the soft keyboard
+    /// (<see cref="ScaffoldKeyboardMode"/>): on the content of a bottom sheet or a popup
+    /// (call-site options win over it), <see cref="ScaffoldKeyboardMode.Resize"/> when unset.
+    /// Reserved for pages as well (no page-level effect yet).
+    /// </summary>
+    public static readonly BindableProperty KeyboardModeProperty =
+        BindableProperty.CreateAttached("KeyboardMode", typeof(ScaffoldKeyboardMode?), typeof(Scaffold), null);
+
+    /// <summary>
     /// Attached property declaring the system status bar (and Android navigation bar) ICON
     /// style over a page's content (default <see cref="ScaffoldSystemBarStyle.Auto"/>).
     /// Resolution, most specific set value wins: current <see cref="Page"/> →
@@ -569,6 +578,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
             Scrim = options?.Scrim ?? ScaffoldPopup.GetScrim(content) ?? CreateDefaultScrim(),
             CloseOnScrimTap = options?.CloseOnScrimTap ?? ScaffoldPopup.GetCloseOnScrimTap(content) ?? true,
             CloseOnBack = options?.CloseOnBack ?? ScaffoldPopup.GetCloseOnBack(content) ?? true,
+            KeyboardMode = options?.KeyboardMode ?? GetKeyboardMode(content) ?? ScaffoldKeyboardMode.Resize,
             DisconnectContentOnClose = true,
             PopupPresentation = new ScaffoldPopupPresentation(
                 options?.Placement ?? ScaffoldPopup.GetPlacement(content) ?? ScaffoldPopupPlacement.Center,
@@ -645,6 +655,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
             Scrim = options?.Scrim ?? ScaffoldBottomSheet.GetScrim(content) ?? CreateDefaultScrim(),
             CloseOnScrimTap = options?.CloseOnScrimTap ?? ScaffoldBottomSheet.GetCloseOnScrimTap(content) ?? true,
             CloseOnBack = options?.CloseOnBack ?? ScaffoldBottomSheet.GetCloseOnBack(content) ?? true,
+            KeyboardMode = options?.KeyboardMode ?? GetKeyboardMode(content) ?? ScaffoldKeyboardMode.Resize,
             DisconnectContentOnClose = true,
             ScrimAutomationId = "SheetScrim"
         };
@@ -999,6 +1010,12 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
     /// <summary>Gets whether the nav bar draws over the page instead of insetting it.</summary>
     public static bool GetNavBarOverlapsContent(BindableObject bindable) => (bool)bindable.GetValue(NavBarOverlapsContentProperty);
+
+    /// <summary>Gets the declared soft-keyboard mode of a surface (null = unset, resolves to <see cref="ScaffoldKeyboardMode.Resize"/>).</summary>
+    public static ScaffoldKeyboardMode? GetKeyboardMode(BindableObject bindable) => (ScaffoldKeyboardMode?)bindable.GetValue(KeyboardModeProperty);
+
+    /// <summary>Sets the declared soft-keyboard mode of a surface.</summary>
+    public static void SetKeyboardMode(BindableObject bindable, ScaffoldKeyboardMode? value) => bindable.SetValue(KeyboardModeProperty, value);
 
     /// <summary>Sets whether the nav bar draws over the page instead of insetting it.</summary>
     public static void SetNavBarOverlapsContent(BindableObject bindable, bool value) => bindable.SetValue(NavBarOverlapsContentProperty, value);

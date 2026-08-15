@@ -45,6 +45,9 @@ internal sealed class ScaffoldOverlayRequest
     /// <summary>Whether the content's handlers are disconnected when the entry closes (single-use content).</summary>
     public bool DisconnectContentOnClose { get; init; }
 
+    /// <summary>How the entry reacts to the soft keyboard; meaningful for popups and bottom sheets.</summary>
+    public ScaffoldKeyboardMode KeyboardMode { get; init; } = ScaffoldKeyboardMode.Resize;
+
     /// <summary>The drawer side; meaningful for <see cref="ScaffoldOverlayKind.Flyout"/> only.</summary>
     public ScaffoldFlyoutSide FlyoutSide { get; init; }
 

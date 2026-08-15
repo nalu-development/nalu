@@ -276,6 +276,7 @@ internal sealed class ScaffoldViewController : UIViewController
         var tracker = new KeyboardTrackerView(OnKeyboardTrackerGeometryChanged);
         container.AddSubview(tracker);
         _keyboardTracker = tracker;
+        ObserveEditingFocus();
 
         var keyboardGuide = container.KeyboardLayoutGuide;
 
@@ -289,6 +290,42 @@ internal sealed class ScaffoldViewController : UIViewController
     }
 
     private KeyboardTrackerView? _keyboardTracker;
+    private NSObject? _textFieldBeganEditingToken;
+    private NSObject? _textViewBeganEditingToken;
+
+    /// <summary>
+    /// A Pan-mode surface follows the FOCUSED input, and focus can move without the keyboard
+    /// moving (tab to the next field): the begin-editing notifications re-raise
+    /// <see cref="KeyboardOverlapChanged"/> so presenters re-place their Pan surfaces. (These are
+    /// text-input notifications, not keyboard geometry — the geometry stays with the guide.)
+    /// </summary>
+    private void ObserveEditingFocus()
+    {
+        _textFieldBeganEditingToken = UITextField.Notifications.ObserveTextDidBeginEditing((_, _) => OnEditingFocusChanged());
+        _textViewBeganEditingToken = UITextView.Notifications.ObserveTextDidBeginEditing((_, _) => OnEditingFocusChanged());
+    }
+
+    private void OnEditingFocusChanged()
+    {
+        if (_lastKeyboardOverlap > 0)
+        {
+            KeyboardOverlapChanged?.Invoke();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _textFieldBeganEditingToken?.Dispose();
+            _textViewBeganEditingToken?.Dispose();
+            _textFieldBeganEditingToken = null;
+            _textViewBeganEditingToken = null;
+        }
+
+        base.Dispose(disposing);
+    }
 
     /// <summary>
     /// The height (points) of the docked soft keyboard's overlap with the container, measured from
@@ -300,9 +337,10 @@ internal sealed class ScaffoldViewController : UIViewController
     private nfloat _lastKeyboardOverlap;
 
     /// <summary>
-    /// Raised from the keyboard tracker's geometry change when <see cref="KeyboardOverlap"/> changed.
-    /// Unlike <see cref="WindowGeometryChanged"/> the pass that raises it is NOT unanimated: it
-    /// runs inside UIKit's keyboard animation, and overlays re-placed against the keyboard travel
+    /// Raised from the keyboard tracker's geometry change when <see cref="KeyboardOverlap"/> changed
+    /// (and when the editing focus moves while the keyboard is up — Pan surfaces follow the focused
+    /// input). Unlike <see cref="WindowGeometryChanged"/> the pass that raises it is NOT unanimated:
+    /// it runs inside UIKit's keyboard animation, and overlays re-placed against the keyboard travel
     /// with it.
     /// </summary>
     public Action? KeyboardOverlapChanged { get; set; }

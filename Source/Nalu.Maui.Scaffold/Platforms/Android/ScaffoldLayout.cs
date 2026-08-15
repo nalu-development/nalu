@@ -59,11 +59,26 @@ public sealed class ScaffoldLayout : FrameLayout
         : base(context)
     {
         SetClipChildren(false);
-
     }
 
     private ImeAnimationCallback? _imeAnimationCallback;
     private AView? _imeAnimationHost;
+    private FocusChangeListener? _focusChangeListener;
+
+    /// <summary>
+    /// A Pan-mode surface follows the FOCUSED input, and focus can move without the IME moving
+    /// (tab to the next field): window focus changes re-raise <see cref="KeyboardInsetsChanged"/>.
+    /// </summary>
+    private sealed class FocusChangeListener(ScaffoldLayout owner) : Java.Lang.Object, ViewTreeObserver.IOnGlobalFocusChangeListener
+    {
+        public void OnGlobalFocusChanged(AView? oldFocus, AView? newFocus)
+        {
+            if (owner.ImeBottomInsetPx > 0)
+            {
+                owner.KeyboardInsetsChanged?.Invoke();
+            }
+        }
+    }
 
     /// <inheritdoc />
     protected override void OnAttachedToWindow()
@@ -82,6 +97,12 @@ public sealed class ScaffoldLayout : FrameLayout
             _imeAnimationHost = decor;
             ViewCompat.SetWindowInsetsAnimationCallback(decor, _imeAnimationCallback);
         }
+
+        if (ViewTreeObserver is { IsAlive: true } observer)
+        {
+            _focusChangeListener ??= new FocusChangeListener(this);
+            observer.AddOnGlobalFocusChangeListener(_focusChangeListener);
+        }
     }
 
     /// <inheritdoc />
@@ -91,6 +112,11 @@ public sealed class ScaffoldLayout : FrameLayout
         {
             ViewCompat.SetWindowInsetsAnimationCallback(host, null);
             _imeAnimationHost = null;
+        }
+
+        if (_focusChangeListener is { } focusListener && ViewTreeObserver is { IsAlive: true } observer)
+        {
+            observer.RemoveOnGlobalFocusChangeListener(focusListener);
         }
 
         _imeAnimating = false;

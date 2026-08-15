@@ -78,7 +78,9 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
     }
 
     private static string SheetOrPopupId(string entryId)
-        => entryId.Contains("Sheet", StringComparison.Ordinal) ? SheetId : entryId.Replace("Entry", "Content", StringComparison.Ordinal);
+        => entryId.Contains("Sheet", StringComparison.Ordinal)
+            ? SheetId
+            : entryId.Replace("BottomEntry", "Content", StringComparison.Ordinal).Replace("Entry", "Content", StringComparison.Ordinal);
 
     private async Task LowerKeyboardAsync(string hideButtonId, string overlayId)
     {
@@ -198,6 +200,74 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         lifted.Y.Should().BeLessThan(resting.Y, "the popup moved up");
 
         await LowerKeyboardAsync("KeyboardAnchoredPopupHideButton", content);
+        await App.WaitForBoundsAsync(content, b => Math.Abs(b.Y - resting.Y) <= 1.5);
+    }
+
+    [Fact]
+    public async Task PanSheetSlidesUpJustEnoughForTheFocusedEntryAndKeepsItsSize()
+    {
+        var (_, windowHeight) = await App.GetWindowSizeAsync();
+
+        await App.TapAsync("ShowKeyboardPanSheetButton");
+        await App.WaitForTextAsync("KeyboardOverlayState", "overlay:open");
+        var resting = await App.WaitForStableBoundsAsync(SheetId);
+        resting.Bottom.Should().BeApproximately(windowHeight, 1);
+        var restingBottomEntry = await App.GetBoundsAsync("KeyboardPanSheetBottomEntry");
+        var restingTopEntry = await App.GetBoundsAsync("KeyboardPanSheetEntry");
+
+        // Focus the BOTTOM entry: the sheet keeps its size and slides up by the least that puts
+        // that entry above the keyboard.
+        var keyboard = await RaiseKeyboardAsync("KeyboardPanSheetBottomEntry");
+        var panned = await App.WaitForBoundsAsync(SheetId, b => b.Y < resting.Y - 1);
+        panned.Height.Should().BeApproximately(resting.Height, 1.5, "Pan never resizes the surface");
+
+        var pan = resting.Y - panned.Y;
+        pan.Should().BeLessThanOrEqualTo(keyboard + 1, "the pan never exceeds the keyboard's overlap");
+
+        var bottomEntry = await App.WaitForBoundsAsync("KeyboardPanSheetBottomEntry", b => b.Bottom <= windowHeight - keyboard + 1);
+        bottomEntry.Bottom.Should().BeGreaterThan(windowHeight - keyboard - 40, "the pan is the LEAST needed: the entry sits right above the keyboard (8dp gap)");
+        bottomEntry.Y.Should().BeApproximately(restingBottomEntry.Y - pan, 1.5, "content moved with the sheet, not inside it");
+
+        // Move the focus to the TOP entry: the sheet re-pans for it (less, or not at all).
+        await App.FocusAsync("KeyboardPanSheetEntry");
+        var repanned = await App.WaitForBoundsAsync(SheetId, b => b.Y > panned.Y + 1 || Math.Abs(b.Y - panned.Y) <= 1);
+        var repan = resting.Y - repanned.Y;
+        repan.Should().BeLessThanOrEqualTo(pan + 1);
+        (await App.GetBoundsAsync("KeyboardPanSheetEntry")).Bottom.Should().BeLessThanOrEqualTo(windowHeight - keyboard + 1);
+        (await App.GetBoundsAsync("KeyboardPanSheetEntry")).Y.Should().BeApproximately(restingTopEntry.Y - repan, 1.5);
+
+        await LowerKeyboardAsync("KeyboardPanSheetHideButton", SheetId);
+        var back = await App.WaitForBoundsAsync(SheetId, b => Math.Abs(b.Y - resting.Y) <= 1.5);
+        back.Height.Should().BeApproximately(resting.Height, 1.5);
+    }
+
+    [Fact]
+    public async Task PanPopupSlidesUpJustEnoughAndKeepsItsSize()
+    {
+        var (_, windowHeight) = await App.GetWindowSizeAsync();
+        const string content = "KeyboardPanPopupContent";
+
+        await App.TapAsync("ShowKeyboardPanPopupButton");
+        await App.WaitForTextAsync("KeyboardOverlayState", "overlay:open");
+        var resting = await App.WaitForStableBoundsAsync(content);
+
+        var keyboard = await RaiseKeyboardAsync("KeyboardPanPopupBottomEntry");
+        var panned = await App.WaitForStableBoundsAsync(content);
+        panned.Height.Should().BeApproximately(resting.Height, 1.5, "Pan never resizes the surface");
+        panned.Width.Should().BeApproximately(resting.Width, 1.5);
+
+        var entry = await App.GetBoundsAsync("KeyboardPanPopupBottomEntry");
+        entry.Bottom.Should().BeLessThanOrEqualTo(windowHeight - keyboard + 1, "the focused entry is above the keyboard");
+
+        // Minimal pan: either the popup did not need to move (entry already above the keyboard) or
+        // it moved by exactly what the entry needed (gap included).
+        var pan = resting.Y - panned.Y;
+        pan.Should().BeGreaterThanOrEqualTo(-1);
+        var restingEntryBottom = entry.Bottom + pan;
+        var needed = Math.Max(0, restingEntryBottom - (windowHeight - keyboard) + 8);
+        pan.Should().BeApproximately(needed, 2);
+
+        await LowerKeyboardAsync("KeyboardPanPopupHideButton", content);
         await App.WaitForBoundsAsync(content, b => Math.Abs(b.Y - resting.Y) <= 1.5);
     }
 }

@@ -26,4 +26,29 @@ internal static class ScaffoldOverlayGeometry
     /// </summary>
     public static double SheetBottomPadding(double systemBottomInset, double keyboardOverlap)
         => BottomInset(systemBottomInset, keyboardOverlap);
+
+    /// <summary>Gap kept between a panned surface's focused input and the keyboard's top edge.</summary>
+    public const double PanGap = 8;
+
+    /// <summary>
+    /// <see cref="ScaffoldKeyboardMode.Pan"/>: how far up a surface slides — the least that keeps
+    /// the focused input (its bottom edge, in the surface's UNPANNED container coordinates) above
+    /// the keyboard's top edge, or the surface's own overlap with the keyboard when no focused
+    /// input is known — never past the surface's top edge reaching <paramref name="minTop"/>.
+    /// </summary>
+    /// <param name="keyboardTop">The keyboard's top edge in container coordinates (container height − overlap).</param>
+    /// <param name="surfaceTop">The surface's visible top edge, unpanned.</param>
+    /// <param name="surfaceBottom">The surface's bottom edge, unpanned.</param>
+    /// <param name="focusedInputBottom">The focused input's bottom edge, unpanned; null when unknown.</param>
+    /// <param name="minTop">The highest edge the surface may be panned to (the top system inset).</param>
+    public static double Pan(double keyboardTop, double surfaceTop, double surfaceBottom, double? focusedInputBottom, double minTop)
+    {
+        var needed = focusedInputBottom is { } focused
+            ? focused + PanGap - keyboardTop
+            : surfaceBottom - keyboardTop;
+
+        var maxPan = Math.Max(0, surfaceTop - minTop);
+
+        return Math.Clamp(needed, 0, maxPan);
+    }
 }

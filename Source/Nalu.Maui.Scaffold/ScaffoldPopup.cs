@@ -85,6 +85,13 @@ public sealed class ScaffoldPopupOptions
     public bool? CloseOnBack { get; init; }
 
     /// <summary>
+    /// Gets or sets how the popup reacts to the soft keyboard (see <see cref="ScaffoldKeyboardMode"/>).
+    /// Defaults to <see cref="ScaffoldKeyboardMode.Resize"/>; the content's
+    /// <see cref="Scaffold.KeyboardModeProperty"/> is the attached counterpart.
+    /// </summary>
+    public ScaffoldKeyboardMode? KeyboardMode { get; init; }
+
+    /// <summary>
     /// Gets or sets the minimum gap kept between the popup and the safe-area edges (the
     /// placement area shrinks by it). Defaults to 16. To cap the popup's own size, set
     /// <see cref="VisualElement.MaximumWidthRequest"/> /

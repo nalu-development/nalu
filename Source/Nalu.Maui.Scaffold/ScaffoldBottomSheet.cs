@@ -71,6 +71,13 @@ public sealed class ScaffoldBottomSheetOptions
     public bool? CloseOnBack { get; init; }
 
     /// <summary>
+    /// Gets or sets how the sheet reacts to the soft keyboard (see <see cref="ScaffoldKeyboardMode"/>).
+    /// Defaults to <see cref="ScaffoldKeyboardMode.Resize"/>; the content's
+    /// <see cref="Scaffold.KeyboardModeProperty"/> is the attached counterpart.
+    /// </summary>
+    public ScaffoldKeyboardMode? KeyboardMode { get; init; }
+
+    /// <summary>
     /// Gets or sets the maximum sheet width. Defaults to unbounded (full window width); when
     /// the window is wider (tablets, landscape), the sheet floats centered at this width,
     /// still bottom-anchored.

@@ -37,6 +37,12 @@ public class KeyboardOverlayHomePage : ContentPage
         var showPopupButton = new Button { Text = "Show entry popup", AutomationId = "ShowKeyboardPopupButton", FontSize = 12 };
         showPopupButton.Clicked += async (_, _) => await ShowEntryPopupAsync(anchor: null);
 
+        var showPanSheetButton = new Button { Text = "Show pan sheet", AutomationId = "ShowKeyboardPanSheetButton", FontSize = 12 };
+        showPanSheetButton.Clicked += async (_, _) => await ShowPanSheetAsync();
+
+        var showPanPopupButton = new Button { Text = "Show pan popup", AutomationId = "ShowKeyboardPanPopupButton", FontSize = 12 };
+        showPanPopupButton.Clicked += async (_, _) => await ShowPanPopupAsync();
+
         var anchorButton = new Button { Text = "Show anchored entry popup", AutomationId = "ShowKeyboardAnchoredPopupButton", FontSize = 12 };
         anchorButton.Clicked += async (_, _) => await ShowEntryPopupAsync(anchorButton);
 
@@ -53,6 +59,8 @@ public class KeyboardOverlayHomePage : ContentPage
                 showSheetButton,
                 showTallSheetButton,
                 showPopupButton,
+                showPanSheetButton,
+                showPanPopupButton,
                 SoftKeyboardProbe.CreateLabel("KeyboardOverlayKeyboardProbe"),
                 SoftKeyboardProbe.CreateHeightLabel("KeyboardOverlayKeyboardHeight"),
                 _state,
@@ -165,6 +173,58 @@ public class KeyboardOverlayHomePage : ContentPage
             }
         );
 
+        _state.Text = _overlay.IsOpen ? "overlay:open" : "overlay:failed";
+        ObserveClose(_overlay);
+    }
+
+    /// <summary>
+    /// A Pan-mode sheet (<see cref="Scaffold.KeyboardModeProperty"/> on the content): the sheet
+    /// keeps its size and slides up by the least that keeps the FOCUSED entry above the keyboard —
+    /// a bottom entry pans it (almost) a keyboard's worth, the top one much less.
+    /// </summary>
+    private async Task ShowPanSheetAsync()
+    {
+        var filler = new VerticalStackLayout { Spacing = 0 };
+
+        for (var i = 0; i < 6; i++)
+        {
+            filler.Add(new Label { Text = $"Sheet filler {i}", FontSize = 11 });
+        }
+
+        var bottomEntry = new Entry { AutomationId = "KeyboardPanSheetBottomEntry", Placeholder = "bottom entry", FontSize = 14 };
+
+        var content = new VerticalStackLayout
+        {
+            Padding = new Thickness(16, 0, 16, 16),
+            Children = { MakeOverlayBody("PanSheet", filler, bottomEntry) }
+        };
+
+        Scaffold.SetKeyboardMode(content, ScaffoldKeyboardMode.Pan);
+
+        _overlay = await this.GetScaffold().ShowBottomSheetAsync(content);
+        _state.Text = _overlay.IsOpen ? "overlay:open" : "overlay:failed";
+        ObserveClose(_overlay);
+    }
+
+    /// <summary>A Pan-mode centered popup: same size, slides up just enough for the focused entry.</summary>
+    private async Task ShowPanPopupAsync()
+    {
+        var bottomEntry = new Entry { AutomationId = "KeyboardPanPopupBottomEntry", Placeholder = "bottom entry", FontSize = 14 };
+
+        var content = new Border
+        {
+            AutomationId = "KeyboardPanPopupContent",
+            StrokeThickness = 0,
+            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(12) },
+            Background = new SolidColorBrush(Colors.White),
+            Padding = 16,
+            WidthRequest = 240,
+            Content = MakeOverlayBody("PanPopup", new Label { Text = "Some more content", FontSize = 12, HeightRequest = 120 }, bottomEntry)
+        };
+
+        Scaffold.SetKeyboardMode(content, ScaffoldKeyboardMode.Pan);
+
+        _overlay = await this.GetScaffold().ShowPopupAsync(content);
         _state.Text = _overlay.IsOpen ? "overlay:open" : "overlay:failed";
         ObserveClose(_overlay);
     }
