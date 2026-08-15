@@ -87,21 +87,31 @@ Sheets and popups hosting text input are **keyboard-aware** out of the box — n
 
 Both move **with** the keyboard animation and go back where they were when it hides.
 
-That is the default **`Resize`** mode. The mode is per overlay — `Scaffold.KeyboardMode`
-attached to the content (or `KeyboardMode` in the popup/sheet options), the same vocabulary
-meant to describe pages next:
+That is the default **`Resize`** mode — and the same policy applies to **pages**: out of the
+box every scaffold page treats the keyboard as a bottom inset too (MAUI alone does nothing unless
+you set `SafeAreaEdges="SoftInput"` on every page). One attached property drives all of it,
+`Scaffold.KeyboardMode`, declared on a page (or on the `Scaffold` itself as the app-wide default)
+and on sheet/popup content (call-site options `KeyboardMode` win over it):
 
 ```xml
+<!-- a page that must not react to the keyboard (a full-bleed map) -->
+<ContentPage nalu:Scaffold.KeyboardMode="None" ...>
+
+<!-- popup / sheet content that slides instead of resizing -->
 <VerticalStackLayout nalu:Scaffold.KeyboardMode="Pan">
     <Entry ... />
 </VerticalStackLayout>
 ```
 
-| `ScaffoldKeyboardMode` | Bottom sheet | Popup |
-|---|---|---|
-| `Resize` (default) | Surface anchored, content padded above the keyboard, detents unchanged | Re-placed in the area above the keyboard (may get shorter) |
-| `Pan` | Keeps its size; slides up by the **least** that keeps the *focused* input above the keyboard (its own overlap when no focused input is found), never past the top inset; follows focus changes | Same — minimal slide, no re-placement, no resize |
-| `None` | Ignores the keyboard | Ignores the keyboard |
+| `ScaffoldKeyboardMode` | Bottom sheet | Popup | Page |
+|---|---|---|---|
+| `Resize` (default) | Surface anchored, content padded above the keyboard, detents unchanged | Re-placed in the area above the keyboard (may get shorter) | The keyboard becomes the page's bottom safe-area inset (iOS `AdditionalSafeAreaInsets`, Android system-bar inset fold): the page lays out above it exactly as it does above the home indicator / navigation bar |
+| `Pan` | Keeps its size; slides up by the **least** that keeps the *focused* input above the keyboard (its own overlap when no focused input is found), never past the top inset; follows focus changes | Same — minimal slide, no re-placement, no resize | The whole page slides up by the same rule (under the chrome, `adjustPan`-like) |
+| `None` | Ignores the keyboard | Ignores the keyboard | Ignores the keyboard (on Android the IME insets reach the page, so MAUI's own `SafeAreaEdges="SoftInput"` still works there) |
+
+**One surface owns the keyboard at a time**: the topmost presented sheet or popup when there is
+one, the page otherwise. Only the owner resizes/pans; a page never moves under an overlay's
+keyboard, and the keyboard hands over when an overlay opens or closes.
 
 `Pan` is Android's `adjustPan` semantics: content below the focused input may end up under the
 keyboard — use it for fixed-size surfaces whose upper part must not move (a map with a search

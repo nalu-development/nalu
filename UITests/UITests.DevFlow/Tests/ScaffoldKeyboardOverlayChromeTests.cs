@@ -78,9 +78,12 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
     }
 
     private static string SheetOrPopupId(string entryId)
-        => entryId.Contains("Sheet", StringComparison.Ordinal)
-            ? SheetId
-            : entryId.Replace("BottomEntry", "Content", StringComparison.Ordinal).Replace("Entry", "Content", StringComparison.Ordinal);
+        => entryId switch
+        {
+            "KeyboardPageEntry" => "KeyboardPageEntry",
+            _ when entryId.Contains("Sheet", StringComparison.Ordinal) => SheetId,
+            _ => entryId.Replace("BottomEntry", "Content", StringComparison.Ordinal).Replace("Entry", "Content", StringComparison.Ordinal)
+        };
 
     private async Task LowerKeyboardAsync(string hideButtonId, string overlayId)
     {
@@ -269,5 +272,69 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
 
         await LowerKeyboardAsync("KeyboardPanPopupHideButton", content);
         await App.WaitForBoundsAsync(content, b => Math.Abs(b.Y - resting.Y) <= 1.5);
+    }
+
+    private async Task<(double Keyboard, ElementBounds Resting, ElementBounds Title, ElementBounds Entry, ElementBounds Panned)> RaisePageKeyboardAsync(string mode)
+    {
+        var (_, windowHeight) = await App.GetWindowSizeAsync();
+        await App.TapAsync($"KeyboardPageMode{mode}Button");
+        await App.WaitForTextAsync("KeyboardPageMode", $"page:{mode}");
+
+        var resting = await App.WaitForStableBoundsAsync("KeyboardPageEntry");
+        resting.Bottom.Should().BeGreaterThan(windowHeight - 120, "the page entry sits at the very bottom of the page");
+        // The page's top-level scroll view: it does not move under Resize (it shrinks), moves by
+        // the pan under Pan, and stays put under None.
+        var title = await App.GetBoundsAsync("KeyboardPageScroll");
+
+        var keyboard = await RaiseKeyboardAsync("KeyboardPageEntry");
+        var entry = await App.WaitForStableBoundsAsync("KeyboardPageEntry");
+        var panned = await App.GetBoundsAsync("KeyboardPageScroll");
+
+        return (keyboard, resting, title, entry, panned);
+    }
+
+    [Fact]
+    public async Task PageResizeIsTheDefault_TheEntryAtTheBottomOfThePageEndsAboveTheKeyboard()
+    {
+        var (_, windowHeight) = await App.GetWindowSizeAsync();
+        var (keyboard, resting, title, entry, titleAfter) = await RaisePageKeyboardAsync("Resize");
+
+        entry.Bottom.Should().BeLessThanOrEqualTo(windowHeight - keyboard + 1, "the page is padded above the keyboard");
+        entry.Y.Should().BeLessThan(resting.Y - 50);
+        titleAfter.Y.Should().BeApproximately(title.Y, 1.5, "Resize pads: the top of the page does not move");
+        titleAfter.Height.Should().BeLessThan(title.Height - 50, "the page's flexible content shrank by the keyboard");
+
+        await LowerKeyboardAsync("KeyboardPageHideButton", "KeyboardPageEntry");
+        (await App.GetBoundsAsync("KeyboardPageEntry")).Y.Should().BeApproximately(resting.Y, 1.5);
+    }
+
+    [Fact]
+    public async Task PagePanSlidesTheWholePageJustEnough()
+    {
+        var (_, windowHeight) = await App.GetWindowSizeAsync();
+        var (keyboard, resting, title, entry, titleAfter) = await RaisePageKeyboardAsync("Pan");
+
+        entry.Bottom.Should().BeLessThanOrEqualTo(windowHeight - keyboard + 1, "the focused entry is above the keyboard");
+        var pan = resting.Y - entry.Y;
+        pan.Should().BeInRange(1, keyboard + 1);
+        (title.Y - titleAfter.Y).Should().BeApproximately(pan, 1.5, "Pan slides the whole page, title included");
+        entry.Bottom.Should().BeGreaterThan(windowHeight - keyboard - 40, "the pan is the least needed");
+
+        await LowerKeyboardAsync("KeyboardPageHideButton", "KeyboardPageEntry");
+        (await App.GetBoundsAsync("KeyboardPageScroll")).Y.Should().BeApproximately(title.Y, 1.5);
+        await App.TapAsync("KeyboardPageModeResizeButton");
+    }
+
+    [Fact]
+    public async Task PageNoneLeavesThePageAlone()
+    {
+        var (keyboard, resting, title, entry, titleAfter) = await RaisePageKeyboardAsync("None");
+
+        entry.Y.Should().BeApproximately(resting.Y, 1.5, "None: the page ignores the keyboard");
+        titleAfter.Y.Should().BeApproximately(title.Y, 1.5);
+        keyboard.Should().BeGreaterThan(0);
+
+        await LowerKeyboardAsync("KeyboardPageHideButton", "KeyboardPageEntry");
+        await App.TapAsync("KeyboardPageModeResizeButton");
     }
 }

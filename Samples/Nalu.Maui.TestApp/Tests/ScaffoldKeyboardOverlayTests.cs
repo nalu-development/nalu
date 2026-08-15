@@ -68,16 +68,44 @@ public class KeyboardOverlayHomePage : ContentPage
             }
         };
 
+        // PAGE-level keyboard policy (Scaffold.KeyboardMode on the page, live): an entry at the very
+        // bottom of the page — Resize pads the page above the keyboard, Pan slides the page, None
+        // leaves the entry under the keyboard — switched by the buttons.
+        var pageEntry = new Entry { AutomationId = "KeyboardPageEntry", Placeholder = "page entry", FontSize = 14 };
+        var pageModeLabel = new Label { AutomationId = "KeyboardPageMode", Text = "page:Resize", FontSize = 11 };
+        var pageModes = new HorizontalStackLayout { Spacing = 6 };
+
+        foreach (var mode in new[] { ScaffoldKeyboardMode.Resize, ScaffoldKeyboardMode.Pan, ScaffoldKeyboardMode.None })
+        {
+            var button = new Button { Text = mode.ToString(), AutomationId = $"KeyboardPageMode{mode}Button", FontSize = 11, Padding = new Thickness(8, 4) };
+            button.Clicked += (_, _) =>
+            {
+                Scaffold.SetKeyboardMode(this, mode);
+                pageModeLabel.Text = $"page:{mode}";
+            };
+            pageModes.Add(button);
+        }
+
+        var hidePageKeyboardButton = new Button { Text = "Hide", AutomationId = "KeyboardPageHideButton", FontSize = 11, Padding = new Thickness(8, 4) };
+        hidePageKeyboardButton.Clicked += async (_, _) =>
+        {
+            pageEntry.Unfocus();
+            await pageEntry.HideSoftInputAsync(CancellationToken.None);
+        };
+        pageModes.Add(hidePageKeyboardButton);
+        pageModes.Add(pageModeLabel);
+
         // The anchor sits at the BOTTOM of the page: with the keyboard up, "below the anchor" no
         // longer fits and the popup must flip above.
-        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 0, 16, 16), Children = { anchorButton } };
+        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 0, 16, 16), Spacing = 6, Children = { pageModes, anchorButton, pageEntry } };
 
         var grid = new Grid
         {
             RowDefinitions = [new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto)]
         };
 
-        grid.Add(top);
+        // Scrollable: under the page-level Resize policy the star row shrinks by the keyboard.
+        grid.Add(new ScrollView { AutomationId = "KeyboardPageScroll", Content = top });
         grid.Add(bottom, 0, 1);
 
         Content = grid;

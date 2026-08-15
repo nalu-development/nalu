@@ -41,6 +41,18 @@ public sealed class ScaffoldLayout : FrameLayout
     /// <summary>Whether the presenter wants the top chrome footprint applied once the strip is measured.</summary>
     internal bool ChromeTopDesired { get; set; }
 
+    /// <summary>The current page's soft-keyboard policy (resolved by the presenter, read live).</summary>
+    internal Func<ScaffoldKeyboardMode>? PageKeyboardMode { get; set; }
+
+    /// <summary>
+    /// Whether a presented sheet/popup OWNS the keyboard (set by the presenter). The keyboard inset
+    /// goes to ONE surface: the topmost sheet or popup when one is presented, the page otherwise.
+    /// </summary>
+    internal Func<bool>? OverlayOwnsKeyboard { get; set; }
+
+    /// <summary>The keyboard overlap (px) the PAGE reacts to: 0 while an overlay owns the keyboard.</summary>
+    internal int PageKeyboardOverlapPx => OverlayOwnsKeyboard?.Invoke() == true ? 0 : ImeBottomInsetPx;
+
     /// <summary>
     /// Full height (px) of the bottom chrome strip: bar footprint + system bottom inset.
     /// Zero when no tab bar is shown.
@@ -75,6 +87,7 @@ public sealed class ScaffoldLayout : FrameLayout
         {
             if (owner.ImeBottomInsetPx > 0)
             {
+                (owner.PageLayer as ScaffoldPageLayerLayout)?.ApplyKeyboard();
                 owner.KeyboardInsetsChanged?.Invoke();
             }
         }
@@ -153,6 +166,7 @@ public sealed class ScaffoldLayout : FrameLayout
         if (value != ImeBottomInsetPx)
         {
             ImeBottomInsetPx = value;
+            (PageLayer as ScaffoldPageLayerLayout)?.ApplyKeyboard();
             KeyboardInsetsChanged?.Invoke();
         }
     }

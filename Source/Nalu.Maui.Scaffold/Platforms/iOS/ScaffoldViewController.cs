@@ -228,6 +228,22 @@ internal sealed class ScaffoldViewController : UIViewController
     public bool CurrentPageWantsNavBarInset { get; set; }
 
     /// <summary>
+    /// The current page's soft-keyboard policy (resolved by the presenter, live: the attached
+    /// value may change while the page is presented).
+    /// </summary>
+    public Func<ScaffoldKeyboardMode>? CurrentPageKeyboardMode { get; set; }
+
+    /// <summary>
+    /// Whether a presented sheet/popup OWNS the keyboard (set by the presenter). The keyboard inset
+    /// goes to ONE surface: the topmost sheet or popup when one is presented, the page otherwise —
+    /// so a page never resizes/pans under an overlay's keyboard.
+    /// </summary>
+    public Func<bool>? OverlayOwnsKeyboard { get; set; }
+
+    /// <summary>The keyboard overlap the CURRENT PAGE reacts to: 0 while an overlay owns the keyboard.</summary>
+    private double PageKeyboardOverlap => OverlayOwnsKeyboard?.Invoke() == true ? 0 : (double)_lastKeyboardOverlap;
+
+    /// <summary>
     /// Bar footprint (points) above the system inset — the page-facing inset contribution.
     /// The strip's measured height INCLUDES any bottom inset the bar consumed (SafeAreaEdges),
     /// and the page already receives the system inset from the system safe area, so the
@@ -309,6 +325,7 @@ internal sealed class ScaffoldViewController : UIViewController
     {
         if (_lastKeyboardOverlap > 0)
         {
+            ApplyCurrentPageKeyboard();
             KeyboardOverlapChanged?.Invoke();
         }
     }
@@ -375,9 +392,47 @@ internal sealed class ScaffoldViewController : UIViewController
         if (overlap != _lastKeyboardOverlap)
         {
             _lastKeyboardOverlap = overlap;
+            ApplyCurrentPageKeyboard();
             KeyboardOverlapChanged?.Invoke();
         }
     }
+
+    /// <summary>
+    /// The current page's reaction to the keyboard: Resize re-applies its insets (see
+    /// <see cref="ApplyCurrentPageInsets"/>); Pan slides the page's view by the least that keeps
+    /// the focused input above the keyboard (never more than the keyboard's overlap); None leaves it
+    /// alone. Runs inside the keyboard animation (KVO) — the page travels with it.
+    /// </summary>
+    private void ApplyCurrentPageKeyboard()
+    {
+        if (CurrentPageController?.View is not { } pageView)
+        {
+            return;
+        }
+
+        var mode = CurrentPageKeyboardMode?.Invoke() ?? ScaffoldKeyboardMode.Resize;
+        var overlap = PageKeyboardOverlap;
+
+        double pan = 0;
+
+        if (mode == ScaffoldKeyboardMode.Pan && overlap > 0 && View is { } container)
+        {
+            var keyboardTop = (double)container.Bounds.Height - overlap;
+            var focused = ScaffoldFocusedInput.BottomIn(pageView);
+            var needed = focused is { } focusedBottom ? focusedBottom + ScaffoldOverlayGeometry.PanGap - keyboardTop : overlap;
+            pan = Math.Clamp(needed, 0, overlap);
+        }
+
+        _currentPagePan = pan;
+        pageView.Transform = pan > 0 ? CGAffineTransform.MakeTranslation(0, (nfloat)(-pan)) : CGAffineTransform.MakeIdentity();
+
+        ApplyCurrentPageInsets();
+    }
+
+    private double _currentPagePan;
+
+    /// <summary>Re-applies the current page's keyboard reaction (the presenter calls it after a page swap).</summary>
+    public void RefreshCurrentPageKeyboard() => ApplyCurrentPageKeyboard();
 
     /// <summary>
     /// The guide is a keyboard only while something is being edited. When the keyboard is dismissed
@@ -798,13 +853,36 @@ internal sealed class ScaffoldViewController : UIViewController
             ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View!.SafeAreaInsets.Top)
             : 0;
 
-    /// <summary>Applies the current page's chrome inset contributions to its own controller.</summary>
+    /// <summary>
+    /// Applies the current page's chrome inset contributions to its own controller — and, under
+    /// <see cref="ScaffoldKeyboardMode.Resize"/>, the soft keyboard: the keyboard becomes the page's
+    /// bottom safe-area inset (it covers the bar and the system inset, so it REPLACES their
+    /// contribution rather than adding to it), and the page lays out above it exactly as it does
+    /// above the home indicator.
+    /// </summary>
     public void ApplyCurrentPageInsets()
     {
         if (CurrentPageController is { } pageController)
         {
             var bottom = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null ? BarHeight : 0;
             var top = CurrentPageWantsNavBarInset ? NavBarInsetContribution : 0;
+            var systemBottom = View?.SafeAreaInsets.Bottom ?? 0;
+
+            if (CurrentPageKeyboardMode?.Invoke() == ScaffoldKeyboardMode.Resize && PageKeyboardOverlap is var keyboard && keyboard > 0)
+            {
+                bottom = (nfloat)Math.Max((double)bottom, keyboard - systemBottom);
+            }
+
+            // Pan: the page's view is translated up by the pan, and UIKit derives a view's safe
+            // area from where it IS — the bottom inset shrinks by the pan (the top one stays: UIKit
+            // does not extend a safe area past a view's own edge, and additional insets clamp at
+            // 0), which would reflow the content instead of sliding it. Compensate, so the page's
+            // safe area is exactly what it was at rest.
+            if (_currentPagePan > 0)
+            {
+                bottom += (nfloat)Math.Min(_currentPagePan, (double)systemBottom);
+            }
+
             var insets = new UIEdgeInsets(top, 0, bottom, 0);
 
             // Only on change: writing AdditionalSafeAreaInsets re-dirties the page subtree even

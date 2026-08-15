@@ -117,6 +117,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // ...and when the soft keyboard changes its overlap (per animation frame while it moves):
         // sheets and popups are re-placed against the area ABOVE it.
         platformView.KeyboardInsetsChanged ??= () => RelayoutKeyboardAwareOverlays(platformView, platformView.Context!);
+        platformView.OverlayOwnsKeyboard ??= () => KeyboardOwner is not null;
 
         var stack = root.NavigationStack;
         var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
@@ -168,6 +169,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         platformView.PageBottomInsetPx = barVisible ? _lastStripHeight : 0;
         platformView.ChromeTopDesired = navBarInsets;
         platformView.PageTopInsetPx = navBarInsets ? _lastNavStripHeight : 0;
+        platformView.PageKeyboardMode = () => scaffold.ResolvePageKeyboardMode(targetPage);
 
         // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
         // page slides in (and back in sync on pop).
@@ -1775,7 +1777,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 popupHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
                 panel = popupHost;
 
-                platformView.AddView(panel, LayoutPopup(request, platformView, context));
+                platformView.AddView(panel, LayoutPopup(request, platformView, context, platformView.ImeBottomInsetPx));
 
                 break;
             }
@@ -1793,7 +1795,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 nestedHost.AddView(panel, new Android.Widget.FrameLayout.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
                 panel = nestedHost;
 
-                platformView.AddView(panel, LayoutBottomSheet(sheet, request.KeyboardMode, panel, platformView, context, initial: true));
+                platformView.AddView(panel, LayoutBottomSheet(sheet, request.KeyboardMode, panel, platformView, context, initial: true, platformView.ImeBottomInsetPx));
 
                 break;
             }
@@ -1817,6 +1819,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         _overlays.Add(entry);
         scaffold.UpdateBackCallbackEnabled();
+
+        // A new sheet/popup takes the keyboard over from the page (or the entry below it).
+        if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet)
+        {
+            OnKeyboardOwnerChanged(platformView, context);
+        }
 
         // MAUI's net10 safe-area pass evaluates each layout at its FIRST traversal with an
         // off-screen heuristic: a view laid out while translated off the screen receives FULL
@@ -1857,7 +1865,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// minus its system insets and the popup's margin, and an anchored popup follows wherever its
     /// anchor now sits. Returns the layout params to mount (or re-mount) it with.
     /// </summary>
-    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, ScaffoldLayout container, Android.Content.Context context)
+    private Android.Widget.FrameLayout.LayoutParams LayoutPopup(ScaffoldOverlayRequest request, ScaffoldLayout container, Android.Content.Context context, int keyboardOverlapPx)
     {
         var systemInsets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
         var presentation = request.PopupPresentation!;
@@ -1866,9 +1874,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Resize: the keyboard is a bottom inset for placement purposes (an anchored popup that no
         // longer fits below flips above, a centered one centers in what is left). Pan / None: the
         // popup is placed as if there were no keyboard (Pan then slides it — below).
-        var keyboardOverlap = context.FromPixels(container.ImeBottomInsetPx);
+        var keyboardOverlap = context.FromPixels(keyboardOverlapPx);
         var bottomInsetPx = request.KeyboardMode == ScaffoldKeyboardMode.Resize
-            ? ScaffoldOverlayGeometry.BottomInset(systemInsets?.Bottom ?? 0, container.ImeBottomInsetPx)
+            ? ScaffoldOverlayGeometry.BottomInset(systemInsets?.Bottom ?? 0, keyboardOverlapPx)
             : systemInsets?.Bottom ?? 0;
 
         var area = new Rect(
@@ -1910,7 +1918,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         if (request.KeyboardMode == ScaffoldKeyboardMode.Pan && keyboardOverlap > 0)
         {
-            var focusedBottom = request.Content.Handler?.PlatformView is AView panel ? FocusedInputBottom(panel, context) : null;
+            var focusedBottom = request.Content.Handler?.PlatformView is AView panel ? ScaffoldFocusedInput.BottomIn(panel, context) : null;
 
             rect.Y -= ScaffoldOverlayGeometry.Pan(
                 context.FromPixels(container.Height) - keyboardOverlap,
@@ -1935,45 +1943,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
-    /// The bottom edge (dp, relative to <paramref name="panel"/>'s top edge as laid out — its
-    /// children's translations included) of the focused text input inside the panel — what a
-    /// Pan-mode surface keeps above the keyboard; null when the window focus is elsewhere.
-    /// </summary>
-    private static double? FocusedInputBottom(AView panel, Android.Content.Context context)
-    {
-        if (context.GetActivity()?.CurrentFocus is not { } focus || !IsDescendantOf(focus, panel))
-        {
-            return null;
-        }
-
-        var focusLocation = new int[2];
-        var panelLocation = new int[2];
-        focus.GetLocationInWindow(focusLocation);
-        panel.GetLocationInWindow(panelLocation);
-
-        return context.FromPixels(focusLocation[1] - panelLocation[1] + focus.Height);
-    }
-
-    private static bool IsDescendantOf(AView view, AView ancestor)
-    {
-        for (var parent = view.Parent; parent is not null; parent = parent.Parent)
-        {
-            if (ReferenceEquals(parent, ancestor))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
     /// Frames a bottom sheet against the CURRENT window: capped width, centered, bottom-anchored,
     /// with its detents resolved against the height available above the top inset. Returns the
     /// layout params to mount (or re-mount) it with.
     /// </summary>
     /// <param name="sheet">The presented sheet.</param>
     /// <param name="keyboardMode">How the sheet reacts to the soft keyboard.</param>
+    /// <param name="keyboardOverlapPx">The keyboard overlap (px) this sheet reacts to (0 unless it OWNS the keyboard — see <see cref="KeyboardOwner"/>).</param>
     /// <param name="panel">The sheet's platform view (the nested host).</param>
     /// <param name="container">The overlay container the sheet is framed against.</param>
     /// <param name="context">The Android context, for pixel conversions.</param>
@@ -1987,10 +1963,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         AView panel,
         ScaffoldLayout container,
         Android.Content.Context context,
-        bool initial)
+        bool initial,
+        int keyboardOverlapPx)
     {
         var insets = ViewCompat.GetRootWindowInsets(container)?.GetInsets(WindowInsetsCompat.Type.SystemBars());
-        var keyboardOverlap = context.FromPixels(container.ImeBottomInsetPx);
+        var keyboardOverlap = context.FromPixels(keyboardOverlapPx);
 
         var availableHeight = context.FromPixels(container.Height - (insets?.Top ?? 0));
 
@@ -1998,7 +1975,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // to the bottom edge while its content is padded up to the keyboard's top edge (see
         // ScaffoldOverlayGeometry). Pan / None: system inset only.
         var bottomPaddingPx = keyboardMode == ScaffoldKeyboardMode.Resize
-            ? ScaffoldOverlayGeometry.SheetBottomPadding(insets?.Bottom ?? 0, container.ImeBottomInsetPx)
+            ? ScaffoldOverlayGeometry.SheetBottomPadding(insets?.Bottom ?? 0, keyboardOverlapPx)
             : insets?.Bottom ?? 0;
 
         // Padding first (it affects the natural height), then measure, then geometry.
@@ -2025,7 +2002,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             var containerHeight = context.FromPixels(container.Height);
             var visibleTop = containerHeight - sheetHeight + sheet.TranslationY;
-            var focusedBottom = FocusedInputBottom(panel, context);
+            var focusedBottom = ScaffoldFocusedInput.BottomIn(panel, context);
 
             pan = ScaffoldOverlayGeometry.Pan(
                 containerHeight - keyboardOverlap,
@@ -2047,6 +2024,28 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// Re-places the overlays whose geometry depends on the soft keyboard (sheets, popups) after
     /// its overlap changed — per animation frame while it moves.
     /// </summary>
+    /// <summary>
+    /// The presented entry that OWNS the soft keyboard: the topmost sheet or popup — the keyboard
+    /// inset is applied to that surface alone; when none is presented, the page owns it (see
+    /// <see cref="ScaffoldLayout.OverlayOwnsKeyboard"/>).
+    /// </summary>
+    private OverlayEntry? KeyboardOwner
+        => _overlays.LastOrDefault(static entry => !entry.Closing && entry.Request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet);
+
+    private int KeyboardOverlapFor(OverlayEntry entry, ScaffoldLayout container)
+        => ReferenceEquals(entry, KeyboardOwner) ? container.ImeBottomInsetPx : 0;
+
+    /// <summary>The keyboard's owner changed (an entry presented or closed): overlays and page re-apply their keyboard reaction.</summary>
+    private void OnKeyboardOwnerChanged(ScaffoldLayout platformView, Android.Content.Context context)
+    {
+        if (platformView.ImeBottomInsetPx > 0)
+        {
+            RelayoutKeyboardAwareOverlays(platformView, context);
+        }
+
+        (platformView.PageLayer as ScaffoldPageLayerLayout)?.ApplyKeyboard();
+    }
+
     private void RelayoutKeyboardAwareOverlays(ScaffoldLayout container, Android.Content.Context context)
     {
         foreach (var entry in _overlays.ToArray())
@@ -2059,12 +2058,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             switch (entry.Request)
             {
                 case { Content: ScaffoldBottomSheetView sheet }:
-                    panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false);
+                    panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false, KeyboardOverlapFor(entry, container));
 
                     break;
 
                 case { Kind: ScaffoldOverlayKind.Popup }:
-                    panel.LayoutParameters = LayoutPopup(entry.Request, container, context);
+                    panel.LayoutParameters = LayoutPopup(entry.Request, container, context, KeyboardOverlapFor(entry, container));
 
                     break;
             }
@@ -2096,12 +2095,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             switch (entry.Request)
             {
                 case { Content: ScaffoldBottomSheetView sheet }:
-                    panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false);
+                    panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false, KeyboardOverlapFor(entry, container));
 
                     break;
 
                 case { Kind: ScaffoldOverlayKind.Popup }:
-                    panel.LayoutParameters = LayoutPopup(entry.Request, container, context);
+                    panel.LayoutParameters = LayoutPopup(entry.Request, container, context, KeyboardOverlapFor(entry, container));
 
                     break;
 
@@ -2247,6 +2246,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
         (entry.ScrimPlatform.Parent as AViewGroup)?.RemoveView(entry.ScrimPlatform);
         _overlays.Remove(entry);
+
+        // The keyboard goes back to the entry below, or to the page.
+        if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet
+            && scaffold.Handler is IPlatformViewHandler { PlatformView: ScaffoldLayout ownerLayout } && ownerLayout.Context is { } ownerContext)
+        {
+            OnKeyboardOwnerChanged(ownerLayout, ownerContext);
+        }
 
         ScaffoldOverlayAnimations.ResetContent(request.Content);
         entry.ScrimView.DisconnectHandlers();
