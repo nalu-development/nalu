@@ -39,7 +39,9 @@ Declarative flavor — options attached to the view:
 ```
 
 Popups enter with a subtle fade+scale; the content view is measured at its natural size within
-the placement area.
+the placement area — and **re-placed whenever that natural size changes** after presentation (a
+deferred image, an expanding section, a loaded list): the popup re-fits and re-centers/re-anchors
+on its own, nothing to call.
 
 ## Bottom sheets
 
@@ -67,7 +69,9 @@ await scaffold.ShowBottomSheetAsync(new FilterSheet(), new ScaffoldBottomSheetOp
 | `Scrim`, `CloseOnScrimTap`, `CloseOnBack` | As for popups. |
 
 Sheets are draggable between detents with native-feeling physics; the sheet handles its own
-bottom safe-area padding. The same `ScaffoldBottomSheet.*` attached properties exist for
+bottom safe-area padding. A `Content` detent follows the content's natural height **live**: content
+that grows or shrinks after presentation re-resolves the detent (the sheet stays bottom-anchored on
+the detent it rests on). The same `ScaffoldBottomSheet.*` attached properties exist for
 declaring options on the sheet view.
 
 ## Soft keyboard
