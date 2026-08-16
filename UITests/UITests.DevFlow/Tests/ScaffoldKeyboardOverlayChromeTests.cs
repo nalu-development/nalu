@@ -337,4 +337,50 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         await LowerKeyboardAsync("KeyboardPageHideButton", "KeyboardPageEntry");
         await App.TapAsync("KeyboardPageModeResizeButton");
     }
+
+    [Fact]
+    public async Task KeyboardStateBindingsFollowTheKeyboard()
+    {
+        // At rest: hidden, 0, banner shown.
+        await App.WaitForTextAsync("KeyboardStateVisible", "visible:False");
+        await App.WaitForTextAsync("KeyboardStateHeight", "height:0");
+        await WaitForBannerVisibilityAsync(true);
+
+        var (keyboard, _, _, _, _) = await RaisePageKeyboardAsync("Resize");
+
+        // {nalu:KeyboardBinding IsVisible/Height} reflect the platform probe's overlap, and the
+        // banner bound to !IsVisible collapses.
+        await App.WaitForTextAsync("KeyboardStateVisible", "visible:True");
+        await App.WaitForTextMatchAsync(
+            "KeyboardStateHeight",
+            text => text is not null && text.StartsWith("height:", StringComparison.Ordinal)
+                    && double.TryParse(text["height:".Length..], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var h)
+                    && Math.Abs(h - keyboard) <= 2);
+        await WaitForBannerVisibilityAsync(false);
+
+        await LowerKeyboardAsync("KeyboardPageHideButton", "KeyboardPageEntry");
+        await App.WaitForTextAsync("KeyboardStateVisible", "visible:False");
+        await App.WaitForTextAsync("KeyboardStateHeight", "height:0");
+        await WaitForBannerVisibilityAsync(true);
+    }
+
+    private async Task WaitForBannerVisibilityAsync(bool visible)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        bool? last = null;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            last = (await App.FindElementAsync("KeyboardStateBanner"))?.IsVisible;
+
+            if (last == visible)
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        last.Should().Be(visible, "the banner is bound to !KeyboardState.IsVisible");
+    }
 }

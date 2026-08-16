@@ -25,7 +25,7 @@ When the keyboard is about to be shown, the system will loop through ancestors a
 If not found, it will fall back to what specified in `UseNaluSoftKeyboardManager`.
 
 `SoftKeyboardManager` also provides a `State` observable object which provides keyboard state information.
-This can be useful if you want to bind the visibility of an element to the visibility of the keyboard (very useful when you want to hide some areas in `Resize` mode when the keyboard is visible.
+This can be useful if you want to bind the visibility of an element to the visibility of the keyboard (very useful when you want to hide some areas in `Resize` mode when the keyboard is visible). In a Scaffold-hosted app the equivalent is `Scaffold.KeyboardState` with `{nalu:KeyboardBinding}` (see [Scaffold & the Soft Keyboard](scaffold-keyboard.md)).
 
 This is less flexible than the MAUI's iOS `KeyboardAutoManagerScroll` but it is more consistent and probably convenient thanks to the keyboard-state bindable properties.
 

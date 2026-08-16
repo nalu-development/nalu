@@ -116,7 +116,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // ...and when the soft keyboard changes its overlap (per animation frame while it moves):
         // sheets and popups are re-placed against the area ABOVE it.
-        platformView.KeyboardInsetsChanged ??= () => RelayoutKeyboardAwareOverlays(platformView, platformView.Context!);
+        platformView.KeyboardInsetsChanged ??= () =>
+        {
+            scaffold.KeyboardState.Update(platformView.Context!.FromPixels(platformView.ImeBottomInsetPx));
+            RelayoutKeyboardAwareOverlays(platformView, platformView.Context!);
+        };
         platformView.OverlayOwnsKeyboard ??= () => KeyboardOwner is not null;
 
         var stack = root.NavigationStack;

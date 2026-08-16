@@ -17,6 +17,8 @@ popups behave in each mode, and how to combine the scaffold's `None` mode with M
   sheet/popup content — switches a surface to `Pan` (slide, don't resize) or `None` (ignore).
 - `None` on a page hands the keyboard back to MAUI: use `SafeAreaEdges="SoftInput"` on the
   layouts that should pad themselves.
+- `Scaffold.KeyboardState` (`IsVisible`, `Height`) is bindable from any element via
+  `{nalu:KeyboardBinding}` — collapse or pad content while the keyboard is up.
 - `Nalu.Maui.Core`'s `UseNaluSoftKeyboardManager` is not supported with the scaffold (analyzer
   error `NALU0104`).
 
@@ -178,6 +180,43 @@ Practical notes:
 
 Popups over sheets: the popup, being topmost, owns the keyboard — the sheet stays put.
 
+## Binding to the keyboard state
+
+Whatever the mode, content often needs to *react* to the keyboard beyond geometry — hide a promo
+banner while typing, size a spacer to the keyboard, show a "done" bar. `Scaffold.KeyboardState`
+is one observable object per scaffold, fed by the same platform geometry the modes use (per
+animation frame), with:
+
+| Property | Meaning |
+|---|---|
+| `IsVisible` | `Height > 0` — the keyboard overlaps the window (on iOS the hardware-keyboard accessory bar counts). |
+| `Height` | The overlap with the window's bottom edge in dp: 0 hidden, running while animating, resting height when shown (iOS: accessory bar included). |
+
+Bind from anywhere inside the scaffold's tree with the `{nalu:KeyboardBinding}` markup extension
+(path, `Converter`, `ConverterParameter`, `StringFormat`, `Mode`) or `KeyboardBindings` in code:
+
+```xml
+<!-- collapse while typing -->
+<Border IsVisible="{nalu:KeyboardBinding IsVisible, Converter={StaticResource InvertedBool}}" .../>
+
+<!-- a spacer that grows with the keyboard (e.g. under a Pan surface) -->
+<BoxView HeightRequest="{nalu:KeyboardBinding Height}" />
+
+<!-- show a hint only while the keyboard is up -->
+<Label Text="Tap outside to dismiss" IsVisible="{nalu:KeyboardBinding IsVisible}" />
+```
+
+```csharp
+banner.SetBinding(VisualElement.IsVisibleProperty, KeyboardBindings.Create("IsVisible", converter: new InvertedBoolConverter()));
+
+// typed / compiled (trimming/AOT-safe):
+spacer.SetBinding(VisualElement.HeightRequestProperty, static (Scaffold s) => s.KeyboardState.Height, source: KeyboardBindings.ScaffoldAncestor);
+```
+
+The state is global to the scaffold (not per surface): it says whether the keyboard is up, not who
+owns it. Under `Resize` the owner surface is already padded, so use the state for *content*
+decisions (visibility, alternate layouts), not to add more padding.
+
 ## Choosing a mode
 
 - **Forms, dialogs with a couple of fields, chat composers** → `Resize` (default). Everything the
@@ -190,7 +229,7 @@ Popups over sheets: the popup, being topmost, owns the keyboard — the sheet st
 ## Testing & troubleshooting
 
 - The TestApp harness page **"Scaffold Keyboard Overlay Tests"** exercises every combination
-  (page Resize/Pan/None, sheets, tall sheets, centered/anchored/pan popups) and the
+  (page Resize/Pan/None, sheets, tall sheets, centered/anchored/pan popups, `KeyboardBinding` probes) and the
   `ScaffoldKeyboardOverlayChromeTests` suite asserts the geometry against a platform probe of the
   keyboard's real overlap (`SoftKeyboardProbe.CreateHeightLabel`). **"Scaffold Keyboard Content
   Tests"** + `ScaffoldKeyboardContentTests` cover entries and growing multi-line editors inside a

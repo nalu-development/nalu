@@ -80,7 +80,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // inside UIKit's keyboard animation, and a sheet stepping out of the keyboard's way should
         // travel with it. Only the sheet and popup slots depend on the keyboard, so this is not the
         // full RelayoutOverlays (which also dismisses the tab bar panel).
-        controller.KeyboardOverlapChanged ??= () => RelayoutKeyboardAwareOverlays(controller, controller.ContentContainer);
+        controller.KeyboardOverlapChanged ??= () =>
+        {
+            scaffold.KeyboardState.Update(controller.KeyboardOverlap);
+            RelayoutKeyboardAwareOverlays(controller, controller.ContentContainer);
+        };
         controller.OverlayOwnsKeyboard ??= () => KeyboardOwner is not null;
 
         // A navigation arriving while a finger is still scrubbing (programmatic push, tab
