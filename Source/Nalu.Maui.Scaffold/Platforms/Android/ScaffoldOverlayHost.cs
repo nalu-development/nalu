@@ -43,8 +43,14 @@ internal static class ScaffoldOverlayImeIsolation
 
 /// <summary>
 /// Android host of a popup's platform view: a match-parent slot the presenter positions with
-/// layout params, and the IME isolation boundary of the popup subtree
-/// (<see cref="ScaffoldOverlayImeIsolation"/>).
+/// layout params, and the INSET boundary of the popup subtree: nothing reaches the content —
+/// neither the IME (<see cref="ScaffoldOverlayImeIsolation"/>) nor the system bars / cutout.
+/// The presenter places the popup INSIDE the safe area already, so any self-padding by MAUI's
+/// net10 inset listener would double it — and that listener evaluates a layout against its
+/// window position at dispatch time, i.e. possibly before the popup is where it will end up
+/// (a root layout that "sees" itself at the window's top edge pads by the status bar and keeps
+/// it until the next dispatch: content pushed down, bottom cut off — a race that used to show
+/// randomly on presentation).
 /// </summary>
 internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context), IScaffoldOverlayPanelHost
 {
@@ -53,7 +59,7 @@ internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context),
 
     /// <inheritdoc />
     public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
-        => base.DispatchApplyWindowInsets(ScaffoldOverlayImeIsolation.StripIme(this, insets));
+        => base.DispatchApplyWindowInsets(insets is null ? null : WindowInsetsCompat.Consumed?.ToWindowInsets() ?? insets);
 
     /// <summary>
     /// A descendant's <c>requestLayout()</c> bubbles here natively (an image that finished
