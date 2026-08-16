@@ -1129,6 +1129,43 @@ public sealed class NaluApp : IAsyncLifetime
         await RunAdbAsync("shell", script).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Starts a predictive-back edge scrub and HOLDS it mid-way (DOWN + stepped MOVEs, no UP), so
+    /// the caller can observe the peek state; finish with <see cref="PredictiveBackReleaseAsync"/>.
+    /// </summary>
+    public async Task PredictiveBackHoldAsync()
+    {
+        var (width, height) = await GetAndroidScreenSizeAsync().ConfigureAwait(false);
+        var y = height / 2;
+        var stops = new[] { 0.04, 0.1, 0.18, 0.28, 0.38 };
+
+        var script = $"input motionevent DOWN 5 {y}; "
+                     + string.Join("; ", stops.Select(s => $"input motionevent MOVE {(int) (width * s)} {y}"));
+
+        await RunAdbAsync("shell", script).ConfigureAwait(false);
+    }
+
+    /// <summary>Releases a held predictive-back scrub: <paramref name="commit"/> lifts far out (back), otherwise it slides back to the edge and cancels.</summary>
+    public async Task PredictiveBackReleaseAsync(bool commit)
+    {
+        var (width, height) = await GetAndroidScreenSizeAsync().ConfigureAwait(false);
+        var y = height / 2;
+
+        var script = commit
+            ? $"input motionevent MOVE {(int) (width * 0.48)} {y}; input motionevent MOVE {(int) (width * 0.58)} {y}; input motionevent UP {(int) (width * 0.58)} {y}"
+            : $"input motionevent MOVE {(int) (width * 0.2)} {y}; input motionevent MOVE {(int) (width * 0.05)} {y}; input motionevent UP 5 {y}";
+
+        await RunAdbAsync("shell", script).ConfigureAwait(false);
+    }
+
+    private static async Task<(int Width, int Height)> GetAndroidScreenSizeAsync()
+    {
+        var size = await RunAdbAsync("shell", "wm", "size").ConfigureAwait(false);
+        var dimensions = size[(size.IndexOf(':') + 1)..].Trim().Split('x');
+
+        return (int.Parse(dimensions[0], CultureInfo.InvariantCulture), int.Parse(dimensions[1], CultureInfo.InvariantCulture));
+    }
+
     private static async Task<string> RunAdbAsync(params string[] arguments)
     {
         var startInfo = new ProcessStartInfo("adb")

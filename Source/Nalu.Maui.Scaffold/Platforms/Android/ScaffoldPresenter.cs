@@ -545,7 +545,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// </summary>
     public void StartBackPreview()
     {
+        // No preview over a stack in motion (a navigation still executing — e.g. an awaited
+        // OnAppearingAsync): the back press itself still routes to the engine on commit.
         if (_backPreviewActive
+            || scaffold.IsNavigationInFlight
             || HasOverlay
             || _pageLayer is not { } pageLayer
             || _container is not { } container

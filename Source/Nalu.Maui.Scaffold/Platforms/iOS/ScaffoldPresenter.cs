@@ -246,7 +246,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     private bool CanBeginInteractivePop()
     {
+        // Same rule as the Android predictive-back preview: no interactive scrub over a stack in motion.
         var canBegin = !_syncInFlight
+                       && !scaffold.IsNavigationInFlight
                        && !HasOverlay
                        && _interactivePop is null
                        && _popHandoff is null

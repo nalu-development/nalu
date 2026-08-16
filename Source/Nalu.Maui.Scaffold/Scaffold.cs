@@ -1338,8 +1338,35 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
         return navigationService.InitializeAsync(proxy, initialSegmentName, InitialIntent);
     }
 
+    /// <summary>
+    /// Whether a navigation is being executed by the engine right now — from its request through
+    /// guards, page swap, transition and the awaited lifecycle callbacks (an <c>OnAppearingAsync</c>
+    /// that takes seconds keeps it in flight). Navigations are serialized, so this is a plain flag.
+    /// The back PREVIEWS (Android predictive back, iOS interactive pop) do not start while set:
+    /// peeking the page below a page that is still arriving would scrub a stack in motion; the back
+    /// request itself still reaches the engine, which serializes or ignores it as usual.
+    /// </summary>
+    internal bool IsNavigationInFlight { get; private set; }
+
     internal void SendNavigationLifecycleEvent(NavigationLifecycleEventArgs args)
-        => NavigationEvent?.Invoke(this, args);
+    {
+        switch (args.EventType)
+        {
+            case NavigationLifecycleEventType.NavigationRequested:
+                IsNavigationInFlight = true;
+
+                break;
+
+            case NavigationLifecycleEventType.NavigationCompleted:
+            case NavigationLifecycleEventType.NavigationCanceled:
+            case NavigationLifecycleEventType.NavigationFailed:
+                IsNavigationInFlight = false;
+
+                break;
+        }
+
+        NavigationEvent?.Invoke(this, args);
+    }
 
     /// <inheritdoc />
     public void Dispose()
