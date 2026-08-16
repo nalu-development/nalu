@@ -38,6 +38,39 @@ public class ScaffoldPopupChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLife
         await App.WaitForTextAsync("CenterPopupState", "center:closed");
     }
 
+    /// <summary>
+    /// Regression: on Android the popup content used to be displaced by a system-bar padding at
+    /// presentation (MAUI's inset listener evaluating the subtree before it was laid out at its
+    /// place) — randomly, depending on frame timing. Repeated presentations must place the
+    /// content identically, every child inside the surface, nothing pushed down or cut off.
+    /// </summary>
+    [Fact]
+    public async Task RepeatedPresentationsPlaceTheContentIdentically()
+    {
+        await WaitDisplayedAsync("PopupHomePage");
+        double? firstOffset = null;
+
+        for (var i = 0; i < 8; i++)
+        {
+            await App.TapAsync("ShowCenterPopupButton");
+            await App.WaitForTextAsync("CenterPopupState", "center:open");
+            var content = await App.WaitForStableBoundsAsync("CenterPopupContent");
+            var close = await App.GetBoundsAsync("CloseCenterPopupButton");
+            var navigate = await App.GetBoundsAsync("NavigateFromPopupButton");
+
+            // The first control sits right under the title, the last one inside the surface.
+            var offset = close.Y - content.Y;
+            offset.Should().BeLessThan(80, $"presentation #{i}: no system-bar padding pushed the content down");
+            navigate.Bottom.Should().BeLessThanOrEqualTo(content.Bottom + 1, $"presentation #{i}: the last control is not cut off");
+
+            firstOffset ??= offset;
+            offset.Should().BeApproximately(firstOffset.Value, 2, $"presentation #{i}: same placement as the first");
+
+            await App.TapAsync("CloseCenterPopupButton");
+            await App.WaitForTextAsync("CenterPopupState", "center:closed");
+        }
+    }
+
     [Fact]
     public async Task ScrimTapClosesPopup()
     {

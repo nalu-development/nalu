@@ -1898,13 +1898,17 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             OnKeyboardOwnerChanged(platformView, context);
         }
 
-        // MAUI's net10 safe-area pass evaluates each layout at its FIRST traversal with an
-        // off-screen heuristic: a view laid out while translated off the screen receives FULL
-        // system-bar padding ("it will settle at origin"), permanently displacing overlay
-        // content. Let the subtree settle a traversal at its REAL position — hidden — before
-        // the entrance translation applies.
+        // MAUI's net10 inset listener evaluates a layout against its WINDOW POSITION at dispatch
+        // time — and the attach-time dispatch runs before the panel is laid out where the
+        // presenter put it (a subtree that "sees" itself at the window's origin pads by the
+        // system bars and keeps it until the next dispatch: content displaced, bottom cut off).
+        // Deterministic settle, in the platform's frame pipeline (no timers): hidden, wait for
+        // the first layout at the REAL position, force an insets re-dispatch against that
+        // geometry, wait for the pass that applies it — then reveal and animate in.
         panel.Alpha = 0;
-        await Task.Delay(32);
+        await ScaffoldViewFrames.NextLayoutAsync(panel);
+        ViewCompat.RequestApplyInsets(panel);
+        await ScaffoldViewFrames.NextLayoutAsync(panel);
         panel.Alpha = 1;
 
         ScaffoldOverlayAnimations.PrepareEnter(request, flyoutOffscreen);
