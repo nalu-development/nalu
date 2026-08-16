@@ -19,13 +19,15 @@ namespace Nalu;
 /// that from the host would encode an interpretation that breaks the moment MAUI changes it.
 /// </para>
 /// <para>
-/// What the host DOES have to guarantee is that the answer is current: MAUI folds the consumed
-/// inset into the size in <c>CrossPlatformMeasure</c>, but only arms that fold while laying out
-/// (<c>ValidateSafeArea</c> runs in <c>LayoutSubviews</c>; <c>SizeThatFits</c> replies from cache),
-/// and it propagates the resulting invalidation to the host only when the bar's superview is a
-/// cross-platform layout backing — which a native strip is not. Without settling the layout first,
-/// a bar that consumes the inset on its ROOT keeps the height it reported before placement, when
-/// no inset had reached it yet, and nothing ever asks again.
+/// What the host DOES have to guarantee is that the answer is current. MAUI folds the consumed
+/// inset into the size in <c>CrossPlatformMeasure</c>, but only detects an inset change while the
+/// bar lays out (<c>ValidateSafeArea</c> runs in <c>LayoutSubviews</c>) — and it then asks the
+/// PARENT to re-measure (<c>InvalidateAncestorsMeasures</c>) only when that parent is a
+/// cross-platform layout backing. The strips therefore declare themselves as such
+/// (<see cref="ICrossPlatformLayoutBacking"/>) and receive the invalidation through
+/// <see cref="IPlatformMeasureInvalidationController"/>: mark dirty, request layout, and the
+/// controller re-measures the strip in ITS layout pass. Pure platform layout discipline — no
+/// inline <c>LayoutIfNeeded</c> drains, no deferred settle.
 /// </para>
 /// </remarks>
 internal static class ScaffoldChromeBar
@@ -42,138 +44,131 @@ internal static class ScaffoldChromeBar
     /// </summary>
     internal static nfloat FootprintAboveInset(nfloat measured, nfloat systemInset)
         => (nfloat)Math.Max(0, measured - systemInset);
-
-    /// <summary>
-    /// Lays the bar out at the frame it has just been given, so its safe-area state is current,
-    /// and drops the cached measure taken before the insets reached it.
-    /// </summary>
-    /// <remarks>
-    /// MAUI folds the consumed system inset into the bar's size in <c>CrossPlatformMeasure</c>, but
-    /// arms that fold only while the bar lays out (<c>ValidateSafeArea</c> runs in
-    /// <c>LayoutSubviews</c>; <c>SizeThatFits</c> replies from cache), and it reports the resulting
-    /// change to the host only when the bar's superview is a cross-platform layout backing — which
-    /// a native strip is not. Running the bar's layout here, AFTER its final frame is assigned, is
-    /// what makes the following measure meaningful.
-    /// </remarks>
-    internal static void SettleBarAtCurrentFrame(UIView bar)
-    {
-        bar.SetNeedsLayout();
-        bar.LayoutIfNeeded();
-
-        if (bar is MauiView { View: { } crossPlatformView })
-        {
-            crossPlatformView.InvalidateMeasure();
-        }
-        else
-        {
-            (bar as IPlatformMeasureInvalidationController)?.InvalidateMeasure();
-        }
-    }
 }
 
 /// <summary>
-/// Coalesces and DEFERS the strips' settle-then-remeasure cycle out of the layout pass that
-/// requested it.
+/// Base of the chrome strips hosting a MAUI bar view: a native superview that behaves, for MAUI's
+/// layout machinery, like a cross-platform layout backing — the bar's measure invalidations
+/// (its own or propagated from its subtree, including the safe-area re-fold MAUI performs in the
+/// bar's <c>LayoutSubviews</c>) terminate here (<see cref="IPlatformMeasureInvalidationController"/>),
+/// only marking the strip dirty and requesting a layout; the controller re-measures the strip
+/// (<see cref="Measure"/>) in its own layout pass. The bar FILLS the strip.
 /// </summary>
-/// <remarks>
-/// The settle (<see cref="ScaffoldChromeBar.SettleBarAtCurrentFrame"/>) drains the whole MAUI bar
-/// subtree through <c>LayoutIfNeeded</c>, and that call does not return until the subtree is
-/// CLEAN. Run inline from the strip's own <c>LayoutSubviews</c> — nested inside the window
-/// rotation's layout drain — the bar's safe-area validation keeps re-invalidating against
-/// geometry that is still mid-transition, the subtree never comes clean, and the single nested
-/// drain wedges the main thread outright (observed: the app frozen with ONE strip layout pass on
-/// the stack, grinding the bar's measure forever).
-/// <para>
-/// Deferring to the next runloop turn dissolves that by construction: by the time the settle
-/// runs, the transition's geometry is final and the drain is not nested inside anyone else's.
-/// The one-turn-stale window is invisible — the settle exists to re-fold the safe-area inset
-/// into the bar's measure, and the host re-measures right after it lands. Requests are
-/// coalesced (many invalidations during a rotation, one settle), skipped when the geometry
-/// they would run for is the one already settled, and the invalidation echo raised BY the
-/// settle itself does not re-arm it.
-/// </para>
-/// </remarks>
-internal sealed class ScaffoldBarSettleGuard(UIView strip, UIView bar, Action onSettled)
+internal abstract class ScaffoldChromeStrip : UIView, IPlatformMeasureInvalidationController, ICrossPlatformLayoutBacking
 {
-    private bool _needed;
-    private bool _settling;
-    private bool _scheduled;
-    private bool _hasSettled;
-    private CGRect _settledFrame;
-    private UIEdgeInsets _settledInsets;
+    private bool _invalidateOnWindow;
 
-    /// <summary>
-    /// Records that the bar's measure no longer describes it. Invalidations raised BY a settle are
-    /// ignored: they are its own echo, not a new reason to run another one.
-    /// </summary>
-    internal void Invalidate()
+    public UIView Bar { get; }
+
+    internal bool NeedsMeasure { get; private set; } = true;
+
+    /// <summary>The bar's height, INCLUDING any safe-area padding it chose to consume.</summary>
+    internal nfloat BarHeight { get; private set; }
+
+    protected ScaffoldChromeStrip(UIView bar)
     {
-        if (!_settling)
-        {
-            _needed = true;
-        }
+        Bar = bar;
+        BackgroundColor = UIColor.Clear;
+        CrossPlatformLayout = new BarLayout(this);
+        bar.Superview?.WillRemoveSubview(bar);
+        bar.RemoveFromSuperview();
+        AddSubview(bar);
     }
 
     /// <summary>
-    /// Called from the strip's layout pass: schedules the deferred settle when one is due.
-    /// Never settles inline — see the class remarks.
+    /// What makes MAUI treat this native strip as the bar's layout parent (<c>IsFinalMeasureHandledBySuperView</c>):
+    /// the bar then reports its safe-area re-fold upward instead of silently re-measuring itself.
+    /// The strip measures/arranges the bar in the controller's pass; this object is that contract in MAUI terms.
     /// </summary>
-    internal void SettleSoonIfNeeded()
+    public ICrossPlatformLayout? CrossPlatformLayout { get; set; }
+
+    private sealed class BarLayout(ScaffoldChromeStrip strip) : ICrossPlatformLayout
     {
-        if (!_needed || _scheduled)
+        public Size CrossPlatformMeasure(double widthConstraint, double heightConstraint)
+            => strip.Bar.SizeThatFits(new CGSize(widthConstraint, heightConstraint)).ToSize();
+
+        public Size CrossPlatformArrange(Rect bounds)
         {
-            return;
+            strip.Bar.Frame = bounds.ToCGRect();
+
+            return bounds.Size;
         }
-
-        if (_hasSettled && bar.Frame == _settledFrame && SameInsets(strip.SafeAreaInsets, _settledInsets))
-        {
-            // Same geometry as the last settle: re-running it would produce the same answer.
-            _needed = false;
-
-            return;
-        }
-
-        _scheduled = true;
-        DispatchQueue.MainQueue.DispatchAsync(SettleNow);
     }
 
-    private void SettleNow()
+    /// <summary>Measures the bar for the given width (called by the controller in its layout pass).</summary>
+    internal void Measure(nfloat width)
     {
-        _scheduled = false;
-
-        // The request may have been satisfied or invalidated meanwhile; a detached strip has
-        // nothing to settle against (it re-arms on remount via SafeAreaInsetsDidChange).
-        if (!_needed || strip.Window is null)
-        {
-            return;
-        }
-
-        _needed = false;
-        _settling = true;
-
-        try
-        {
-            // Unanimated: the settle arranges the bar subtree, and this turn may still be inside
-            // an animation block someone else opened.
-            UIView.PerformWithoutAnimation(() => ScaffoldChromeBar.SettleBarAtCurrentFrame(bar));
-        }
-        finally
-        {
-            _settling = false;
-        }
-
-        _hasSettled = true;
-        _settledFrame = bar.Frame;
-        _settledInsets = strip.SafeAreaInsets;
-
-        onSettled();
+        BarHeight = ScaffoldChromeBar.MeasureHeight(Bar, width);
+        NeedsMeasure = false;
     }
 
-    private static bool SameInsets(UIEdgeInsets left, UIEdgeInsets right)
-        => left.Top == right.Top
-           && left.Bottom == right.Bottom
-           && left.Left == right.Left
-           && left.Right == right.Right;
+    /// <summary>
+    /// The hosted bar's CONTENT changed (a virtual bar swap keeps this strip's platform view, so no
+    /// platform invalidation is raised): mark dirty and request the pass.
+    /// </summary>
+    internal void InvalidateBarMeasure() => MarkMeasureDirty();
+
+    private void MarkMeasureDirty()
+    {
+        NeedsMeasure = true;
+        SetNeedsLayout();
+        Superview?.SetNeedsLayout();
+    }
+
+    /// <returns><c>false</c>: propagation stops here — the strip owns what happens above it.</returns>
+    bool IPlatformMeasureInvalidationController.InvalidateMeasure(bool isPropagating)
+    {
+        MarkMeasureDirty();
+
+        return false;
+    }
+
+    void IPlatformMeasureInvalidationController.InvalidateAncestorsMeasuresWhenMovedToWindow()
+        => _invalidateOnWindow = true;
+
+    public override void MovedToWindow()
+    {
+        base.MovedToWindow();
+
+        if (_invalidateOnWindow && Window is not null)
+        {
+            _invalidateOnWindow = false;
+            ((IPlatformMeasureInvalidationController)this).InvalidateMeasure(isPropagating: true);
+        }
+    }
+
+    public override void SafeAreaInsetsDidChange()
+    {
+        base.SafeAreaInsetsDidChange();
+
+        // The bar's cached measure predates these insets: the bar re-folds them in its own layout
+        // and reports back through InvalidateMeasure; marking here covers strips whose bar consumes nothing.
+        MarkMeasureDirty();
+    }
+
+    // The ENTIRE pass is unanimated — see ScaffoldViewController.PerformChromeLayout: this can
+    // run inside the window rotation animation block, where every frame write would otherwise
+    // stack an additive animation per pass.
+    public override void LayoutSubviews()
+        => ScaffoldViewController.PerformChromeLayout(LayoutSubviewsCore);
+
+    private void LayoutSubviewsCore()
+    {
+        base.LayoutSubviews();
+
+        // The bar FILLS the strip, system-inset region included: custom bars can paint under the
+        // system bar (their SafeAreaEdges decides any inner padding). Its safe-area state validates
+        // in ITS layout, which follows this one; a changed fold comes back through InvalidateMeasure.
+        Bar.Frame = Bounds;
+    }
+
+    public override UIView? HitTest(CGPoint point, UIEvent? uievent)
+    {
+        var view = base.HitTest(point, uievent);
+
+        // Only the bar's actual content consumes touches; the strip itself is transparent glass.
+        return ReferenceEquals(view, this) ? null : view;
+    }
 }
 
 /// <summary>
@@ -995,222 +990,18 @@ internal sealed class ScaffoldViewController : UIViewController
 }
 
 /// <summary>
-/// Bottom chrome strip hosting the MAUI tab bar platform view: measures it (cached until
-/// invalidated — the NaluTabBarContainerView pattern) and lets the bar FILL the strip flush to
-/// the screen's bottom edge. The BAR owns the bottom system inset (SafeAreaEdges semantics,
-/// symmetric with the nav strip): a consuming bar measures inset-included, an edge-to-edge bar
-/// measures content-only. Touches pass through everywhere the bar itself is not hit (the
-/// floating pill's side margins must not swallow page taps).
+/// Bottom chrome strip hosting the MAUI tab bar platform view: the bar FILLS the strip flush to
+/// the screen's bottom edge and owns the bottom system inset (SafeAreaEdges semantics — the
+/// default template's Auto-row root keeps its pill above the inset).
 /// </summary>
-internal sealed class ScaffoldTabBarStrip : UIView
-{
-    public UIView Bar { get; }
-
-    internal bool NeedsMeasure { get; private set; } = true;
-
-    private readonly ScaffoldBarSettleGuard _settle;
-
-    internal nfloat BarHeight { get; private set; }
-
-    public ScaffoldTabBarStrip(UIView bar)
-    {
-        Bar = bar;
-        _settle = new ScaffoldBarSettleGuard(this, bar, OnBarSettled);
-        BackgroundColor = UIColor.Clear;
-        bar.Superview?.WillRemoveSubview(bar);
-        bar.RemoveFromSuperview();
-        AddSubview(bar);
-    }
-
-    /// <summary>
-    /// The deferred settle landed: re-measure a bar whose answer has become current, and dirty
-    /// the host only if that CHANGED it — a settle that leaves the height where it was gives the
-    /// host nothing to do, and a bar that consumes nothing (SafeAreaEdges.None) answers the same
-    /// every time, so it costs one settle and stops.
-    /// </summary>
-    private void OnBarSettled()
-    {
-        var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
-
-        if (settled != BarHeight)
-        {
-            BarHeight = settled;
-            NeedsMeasure = true;
-            SetNeedsLayout();
-        }
-    }
-
-    internal void Measure(nfloat width)
-    {
-        BarHeight = ScaffoldChromeBar.MeasureHeight(Bar, width);
-        NeedsMeasure = false;
-    }
-
-    public override void SetNeedsLayout()
-    {
-        base.SetNeedsLayout();
-        NeedsMeasure = true;
-        Superview?.SetNeedsLayout();
-    }
-
-    public override void SafeAreaInsetsDidChange()
-    {
-        base.SafeAreaInsetsDidChange();
-        NeedsMeasure = true;
-
-        // The bar's cached measure predates these insets. It can only re-fold them once it lays
-        // out at its final frame, which happens in OUR layout pass — flag it for there.
-        _settle.Invalidate();
-    }
-
-    // The ENTIRE pass is unanimated — see ScaffoldViewController.PerformChromeLayout: this can
-    // run inside the window rotation animation block, and the settle below re-arranges the
-    // whole MAUI bar subtree, whose every frame write would otherwise stack an additive
-    // animation per pass until walking them consumes the main thread.
-    public override void LayoutSubviews()
-        => ScaffoldViewController.PerformChromeLayout(LayoutSubviewsCore);
-
-    private void LayoutSubviewsCore()
-    {
-        base.LayoutSubviews();
-
-        // The bar FILLS the strip, system-inset region included: custom bars can paint under
-        // the home indicator (their SafeAreaEdges decides any inner padding), while the
-        // default template's Auto-row root keeps its pill above the inset (Auto rows
-        // top-align at their measured height).
-        Bar.Frame = Bounds;
-
-        // The bar now has its final frame; a DEFERRED settle re-folds its safe area into the
-        // measure once this pass's geometry is final (never inline — see ScaffoldBarSettleGuard).
-        _settle.SettleSoonIfNeeded();
-    }
-
-    public override UIView? HitTest(CGPoint point, UIEvent? uievent)
-    {
-        var view = base.HitTest(point, uievent);
-
-        // Only the bar's actual content consumes touches; the strip itself is transparent glass.
-        return ReferenceEquals(view, this) ? null : view;
-    }
-}
+internal sealed class ScaffoldTabBarStrip(UIView bar) : ScaffoldChromeStrip(bar);
 
 /// <summary>
-/// Top chrome strip hosting the MAUI nav bar platform view. Unlike the tab bar strip, the bar
-/// view FILLS the strip (its background extends under the status bar) and consumes the
-/// safe-area padding itself (SafeAreaEdges). Measurement is NORMALIZED to the content height:
-/// once positioned at the top the bar's measure includes the status padding it consumed, so it
-/// is subtracted back (the NaluShellItemRenderer net10 pattern) — the controller adds the
-/// system inset deterministically.
+/// Top chrome strip hosting the MAUI nav bar platform view: the bar FILLS the strip (its
+/// background extends under the status bar) and consumes the safe-area padding itself
+/// (SafeAreaEdges). Measurement is NORMALIZED to the content height by the controller: once
+/// positioned at the top the bar's measure includes the status padding it consumed, so it is
+/// subtracted back (the NaluShellItemRenderer net10 pattern) — the controller adds the system
+/// inset deterministically.
 /// </summary>
-internal sealed class ScaffoldNavBarStrip : UIView, IPlatformMeasureInvalidationController
-{
-    public UIView Bar { get; }
-
-    internal bool NeedsMeasure { get; private set; } = true;
-
-    private readonly ScaffoldBarSettleGuard _settle;
-
-    /// <summary>The bar's height, INCLUDING any safe-area padding it chose to consume.</summary>
-    internal nfloat BarHeight { get; private set; }
-
-    public ScaffoldNavBarStrip(UIView bar)
-    {
-        Bar = bar;
-        _settle = new ScaffoldBarSettleGuard(this, bar, OnBarSettled);
-        BackgroundColor = UIColor.Clear;
-        bar.Superview?.WillRemoveSubview(bar);
-        bar.RemoveFromSuperview();
-        AddSubview(bar);
-    }
-
-    internal void Measure(nfloat width)
-    {
-        BarHeight = ScaffoldChromeBar.MeasureHeight(Bar, width);
-        NeedsMeasure = false;
-    }
-
-    /// <summary>
-    /// The hosted bar's CONTENT changed — a virtual bar swap, which keeps this strip's platform
-    /// view and so raises no inset callback. The measure still describes the previous bar, and the
-    /// incoming one has not laid out yet, so it goes through the same settle-then-measure path.
-    /// </summary>
-    internal void InvalidateBarMeasure()
-    {
-        _settle.Invalidate();
-        NeedsMeasure = true;
-        SetNeedsLayout();
-        Superview?.SetNeedsLayout();
-    }
-
-    private bool _invalidateOnWindow;
-
-    /// <summary>Same typed invalidation channel as the tab bar strip; see there.</summary>
-    /// <returns><c>false</c>: propagation stops here — the strip owns what happens above it.</returns>
-    bool IPlatformMeasureInvalidationController.InvalidateMeasure(bool isPropagating)
-    {
-        NeedsMeasure = true;
-        SetNeedsLayout();
-        Superview?.SetNeedsLayout();
-
-        return false;
-    }
-
-    void IPlatformMeasureInvalidationController.InvalidateAncestorsMeasuresWhenMovedToWindow()
-        => _invalidateOnWindow = true;
-
-    public override void MovedToWindow()
-    {
-        base.MovedToWindow();
-
-        if (_invalidateOnWindow && Window is not null)
-        {
-            _invalidateOnWindow = false;
-            ((IPlatformMeasureInvalidationController)this).InvalidateMeasure(isPropagating: true);
-        }
-    }
-
-    public override void SafeAreaInsetsDidChange()
-    {
-        base.SafeAreaInsetsDidChange();
-        NeedsMeasure = true;
-
-        // The bar's cached measure predates these insets. It can only re-fold them once it lays
-        // out at its final frame, which happens in OUR layout pass — flag it for there.
-        _settle.Invalidate();
-    }
-
-    // Unanimated as a whole — same hazard as the tab bar strip; see its LayoutSubviews.
-    public override void LayoutSubviews()
-        => ScaffoldViewController.PerformChromeLayout(LayoutSubviewsCore);
-
-    private void LayoutSubviewsCore()
-    {
-        base.LayoutSubviews();
-        Bar.Frame = Bounds;
-
-        // Same deferred settle contract as the tab bar strip; see ScaffoldBarSettleGuard.
-        _settle.SettleSoonIfNeeded();
-    }
-
-    /// <summary>Same post-settle re-measure contract as the tab bar strip.</summary>
-    private void OnBarSettled()
-    {
-        var settled = ScaffoldChromeBar.MeasureHeight(Bar, Bounds.Width);
-
-        if (settled != BarHeight)
-        {
-            BarHeight = settled;
-            NeedsMeasure = true;
-            SetNeedsLayout();
-            Superview?.SetNeedsLayout();
-        }
-    }
-
-    public override UIView? HitTest(CGPoint point, UIEvent? uievent)
-    {
-        var view = base.HitTest(point, uievent);
-
-        // Only the bar's actual content consumes touches; the strip itself is transparent glass.
-        return ReferenceEquals(view, this) ? null : view;
-    }
-}
+internal sealed class ScaffoldNavBarStrip(UIView bar) : ScaffoldChromeStrip(bar);
