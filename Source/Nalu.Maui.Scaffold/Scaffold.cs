@@ -1127,6 +1127,13 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
     /// </summary>
     public ScaffoldNavBarContext NavBarContext => field ??= new ScaffoldNavBarContext(this);
 
+    /// <summary>
+    /// Gets the observable soft-keyboard state (<see cref="ScaffoldKeyboardState.IsVisible"/>,
+    /// <see cref="ScaffoldKeyboardState.Height"/>) fed by the platform keyboard geometry — bind
+    /// through <see cref="KeyboardBindingExtension"/> / <see cref="KeyboardBindings"/>.
+    /// </summary>
+    public ScaffoldKeyboardState KeyboardState => field ??= new ScaffoldKeyboardState();
+
     /// <summary>The system status/navigation bar icon-style owner (see <see cref="SystemBarStyleProperty"/>).</summary>
     internal ScaffoldSystemBars SystemBars => field ??= new ScaffoldSystemBars(this);
 

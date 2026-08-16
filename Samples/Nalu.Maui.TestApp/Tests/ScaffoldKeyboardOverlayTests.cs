@@ -95,9 +95,20 @@ public class KeyboardOverlayHomePage : ContentPage
         pageModes.Add(hidePageKeyboardButton);
         pageModes.Add(pageModeLabel);
 
+        // Scaffold.KeyboardState through {nalu:KeyboardBinding}: a text probe of both properties, and
+        // a banner that HIDES while the keyboard is up (the classic "collapse this area in Resize
+        // mode" use case) — its visibility is bound, not code-driven.
+        var stateVisible = new Label { AutomationId = "KeyboardStateVisible", FontSize = 11 };
+        stateVisible.SetBinding(Label.TextProperty, KeyboardBindings.Create(nameof(ScaffoldKeyboardState.IsVisible), stringFormat: "visible:{0}"));
+        var stateHeight = new Label { AutomationId = "KeyboardStateHeight", FontSize = 11 };
+        stateHeight.SetBinding(Label.TextProperty, KeyboardBindings.Create(nameof(ScaffoldKeyboardState.Height), stringFormat: "height:{0:0}"));
+        var stateProbe = new HorizontalStackLayout { Spacing = 8, Children = { stateVisible, stateHeight } };
+        var banner = new Label { AutomationId = "KeyboardStateBanner", Text = "banner (hidden while the keyboard is up)", FontSize = 11, BackgroundColor = Colors.Khaki, Padding = 4 };
+        banner.SetBinding(VisualElement.IsVisibleProperty, KeyboardBindings.Create(nameof(ScaffoldKeyboardState.IsVisible), converter: new InvertedBoolConverter()));
+
         // The anchor sits at the BOTTOM of the page: with the keyboard up, "below the anchor" no
         // longer fits and the popup must flip above.
-        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 0, 16, 16), Spacing = 6, Children = { pageModes, anchorButton, pageEntry } };
+        var bottom = new VerticalStackLayout { Padding = new Thickness(16, 0, 16, 16), Spacing = 6, Children = { pageModes, stateProbe, banner, anchorButton, pageEntry } };
 
         var grid = new Grid
         {
@@ -299,4 +310,11 @@ public class KeyboardOverlayScaffold : Scaffold
     {
         Areas.Add(new ScaffoldRoot { Title = "KeyboardOverlays", PageType = typeof(KeyboardOverlayHomePage) });
     }
+}
+
+file sealed class InvertedBoolConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => value is not true;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => throw new NotSupportedException();
 }

@@ -1,6 +1,6 @@
 ---
 name: nalu-scaffold-keyboard
-description: Soft keyboard behavior under Nalu.Maui.Scaffold — Scaffold.KeyboardMode (Resize/Pan/None) for pages, sheets and popups, keyboard ownership, MAUI SafeAreaEdges interplay, NALU0104. Load when an input, form or keyboard layout misbehaves.
+description: Soft keyboard under Nalu.Maui.Scaffold — Scaffold.KeyboardMode (Resize/Pan/None) for pages, sheets and popups, keyboard ownership, {nalu:KeyboardBinding} to KeyboardState (IsVisible/Height), MAUI SafeAreaEdges interplay, NALU0104. Load for any input/keyboard layout work.
 ---
 # Nalu Scaffold — Soft Keyboard
 
@@ -20,6 +20,8 @@ Presenting sheets/popups themselves → see skill `nalu-scaffold-overlays`.
 | Resolution — page | page value → `Scaffold` value → `Resize` |
 | Resolution — sheet/popup | call-site option → attached value on content → `Resize` |
 | Owner | topmost presented sheet or popup; otherwise the current page. Others keep resting geometry. Ownership hands over when an overlay opens/closes with the keyboard up |
+| `Scaffold.KeyboardState` (`ScaffoldKeyboardState`: `IsVisible`, `Height` dp) | One observable per scaffold, fed by the platform geometry per animation frame; global (says whether the keyboard is up, not who owns it) |
+| `{nalu:KeyboardBinding Path, Converter, ConverterParameter, StringFormat, Mode}` / `KeyboardBindings.Create(...)` / `KeyboardBindings.ScaffoldAncestor` | Bind to the state from any element inside the scaffold tree (pages, sheet/popup content, chrome) |
 | Platform floors | iOS 15+, Android API 30+, MAUI 10.0.90+ |
 | Analyzer `NALU0104` (error) | `UseNaluSoftKeyboardManager` (Nalu.Maui.Core) is not supported with the scaffold — remove it |
 
@@ -76,6 +78,17 @@ await overlays.ShowBottomSheetAsync<NoteSheetModel>(options: new ScaffoldBottomS
 });
 ```
 
+**React to the keyboard: collapse a banner, size a spacer**
+```xml
+<Border IsVisible="{nalu:KeyboardBinding IsVisible, Converter={StaticResource InvertedBool}}" ... />
+<BoxView HeightRequest="{nalu:KeyboardBinding Height}" />
+<Label Text="Tap outside to dismiss" IsVisible="{nalu:KeyboardBinding IsVisible}" />
+```
+```csharp
+banner.SetBinding(VisualElement.IsVisibleProperty, KeyboardBindings.Create("IsVisible", converter: new InvertedBoolConverter()));
+spacer.SetBinding(VisualElement.HeightRequestProperty, static (Scaffold s) => s.KeyboardState.Height, source: KeyboardBindings.ScaffoldAncestor); // typed, AOT-safe
+```
+
 **Chat-like page (default `Resize`, nothing to declare)**
 ```xml
 <Grid RowDefinitions="*,Auto">
@@ -108,6 +121,10 @@ await overlays.ShowBottomSheetAsync<NoteSheetModel>(options: new ScaffoldBottomS
   iOS 26: the keyboard frame includes MAUI's transparent input-accessory band — content is padded above it.
 - `HideSoftInputOnTapped` keeps working on scaffold pages; navigating away hides the keyboard before the
   page swap on both platforms.
+- `KeyboardState` is for CONTENT decisions (hide/show, alternate layouts, spacers under Pan/None): under
+  `Resize` the owner is already padded — do not add keyboard-height padding on top. `IsVisible` is
+  `Height > 0` (iOS hardware-keyboard accessory bar counts). Do not use `Nalu.Maui.Core`'s
+  `SoftKeyboardManager.State` in a scaffold app.
 - Do not call `UseNaluSoftKeyboardManager` (NALU0104): its hooks re-pad the page controller and rewrite
   the soft-input mode, fighting the scaffold. Do not set `WindowSoftInputModeAdjust` yourself either.
 - Choosing: forms/dialogs/chat composers → `Resize`; fixed surface whose top must not move (map + search,
