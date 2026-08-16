@@ -29,9 +29,9 @@ public class ScaffoldOverlayGrowthTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
         await App.TapAsync("ShowGrowingPopupButton");
         var initial = await App.WaitForStableBoundsAsync("GrowingPopupContent");
-        initial.Height.Should().BeLessThan(320, "the content starts with a 40dp spacer");
+        (await App.GetPropertyAsync("GrowingPopupState", "Text")).Should().Be("size:40", "the initial bounds must be captured before the deferred growth (1.5 s after load)");
 
-        // Deferred growth (700 ms after load): the popup follows without any app call.
+        // Deferred growth (1.5 s after load): the popup follows without any app call.
         await App.WaitForTextAsync("GrowingPopupState", "size:100");
         var deferred = await App.WaitForBoundsAsync("GrowingPopupContent", b => b.Height >= initial.Height + 55, TimeSpan.FromSeconds(5));
         deferred.Height.Should().BeApproximately(initial.Height + 60, 2, "the spacer grew from 40 to 100");
@@ -61,6 +61,7 @@ public class ScaffoldOverlayGrowthTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
         await App.TapAsync("ShowGrowingSheetButton");
         var initial = await App.WaitForStableBoundsAsync("ScaffoldBottomSheet");
+        (await App.GetPropertyAsync("GrowingSheetState", "Text")).Should().Be("size:40", "the initial bounds must be captured before the deferred growth (1.5 s after load)");
         initial.Bottom.Should().BeApproximately(windowHeight, 1);
 
         // Deferred growth: the Content detent re-resolves; the sheet stays bottom-anchored.

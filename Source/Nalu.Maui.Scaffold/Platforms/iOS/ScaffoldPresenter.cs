@@ -51,8 +51,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         public double FlyoutOffscreenTranslation { get; init; }
         public bool Closing { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public EventHandler? ContentMeasureInvalidated { get; set; }
         public bool ContentRelayoutPending { get; set; }
+        public EventHandler? ContentMeasureInvalidated { get; set; }
     }
 
     private readonly List<OverlayEntry> _overlays = [];
@@ -61,14 +61,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     /// <summary>
     /// Sheets and popups are placed from their content's NATURAL size, which can change after
-    /// presentation (a deferred image, an expanding section, a loaded list): the content's
-    /// measure invalidation (bubbling up from any descendant) schedules one re-placement on the
-    /// next dispatcher turn — the popup re-fits and re-centers/re-anchors, a Content-detent sheet
-    /// re-resolves its height. Coalesced; the arrange itself does not invalidate, so it converges.
+    /// presentation (a deferred image, an expanding section, a loaded list). Two signals feed one
+    /// coalesced re-placement on the next dispatcher turn (the popup re-fits and re-centers /
+    /// re-anchors, a Content-detent sheet re-resolves its height): the PLATFORM invalidation walk
+    /// terminated by the panel host (<see cref="ScaffoldOverlayPanelHost"/>), and the Controls-level
+    /// <see cref="VisualElement.MeasureInvalidated"/> of the root, which bubbles from any descendant
+    /// by default. Neither alone is sufficient: MAUI gates the native walk per view (silent until
+    /// that view is measured again — in the overlay layer nothing above re-measures it but us), and
+    /// the Controls propagation is an app-level opt-out (<c>SkipMeasureInvalidatedPropagation</c>).
+    /// The pass itself is ignored (it invalidates: the sheet toggles its content clamp around the
+    /// measure), so it converges.
     /// </summary>
-    private void ObserveContentMeasure(OverlayEntry entry, ScaffoldViewController controller, UIView container)
+    private void ObserveContentMeasure(OverlayEntry entry, ScaffoldOverlayPanelHost host, ScaffoldViewController controller, UIView container)
     {
-        entry.ContentMeasureInvalidated = (_, _) =>
+        void Schedule()
         {
             if (entry.Closing || entry.ContentRelayoutPending)
             {
@@ -79,8 +85,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             scaffold.Dispatcher.Dispatch(() =>
             {
-                // The flag stays up while re-placing: the pass itself invalidates (the sheet
-                // toggles its content clamp around the measure) and must not re-schedule.
                 try
                 {
                     if (entry.Closing || !_overlays.Contains(entry))
@@ -95,9 +99,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                     entry.ContentRelayoutPending = false;
                 }
             });
-        };
+        }
 
+        entry.ContentMeasureInvalidated = (_, _) => Schedule();
         entry.Request.Content.MeasureInvalidated += entry.ContentMeasureInvalidated;
+        host.ContentMeasureInvalidated = Schedule;
     }
 
     private void RelayoutEntry(OverlayEntry entry, ScaffoldViewController controller, UIView container)
@@ -1237,8 +1243,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             case ScaffoldOverlayKind.Popup:
             {
-                panel = request.Content.ToPlatform(mauiContext);
+                var popupPanel = request.Content.ToPlatform(mauiContext);
                 LayoutPopup(request, controller, container, controller.KeyboardOverlap);
+                panel = new ScaffoldOverlayPanelHost(popupPanel, container.Bounds);
                 container.AddSubview(panel);
 
                 break;
@@ -1247,13 +1254,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             case ScaffoldOverlayKind.BottomSheet:
             {
                 var sheet = (ScaffoldBottomSheetView)request.Content;
-                panel = request.Content.ToPlatform(mauiContext);
+                var sheetPanel = request.Content.ToPlatform(mauiContext);
                 LayoutBottomSheet(sheet, request.KeyboardMode, controller, container, initial: true, controller.KeyboardOverlap);
+                panel = new ScaffoldOverlayPanelHost(sheetPanel, container.Bounds);
                 container.AddSubview(panel);
 
                 // Native cooperative drag: the MAUI pan is skipped on iOS (it would beat the
                 // inner scroll view's pan) — see ScaffoldBottomSheetGesture.
-                ScaffoldBottomSheetGesture.Attach(sheet, panel);
+                ScaffoldBottomSheetGesture.Attach(sheet, sheetPanel);
 
                 break;
             }
@@ -1279,10 +1287,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // A new sheet/popup takes the keyboard over from the page (or the entry below it), and
         // follows its content's natural size from now on.
-        if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet)
+        if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet && panel is ScaffoldOverlayPanelHost host)
         {
             OnKeyboardOwnerChanged(controller);
-            ObserveContentMeasure(entry, controller, container);
+            ObserveContentMeasure(entry, host, controller, container);
         }
 
         ScaffoldOverlayAnimations.PrepareEnter(request, flyoutOffscreen);
@@ -1665,6 +1673,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         entry.Closing = true;
         var request = entry.Request;
+
+        if (entry.ContentPlatform is ScaffoldOverlayPanelHost host)
+        {
+            host.ContentMeasureInvalidated = null;
+        }
 
         if (entry.ContentMeasureInvalidated is { } measureHandler)
         {

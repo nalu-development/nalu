@@ -46,9 +46,33 @@ internal static class ScaffoldOverlayImeIsolation
 /// layout params, and the IME isolation boundary of the popup subtree
 /// (<see cref="ScaffoldOverlayImeIsolation"/>).
 /// </summary>
-internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context)
+internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context), IScaffoldOverlayPanelHost
 {
+    /// <inheritdoc />
+    public Action? ContentMeasureInvalidated { get; set; }
+
     /// <inheritdoc />
     public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
         => base.DispatchApplyWindowInsets(ScaffoldOverlayImeIsolation.StripIme(this, insets));
+
+    /// <summary>
+    /// A descendant's <c>requestLayout()</c> bubbles here natively (an image that finished
+    /// loading, an expanded section) — the presenter re-places the popup from its new natural size.
+    /// </summary>
+    public override void RequestLayout()
+    {
+        base.RequestLayout();
+        ContentMeasureInvalidated?.Invoke();
+    }
+}
+
+/// <summary>
+/// The Android hosts of popup and sheet panels: the presenter's hook onto the native
+/// <c>requestLayout()</c> bubbling from the hosted content (the Controls-level measure
+/// invalidation does not bubble; the platform one does).
+/// </summary>
+internal interface IScaffoldOverlayPanelHost
+{
+    /// <summary>Raised (synchronously, from <c>requestLayout()</c>) when the host or any descendant requested a layout.</summary>
+    Action? ContentMeasureInvalidated { get; set; }
 }
