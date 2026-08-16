@@ -88,6 +88,11 @@ internal static class ScaffoldOverlayAnimations
 {
     private const uint _duration = 250;
 
+    /// <summary>Popups are quick in and out (fade + subtle scale): a snappier 200 ms than the sliding kinds.</summary>
+    private const uint _popupDuration = 200;
+
+    private static uint DurationOf(ScaffoldOverlayKind kind) => kind == ScaffoldOverlayKind.Popup ? _popupDuration : _duration;
+
     /// <summary>Prepares the content's animated properties for entry (called after platform mounting, before <see cref="EnterAsync"/>).</summary>
     /// <param name="request">The entry.</param>
     /// <param name="flyoutOffscreenTranslation">The physical offscreen X translation of a flyout (±width).</param>
@@ -123,13 +128,13 @@ internal static class ScaffoldOverlayAnimations
     /// <summary>Animates the entry in (scrim fade + kind-specific content motion).</summary>
     public static Task EnterAsync(ScaffoldOverlayRequest request, View scrimView)
         => Task.WhenAll(
-            scrimView.FadeToAsync(1, _duration),
+            scrimView.FadeToAsync(1, DurationOf(request.Kind)),
             request.Kind switch
             {
                 ScaffoldOverlayKind.Flyout => request.Content.TranslateToAsync(0, 0, _duration, Easing.CubicOut),
                 ScaffoldOverlayKind.Popup => Task.WhenAll(
-                    request.Content.FadeToAsync(1, _duration),
-                    request.Content.ScaleToAsync(1, _duration, Easing.CubicOut)
+                    request.Content.FadeToAsync(1, _popupDuration),
+                    request.Content.ScaleToAsync(1, _popupDuration, Easing.CubicOut)
                 ),
                 ScaffoldOverlayKind.BottomSheet => ((ScaffoldBottomSheetView)request.Content).EnterAsync(),
                 _ => Task.WhenAll(
@@ -142,13 +147,13 @@ internal static class ScaffoldOverlayAnimations
     /// <summary>Animates the entry out (mirror of <see cref="EnterAsync"/>).</summary>
     public static Task ExitAsync(ScaffoldOverlayRequest request, View scrimView, double flyoutOffscreenTranslation)
         => Task.WhenAll(
-            scrimView.FadeToAsync(0, _duration),
+            scrimView.FadeToAsync(0, DurationOf(request.Kind)),
             request.Kind switch
             {
                 ScaffoldOverlayKind.Flyout => request.Content.TranslateToAsync(flyoutOffscreenTranslation, 0, _duration, Easing.CubicIn),
                 ScaffoldOverlayKind.Popup => Task.WhenAll(
-                    request.Content.FadeToAsync(0, _duration),
-                    request.Content.ScaleToAsync(0.97, _duration, Easing.CubicIn)
+                    request.Content.FadeToAsync(0, _popupDuration),
+                    request.Content.ScaleToAsync(0.97, _popupDuration, Easing.CubicIn)
                 ),
                 ScaffoldOverlayKind.BottomSheet => ((ScaffoldBottomSheetView)request.Content).ExitAsync(),
                 _ => Task.WhenAll(

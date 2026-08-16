@@ -232,6 +232,7 @@ public sealed class ScaffoldBottomSheetView : Border
     private readonly RoundRectangle _handle;
 
     private readonly View _contentView;
+    private readonly Grid _contentHost;
     private double[] _detentOffsets = [0];
     private double _sheetHeight;
     private Func<Task>? _dismissAsync;
@@ -322,7 +323,16 @@ public sealed class ScaffoldBottomSheetView : Border
             }
         };
         layout.Add(_handle, 0, 0);
-        layout.Add(content, 0, 1);
+
+        // The content row measures UNBOUNDED (Auto — required for Content-detent natural sizing),
+        // so scrollable content would inflate to its full content height and lose its scroll
+        // range: the row is clamped to the space the sheet actually gives it. The clamp lives on
+        // THIS host, never on the user's view (whose own MaximumHeightRequest stays theirs), and
+        // the natural height is measured on the content directly, bypassing it — so it never has
+        // to be lifted around a measure (a lift-and-restore would invalidate on every layout pass).
+        _contentHost = new Grid { SafeAreaEdges = SafeAreaEdges.None };
+        _contentHost.Add(content);
+        layout.Add(_contentHost, 0, 1);
         _contentView = content;
 
         Content = layout;
@@ -360,14 +370,23 @@ public sealed class ScaffoldBottomSheetView : Border
 
     /// <summary>Applies the bottom inset (system bar — or the soft keyboard's overlap, which replaces it) as content padding BEFORE the natural-height measure.</summary>
     internal void PrepareForMeasure(double bottomInset)
-    {
-        Padding = new Thickness(0, 0, 0, bottomInset);
+        => Padding = new Thickness(0, 0, 0, bottomInset);
 
-        // The natural height must be measured UNBOUNDED: the clamp InitializeGeometry puts on the
-        // content row (to the previous sheet height) would otherwise hide any growth of the
-        // content since the last pass — a re-measure after a deferred image, an expanded section.
-        _contentView.MaximumHeightRequest = double.PositiveInfinity;
+    /// <summary>
+    /// The sheet's natural height for the given width and available room: handle row + padding +
+    /// the CONTENT's desired height, measured on the content itself (not through the clamped
+    /// content row) so growth after presentation is seen — capped at the available height.
+    /// </summary>
+    internal double MeasureNaturalHeight(double width, double availableHeight)
+    {
+        var chrome = HandleRowHeight + Padding.VerticalThickness;
+        var room = Math.Max(0, availableHeight - chrome);
+        var content = ((IView)_contentView).Measure(Math.Max(0, width - Padding.HorizontalThickness), room).Height;
+
+        return Math.Min(availableHeight, chrome + content);
     }
+
+    private double HandleRowHeight => _presentation.ShowDragHandle ? 20 : 0;
 
     /// <summary>
     /// Computes the sheet geometry from the measured natural height: the sheet is as tall as
@@ -394,11 +413,15 @@ public sealed class ScaffoldBottomSheetView : Border
 
         InitialOffset = _sheetHeight - ResolveDetentHeight(Math.Clamp(_presentation.InitialDetent, 0, detents.Length - 1));
 
-        // The content row measures UNBOUNDED (Auto — required for Content-detent natural
-        // sizing), so scrollable content would inflate to its full content height and lose
-        // its scroll range. Clamp it to the space the sheet actually gives it.
-        var handleRowHeight = _presentation.ShowDragHandle ? 20 : 0;
-        _contentView.MaximumHeightRequest = Math.Max(0, _sheetHeight - handleRowHeight - Padding.VerticalThickness);
+        // Clamp the content row to the space the sheet gives it (see the ctor); only when it
+        // changed — an equal value must not invalidate (the layout pass that measures us would
+        // otherwise never settle).
+        var clamp = Math.Max(0, _sheetHeight - HandleRowHeight - Padding.VerticalThickness);
+
+        if (Math.Abs(_contentHost.MaximumHeightRequest - clamp) > 0.5)
+        {
+            _contentHost.MaximumHeightRequest = clamp;
+        }
 
         return _sheetHeight;
     }
@@ -415,11 +438,18 @@ public sealed class ScaffoldBottomSheetView : Border
     /// </remarks>
     internal double UpdateGeometry(double availableHeight, double naturalHeight)
     {
+        var previousHeight = _sheetHeight;
         var restingDetent = NearestDetentIndex();
         var height = InitializeGeometry(availableHeight, naturalHeight);
 
-        // Re-anchor on the same detent, now resolved against the new available height.
-        TranslationY = Math.Clamp(_sheetHeight - ResolveDetentHeight(restingDetent), 0, _sheetHeight);
+        // Re-anchor on the same detent, now resolved against the new geometry — only when the
+        // sheet height actually changed: a measure pass that changes nothing (a pressed button,
+        // a label update) must not touch the translation, which may be mid-flight (a snap
+        // animation, a drag) and would be yanked to the nearest detent.
+        if (Math.Abs(height - previousHeight) > 0.5)
+        {
+            TranslationY = Math.Clamp(_sheetHeight - ResolveDetentHeight(restingDetent), 0, _sheetHeight);
+        }
 
         return height;
     }

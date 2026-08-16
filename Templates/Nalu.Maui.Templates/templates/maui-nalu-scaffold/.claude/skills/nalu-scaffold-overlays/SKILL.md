@@ -154,7 +154,7 @@ await overlays.ShowBottomSheetAsync<QuickNoteView>();
 - Popup/sheet content is single-use (handlers disconnected on close): create a new view per presentation.
   Tab bar panel content is reusable.
 - Sheet is as tall as its LARGEST detent; drag rides the whole surface (inner scrollables arbitrate
-  natively). Programmatic detent change: `((ScaffoldBottomSheetView)content.Parent.Parent).SnapToDetentAsync(i)`.
+  natively). Programmatic detent change: walk `content.Parent` up to the `ScaffoldBottomSheetView` ancestor and call `SnapToDetentAsync(i)` (the depth is an implementation detail).
   Style the chrome via `Style TargetType="nalu:ScaffoldBottomSheetView"` (`SheetBackground`,
   `SheetCornerRadius`, `HandleColor`) — `SheetBackground` defaults to opaque white, set it per theme.
 - Overlay content never self-insets (scrim covers the whole window); sheets/panels handle their own safe

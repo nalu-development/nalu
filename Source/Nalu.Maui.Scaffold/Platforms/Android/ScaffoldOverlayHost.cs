@@ -46,9 +46,34 @@ internal static class ScaffoldOverlayImeIsolation
 /// layout params, and the IME isolation boundary of the popup subtree
 /// (<see cref="ScaffoldOverlayImeIsolation"/>).
 /// </summary>
-internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context)
+internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context), IScaffoldOverlayPanelHost
 {
+    /// <inheritdoc />
+    public bool PanelDirty { get; set; }
+
     /// <inheritdoc />
     public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
         => base.DispatchApplyWindowInsets(ScaffoldOverlayImeIsolation.StripIme(this, insets));
+
+    /// <summary>
+    /// A descendant's <c>requestLayout()</c> bubbles here natively (an image that finished
+    /// loading, an expanded section): mark only — the presenter re-measures and re-places the
+    /// popup in the container's measure pass (<see cref="ScaffoldLayout.OverlayMeasurePass"/>).
+    /// </summary>
+    public override void RequestLayout()
+    {
+        PanelDirty = true;
+        base.RequestLayout();
+    }
+}
+
+/// <summary>
+/// The Android hosts of popup and sheet panels: <c>requestLayout()</c> bubbling from the hosted
+/// content (the native invalidation channel) marks the panel dirty; the presenter consumes the
+/// flag in the container's measure pass — measuring inside the invalidation is never done.
+/// </summary>
+internal interface IScaffoldOverlayPanelHost
+{
+    /// <summary>Set by <c>requestLayout()</c> (host or any descendant); cleared by the presenter once re-placed.</summary>
+    bool PanelDirty { get; set; }
 }

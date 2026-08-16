@@ -148,9 +148,18 @@ public class SheetHomePage : ContentPage
     }
 
     private static Task SnapAsync(View sheetContent, int detentIndex)
-        => sheetContent.Parent?.Parent is ScaffoldBottomSheetView sheetView
-            ? sheetView.SnapToDetentAsync(detentIndex)
-            : Task.CompletedTask;
+    {
+        // The presenting sheet view is an ancestor of the content (the exact depth is an implementation detail).
+        for (Element? ancestor = sheetContent.Parent; ancestor is not null; ancestor = ancestor.Parent)
+        {
+            if (ancestor is ScaffoldBottomSheetView sheetView)
+            {
+                return sheetView.SnapToDetentAsync(detentIndex);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// A sheet whose content is a TALL ScrollView: covers the cooperative drag/scroll

@@ -17,8 +17,18 @@ namespace Nalu;
 /// enough — the sheet's MAUI pan keeps covering handle/non-scrollable surfaces (on Android
 /// the scrollable child consumes touches first, so the two never fight).
 /// </remarks>
-internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScrollingParent3
+internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScrollingParent3, IScaffoldOverlayPanelHost
 {
+    /// <inheritdoc />
+    public bool PanelDirty { get; set; }
+
+    /// <summary>A descendant's <c>requestLayout()</c> bubbles here natively: mark only — the presenter re-resolves the sheet's Content detent in the container's measure pass.</summary>
+    public override void RequestLayout()
+    {
+        PanelDirty = true;
+        base.RequestLayout();
+    }
+
     private readonly ScaffoldBottomSheetView _sheet;
     private readonly NestedScrollingParentHelper _helper;
     private readonly float _density;

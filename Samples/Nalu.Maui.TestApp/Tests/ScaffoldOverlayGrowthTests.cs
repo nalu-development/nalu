@@ -47,12 +47,13 @@ public class OverlayGrowthHomePage : ContentPage
         };
     }
 
-    /// <summary>Content with a spacer that grows on demand (button) and once by itself after 700 ms (deferred load).</summary>
+    /// <summary>Content with a spacer that grows on demand (button) and once by itself after 1.5 s (deferred load).</summary>
     private static View BuildGrowingContent(string marker, Func<Task> closeAsync)
     {
         var spacer = new BoxView { AutomationId = $"{marker}Spacer", HeightRequest = 40, Color = Colors.LightSkyBlue };
         var state = new Label { AutomationId = $"{marker}State", Text = "size:40", FontSize = 12 };
 
+        var innerGrid = new Grid { Children = { spacer } };
         var grow = new Button { Text = "Grow", AutomationId = $"{marker}GrowButton", FontSize = 12 };
         grow.Clicked += (_, _) =>
         {
@@ -80,7 +81,7 @@ public class OverlayGrowthHomePage : ContentPage
             {
                 new Label { Text = marker, FontSize = 16, FontAttributes = FontAttributes.Bold },
                 // Nested one level down: the invalidation must bubble up to the overlay root.
-                new Grid { Children = { spacer } },
+                innerGrid,
                 state,
                 grow,
                 shrink,
@@ -92,7 +93,7 @@ public class OverlayGrowthHomePage : ContentPage
         // loads): the overlay must follow on its own.
         content.Loaded += async (_, _) =>
         {
-            await Task.Delay(700);
+            await Task.Delay(1500);
 
             if (content.IsLoaded && spacer.HeightRequest < 100)
             {

@@ -312,6 +312,21 @@ public sealed class ScaffoldLayout : FrameLayout
     private int _lastWidth = -1;
     private int _lastHeight = -1;
 
+    /// <summary>
+    /// The presenter's overlay MEASURE step, run at the start of this container's measure pass:
+    /// popup/sheet panels whose content requested a layout (<see cref="IScaffoldOverlayPanelHost.PanelDirty"/>)
+    /// are re-measured and their layout params refreshed BEFORE the children are measured — the
+    /// only place where overlay content is measured.
+    /// </summary>
+    internal Action? OverlayMeasurePass { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        OverlayMeasurePass?.Invoke();
+        base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
     /// <inheritdoc />
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
     {

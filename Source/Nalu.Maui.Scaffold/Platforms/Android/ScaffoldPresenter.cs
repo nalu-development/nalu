@@ -51,62 +51,72 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         public double FlyoutOffscreenTranslation { get; init; }
         public bool Closing { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public EventHandler? ContentMeasureInvalidated { get; set; }
-        public bool ContentRelayoutPending { get; set; }
     }
 
     private readonly List<OverlayEntry> _overlays = [];
 
     /// <summary>
     /// Sheets and popups are placed from their content's NATURAL size, which can change after
-    /// presentation (a deferred image, an expanding section, a loaded list): the content's
-    /// measure invalidation (bubbling up from any descendant) schedules one re-placement on the
-    /// next dispatcher turn — the popup re-fits and re-centers/re-anchors, a Content-detent sheet
-    /// re-resolves its height. Coalesced; the arrange itself does not invalidate, so it converges.
+    /// presentation (a deferred image, an expanding section, a loaded list). The native
+    /// <c>requestLayout()</c> bubbling from the content marks its panel host dirty; this runs at
+    /// the start of the container's MEASURE PASS (<see cref="ScaffoldLayout.OverlayMeasurePass"/>)
+    /// and re-measures + re-places every dirty entry — the popup re-fits and re-centers /
+    /// re-anchors, a Content-detent sheet re-resolves its height — writing the new geometry into
+    /// the panel's EXISTING layout params (a new params object would request another layout from
+    /// inside the pass). Measuring never happens inside the invalidation.
     /// </summary>
-    private void ObserveContentMeasure(OverlayEntry entry, ScaffoldLayout container, Android.Content.Context context)
+    private void MeasureDirtyOverlays(ScaffoldLayout container, Android.Content.Context context)
     {
-        entry.ContentMeasureInvalidated = (_, _) =>
+        foreach (var entry in _overlays)
         {
-            if (entry.Closing || entry.ContentRelayoutPending)
+            if (entry.Closing || entry.ContentPlatform is not { } panel || panel is not IScaffoldOverlayPanelHost { PanelDirty: true } host)
             {
-                return;
+                continue;
             }
 
-            entry.ContentRelayoutPending = true;
+            host.PanelDirty = false;
 
-            scaffold.Dispatcher.Dispatch(() =>
+            switch (entry.Request)
             {
-                // The flag stays up while re-placing: the pass itself invalidates (the sheet
-                // toggles its content clamp around the measure) and must not re-schedule.
-                try
-                {
-                    if (entry.Closing || !_overlays.Contains(entry) || entry.ContentPlatform is not { } panel)
-                    {
-                        return;
-                    }
+                case { Content: ScaffoldBottomSheetView sheet }:
+                    ApplyIfChanged(panel, LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false, KeyboardOverlapFor(entry, container)));
 
-                    switch (entry.Request)
-                    {
-                        case { Content: ScaffoldBottomSheetView sheet }:
-                            panel.LayoutParameters = LayoutBottomSheet(sheet, entry.Request.KeyboardMode, panel, container, context, initial: false, KeyboardOverlapFor(entry, container));
+                    break;
 
-                            break;
+                case { Kind: ScaffoldOverlayKind.Popup }:
+                    ApplyIfChanged(panel, LayoutPopup(entry.Request, container, context, KeyboardOverlapFor(entry, container)));
 
-                        case { Kind: ScaffoldOverlayKind.Popup }:
-                            panel.LayoutParameters = LayoutPopup(entry.Request, container, context, KeyboardOverlapFor(entry, container));
+                    break;
+            }
+        }
+    }
 
-                            break;
-                    }
-                }
-                finally
-                {
-                    entry.ContentRelayoutPending = false;
-                }
-            });
-        };
+    /// <summary>
+    /// Copies the new geometry into the panel's EXISTING layout params when it differs (mutating
+    /// in place: this runs inside the container's measure pass, where assigning a new params
+    /// object would request yet another layout).
+    /// </summary>
+    private static void ApplyIfChanged(AView panel, Android.Widget.FrameLayout.LayoutParams next)
+    {
+        if (panel.LayoutParameters is not Android.Widget.FrameLayout.LayoutParams current)
+        {
+            panel.LayoutParameters = next;
 
-        entry.Request.Content.MeasureInvalidated += entry.ContentMeasureInvalidated;
+            return;
+        }
+
+        if (current.Width == next.Width && current.Height == next.Height
+            && current.LeftMargin == next.LeftMargin && current.TopMargin == next.TopMargin
+            && current.RightMargin == next.RightMargin && current.BottomMargin == next.BottomMargin
+            && current.Gravity == next.Gravity)
+        {
+            return;
+        }
+
+        current.Width = next.Width;
+        current.Height = next.Height;
+        current.Gravity = next.Gravity;
+        current.SetMargins(next.LeftMargin, next.TopMargin, next.RightMargin, next.BottomMargin);
     }
 
     private ScaffoldRoot? _currentRoot;
@@ -175,6 +185,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             scaffold.KeyboardState.Update(platformView.Context!.FromPixels(platformView.ImeBottomInsetPx));
             RelayoutKeyboardAwareOverlays(platformView, platformView.Context!);
         };
+
+        // ...and re-measure popups/sheets whose content changed size, in the container's measure pass.
+        platformView.OverlayMeasurePass ??= () => MeasureDirtyOverlays(platformView, platformView.Context!);
         platformView.OverlayOwnsKeyboard ??= () => KeyboardOwner is not null;
 
         var stack = root.NavigationStack;
@@ -1883,7 +1896,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet)
         {
             OnKeyboardOwnerChanged(platformView, context);
-            ObserveContentMeasure(entry, platformView, context);
         }
 
         // MAUI's net10 safe-area pass evaluates each layout at its FIRST traversal with an
@@ -2043,12 +2055,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var sheetWidthPx = (int)Math.Min(container.Width, context.ToPixels(sheet.MaxWidth));
 
-        panel.Measure(
-            AView.MeasureSpec.MakeMeasureSpec(sheetWidthPx, MeasureSpecMode.Exactly),
-            AView.MeasureSpec.MakeMeasureSpec((int)context.ToPixels(availableHeight), MeasureSpecMode.AtMost)
-        );
-
-        var natural = Math.Min(context.FromPixels(panel.MeasuredHeight), availableHeight);
+        // Natural height measured on the CONTENT (not through the clamped content row — see
+        // ScaffoldBottomSheetView): growth after presentation is seen.
+        var natural = sheet.MeasureNaturalHeight(context.FromPixels(sheetWidthPx), availableHeight);
 
         var sheetHeight = initial
             ? sheet.InitializeGeometry(availableHeight, natural)
@@ -2290,11 +2299,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         entry.Closing = true;
         var request = entry.Request;
 
-        if (entry.ContentMeasureInvalidated is { } measureHandler)
-        {
-            request.Content.MeasureInvalidated -= measureHandler;
-            entry.ContentMeasureInvalidated = null;
-        }
 
         if (request.Kind == ScaffoldOverlayKind.Flyout)
         {
