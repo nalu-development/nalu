@@ -1173,8 +1173,11 @@ public sealed class NaluApp : IAsyncLifetime
         }
         else if (platform.Contains("ios", StringComparison.OrdinalIgnoreCase))
         {
-            await RunSimctlAsync("terminate", "booted", TestAppId).ConfigureAwait(false);
-            await RunSimctlAsync("launch", "booted", TestAppId).ConfigureAwait(false);
+            // Explicit device: 'booted' is ambiguous with a second simulator up (another run or
+            // agent) — the kill/relaunch would land on the wrong one and this app would just keep running.
+            var udid = await GetBootedSimulatorUdidAsync().ConfigureAwait(false);
+            await RunSimctlAsync("terminate", udid, TestAppId).ConfigureAwait(false);
+            await RunSimctlAsync("launch", udid, TestAppId).ConfigureAwait(false);
         }
         else
         {
