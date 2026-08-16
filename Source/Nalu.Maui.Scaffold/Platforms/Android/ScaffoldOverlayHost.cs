@@ -49,7 +49,7 @@ internal static class ScaffoldOverlayImeIsolation
 internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context), IScaffoldOverlayPanelHost
 {
     /// <inheritdoc />
-    public Action? ContentMeasureInvalidated { get; set; }
+    public bool PanelDirty { get; set; }
 
     /// <inheritdoc />
     public override WindowInsets? DispatchApplyWindowInsets(WindowInsets? insets)
@@ -57,22 +57,23 @@ internal sealed class ScaffoldPopupHost(Context context) : FrameLayout(context),
 
     /// <summary>
     /// A descendant's <c>requestLayout()</c> bubbles here natively (an image that finished
-    /// loading, an expanded section) — the presenter re-places the popup from its new natural size.
+    /// loading, an expanded section): mark only — the presenter re-measures and re-places the
+    /// popup in the container's measure pass (<see cref="ScaffoldLayout.OverlayMeasurePass"/>).
     /// </summary>
     public override void RequestLayout()
     {
+        PanelDirty = true;
         base.RequestLayout();
-        ContentMeasureInvalidated?.Invoke();
     }
 }
 
 /// <summary>
-/// The Android hosts of popup and sheet panels: the presenter's hook onto the native
-/// <c>requestLayout()</c> bubbling from the hosted content (the Controls-level measure
-/// invalidation does not bubble; the platform one does).
+/// The Android hosts of popup and sheet panels: <c>requestLayout()</c> bubbling from the hosted
+/// content (the native invalidation channel) marks the panel dirty; the presenter consumes the
+/// flag in the container's measure pass — measuring inside the invalidation is never done.
 /// </summary>
 internal interface IScaffoldOverlayPanelHost
 {
-    /// <summary>Raised (synchronously, from <c>requestLayout()</c>) when the host or any descendant requested a layout.</summary>
-    Action? ContentMeasureInvalidated { get; set; }
+    /// <summary>Set by <c>requestLayout()</c> (host or any descendant); cleared by the presenter once re-placed.</summary>
+    bool PanelDirty { get; set; }
 }

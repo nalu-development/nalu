@@ -51,8 +51,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         public double FlyoutOffscreenTranslation { get; init; }
         public bool Closing { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public bool ContentRelayoutPending { get; set; }
-        public EventHandler? ContentMeasureInvalidated { get; set; }
     }
 
     private readonly List<OverlayEntry> _overlays = [];
@@ -61,50 +59,24 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     /// <summary>
     /// Sheets and popups are placed from their content's NATURAL size, which can change after
-    /// presentation (a deferred image, an expanding section, a loaded list). Two signals feed one
-    /// coalesced re-placement on the next dispatcher turn (the popup re-fits and re-centers /
-    /// re-anchors, a Content-detent sheet re-resolves its height): the PLATFORM invalidation walk
-    /// terminated by the panel host (<see cref="ScaffoldOverlayPanelHost"/>), and the Controls-level
-    /// <see cref="VisualElement.MeasureInvalidated"/> of the root, which bubbles from any descendant
-    /// by default. Neither alone is sufficient: MAUI gates the native walk per view (silent until
-    /// that view is measured again — in the overlay layer nothing above re-measures it but us), and
-    /// the Controls propagation is an app-level opt-out (<c>SkipMeasureInvalidatedPropagation</c>).
-    /// The pass itself is ignored (it invalidates: the sheet toggles its content clamp around the
-    /// measure), so it converges.
+    /// presentation (a deferred image, an expanding section, a loaded list). The panel host
+    /// terminates MAUI's platform invalidation walk, marks itself dirty and requests a layout;
+    /// in its LAYOUT PASS (<c>LayoutSubviews</c>) it calls back here to measure and re-place the
+    /// entry — the popup re-fits and re-centers/re-anchors, a Content-detent sheet re-resolves
+    /// its height. Measuring only ever happens inside the layout pass, never inside the
+    /// invalidation (that is what keeps MAUI's per-view propagation gate consistent: the views
+    /// get re-measured by their root and propagate again next time).
     /// </summary>
     private void ObserveContentMeasure(OverlayEntry entry, ScaffoldOverlayPanelHost host, ScaffoldViewController controller, UIView container)
-    {
-        void Schedule()
+        => host.MeasurePanel = () =>
         {
-            if (entry.Closing || entry.ContentRelayoutPending)
+            if (entry.Closing || !_overlays.Contains(entry))
             {
                 return;
             }
 
-            entry.ContentRelayoutPending = true;
-
-            scaffold.Dispatcher.Dispatch(() =>
-            {
-                try
-                {
-                    if (entry.Closing || !_overlays.Contains(entry))
-                    {
-                        return;
-                    }
-
-                    RelayoutEntry(entry, controller, container);
-                }
-                finally
-                {
-                    entry.ContentRelayoutPending = false;
-                }
-            });
-        }
-
-        entry.ContentMeasureInvalidated = (_, _) => Schedule();
-        entry.Request.Content.MeasureInvalidated += entry.ContentMeasureInvalidated;
-        host.ContentMeasureInvalidated = Schedule;
-    }
+            RelayoutEntry(entry, controller, container);
+        };
 
     private void RelayoutEntry(OverlayEntry entry, ScaffoldViewController controller, UIView container)
     {
@@ -1412,7 +1384,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var sheetView = (IView)sheet;
         var sheetWidth = Math.Min((double)bounds.Width, sheet.MaxWidth);
-        var natural = sheetView.Measure(sheetWidth, availableHeight).Height;
+        var natural = sheet.MeasureNaturalHeight(sheetWidth, availableHeight);
         var naturalHeight = Math.Min(natural, availableHeight);
 
         var sheetHeight = initial
@@ -1676,13 +1648,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         if (entry.ContentPlatform is ScaffoldOverlayPanelHost host)
         {
-            host.ContentMeasureInvalidated = null;
-        }
-
-        if (entry.ContentMeasureInvalidated is { } measureHandler)
-        {
-            request.Content.MeasureInvalidated -= measureHandler;
-            entry.ContentMeasureInvalidated = null;
+            host.MeasurePanel = null;
         }
 
         if (request.Kind == ScaffoldOverlayKind.Flyout)

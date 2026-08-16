@@ -1199,6 +1199,18 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
     // ILeavingGuard is the one confirmation mechanism, covering every leave path uniformly.
 
     /// <summary>
+    /// Views hosted by the scaffold as logical children (popup and sheet content, scrims, drawers,
+    /// panels, bar views) are placed by the presenters, not by the page: they must NOT inherit
+    /// the page's <see cref="LayoutConstraint.Fixed"/> ("fills the page") verdict a
+    /// <see cref="TemplatedPage"/> gives its Fill/Fill children — a Fixed root stops MAUI's
+    /// platform measure-invalidation walk at itself and re-lays out in its CURRENT bounds, so a
+    /// popup whose content grows after presentation would never reach the presenter. The
+    /// scaffold's own <see cref="ContentPage.Content"/> keeps the page semantics.
+    /// </summary>
+    protected override LayoutConstraint ComputeConstraintForView(View view)
+        => ReferenceEquals(view, Content) ? base.ComputeConstraintForView(view) : LayoutConstraint.None;
+
+    /// <summary>
     /// Routes back requests arriving through MAUI's legacy/synthetic channel (e.g. automation
     /// drivers, platforms without dispatcher-based back) into the navigation engine, matching
     /// the behavior of the Android dispatcher callback. Guards and lifecycle always run.

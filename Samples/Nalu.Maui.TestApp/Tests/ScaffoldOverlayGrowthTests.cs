@@ -53,6 +53,7 @@ public class OverlayGrowthHomePage : ContentPage
         var spacer = new BoxView { AutomationId = $"{marker}Spacer", HeightRequest = 40, Color = Colors.LightSkyBlue };
         var state = new Label { AutomationId = $"{marker}State", Text = "size:40", FontSize = 12 };
 
+        var innerGrid = new Grid { Children = { spacer } };
         var grow = new Button { Text = "Grow", AutomationId = $"{marker}GrowButton", FontSize = 12 };
         grow.Clicked += (_, _) =>
         {
@@ -80,7 +81,7 @@ public class OverlayGrowthHomePage : ContentPage
             {
                 new Label { Text = marker, FontSize = 16, FontAttributes = FontAttributes.Bold },
                 // Nested one level down: the invalidation must bubble up to the overlay root.
-                new Grid { Children = { spacer } },
+                innerGrid,
                 state,
                 grow,
                 shrink,

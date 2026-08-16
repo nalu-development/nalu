@@ -20,13 +20,13 @@ namespace Nalu;
 internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScrollingParent3, IScaffoldOverlayPanelHost
 {
     /// <inheritdoc />
-    public Action? ContentMeasureInvalidated { get; set; }
+    public bool PanelDirty { get; set; }
 
-    /// <summary>A descendant's <c>requestLayout()</c> bubbles here natively — the presenter re-resolves the sheet's Content detent.</summary>
+    /// <summary>A descendant's <c>requestLayout()</c> bubbles here natively: mark only — the presenter re-resolves the sheet's Content detent in the container's measure pass.</summary>
     public override void RequestLayout()
     {
+        PanelDirty = true;
         base.RequestLayout();
-        ContentMeasureInvalidated?.Invoke();
     }
 
     private readonly ScaffoldBottomSheetView _sheet;
