@@ -148,6 +148,9 @@ await overlays.ShowBottomSheetAsync<QuickNoteView>();
   side when they do not fit. Cap popup size with `MaximumWidthRequest`/`MaximumHeightRequest` on the content.
 - The scrim always blocks input below, even when transparent; `CloseOnBack = false` makes the topmost entry
   consume back without closing. iOS edge-swipe pop is disabled while an overlay is open.
+- Overlays FOLLOW their content's natural size after presentation: a popup re-fits/re-places and a `Content`
+  detent sheet re-resolves its height when the content grows or shrinks (deferred images, expanded sections)
+  — no call needed. Fixed `Fraction`/`Height` detents don't move.
 - Popup/sheet content is single-use (handlers disconnected on close): create a new view per presentation.
   Tab bar panel content is reusable.
 - Sheet is as tall as its LARGEST detent; drag rides the whole surface (inner scrollables arbitrate

@@ -51,11 +51,70 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         public double FlyoutOffscreenTranslation { get; init; }
         public bool Closing { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public EventHandler? ContentMeasureInvalidated { get; set; }
+        public bool ContentRelayoutPending { get; set; }
     }
 
     private readonly List<OverlayEntry> _overlays = [];
 
     public bool HasOverlay => _overlays.Count > 0;
+
+    /// <summary>
+    /// Sheets and popups are placed from their content's NATURAL size, which can change after
+    /// presentation (a deferred image, an expanding section, a loaded list): the content's
+    /// measure invalidation (bubbling up from any descendant) schedules one re-placement on the
+    /// next dispatcher turn — the popup re-fits and re-centers/re-anchors, a Content-detent sheet
+    /// re-resolves its height. Coalesced; the arrange itself does not invalidate, so it converges.
+    /// </summary>
+    private void ObserveContentMeasure(OverlayEntry entry, ScaffoldViewController controller, UIView container)
+    {
+        entry.ContentMeasureInvalidated = (_, _) =>
+        {
+            if (entry.Closing || entry.ContentRelayoutPending)
+            {
+                return;
+            }
+
+            entry.ContentRelayoutPending = true;
+
+            scaffold.Dispatcher.Dispatch(() =>
+            {
+                // The flag stays up while re-placing: the pass itself invalidates (the sheet
+                // toggles its content clamp around the measure) and must not re-schedule.
+                try
+                {
+                    if (entry.Closing || !_overlays.Contains(entry))
+                    {
+                        return;
+                    }
+
+                    RelayoutEntry(entry, controller, container);
+                }
+                finally
+                {
+                    entry.ContentRelayoutPending = false;
+                }
+            });
+        };
+
+        entry.Request.Content.MeasureInvalidated += entry.ContentMeasureInvalidated;
+    }
+
+    private void RelayoutEntry(OverlayEntry entry, ScaffoldViewController controller, UIView container)
+    {
+        switch (entry.Request)
+        {
+            case { Content: ScaffoldBottomSheetView sheet }:
+                LayoutBottomSheet(sheet, entry.Request.KeyboardMode, controller, container, initial: false, KeyboardOverlapFor(entry, controller));
+
+                break;
+
+            case { Kind: ScaffoldOverlayKind.Popup }:
+                LayoutPopup(entry.Request, controller, container, KeyboardOverlapFor(entry, controller));
+
+                break;
+        }
+    }
 
     public bool IsOverlayPresented(ScaffoldOverlayRequest request) => FindEntry(request) is not null;
 
@@ -1218,10 +1277,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         _overlays.Add(entry);
 
-        // A new sheet/popup takes the keyboard over from the page (or the entry below it).
+        // A new sheet/popup takes the keyboard over from the page (or the entry below it), and
+        // follows its content's natural size from now on.
         if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet)
         {
             OnKeyboardOwnerChanged(controller);
+            ObserveContentMeasure(entry, controller, container);
         }
 
         ScaffoldOverlayAnimations.PrepareEnter(request, flyoutOffscreen);
@@ -1604,6 +1665,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         entry.Closing = true;
         var request = entry.Request;
+
+        if (entry.ContentMeasureInvalidated is { } measureHandler)
+        {
+            request.Content.MeasureInvalidated -= measureHandler;
+            entry.ContentMeasureInvalidated = null;
+        }
 
         if (request.Kind == ScaffoldOverlayKind.Flyout)
         {

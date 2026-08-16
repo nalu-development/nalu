@@ -360,7 +360,14 @@ public sealed class ScaffoldBottomSheetView : Border
 
     /// <summary>Applies the bottom inset (system bar — or the soft keyboard's overlap, which replaces it) as content padding BEFORE the natural-height measure.</summary>
     internal void PrepareForMeasure(double bottomInset)
-        => Padding = new Thickness(0, 0, 0, bottomInset);
+    {
+        Padding = new Thickness(0, 0, 0, bottomInset);
+
+        // The natural height must be measured UNBOUNDED: the clamp InitializeGeometry puts on the
+        // content row (to the previous sheet height) would otherwise hide any growth of the
+        // content since the last pass — a re-measure after a deferred image, an expanded section.
+        _contentView.MaximumHeightRequest = double.PositiveInfinity;
+    }
 
     /// <summary>
     /// Computes the sheet geometry from the measured natural height: the sheet is as tall as
