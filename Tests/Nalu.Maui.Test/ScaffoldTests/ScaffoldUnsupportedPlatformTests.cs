@@ -14,14 +14,30 @@ public class ScaffoldUnsupportedPlatformTests
 {
     private sealed record SomeOverlayModel(IOverlayRef Overlay);
 
-    private static IServiceScope BuildScope()
+    private static IServiceProvider BuildProvider()
     {
         var builder = MauiApp.CreateBuilder(useDefaults: false);
 
         builder.UseNaluScaffold(scaffold => scaffold.AddOverlay<SomeOverlayModel, ContentView>(static (_, _) => new ContentView()));
-        builder.Services.AddScoped(static _ => Substitute.For<INavigationService>());
+        // As in the real app: the navigation service is a singleton.
+        builder.Services.AddSingleton(static _ => Substitute.For<INavigationService>());
 
-        return builder.Build().Services.CreateScope();
+        return builder.Build().Services;
+    }
+
+    private static IServiceScope BuildScope() => BuildProvider().CreateScope();
+
+    [Fact(DisplayName = "IOverlayService is a singleton: resolvable from the root and shared across scopes")]
+    public void OverlayServiceIsASingleton()
+    {
+        var provider = BuildProvider();
+
+        var fromRoot = provider.GetRequiredService<IOverlayService>();
+        using var scopeA = provider.CreateScope();
+        using var scopeB = provider.CreateScope();
+
+        scopeA.ServiceProvider.GetRequiredService<IOverlayService>().Should().BeSameAs(fromRoot);
+        scopeB.ServiceProvider.GetRequiredService<IOverlayService>().Should().BeSameAs(fromRoot);
     }
 
     [Fact(DisplayName = "UseNaluScaffold registers both services on the neutral TFM")]

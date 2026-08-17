@@ -39,11 +39,13 @@ public static class ScaffoldAppBuilderExtensions
         builder.Services.AddScoped<IScaffoldFlyoutController, ScaffoldFlyoutController>();
 
         // Model-first overlays: the registry is built ONCE here (trim-safe closures, no
-        // reflection over registrations); the service resolves the ambient scaffold per call.
+        // reflection over registrations); the service is a SINGLETON (like INavigationService —
+        // injectable from page models and app-wide services alike): it resolves the ambient
+        // scaffold per call and creates its own DI scope per presentation.
         var overlayRegistry = new ScaffoldOverlayRegistry();
         configure?.Invoke(overlayRegistry);
         builder.Services.AddSingleton(overlayRegistry);
-        builder.Services.AddScoped<IOverlayService, ScaffoldOverlayService>();
+        builder.Services.AddSingleton<IOverlayService, ScaffoldOverlayService>();
 
         return builder.ConfigureMauiHandlers(handlers => handlers.AddHandler<Scaffold, ScaffoldHandler>());
     }
