@@ -23,7 +23,7 @@ Modal *pages* (`Scaffold.PageMode`) are navigation, not overlays → see skill `
 | `ScaffoldTabBar.ShowPanelAsync(...)` | Same, from the tab bar element | |
 | `IScaffoldPopup` (`IsOpen`, `Closed`, `CloseAsync()`, `IAsyncDisposable`) | Lifetime handle | `Closed` completes on EVERY close path; `CloseAsync` idempotent; `await using` scopes it |
 | `element.GetScaffold()` / `GetScaffoldOrDefault()` | Reach the owning scaffold from a page/view | Only after parenting — never in a constructor |
-| `IOverlayService` (scoped) | Model-first `ShowPopupAsync` / `ShowBottomSheetAsync` | `<TModel, TResult>` returns `Task<TResult?>`; `<TModel>` returns `Task` |
+| `IOverlayService` (singleton) | Model-first `ShowPopupAsync` / `ShowBottomSheetAsync` | `<TModel, TResult>` returns `Task<TResult?>`; `<TModel>` returns `Task` |
 | `IOverlayRef` (`CloseAsync()`, `CloseAsync(object? result)`) | Injected into the model (or view) to close itself | Result validated against `TResult` at close time |
 | `UseNaluScaffold(s => s.AddOverlays())` | Source-generated registration of this assembly's overlays | Combine with manual `AddOverlay<...>` for other assemblies |
 | `[AutoOverlay]`, `[AutoOverlay(typeof(TView))]`, `[AutoOverlay(Enabled = false)]` | Tune generator discovery | Opt in / pick view / opt out |

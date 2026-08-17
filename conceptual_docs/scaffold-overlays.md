@@ -182,12 +182,13 @@ public partial class DurationSheetModel(IOverlayRef overlay) : IEnteringAware<Du
 
 ### Scopes
 
-`IOverlayService` is registered **scoped** (page models inject it like `INavigationService`),
-over a **singleton** registry built once inside `UseNaluScaffold` — the `AddOverlay*` calls are
-evaluated at startup, never per presentation. Each presentation then creates its **own** DI
-scope for the model/view pair, disposed when the overlay closes: it is a fresh scope, not a
-child of the page's, so page-scoped services are not shared with the overlay — the intent is
-the channel for what the overlay needs to know.
+`IOverlayService` is registered as a **singleton** (inject it like `INavigationService` — from
+page models and from app-wide services alike), over a **singleton** registry built once inside
+`UseNaluScaffold` — the `AddOverlay*` calls are evaluated at startup, never per presentation.
+Each presentation creates its **own** DI scope for the model/view pair, disposed when the
+overlay closes: it is a fresh scope (a child of the root provider), not a child of the calling
+page's scope, so page-scoped services are not shared with the overlay — the intent is the
+channel for what the overlay needs to know.
 
 Keep ONE public constructor per model/view: multi-constructor selection is not service-aware.
 

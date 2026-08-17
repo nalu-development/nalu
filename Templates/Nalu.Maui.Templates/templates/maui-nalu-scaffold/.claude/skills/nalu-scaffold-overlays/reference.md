@@ -100,8 +100,9 @@ Diagnostics (category `NaluScaffold`):
   `OnEnteringAsync(intent)` (typed overload by assignability, explicit interface impls count; else
   parameterless `IEnteringAware`) → present (skipped if close was requested during entering) →
   on close: `ILeavingAware.OnLeavingAsync()` → `IAsyncDisposable`/`IDisposable` → scope disposed.
-- `IOverlayService` is scoped (inject like `INavigationService`); the registry is a singleton built once
-  inside `UseNaluScaffold`.
+- `IOverlayService` is a singleton (inject like `INavigationService`, also from app-wide services); the
+  registry is a singleton built once inside `UseNaluScaffold`; each presentation gets its own DI scope
+  (child of the root, not of the calling page's scope).
 
 ## Options resolution timing
 
