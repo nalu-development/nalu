@@ -5,6 +5,24 @@ namespace Nalu.Maui.TestApp.Tests;
 
 file static class AppearancePageFactory
 {
+    /// <summary>App-scope theme flip (UserAppTheme, like an in-app switcher) + reset.</summary>
+    public static View MakeThemeButtons(string marker)
+    {
+        var toggle = new Button { Text = "Toggle app theme", AutomationId = $"ToggleTheme{marker}", FontSize = 11 };
+        toggle.Clicked += (_, _) =>
+        {
+            var application = Application.Current!;
+            application.UserAppTheme = (application.UserAppTheme == AppTheme.Unspecified ? application.RequestedTheme : application.UserAppTheme) == AppTheme.Dark
+                ? AppTheme.Light
+                : AppTheme.Dark;
+        };
+
+        var reset = new Button { Text = "Reset app theme", AutomationId = $"ResetTheme{marker}", FontSize = 11 };
+        reset.Clicked += (_, _) => Application.Current!.UserAppTheme = AppTheme.Unspecified;
+
+        return new HorizontalStackLayout { Spacing = 6, Children = { toggle, reset } };
+    }
+
     /// <summary>The app-reset escape hatch NaluApp.ResetAsync relies on for Scaffold-hosted pages (no decorated ResetButton).</summary>
     public static Button MakeExitButton(string marker)
     {
@@ -89,6 +107,11 @@ public class AppearanceHomePage : ContentPage
         BindingContext = model;
         Title = "Appearance Home";
 
+        // Resolved title color (hex): the theme-change tests read the scaffold-level
+        // AppThemeBinding through it.
+        var titleForegroundProbe = new Label { AutomationId = "AppearanceHomeTitleForeground", FontSize = 11 };
+        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
+
         Content = new VerticalStackLayout
         {
             Spacing = 6,
@@ -96,6 +119,7 @@ public class AppearanceHomePage : ContentPage
             Children =
             {
                 new Label { Text = "AppearancePageHome", AutomationId = "AppearancePageHome", FontSize = 22, FontAttributes = FontAttributes.Bold },
+                titleForegroundProbe,
                 NavPageFactory.MakeButton("Push styled", "PushAppearanceStyled", model.PushStyled),
                 NavPageFactory.MakeButton("Push overlap", "PushAppearanceOverlap", model.PushOverlap),
                 NavPageFactory.MakeButton("Push scroll", "PushAppearanceScroll", model.PushScroll),
@@ -154,6 +178,7 @@ public class AppearanceOverlapPage : ContentPage
             {
                 foregroundProbe,
                 titleForegroundProbe,
+                AppearancePageFactory.MakeThemeButtons("AppearanceOverlap"),
                 NavPageFactory.MakeButton("Pop", "PopAppearanceOverlap", model.Pop),
                 AppearancePageFactory.MakeExitButton("AppearanceOverlap")
             }
@@ -298,13 +323,15 @@ public class NavBarAppearanceScaffold : Scaffold
 
         Areas.Add(new ScaffoldRoot { Title = "Home", PageType = typeof(AppearanceHomePage) });
 
-        SetNavBarAppearance(
-            this,
-            new ScaffoldNavBarAppearance
-            {
-                Background = new SolidColorBrush(Colors.LightSteelBlue)
-            }
-        );
+        // Theme-aware global surface, the DailyHelper/template shape: the brush Color and the
+        // title color carry AppThemeBindings. They must keep following UserAppTheme even while a
+        // page-level appearance (the overlap page's transparent bar) is the one presented.
+        var surface = new SolidColorBrush();
+        surface.SetAppThemeColor(SolidColorBrush.ColorProperty, Colors.LightSteelBlue, Colors.DarkSlateBlue);
+
+        var appearance = new ScaffoldNavBarAppearance { Background = surface };
+        appearance.SetAppThemeColor(ScaffoldNavBarAppearance.TitleForegroundProperty, Colors.Black, Colors.White);
+        SetNavBarAppearance(this, appearance);
     }
 }
 

@@ -176,14 +176,14 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         }
 
         var (page, areaAppearance, scaffoldAppearance) = _scaffold.GetNavBarAppearanceChain(_page);
-        SwapAppearanceSubscription(ref _pageAppearance, page);
-        SwapAppearanceSubscription(ref _areaAppearance, areaAppearance);
-        SwapAppearanceSubscription(ref _scaffoldAppearance, scaffoldAppearance);
+        SwapAppearanceSubscription(ref _pageAppearance, page, _page);
+        SwapAppearanceSubscription(ref _areaAppearance, areaAppearance, _area);
+        SwapAppearanceSubscription(ref _scaffoldAppearance, scaffoldAppearance, _scaffold);
 
         ApplyEffectiveAppearance();
     }
 
-    private void SwapAppearanceSubscription(ref ScaffoldNavBarAppearance? field, ScaffoldNavBarAppearance? value)
+    private void SwapAppearanceSubscription(ref ScaffoldNavBarAppearance? field, ScaffoldNavBarAppearance? value, Element? owner)
     {
         if (ReferenceEquals(field, value))
         {
@@ -208,6 +208,13 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         {
             value.PropertyChanged += OnAppearancePropertyChanged;
             value.SetContext(_scaffold.NavBarContext);
+
+            // Entering the chain: the appearance must hang from a live element so its theme /
+            // dynamic-resource bindings (and its brush's) are current — see EnsureRooted.
+            if (owner is not null)
+            {
+                value.EnsureRooted(owner);
+            }
         }
     }
 
@@ -251,9 +258,9 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         _scrollObservation?.Dispose();
         _scrollObservation = null;
         UpdateSources(null);
-        SwapAppearanceSubscription(ref _pageAppearance, null);
-        SwapAppearanceSubscription(ref _areaAppearance, null);
-        SwapAppearanceSubscription(ref _scaffoldAppearance, null);
+        SwapAppearanceSubscription(ref _pageAppearance, null, null);
+        SwapAppearanceSubscription(ref _areaAppearance, null, null);
+        SwapAppearanceSubscription(ref _scaffoldAppearance, null, null);
 
         if (_area is not null)
         {

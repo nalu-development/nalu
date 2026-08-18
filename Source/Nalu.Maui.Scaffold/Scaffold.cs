@@ -973,8 +973,16 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
         element.BindingContextChanged -= OnAppearanceHostBindingContextChanged;
 
+        if (oldValue is ScaffoldNavBarAppearance previous && ReferenceEquals(previous.Parent, element))
+        {
+            previous.Parent = null;
+        }
+
         if (newValue is ScaffoldNavBarAppearance appearance)
         {
+            // Parenting puts the appearance (and its brush) in the element tree, where MAUI
+            // delivers theme/resource changes; a style-shared instance keeps its first parent.
+            appearance.Parent ??= element;
             SetInheritedBindingContext(appearance, element.BindingContext);
             element.BindingContextChanged += OnAppearanceHostBindingContextChanged;
         }

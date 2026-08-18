@@ -65,6 +65,11 @@ replacement:
 | `Opacity` | Whole-surface opacity. |
 | `OffsetY` | Vertical offset (hide-on-scroll effects). |
 
+`{AppThemeBinding}` / `{DynamicResource}` on these properties — and inside the `Background` brush —
+stay live: the appearance is an `Element` parented to the element it is attached to (its brush to the
+appearance), so app-theme and resource changes reach it even while another page's appearance is the
+presented one.
+
 Color precedence on a primitive: an explicit (or styled) `TextColor` / `IconColor` on the
 primitive itself → the appearance chain (title: level-wise `TitleForeground` ?? `Foreground`;
 buttons: `Foreground`) → the built-in default. Prefer the appearance channels over styling

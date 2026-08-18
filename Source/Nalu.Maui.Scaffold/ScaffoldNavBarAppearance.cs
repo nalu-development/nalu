@@ -23,15 +23,73 @@ namespace Nalu;
 /// in a shared <see cref="Style"/> is one object attached to many elements: fine for constant
 /// values, unsuitable for bindings.
 /// </para>
+/// <para>
+/// It is an <see cref="Element"/> parented to the element it is attached to (and re-rooted on the
+/// element presenting it whenever it enters the resolution chain): that is what lets
+/// <c>{AppThemeBinding}</c> and <c>{DynamicResource}</c> on its properties — and inside its
+/// <see cref="Background"/> brush, parented to the appearance in turn — keep following the app
+/// theme and resources, even while another appearance is the one presented. MAUI delivers those
+/// changes down the element tree only.
+/// </para>
 /// </remarks>
-public sealed class ScaffoldNavBarAppearance : BindableObject
+public sealed class ScaffoldNavBarAppearance : Element
 {
     /// <summary>The default strip background used when no appearance in the chain sets one.</summary>
     internal static readonly Color _defaultBackgroundColor = Color.FromArgb("#F7FFFFFF");
 
     /// <summary>Bindable property for <see cref="Background"/>.</summary>
     public static readonly BindableProperty BackgroundProperty =
-        BindableProperty.Create(nameof(Background), typeof(Brush), typeof(ScaffoldNavBarAppearance));
+        BindableProperty.Create(nameof(Background), typeof(Brush), typeof(ScaffoldNavBarAppearance), propertyChanged: OnBackgroundChanged);
+
+    // The brush joins the appearance's element chain so theme/resource changes reach it whether or
+    // not it is the brush currently painted on the strip (MAUI's own Background tracking only
+    // notifies the brush while it is applied — and does not refresh it when re-applied). MAUI's
+    // shared immutable brushes (Brush.Transparent & co.) are never re-parented.
+    private static void OnBackgroundChanged(BindableObject bindable, object? oldValue, object? newValue)
+    {
+        var appearance = (ScaffoldNavBarAppearance) bindable;
+
+        if (oldValue is Brush old && ReferenceEquals(old.Parent, appearance))
+        {
+            old.Parent = null;
+        }
+
+        if (newValue is Brush brush && brush.Parent is null && brush.GetType().Name != "ImmutableBrush")
+        {
+            brush.Parent = appearance;
+        }
+    }
+
+    /// <summary>
+    /// Makes sure this appearance sits in a LIVE element chain: parented to <paramref name="owner"/>
+    /// unless it already hangs from an element that reaches the <see cref="Application"/> (an
+    /// appearance shared by a style may still be parented to a page that has since been
+    /// destroyed). Re-parenting also refreshes its dynamic resources — theme included.
+    /// </summary>
+    internal void EnsureRooted(Element owner)
+    {
+        if (ReferenceEquals(Parent, owner) || IsRooted(Parent))
+        {
+            return;
+        }
+
+        Parent = owner;
+    }
+
+    private static bool IsRooted(Element? element)
+    {
+        while (element is not null)
+        {
+            if (element is Application)
+            {
+                return true;
+            }
+
+            element = element.Parent;
+        }
+
+        return false;
+    }
 
     /// <summary>Bindable property for <see cref="Foreground"/>.</summary>
     public static readonly BindableProperty ForegroundProperty =

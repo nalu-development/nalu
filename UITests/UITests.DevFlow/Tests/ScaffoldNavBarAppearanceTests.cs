@@ -166,6 +166,55 @@ public class ScaffoldNavBarAppearanceTests(NaluApp app) : BaseUiTest(app), IAsyn
         await App.WaitForTextAsync("NavBarTitleLabel", "Appearance Home");
     }
 
+    /// <summary>
+    /// The scaffold-level appearance is theme-aware (AppThemeBinding on its brush Color and on
+    /// TitleForeground). Changing the app theme WHILE a page-level appearance is presented (the
+    /// overlap page paints its own transparent bar) must still update it: after the pop the bar
+    /// paints the DARK surface and the title reads the dark color. Regression: the detached brush
+    /// (MAUI notifies theme changes down the element tree only) came back with the LIGHT color —
+    /// a white bar under a white title.
+    /// </summary>
+    [Fact]
+    public async Task ThemeChangeWhileAnotherAppearanceIsPresentedReachesTheGlobalOne()
+    {
+        await WaitDisplayedAsync("AppearancePageHome");
+        await App.WaitForTextAsync("AppearanceHomeTitleForeground", "#000000");
+        await App.WaitForPixelColorAsync("NavBarSurface", 4, 66, c => IsClose(c, 0xB0, 0xC4, 0xDE), TimeSpan.FromSeconds(5));
+
+        await App.TapAsync("PushAppearanceOverlap");
+        await App.WaitForTextAsync("NavBarTitleLabel", "Overlap Title");
+
+        try
+        {
+            await App.TapAsync("ToggleThemeAppearanceOverlap");
+            await App.TapAsync("PopAppearanceOverlap");
+            await WaitDisplayedAsync("AppearancePageHome");
+
+            await App.WaitForTextAsync("AppearanceHomeTitleForeground", "#FFFFFF");
+            await App.WaitForPixelColorAsync("NavBarSurface", 4, 66, c => IsClose(c, 0x48, 0x3D, 0x8B), TimeSpan.FromSeconds(5));
+
+            // And back to light, at the root this time (the brush is the presented one).
+            await App.TapAsync("PushAppearanceOverlap");
+            await App.WaitForTextAsync("NavBarTitleLabel", "Overlap Title");
+            await App.TapAsync("ToggleThemeAppearanceOverlap");
+            await App.TapAsync("PopAppearanceOverlap");
+            await WaitDisplayedAsync("AppearancePageHome");
+            await App.WaitForTextAsync("AppearanceHomeTitleForeground", "#000000");
+            await App.WaitForPixelColorAsync("NavBarSurface", 4, 66, c => IsClose(c, 0xB0, 0xC4, 0xDE), TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            // Never leak a forced theme into the next test.
+            await App.TapAsync("PushAppearanceOverlap");
+            await App.WaitForTextAsync("NavBarTitleLabel", "Overlap Title");
+            await App.TapAsync("ResetThemeAppearanceOverlap");
+            await App.TapAsync("PopAppearanceOverlap");
+        }
+    }
+
+    private static bool IsClose((byte R, byte G, byte B) c, byte r, byte g, byte b)
+        => Math.Abs(c.R - r) < 20 && Math.Abs(c.G - g) < 20 && Math.Abs(c.B - b) < 20;
+
     [Fact]
     public async Task TitleForegroundIsASeparateChannelFromForeground()
     {
