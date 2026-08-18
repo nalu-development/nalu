@@ -721,18 +721,24 @@ internal sealed class ScaffoldViewController : UIViewController
         // Only the strip transform and the page inset relayout are meant to animate.
         UIView.PerformWithoutAnimation(strip.LayoutIfNeeded);
 
-        var targetTransform = presented
-            ? CGAffineTransform.MakeIdentity()
-            : CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
+        // The hidden translation is the strip's CURRENT height — read when the transform is
+        // written, never earlier: a bar swap issued with this call leaves the strip dirty, and its
+        // re-measure runs in the controller's layout pass (flushed by the presenter before it
+        // stages the page, i.e. before the animation below starts on the next turn). A target
+        // captured here would hide the strip by the PREVIOUS bar's height and leave the new,
+        // taller bar peeking over the page.
+        CGAffineTransform TargetTransform()
+            => presented ? CGAffineTransform.MakeIdentity() : CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
 
         if (!animated)
         {
-            strip.Transform = targetTransform;
+            strip.Transform = TargetTransform();
             ApplyCurrentPageInsets();
 
             return;
         }
 
+        var wasAtRestHidden = _navBarAnimating == 0 && strip.Transform.y0 != 0;
         _navBarAnimating++;
 
         try
@@ -740,15 +746,33 @@ internal sealed class ScaffoldViewController : UIViewController
             await AnimateChromeAsync(
                 () =>
                 {
-                    strip.Transform = targetTransform;
+                    strip.Transform = TargetTransform();
                     ApplyCurrentPageInsets();
                     View!.LayoutIfNeeded();
+                },
+                prepare: () =>
+                {
+                    // Sliding IN a strip that rested hidden: it rests hidden by the height it HAD;
+                    // after a bar swap it may be far shorter (or taller) now — start the slide
+                    // exactly one current height above the edge, or a short bar spends most of
+                    // the slide offscreen and just pops in at the end.
+                    if (presented && wasAtRestHidden)
+                    {
+                        strip.Transform = CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
+                    }
                 }
             );
         }
         finally
         {
             _navBarAnimating--;
+
+            // Settle: a strip re-measured DURING the slide (its target was read at start) must
+            // rest exactly offscreen / at identity for the state it is in now.
+            if (_navBarAnimating == 0 && _navBarPresented == presented)
+            {
+                strip.Transform = TargetTransform();
+            }
         }
     }
 
@@ -760,18 +784,28 @@ internal sealed class ScaffoldViewController : UIViewController
     /// incoming page unpresented and its Appearing unraised. Posting to the main queue starts the
     /// animation on the NEXT turn instead, and its completion handler resolves the task.
     /// </summary>
-    private static Task AnimateChromeAsync(Action animation)
+    private static Task AnimateChromeAsync(Action animation, Action? prepare = null)
     {
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         DispatchQueue.MainQueue.DispatchAsync(
-            () => UIView.AnimateNotify(
-                _barAnimationDurationSeconds,
-                0,
-                UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
-                animation,
-                _ => completion.TrySetResult()
-            )
+            () =>
+            {
+                // Runs right before the animation starts (same turn), never animated: the place
+                // to sync a starting position against geometry settled since the call was made.
+                if (prepare is not null)
+                {
+                    UIView.PerformWithoutAnimation(prepare);
+                }
+
+                UIView.AnimateNotify(
+                    _barAnimationDurationSeconds,
+                    0,
+                    UIViewAnimationOptions.BeginFromCurrentState | UIViewAnimationOptions.AllowUserInteraction,
+                    animation,
+                    _ => completion.TrySetResult()
+                );
+            }
         );
 
         return completion.Task;

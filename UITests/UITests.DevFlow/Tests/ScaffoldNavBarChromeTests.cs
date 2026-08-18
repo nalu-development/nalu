@@ -251,4 +251,62 @@ public class ScaffoldNavBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         await App.WaitForTextAsync("NavBarTitleLabel", "Home Title");
         await App.WaitForBoundsAsync("NavBarPageHome", b => Math.Abs(b.Y - withBar.Y) <= 1);
     }
+
+    /// <summary>
+    /// A hidden bar must STAY hidden across a round trip through a page whose bar has a different
+    /// height (the edge-to-edge page swaps in a 20dp custom bar, the pop swaps the default bar
+    /// back). Regression: the hide slide targeted the strip's PREVIOUS height, so the taller
+    /// default bar came back peeking over the page — the strip visible while the page was laid
+    /// out for no bar. Asserted on pixels: the strip is out of the element tree while hidden.
+    /// </summary>
+    [Fact]
+    public async Task HiddenBarStaysHiddenAcrossABarSwapRoundTrip()
+    {
+        await WaitDisplayedAsync("NavBarPageHome");
+        var withBar = await App.WaitForStableBoundsAsync("NavBarPageHome");
+
+        await App.TapAsync("ToggleNavBar");
+        await App.WaitForElementGoneAsync("NavBarTitleLabel");
+        var hidden = await App.WaitForBoundsAsync("NavBarPageHome", b => b.Y < withBar.Y - 30);
+        var (width, height) = await App.GetWindowSizeAsync();
+
+        // Sample point: beside the page's first line (right edge, no text there) — the bar-less
+        // page paints its own background where the bar used to be.
+        var samplePoint = ((width - 24) / width, hidden.CenterY / height);
+        var restingSample = await WaitForStablePixelAsync(samplePoint);
+
+        await App.TapAsync("PushNavBarEdgeToEdge");
+        await WaitDisplayedAsync("NavBarPageEdgeToEdge");
+        await App.WaitForBoundsAsync("EdgeToEdgeNavBarMarker", b => b.Height > 0);
+
+        await App.TapAsync("PopNavBarEdgeToEdge");
+        await App.WaitForSettledDisplayAsync("NavBarPageHome");
+
+        (await App.WaitForStableBoundsAsync("NavBarPageHome")).Y.Should().BeApproximately(hidden.Y, 1, "the page is still laid out for NO bar");
+        (await App.WaitForElementOrDefaultAsync("NavBarTitleLabel", TimeSpan.FromMilliseconds(500))).Should().BeNull("the bar stays out of the tree");
+
+        var sample = await WaitForStablePixelAsync(samplePoint);
+        sample.Should().Be(restingSample, "nothing but the page's own background is drawn beside its first line — no bar surface peeking over it");
+    }
+
+    /// <summary>The window pixel once it stops changing (a chrome slide may still be in flight).</summary>
+    private async Task<(byte R, byte G, byte B)> WaitForStablePixelAsync((double X, double Y) point)
+    {
+        var last = (await App.SampleWindowPixelsAsync(point))[0];
+
+        for (var i = 0; i < 20; i++)
+        {
+            await Task.Delay(150);
+            var current = (await App.SampleWindowPixelsAsync(point))[0];
+
+            if (current == last)
+            {
+                return current;
+            }
+
+            last = current;
+        }
+
+        return last;
+    }
 }
