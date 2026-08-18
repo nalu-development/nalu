@@ -590,6 +590,48 @@ public class NavigationRestoreTests
         await searchModel.Received(1).OnEnteringAsync(new SearchIntent("root-context"));
     }
 
+    [Fact(DisplayName = "A visited root with an EMPTY stack (no intent) is restored as the current root")]
+    public async Task EmptyStackRootWithoutIntentIsRestored()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store))
+        {
+            await first.BootAsync();
+            (await first.NavigationService.GoToAsync(Navigation.Absolute().Root<ISearchPageModel>())).Should().BeTrue();
+            await first.Restore.FlushAsync();
+            ParseSnapshot(store.Stored!).RootSegment.Should().Be("SearchPage");
+        }
+
+        using var second = new Harness(store);
+        await second.BootAsync();
+
+        second.TabBar.CurrentRoot.Should().Be(second.SearchRoot);
+    }
+
+    [Fact(DisplayName = "A visited root whose stack was emptied again (push + pop) is restored as the current root")]
+    public async Task RootEmptiedByPopIsRestored()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store))
+        {
+            await first.BootAsync();
+            (await first.NavigationService.GoToAsync(Navigation.Absolute().Root<ISearchPageModel>())).Should().BeTrue();
+            (await first.NavigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>().WithIntent(new DetailIntent("x")))).Should().BeTrue();
+            (await first.NavigationService.GoToAsync(Navigation.Relative().Pop())).Should().BeTrue();
+            await first.Restore.FlushAsync();
+            ParseSnapshot(store.Stored!).RootSegment.Should().Be("SearchPage");
+            ParseSnapshot(store.Stored!).Frames.Should().BeEmpty();
+        }
+
+        using var second = new Harness(store);
+        await second.BootAsync();
+
+        second.TabBar.CurrentRoot.Should().Be(second.SearchRoot);
+        second.SearchStack.Should().BeEmpty();
+    }
+
     [Fact(DisplayName = "While a restore is pending, app navigations are ignored; afterwards they work again")]
     public async Task PendingRestoreIgnoresAppNavigations()
     {

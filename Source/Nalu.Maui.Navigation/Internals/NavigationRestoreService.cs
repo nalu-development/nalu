@@ -184,22 +184,47 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
             if (payload is null)
             {
+                _logger?.LogDebug("No navigation-state snapshot to restore.");
+
                 return;
             }
 
             var snapshot = JsonSerializer.Deserialize(payload, NavigationRestoreJsonContext.Default.NavigationRestoreSnapshot);
 
-            if (snapshot is null
-                || snapshot.SchemaVersion != _schemaVersion
-                || snapshot.AppVersion != AppVersionProvider()
-                || snapshot.RouteHash != ComputeRouteHash(shellProxy)
-                || snapshot.RootSegment is null)
+            // Every rejection below is silent by design (the app boots its default destination)
+            // but logged: "why did it not restore?" is otherwise undiagnosable in the field.
+            if (snapshot is null || snapshot.SchemaVersion != _schemaVersion)
             {
+                _logger?.LogInformation("Navigation-state snapshot discarded: unreadable or schema {Schema} != {Expected}.", snapshot?.SchemaVersion, _schemaVersion);
+
+                return;
+            }
+
+            if (snapshot.AppVersion != AppVersionProvider())
+            {
+                _logger?.LogInformation("Navigation-state snapshot discarded: captured by app version {Captured}, running {Current}.", snapshot.AppVersion, AppVersionProvider());
+
+                return;
+            }
+
+            if (snapshot.RouteHash != ComputeRouteHash(shellProxy))
+            {
+                _logger?.LogInformation("Navigation-state snapshot discarded: the route structure (roots / registered intents) changed since capture.");
+
+                return;
+            }
+
+            if (snapshot.RootSegment is null)
+            {
+                _logger?.LogInformation("Navigation-state snapshot discarded: the captured root was not restorable.");
+
                 return;
             }
 
             if (_options!.MaxAge is { } maxAge && _timeProvider.GetUtcNow() - snapshot.CapturedAt > maxAge)
             {
+                _logger?.LogInformation("Navigation-state snapshot discarded: older than MaxAge ({MaxAge}).", maxAge);
+
                 return;
             }
 
@@ -208,6 +233,8 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
             if (!typesBySegment.TryGetValue(snapshot.RootSegment, out var rootPageType)
                 || !GetOrderedRootSegments(shellProxy).Contains(snapshot.RootSegment, StringComparer.Ordinal))
             {
+                _logger?.LogInformation("Navigation-state snapshot discarded: root segment {Segment} is not a root of the current structure.", snapshot.RootSegment);
+
                 return;
             }
 
@@ -259,6 +286,8 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
                 RootIntent = rootIntent,
                 Frames = frames
             };
+
+            _logger?.LogDebug("Navigation-state snapshot accepted: root {Root}, {Frames} frame(s).", snapshot.RootSegment, frames.Count);
 
             _stopRequested = false;
             _suppressNavigations = true;
