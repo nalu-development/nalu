@@ -565,6 +565,10 @@ public partial class VirtualScrollHandler
 
         switch (virtualScroll.ItemsLayout)
         {
+            // GridVirtualScrollLayout lands here on purpose and degrades to a single-column list:
+            // UniformGridLayout has no way to give a header, footer or section boundary a whole
+            // line, so a real grid would drop them mid-line. Documented, and consistent with
+            // SizingStrategy, which Windows also accepts and ignores.
             case LinearVirtualScrollLayout linearLayout:
                 // For linear layouts, use StackLayout
                 if (handler._layout is not WStackLayout stackLayout)
