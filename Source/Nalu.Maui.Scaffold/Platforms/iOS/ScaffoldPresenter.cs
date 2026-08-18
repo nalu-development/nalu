@@ -987,10 +987,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
 
-        // Bar-subtree measure changes reach the strip through the host's Controls-layer bubble —
-        // the platform invalidation walk dies inside the host chain (see BarMeasureInvalidated).
-        host.BarMeasureInvalidated = controller.InvalidateNavBarMeasure;
-
         var freshMount = host.Bar is null;
         host.SetBar(navBarView);
         host.UpdateSources(targetPage);

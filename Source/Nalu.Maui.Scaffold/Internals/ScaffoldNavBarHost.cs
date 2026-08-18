@@ -10,10 +10,20 @@ namespace Nalu.Internals;
 /// bar swaps happen virtually through <see cref="SetBar"/>.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Layout constraint discipline: the scaffold hands the host <c>HorizontallyFixed</c> (the strip
+/// fixes its width, its height follows the bar); star cells of a grid that is not vertically fixed
+/// keep the surface and the bar non-<c>Fixed</c> too, so MAUI's PLATFORM measure-invalidation walk
+/// (which stops at the first fully Fixed layer) climbs from anywhere in the bar subtree to the
+/// native strip, which marks itself dirty and lets the controller re-measure in its layout pass.
+/// The Controls-level <c>MeasureInvalidated</c> event is never used.
+/// </para>
+/// <para>
 /// Appearance values land on the INNER container: the host itself is platform-framed by the
 /// strip, so its virtual frame is never arranged and the iOS transform mapper would silently
 /// skip translations on it (the bottom-sheet lesson) — the inner container IS virtually
 /// arranged by the host's cross-platform layout pass, making <c>TranslationY</c> reliable.
+/// </para>
 /// </remarks>
 internal sealed class ScaffoldNavBarHost : Grid, IDisposable
 {
@@ -31,21 +41,9 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
 
     public View? Bar => _bar;
 
-    /// <summary>
-    /// Raised when a measure invalidation from ANYWHERE in the hosted bar's subtree bubbles
-    /// through the host. The platform strip cannot rely on MAUI's platform-level invalidation
-    /// walk to deliver this: with the host chain between the bar and the strip, the walk dies at
-    /// a <c>MauiView</c> whose propagation latch was never reset (its measure was answered from a
-    /// virtual cache, so its platform <c>SizeThatFits</c> — the latch reset — never ran). The
-    /// CONTROLS-layer bubble used here climbs the LOGICAL tree unconditionally, so a runtime bar
-    /// height change (badge growing the bar, large-title expansion) reliably reaches the strip.
-    /// </summary>
-    public Action? BarMeasureInvalidated { get; set; }
-
     public ScaffoldNavBarHost(Scaffold scaffold)
     {
         _scaffold = scaffold;
-        MeasureInvalidated += (_, _) => BarMeasureInvalidated?.Invoke();
 
         // Chrome never self-pads: the mounted bar view owns its safe-area behavior (the default
         // bar consumes the top inset itself), and on Android an explicit None also dodges the
@@ -63,6 +61,7 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         scaffold.PropertyChanged += OnElementPropertyChanged;
         RefreshAppearanceChain();
     }
+
 
     /// <summary>Swaps the hosted bar view (no platform re-mount; the strip stays as is).</summary>
     public void SetBar(View? bar)

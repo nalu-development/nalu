@@ -51,6 +51,40 @@ public class ScaffoldNavBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (await App.WaitForElementAsync("NavBarBackButton")).IsVisible.Should().BeFalse();
     }
 
+    /// <summary>
+    /// The bar's internal layout must be CURRENT after a push: the back button appears with its
+    /// real size and the title moves over to make room, both inside the bar's row. This is the
+    /// regression the strip/host measure plumbing broke once (a stale row left the button 0×0 and
+    /// the title at its root position, overlapping the back glyph) — asserted on geometry, not
+    /// on visibility flags.
+    /// </summary>
+    [Fact]
+    public async Task PushLaysOutBackButtonAndTitleSideBySide()
+    {
+        await WaitDisplayedAsync("NavBarPageHome");
+        var rootTitle = await App.WaitForStableBoundsAsync("NavBarTitleLabel");
+        var rootRow = await App.WaitForStableBoundsAsync("NavBarTitle");
+
+        await App.TapAsync("PushNavBarDetail");
+        await WaitDisplayedAsync("NavBarPageDetail");
+        await App.WaitForTextAsync("NavBarTitleLabel", "Detail Title");
+
+        var back = await App.WaitForBoundsAsync("NavBarBackButton", b => b.Width >= 40 && b.Height >= 40);
+        var title = await App.WaitForStableBoundsAsync("NavBarTitleLabel");
+        var titleSlot = await App.WaitForStableBoundsAsync("NavBarTitle");
+
+        back.X.Should().BeGreaterThanOrEqualTo(0);
+        back.CenterY.Should().BeApproximately(rootRow.CenterY, 2, "the back button is vertically centered in the same row as the title");
+        titleSlot.X.Should().BeGreaterThanOrEqualTo(back.Right - 1, "the title slot starts after the back button");
+        title.X.Should().BeGreaterThanOrEqualTo(back.Right - 1, "the title text never overlaps the back button");
+        title.CenterY.Should().BeApproximately(rootTitle.CenterY, 2, "the bar keeps its height across the push");
+
+        await App.TapAsync("NavBarBackButton");
+        await WaitDisplayedAsync("NavBarPageHome");
+        await App.WaitForTextAsync("NavBarTitleLabel", "Home Title");
+        (await App.WaitForStableBoundsAsync("NavBarTitleLabel")).X.Should().BeApproximately(rootTitle.X, 1, "the title returns to its root position");
+    }
+
     [Fact]
     public async Task VisiblePolicyKeepsDrawerButtonNextToBack()
     {

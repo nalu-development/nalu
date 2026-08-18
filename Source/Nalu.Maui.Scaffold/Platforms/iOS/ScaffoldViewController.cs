@@ -21,13 +21,14 @@ namespace Nalu;
 /// <para>
 /// What the host DOES have to guarantee is that the answer is current. MAUI folds the consumed
 /// inset into the size in <c>CrossPlatformMeasure</c>, but only detects an inset change while the
-/// bar lays out (<c>ValidateSafeArea</c> runs in <c>LayoutSubviews</c>) — and it then asks the
-/// PARENT to re-measure (<c>InvalidateAncestorsMeasures</c>) only when that parent is a
-/// cross-platform layout backing. The strips therefore declare themselves as such
-/// (<see cref="ICrossPlatformLayoutBacking"/>) and receive the invalidation through
-/// <see cref="IPlatformMeasureInvalidationController"/>: mark dirty, request layout, and the
-/// controller re-measures the strip in ITS layout pass. Pure platform layout discipline — no
-/// inline <c>LayoutIfNeeded</c> drains, no deferred settle.
+/// bar lays out (<c>ValidateSafeArea</c> runs in <c>LayoutSubviews</c>); a changed fold, like any
+/// measure change in the bar subtree, then climbs the platform hierarchy
+/// (<c>InvalidateAncestorsMeasures</c>) — the scaffold keeps every layer between the bar and the
+/// strip non-Fixed so the walk reaches the strip, which implements
+/// <see cref="IPlatformMeasureInvalidationController"/>: mark dirty, request layout on itself and
+/// its superview, and the controller re-measures the strip in ITS layout pass. Pure platform
+/// layout discipline — no Controls-level <c>MeasureInvalidated</c> event, no inline
+/// <c>LayoutIfNeeded</c> drains, no deferred settle.
 /// </para>
 /// </remarks>
 internal static class ScaffoldChromeBar
@@ -47,12 +48,14 @@ internal static class ScaffoldChromeBar
 }
 
 /// <summary>
-/// Base of the chrome strips hosting a MAUI bar view: a native superview that behaves, for MAUI's
-/// layout machinery, like a cross-platform layout backing — the bar's measure invalidations
-/// (its own or propagated from its subtree, including the safe-area re-fold MAUI performs in the
-/// bar's <c>LayoutSubviews</c>) terminate here (<see cref="IPlatformMeasureInvalidationController"/>),
-/// only marking the strip dirty and requesting a layout; the controller re-measures the strip
-/// (<see cref="Measure"/>) in its own layout pass. The bar FILLS the strip.
+/// Base of the chrome strips hosting a MAUI bar view: a plain native superview where the bar's
+/// measure invalidations (its own or propagated from its subtree, including the safe-area re-fold
+/// MAUI performs in the bar's <c>LayoutSubviews</c>) terminate
+/// (<see cref="IPlatformMeasureInvalidationController"/>), only marking the strip dirty and
+/// requesting a layout; the controller re-measures the strip (<see cref="Measure"/>) in its own
+/// layout pass. The bar keeps measuring and arranging itself in its own <c>LayoutSubviews</c>;
+/// only a strip hosting a DIRECT MAUI bar view also declares itself a cross-platform layout
+/// backing (see <see cref="CrossPlatformLayout"/>). The bar FILLS the strip.
 /// </summary>
 internal abstract class ScaffoldChromeStrip : UIView, IPlatformMeasureInvalidationController, ICrossPlatformLayoutBacking
 {
@@ -65,20 +68,23 @@ internal abstract class ScaffoldChromeStrip : UIView, IPlatformMeasureInvalidati
     /// <summary>The bar's height, INCLUDING any safe-area padding it chose to consume.</summary>
     internal nfloat BarHeight { get; private set; }
 
-    protected ScaffoldChromeStrip(UIView bar)
+    protected ScaffoldChromeStrip(UIView bar, bool handlesBarMeasure)
     {
         Bar = bar;
         BackgroundColor = UIColor.Clear;
-        CrossPlatformLayout = new BarLayout(this);
+        CrossPlatformLayout = handlesBarMeasure ? new BarLayout(this) : null;
         bar.Superview?.WillRemoveSubview(bar);
         bar.RemoveFromSuperview();
         AddSubview(bar);
     }
 
     /// <summary>
-    /// What makes MAUI treat this native strip as the bar's layout parent (<c>IsFinalMeasureHandledBySuperView</c>):
-    /// the bar then reports its safe-area re-fold upward instead of silently re-measuring itself.
-    /// The strip measures/arranges the bar in the controller's pass; this object is that contract in MAUI terms.
+    /// Non-null only for a strip whose bar is a DIRECT MAUI view (no MAUI-owned host chain between):
+    /// MAUI reports the bar's safe-area re-fold upward (<c>InvalidateAncestorsMeasures</c> from its
+    /// <c>LayoutSubviews</c>) only when its superview is a cross-platform layout backing, so the
+    /// strip declares itself as such — the bar's measure/arrange still happen in the controller's
+    /// pass, this object is that contract in MAUI terms. A bar mounted through a MAUI host (nav bar)
+    /// already has a backing superview inside the chain and the strip stays a plain native view.
     /// </summary>
     public ICrossPlatformLayout? CrossPlatformLayout { get; set; }
 
@@ -994,7 +1000,7 @@ internal sealed class ScaffoldViewController : UIViewController
 /// the screen's bottom edge and owns the bottom system inset (SafeAreaEdges semantics — the
 /// default template's Auto-row root keeps its pill above the inset).
 /// </summary>
-internal sealed class ScaffoldTabBarStrip(UIView bar) : ScaffoldChromeStrip(bar);
+internal sealed class ScaffoldTabBarStrip(UIView bar) : ScaffoldChromeStrip(bar, handlesBarMeasure: true);
 
 /// <summary>
 /// Top chrome strip hosting the MAUI nav bar platform view: the bar FILLS the strip (its
@@ -1004,4 +1010,4 @@ internal sealed class ScaffoldTabBarStrip(UIView bar) : ScaffoldChromeStrip(bar)
 /// subtracted back (the NaluShellItemRenderer net10 pattern) — the controller adds the system
 /// inset deterministically.
 /// </summary>
-internal sealed class ScaffoldNavBarStrip(UIView bar) : ScaffoldChromeStrip(bar);
+internal sealed class ScaffoldNavBarStrip(UIView bar) : ScaffoldChromeStrip(bar, handlesBarMeasure: false);

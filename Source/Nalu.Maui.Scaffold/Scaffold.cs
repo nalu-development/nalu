@@ -1205,10 +1205,16 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
     /// <see cref="TemplatedPage"/> gives its Fill/Fill children — a Fixed root stops MAUI's
     /// platform measure-invalidation walk at itself and re-lays out in its CURRENT bounds, so a
     /// popup whose content grows after presentation would never reach the presenter. The
-    /// scaffold's own <see cref="ContentPage.Content"/> keeps the page semantics.
+    /// scaffold's own <see cref="ContentPage.Content"/> keeps the page semantics. The nav bar host
+    /// lives in a strip that fixes its WIDTH only (its height follows the bar): HorizontallyFixed.
     /// </summary>
     protected override LayoutConstraint ComputeConstraintForView(View view)
-        => ReferenceEquals(view, Content) ? base.ComputeConstraintForView(view) : LayoutConstraint.None;
+        => view switch
+        {
+            ScaffoldNavBarHost => LayoutConstraint.HorizontallyFixed,
+            _ when ReferenceEquals(view, Content) => base.ComputeConstraintForView(view),
+            _ => LayoutConstraint.None
+        };
 
     /// <summary>
     /// Routes back requests arriving through MAUI's legacy/synthetic channel (e.g. automation
