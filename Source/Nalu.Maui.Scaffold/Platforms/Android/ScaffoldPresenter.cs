@@ -1366,6 +1366,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
         var freshMount = host.Bar is null;
+
+        // A different bar view in the same strip: the strip's CURRENT height describes the bar
+        // it is replacing — its slide targets must be read after the layout pass measures the
+        // new one (a hide by the old height leaves a taller bar peeking over the page).
+        var swapped = !freshMount && !ReferenceEquals(host.Bar, navBarView);
+
         host.SetBar(navBarView);
         host.UpdateSources(targetPage);
 
@@ -1419,17 +1425,48 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         _navBarStrip.Visibility = ViewStates.Visible;
 
-        // Same contract as the tab bar strip: freeze the insets at their resting values
-        // before leaving rest so the translated bar is never re-padded mid-flight.
-        _navBarStrip.FreezeInsets();
+        return HideNavAsync(_navBarStrip);
 
-        return AnimateNavStripToAsync(_navBarStrip, -_lastNavStripHeight, animated);
+        async Task HideNavAsync(ScaffoldNavBarStripLayout strip)
+        {
+            if (swapped)
+            {
+                // Let the strip measure the NEW bar (one layout pass) before choosing how far
+                // to slide it: hidden means "translated by its own height".
+                await ScaffoldViewFrames.NextLayoutAsync(strip);
+
+                if (strip.Height > 0)
+                {
+                    _lastNavStripHeight = strip.Height;
+                }
+            }
+
+            // Same contract as the tab bar strip: freeze the insets at their resting values
+            // before leaving rest so the translated bar is never re-padded mid-flight.
+            strip.FreezeInsets();
+
+            await AnimateNavStripToAsync(strip, -_lastNavStripHeight, animated);
+        }
 
         async Task ShowNavAsync(ScaffoldNavBarStripLayout strip)
         {
             if (strip.TranslationY != 0)
             {
                 strip.FreezeInsets();
+
+                if (swapped)
+                {
+                    // Sliding IN a strip that rests hidden by the height it HAD: after the swap it
+                    // may be far shorter (or taller) — start the slide one NEW height above the
+                    // edge, or a short bar spends the whole slide offscreen and just pops in.
+                    await ScaffoldViewFrames.NextLayoutAsync(strip);
+
+                    if (strip.Height > 0)
+                    {
+                        _lastNavStripHeight = strip.Height;
+                        strip.TranslationY = -strip.Height;
+                    }
+                }
             }
 
             await AnimateNavStripToAsync(strip, 0, animated);
