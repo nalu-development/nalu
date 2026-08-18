@@ -142,7 +142,8 @@ public class NavigationRestoreTests
             InMemoryStore store,
             Action<NavigationRestoreOptions>? configureRestore = null,
             bool withRestore = true,
-            Action<IServiceCollection>? configureServices = null)
+            Action<IServiceCollection>? configureServices = null,
+            bool standaloneInitialRoot = false)
         {
             var services = new ServiceCollection();
             services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
@@ -191,6 +192,27 @@ public class NavigationRestoreTests
             ServiceProvider = services.BuildServiceProvider();
             NavigationService = (NavigationService) ServiceProvider.GetRequiredService<INavigationService>();
             Restore = ServiceProvider.GetRequiredService<NavigationRestoreService>();
+
+            if (standaloneInitialRoot)
+            {
+                // A plain root OUTSIDE any tab bar boots the app; the tab bar area comes after.
+                TabBar = new ScaffoldTabBar
+                {
+                    Roots =
+                    {
+                        new ScaffoldRoot { PageType = typeof(SearchPage) },
+                        new ScaffoldRoot { PageType = typeof(DeepDetailPage) }
+                    }
+                };
+
+                Scaffold = new Scaffold
+                {
+                    Areas = { new ScaffoldRoot { PageType = typeof(HomePage) }, TabBar },
+                    Presenter = new NoopPresenter()
+                };
+
+                return;
+            }
 
             TabBar = new ScaffoldTabBar
             {
@@ -630,6 +652,62 @@ public class NavigationRestoreTests
 
         second.TabBar.CurrentRoot.Should().Be(second.SearchRoot);
         second.SearchStack.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Standalone initial root + tab bar area: a visited tab root with an empty stack is restored")]
+    public async Task TabRootWithEmptyStackIsRestoredWhenTheInitialRootIsStandalone()
+    {
+        var store = new InMemoryStore();
+
+        using (var first = new Harness(store, standaloneInitialRoot: true))
+        {
+            await first.BootAsync();
+            first.Scaffold.CurrentArea.Should().NotBe(first.TabBar);
+            (await first.NavigationService.GoToAsync(Navigation.Absolute().Root<ISearchPageModel>())).Should().BeTrue();
+            first.Scaffold.CurrentArea.Should().Be(first.TabBar);
+            await first.Restore.FlushAsync();
+            ParseSnapshot(store.Stored!).RootSegment.Should().Be("SearchPage");
+        }
+
+        using var second = new Harness(store, standaloneInitialRoot: true);
+        await second.BootAsync();
+
+        second.Scaffold.CurrentArea.Should().Be(second.TabBar);
+        second.TabBar.CurrentRoot.Should().Be(second.TabBar.Roots[0]);
+    }
+
+    [Fact(DisplayName = "Standalone initial root that REDIRECTS to a tab root: the tab root (empty stack) is restored")]
+    public async Task RedirectingStandaloneRootRestoresTheTabRoot()
+    {
+        var store = new InMemoryStore();
+
+        Action<IServiceCollection> redirectingHome = services => services.AddScoped(sp =>
+            {
+                var model = Substitute.For<IHomePageModel>();
+
+                model.OnAppearingAsync()
+                     .Returns(
+                         _ => new ValueTask(sp.GetRequiredService<INavigationService>().GoToAsync(Navigation.Absolute().Root<ISearchPageModel>())),
+                         _ => ValueTask.CompletedTask
+                     );
+
+                return model;
+            }
+        );
+
+        using (var first = new Harness(store, configureServices: redirectingHome, standaloneInitialRoot: true))
+        {
+            await first.BootAsync();
+            first.Scaffold.CurrentArea.Should().Be(first.TabBar, "the init root redirected to the tab root");
+            await first.Restore.FlushAsync();
+            ParseSnapshot(store.Stored!).RootSegment.Should().Be("SearchPage");
+        }
+
+        using var second = new Harness(store, configureServices: redirectingHome, standaloneInitialRoot: true);
+        await second.BootAsync();
+
+        second.Scaffold.CurrentArea.Should().Be(second.TabBar);
+        second.TabBar.CurrentRoot.Should().Be(second.TabBar.Roots[0]);
     }
 
     [Fact(DisplayName = "While a restore is pending, app navigations are ignored; afterwards they work again")]

@@ -136,6 +136,34 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
     }
 
+    /// <summary>
+    /// Init root OUTSIDE any area + a tab bar area: the captured tab root (empty stack) must be
+    /// restored — the boot runs the standalone init root first, then the replay switches area.
+    /// </summary>
+    [Fact]
+    public async Task KillAndRelaunchRestoresATabRootBehindAStandaloneInitRoot()
+    {
+        const string standaloneHarness = "Scaffold Restore Standalone Tests";
+
+        // Leave the default harness (its Dispose turns restore off; the standalone one turns it on).
+        await App.ResetAsync();
+        await App.OpenTestPageAsync(standaloneHarness);
+        await App.WaitForSettledDisplayAsync("RestoreHomePage");
+
+        await App.TapAsync("RestoreGoOtherButton");
+        await App.WaitForSettledDisplayAsync("RestoreOtherPage");
+
+        await Task.Delay(_snapshotSettle);
+        await App.RestartAppAsync();
+        await App.OpenTestPageAsync(standaloneHarness);
+
+        await App.WaitForSettledDisplayAsync("RestoreOtherPage");
+
+        // Back to the default harness so DisposeAsync's convergence finds its pages.
+        await App.ResetAsync();
+        await App.OpenTestPageAsync(_pageName);
+    }
+
     [Fact]
     public async Task AutoNavigationsDuringReplayAreSuppressedExceptOnTheFinalDestination()
     {

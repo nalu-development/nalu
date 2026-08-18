@@ -103,6 +103,43 @@ public class RestoreScaffold : Scaffold
     }
 }
 
+/// <summary>
+/// The "init root outside any area" shape: a standalone <see cref="ScaffoldRoot"/> boots the
+/// app, the tab bar area (with the roots the user actually lives in) comes after. Restore must
+/// land on the captured TAB root even when its stack is empty.
+/// </summary>
+[UsedImplicitly]
+[TestPage("Scaffold Restore Standalone Tests")]
+public class RestoreStandaloneScaffold : Scaffold
+{
+    public RestoreStandaloneScaffold()
+    {
+        ScaffoldRestoreTestSupport.Enable();
+
+        Areas.Add(new ScaffoldRoot { Title = "RestHome", PageType = typeof(RestoreHomePage) });
+        Areas.Add(
+            new ScaffoldTabBar
+            {
+                Roots =
+                {
+                    new ScaffoldRoot { Title = "RestOther", PageType = typeof(RestoreOtherPage) },
+                    new ScaffoldRoot { Title = "RestDeep", PageType = typeof(RestoreDeepPage) }
+                }
+            }
+        );
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            ScaffoldRestoreTestSupport.Disable();
+        }
+
+        base.Dispose(disposing);
+    }
+}
+
 internal static class RestorePageFactory
 {
     public static Button MakeButton(string text, string automationId, Func<Task> action)
