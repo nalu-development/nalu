@@ -472,6 +472,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         controller.CurrentPageWantsBarInset = barVisible;
         controller.CurrentPageWantsNavBarInset = wantsNavBarInset;
         controller.CurrentPageKeyboardMode ??= () => scaffold.ResolvePageKeyboardMode(_currentPage);
+
+        // The chrome update issued alongside this transition may have left the strips dirty (a
+        // nav bar swap re-measures in the controller's layout pass): flush that pass NOW, with the
+        // incoming page already the inset target and still unmounted, so the strips reach their
+        // final geometry and the page's insets are FINAL before it is staged. Left pending, the
+        // pass would run inside the transition's animation block and UIKit would animate both
+        // the strip surface and the page's inset relayout (a page sliding in while its content
+        // also drifts down).
+        controller.View!.LayoutIfNeeded();
         controller.ApplyCurrentPageInsets();
 
         parentController.AddChildViewController(newController);
