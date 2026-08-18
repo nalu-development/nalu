@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Nalu;
 
 /// <summary>Provides scaffold registration methods on <see cref="MauiAppBuilder"/>.</summary>
@@ -17,6 +19,12 @@ public static class ScaffoldAppBuilderExtensions
     /// <see cref="IScaffoldConfigurator.AddOverlay{TModel,TView}()"/> calls.
     /// </param>
     /// <returns>The same builder, for chaining.</returns>
+    // ILLink keeps every IScaffoldConfigurator overload the app calls but, confused by the
+    // arity-only overloads (AddOverlay<TModel,TView>() vs AddOverlay<TView>()), drops the matching
+    // implementations from the sealed registry — which then implements fewer methods than its
+    // interface: "VTable setup of type Nalu.ScaffoldOverlayRegistry failed" at AOT compile time /
+    // on startup (Release iOS). Keeping every public method of the registry keeps the vtable whole.
+    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(ScaffoldOverlayRegistry))]
     public static MauiAppBuilder UseNaluScaffold(this MauiAppBuilder builder, Action<IScaffoldConfigurator>? configure = null)
     {
 #if IOS
