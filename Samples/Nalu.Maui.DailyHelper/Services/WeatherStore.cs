@@ -15,9 +15,9 @@ namespace Nalu.Maui.DailyHelper.Services;
 public sealed class WeatherStore : IDisposable
 {
     // Fixed demo location: no permission prompts, deterministic first run.
-    private const string _placeName = "Verona";
-    private const float _latitude = 45.4384f;
-    private const float _longitude = 10.9916f;
+    private const string _placeName = "Rome";
+    private const float _latitude = 45.5384f;
+    private const float _longitude = 12.2916f;
 
     private readonly OpenMeteoClient _client = new();
     private readonly SourceCache<HourForecast, DateTime> _hours = new(h => h.Time);
