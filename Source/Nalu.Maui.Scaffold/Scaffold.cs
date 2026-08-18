@@ -975,14 +975,18 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
         if (oldValue is ScaffoldNavBarAppearance previous && ReferenceEquals(previous.Parent, element))
         {
-            previous.Parent = null;
+            element.RemoveLogicalChild(previous);
         }
 
         if (newValue is ScaffoldNavBarAppearance appearance)
         {
-            // Parenting puts the appearance (and its brush) in the element tree, where MAUI
-            // delivers theme/resource changes; a style-shared instance keeps its first parent.
-            appearance.Parent ??= element;
+            // As a logical child the appearance (and its brush) sits in the element tree, where
+            // MAUI delivers theme/resource changes; a style-shared instance keeps its first parent.
+            if (appearance.Parent is null)
+            {
+                element.AddLogicalChild(appearance);
+            }
+
             SetInheritedBindingContext(appearance, element.BindingContext);
             element.BindingContextChanged += OnAppearanceHostBindingContextChanged;
         }

@@ -51,12 +51,12 @@ public sealed class ScaffoldNavBarAppearance : Element
 
         if (oldValue is Brush old && ReferenceEquals(old.Parent, appearance))
         {
-            old.Parent = null;
+            appearance.RemoveLogicalChild(old);
         }
 
         if (newValue is Brush brush && brush.Parent is null && brush.GetType().Name != "ImmutableBrush")
         {
-            brush.Parent = appearance;
+            appearance.AddLogicalChild(brush);
         }
     }
 
@@ -73,7 +73,8 @@ public sealed class ScaffoldNavBarAppearance : Element
             return;
         }
 
-        Parent = owner;
+        Parent?.RemoveLogicalChild(this);
+        owner.AddLogicalChild(this);
     }
 
     private static bool IsRooted(Element? element)
