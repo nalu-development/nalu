@@ -901,7 +901,7 @@ public partial class Scaffold : ContentPage, IPageContainer<Page>, IDisposable
 
     /// <summary>Gets the effective styling for the given drawer side (never null).</summary>
     internal ScaffoldFlyoutOptions GetEffectiveFlyoutOptions(ScaffoldFlyoutSide side)
-        => (side == ScaffoldFlyoutSide.Start ? FlyoutStartOptions : FlyoutEndOptions) ?? ScaffoldFlyoutOptions.Default;
+        => (side == ScaffoldFlyoutSide.Start ? FlyoutStartOptions : FlyoutEndOptions) ?? ScaffoldFlyoutOptions._default;
 
     /// <summary>
     /// Whether the scaffold renders right-to-left — the presenters map the logical Start/End

@@ -26,17 +26,17 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Keyboard Overlay Tests";
-    private const string KeyboardProbe = "KeyboardOverlayKeyboardProbe";
-    private const string KeyboardHeightProbe = "KeyboardOverlayKeyboardHeight";
-    private const string SheetId = "ScaffoldBottomSheet";
+    private const string _pageName = "Scaffold Keyboard Overlay Tests";
+    private const string _keyboardProbe = "KeyboardOverlayKeyboardProbe";
+    private const string _keyboardHeightProbe = "KeyboardOverlayKeyboardHeight";
+    private const string _sheetId = "ScaffoldBottomSheet";
 
     /// <summary>The smallest overlap that counts as a real keyboard (not the iOS hardware-keyboard accessory bar).</summary>
-    private const double MinKeyboardHeight = 100;
+    private const double _minKeyboardHeight = 100;
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("KeyboardOverlayHomePage", b => b.Y > 0);
     }
 
@@ -45,7 +45,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
     /// <summary>The keyboard's overlap with the window in dp, from the harness probe.</summary>
     private async Task<double> GetKeyboardHeightAsync()
     {
-        var text = await App.GetPropertyAsync(KeyboardHeightProbe, "Text") ?? "kb:0";
+        var text = await App.GetPropertyAsync(_keyboardHeightProbe, "Text") ?? "kb:0";
 
         return double.Parse(text["kb:".Length..], System.Globalization.CultureInfo.InvariantCulture);
     }
@@ -58,8 +58,8 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
 
             try
             {
-                await App.WaitForSoftKeyboardAsync(visible: true, KeyboardProbe, TimeSpan.FromSeconds(3));
-                await App.WaitForTextMatchAsync(KeyboardHeightProbe, text => text is not null && text != "kb:0", TimeSpan.FromSeconds(3));
+                await App.WaitForSoftKeyboardAsync(visible: true, _keyboardProbe, TimeSpan.FromSeconds(3));
+                await App.WaitForTextMatchAsync(_keyboardHeightProbe, text => text is not null && text != "kb:0", TimeSpan.FromSeconds(3));
 
                 break;
             }
@@ -72,7 +72,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         await App.WaitForStableBoundsAsync(SheetOrPopupId(entryId));
 
         var height = await GetKeyboardHeightAsync();
-        Assert.SkipWhen(height < MinKeyboardHeight, $"No full soft keyboard on this device (overlap {height:0}dp — a hardware keyboard is probably connected).");
+        Assert.SkipWhen(height < _minKeyboardHeight, $"No full soft keyboard on this device (overlap {height:0}dp — a hardware keyboard is probably connected).");
 
         return height;
     }
@@ -81,15 +81,15 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         => entryId switch
         {
             "KeyboardPageEntry" => "KeyboardPageEntry",
-            _ when entryId.Contains("Sheet", StringComparison.Ordinal) => SheetId,
+            _ when entryId.Contains("Sheet", StringComparison.Ordinal) => _sheetId,
             _ => entryId.Replace("BottomEntry", "Content", StringComparison.Ordinal).Replace("Entry", "Content", StringComparison.Ordinal)
         };
 
     private async Task LowerKeyboardAsync(string hideButtonId, string overlayId)
     {
         await App.TapAsync(hideButtonId);
-        await App.WaitForSoftKeyboardAsync(visible: false, KeyboardProbe);
-        await App.WaitForTextAsync(KeyboardHeightProbe, "kb:0");
+        await App.WaitForSoftKeyboardAsync(visible: false, _keyboardProbe);
+        await App.WaitForTextAsync(_keyboardHeightProbe, "kb:0");
         await App.WaitForStableBoundsAsync(overlayId);
     }
 
@@ -100,7 +100,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
 
         await App.TapAsync("ShowKeyboardSheetButton");
         await App.WaitForTextAsync("KeyboardOverlayState", "overlay:open");
-        var resting = await App.WaitForStableBoundsAsync(SheetId);
+        var resting = await App.WaitForStableBoundsAsync(_sheetId);
         resting.Bottom.Should().BeApproximately(windowHeight, 1, "a content sheet rests on the window's bottom edge");
         var restingEntry = await App.GetBoundsAsync("KeyboardSheetEntry");
 
@@ -109,7 +109,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         // The keyboard is a bigger bottom inset REPLACING the system one: the sheet surface STAYS
         // on the bottom edge (continuous behind the keyboard) and grows by (keyboard − system
         // bottom inset), so its content ends up padded above the keyboard's top edge.
-        var padded = await App.WaitForBoundsAsync(SheetId, b => b.Y <= resting.Y - keyboard + 60);
+        var padded = await App.WaitForBoundsAsync(_sheetId, b => b.Y <= resting.Y - keyboard + 60);
         padded.Bottom.Should().BeApproximately(windowHeight, 1, "the sheet surface stays anchored to the bottom edge");
         var growth = resting.Y - padded.Y;
         growth.Should().BeInRange(keyboard - 60, keyboard + 1, "the sheet grows by the keyboard overlap minus the (≤60dp) system inset it replaces");
@@ -118,8 +118,8 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         entry.Y.Should().BeApproximately(restingEntry.Y - growth, 2, "the content moved up with the padding");
         entry.Y.Should().BeGreaterThanOrEqualTo(padded.Y);
 
-        await LowerKeyboardAsync("KeyboardSheetHideButton", SheetId);
-        var back = await App.WaitForBoundsAsync(SheetId, b => Math.Abs(b.Y - resting.Y) <= 1.5);
+        await LowerKeyboardAsync("KeyboardSheetHideButton", _sheetId);
+        var back = await App.WaitForBoundsAsync(_sheetId, b => Math.Abs(b.Y - resting.Y) <= 1.5);
         back.Bottom.Should().BeApproximately(windowHeight, 1);
         (await App.GetBoundsAsync("KeyboardSheetEntry")).Y.Should().BeApproximately(restingEntry.Y, 1.5, "the content returns exactly where it rested");
     }
@@ -131,7 +131,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
 
         await App.TapAsync("ShowKeyboardTallSheetButton");
         await App.WaitForTextAsync("KeyboardOverlayState", "overlay:open");
-        var resting = await App.WaitForStableBoundsAsync(SheetId);
+        var resting = await App.WaitForStableBoundsAsync(_sheetId);
         resting.Height.Should().BeGreaterThan(windowHeight * 0.6, "the 85% detent resolves against the window height");
 
         // Focus the entry at the very BOTTOM of the scrollable content: the detent height is
@@ -139,7 +139,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         // scrollable content area shrinks by the keyboard, and the entry must end up on-screen
         // above the keyboard.
         var keyboard = await RaiseKeyboardAsync("KeyboardTallSheetBottomEntry");
-        var padded = await App.WaitForStableBoundsAsync(SheetId);
+        var padded = await App.WaitForStableBoundsAsync(_sheetId);
 
         padded.Height.Should().BeApproximately(resting.Height, 2, "a Fraction detent resolves against the same available height");
         padded.Bottom.Should().BeApproximately(windowHeight, 1);
@@ -147,8 +147,8 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         var bottomEntry = await App.WaitForBoundsAsync("KeyboardTallSheetBottomEntry", b => b.Bottom <= windowHeight - keyboard + 1 && b.Y >= padded.Y);
         bottomEntry.Bottom.Should().BeLessThanOrEqualTo(windowHeight - keyboard + 1, "the focused entry is above the keyboard");
 
-        await LowerKeyboardAsync("KeyboardTallSheetHideButton", SheetId);
-        var back = await App.WaitForStableBoundsAsync(SheetId);
+        await LowerKeyboardAsync("KeyboardTallSheetHideButton", _sheetId);
+        var back = await App.WaitForStableBoundsAsync(_sheetId);
         back.Height.Should().BeApproximately(resting.Height, 1.5);
         back.Bottom.Should().BeApproximately(windowHeight, 1);
     }
@@ -213,7 +213,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
 
         await App.TapAsync("ShowKeyboardPanSheetButton");
         await App.WaitForTextAsync("KeyboardOverlayState", "overlay:open");
-        var resting = await App.WaitForStableBoundsAsync(SheetId);
+        var resting = await App.WaitForStableBoundsAsync(_sheetId);
         resting.Bottom.Should().BeApproximately(windowHeight, 1);
         var restingBottomEntry = await App.GetBoundsAsync("KeyboardPanSheetBottomEntry");
         var restingTopEntry = await App.GetBoundsAsync("KeyboardPanSheetEntry");
@@ -221,7 +221,7 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
         // Focus the BOTTOM entry: the sheet keeps its size and slides up by the least that puts
         // that entry above the keyboard.
         var keyboard = await RaiseKeyboardAsync("KeyboardPanSheetBottomEntry");
-        var panned = await App.WaitForBoundsAsync(SheetId, b => b.Y < resting.Y - 1);
+        var panned = await App.WaitForBoundsAsync(_sheetId, b => b.Y < resting.Y - 1);
         panned.Height.Should().BeApproximately(resting.Height, 1.5, "Pan never resizes the surface");
 
         var pan = resting.Y - panned.Y;
@@ -233,14 +233,14 @@ public class ScaffoldKeyboardOverlayChromeTests(NaluApp app) : BaseUiTest(app), 
 
         // Move the focus to the TOP entry: the sheet re-pans for it (less, or not at all).
         await App.FocusAsync("KeyboardPanSheetEntry");
-        var repanned = await App.WaitForBoundsAsync(SheetId, b => b.Y > panned.Y + 1 || Math.Abs(b.Y - panned.Y) <= 1);
+        var repanned = await App.WaitForBoundsAsync(_sheetId, b => b.Y > panned.Y + 1 || Math.Abs(b.Y - panned.Y) <= 1);
         var repan = resting.Y - repanned.Y;
         repan.Should().BeLessThanOrEqualTo(pan + 1);
         (await App.GetBoundsAsync("KeyboardPanSheetEntry")).Bottom.Should().BeLessThanOrEqualTo(windowHeight - keyboard + 1);
         (await App.GetBoundsAsync("KeyboardPanSheetEntry")).Y.Should().BeApproximately(restingTopEntry.Y - repan, 1.5);
 
-        await LowerKeyboardAsync("KeyboardPanSheetHideButton", SheetId);
-        var back = await App.WaitForBoundsAsync(SheetId, b => Math.Abs(b.Y - resting.Y) <= 1.5);
+        await LowerKeyboardAsync("KeyboardPanSheetHideButton", _sheetId);
+        var back = await App.WaitForBoundsAsync(_sheetId, b => Math.Abs(b.Y - resting.Y) <= 1.5);
         back.Height.Should().BeApproximately(resting.Height, 1.5);
     }
 

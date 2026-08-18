@@ -15,11 +15,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class VirtualScrollCarouselTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Carousel Tests";
+    private const string _pageName = "Virtual Scroll Carousel Tests";
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("Carousel1");
     }
 

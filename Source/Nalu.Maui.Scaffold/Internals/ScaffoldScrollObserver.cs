@@ -10,7 +10,7 @@ namespace Nalu.Internals;
 /// The tracked MAUI view is often NOT the scrollable itself: component roots wrap their native
 /// scrollable in container views (VirtualScroll being the canonical case). The observer
 /// breadth-first searches the tracked view's PLATFORM subtree up to
-/// <see cref="MaxSearchDepth"/> levels for the first scrollable platform view
+/// <see cref="_maxSearchDepth"/> levels for the first scrollable platform view
 /// (iOS: any <c>UIScrollView</c> — covering collection/table/web views too;
 /// Android: scroll containers and <c>RecyclerView</c>).
 /// </para>
@@ -23,7 +23,7 @@ namespace Nalu.Internals;
 internal static partial class ScaffoldScrollObserver
 {
     /// <summary>How deep below the tracked view's platform root the scrollable may live.</summary>
-    internal const int MaxSearchDepth = 3;
+    internal const int _maxSearchDepth = 3;
 
     /// <summary>
     /// Observes the given tracked view, invoking <paramref name="onOffsetDp"/> with the

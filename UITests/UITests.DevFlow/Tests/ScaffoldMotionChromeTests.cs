@@ -10,7 +10,7 @@ namespace Nalu.Maui.UITests.Tests;
 /// moment a push commits (the window background flashing through beside the incoming page), and
 /// the popped page being torn down — or drawn UNDER the page it reveals — instead of sliding
 /// away above it.
-/// The harness ("Scaffold Motion Tests") stretches the stock slide to <see cref="MotionSeconds"/>
+/// The harness ("Scaffold Motion Tests") stretches the stock slide to <see cref="_motionSeconds"/>
 /// over two flat, far-apart colours, so screenshots taken between agent round trips land
 /// mid-flight. Each frame is sampled at two window-relative points: LEFT, which the outgoing page
 /// owns until the very end of a horizontal slide, and RIGHT, which the incoming one takes first.
@@ -22,10 +22,10 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Motion Tests";
+    private const string _pageName = "Scaffold Motion Tests";
 
     /// <summary>Mirrors MoDetailPage.TransitionSeconds in the TestApp harness.</summary>
-    private const double MotionSeconds = 1.5;
+    private const double _motionSeconds = 1.5;
 
     // Sampled low on the page, where only its own background is ever drawn (the harness keeps
     // every control in the top stack).
@@ -42,7 +42,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         public override string ToString() => $"{Left}/{Right}";
     }
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 
@@ -98,7 +98,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     /// </summary>
     private async Task<Color> MeasureSettledPageAsync(Color? replacing = null)
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(MotionSeconds * 4);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(_motionSeconds * 4);
         Frame previous = default;
         var hasPrevious = false;
 
@@ -132,7 +132,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     /// </summary>
     private async Task WaitForPageColorAsync(Color expected, string because)
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(MotionSeconds * 4);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(_motionSeconds * 4);
         Frame last = default;
 
         while (DateTime.UtcNow < deadline)
@@ -167,7 +167,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         var root = await MeasureSettledPageAsync();
 
         await App.TapAsync("PushMoDetail");
-        var frames = await CaptureFramesAsync(MotionSeconds * 1.6);
+        var frames = await CaptureFramesAsync(_motionSeconds * 1.6);
 
         await App.WaitForElementAsync("MoDetailPage");
         var detail = await MeasureSettledPageAsync(replacing: root);
@@ -195,7 +195,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         var detail = await MeasureSettledPageAsync(replacing: root);
 
         await App.TapAsync("PopMoDetail");
-        var frames = await CaptureFramesAsync(MotionSeconds * 1.6);
+        var frames = await CaptureFramesAsync(_motionSeconds * 1.6);
 
         // THE REGRESSION: the popped page slides away ABOVE the page it reveals. Drawn underneath
         // it — or dropped at commit — it is never seen again and this frame never occurs.
@@ -219,7 +219,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         // This spec enters from the BOTTOM (nothing enters from the right) and gives the covered
         // page a real Behind motion (scale + dim) instead of leaving it at rest.
         await App.TapAsync("PushMoCustom");
-        var frames = await CaptureFramesAsync(MotionSeconds * 1.6);
+        var frames = await CaptureFramesAsync(_motionSeconds * 1.6);
 
         await App.WaitForElementAsync("MoCustomPage");
         var custom = await MeasureSettledPageAsync(replacing: root);
@@ -260,7 +260,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         // Shared element + a custom slow spec on the same navigation: the flight runs in the
         // presenter's overlay while the pages themselves still play their motion.
         await App.TapAsync("PushMoShared");
-        var frames = await CaptureFramesAsync(MotionSeconds * 1.6);
+        var frames = await CaptureFramesAsync(_motionSeconds * 1.6);
 
         await App.WaitForElementAsync("MoSharedPage");
         var shared = await MeasureSettledPageAsync(replacing: root);
@@ -321,7 +321,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
         // Neighbouring roots of the same area: both travel, one leaving as the other arrives.
         await App.TapAsync("TabTwo");
-        var rows = await CaptureRowsAsync(MotionSeconds * 1.6);
+        var rows = await CaptureRowsAsync(_motionSeconds * 1.6);
 
         await App.WaitForElementAsync("MoSecondPage");
         var two = await MeasureSettledPageAsync(replacing: one);
@@ -357,7 +357,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         // outgoing root fades out ON TOP of the new one, which means every frame is a blend of
         // the two pages — never the window.
         await App.TapAsync("MoAreaFarSelector");
-        var rows = await CaptureRowsAsync(MotionSeconds * 1.6);
+        var rows = await CaptureRowsAsync(_motionSeconds * 1.6);
 
         await App.WaitForElementAsync("MoFarPage");
         var far = await MeasureSettledPageAsync(replacing: one);
@@ -391,7 +391,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         // transition ends — a jump the end-state suites cannot see (MAUI derives a page's
         // safe-area padding from its ON-SCREEN position, which a page mid-slide has not reached).
         var during = new List<double>();
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(MotionSeconds * 0.8);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(_motionSeconds * 0.8);
 
         while (DateTime.UtcNow < deadline)
         {

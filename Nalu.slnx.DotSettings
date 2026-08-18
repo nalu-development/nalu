@@ -72,6 +72,7 @@
     &amp;lt;Reformat&amp;gt;false&amp;lt;/Reformat&amp;gt;
   &amp;lt;/Language&amp;gt;
 &amp;lt;/profile&amp;gt;&lt;/RIDER_SETTINGS&gt;&lt;CSReformatCode&gt;True&lt;/CSReformatCode&gt;&lt;CSharpFormatDocComments&gt;True&lt;/CSharpFormatDocComments&gt;&lt;CSReformatInactiveBranches&gt;True&lt;/CSReformatInactiveBranches&gt;&lt;XMLReformatCode&gt;True&lt;/XMLReformatCode&gt;&lt;/Profile&gt;</s:String>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=DEVFLOW/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Initializable/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Nalu/@EntryIndexedValue">True</s:Boolean>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=newvalue/@EntryIndexedValue">True</s:Boolean>

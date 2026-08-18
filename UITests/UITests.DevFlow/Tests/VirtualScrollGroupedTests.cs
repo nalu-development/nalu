@@ -11,11 +11,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollGroupedTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Grouped Tests";
+    private const string _pageName = "Virtual Scroll Grouped Tests";
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("A1");
     }
 

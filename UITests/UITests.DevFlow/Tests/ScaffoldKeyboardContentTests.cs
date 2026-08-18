@@ -20,22 +20,22 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldKeyboardContentTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Keyboard Content Tests";
-    private const double MinKeyboardHeight = 100;
+    private const string _pageName = "Scaffold Keyboard Content Tests";
+    private const double _minKeyboardHeight = 100;
 
     /// <summary>
     /// How far below the keyboard's top edge the EDITOR's bottom may sit while its caret line is
     /// still fully visible: the platforms reveal the caret rect (the glyph box of the last 14pt
     /// line, ~20dp above the editor's padded bottom), not the editor's bottom padding.
     /// </summary>
-    private const double CaretPaddingTolerance = 21;
+    private const double _caretPaddingTolerance = 21;
 
     /// <summary>Top padding + one 14pt line of the harness editors — where the caret of an empty editor sits.</summary>
-    private const double FirstLineHeight = 30;
+    private const double _firstLineHeight = 30;
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("KeyboardScrollFormPage", b => b.Y > 0);
     }
 
@@ -69,7 +69,7 @@ public class ScaffoldKeyboardContentTests(NaluApp app) : BaseUiTest(app), IAsync
         await App.WaitForStableBoundsAsync(inputId);
 
         var height = await GetKeyboardHeightAsync(marker);
-        Assert.SkipWhen(height < MinKeyboardHeight, $"No full soft keyboard on this device (overlap {height:0}dp — a hardware keyboard is probably connected).");
+        Assert.SkipWhen(height < _minKeyboardHeight, $"No full soft keyboard on this device (overlap {height:0}dp — a hardware keyboard is probably connected).");
 
         return height;
     }
@@ -91,7 +91,7 @@ public class ScaffoldKeyboardContentTests(NaluApp app) : BaseUiTest(app), IAsync
     private static void AssertCaretLineAboveKeyboard(ElementBounds editor, double windowHeight, double keyboard, string because)
     {
         var keyboardTop = windowHeight - keyboard;
-        editor.Bottom.Should().BeLessThanOrEqualTo(keyboardTop + CaretPaddingTolerance, because);
+        editor.Bottom.Should().BeLessThanOrEqualTo(keyboardTop + _caretPaddingTolerance, because);
         editor.Bottom.Should().BeGreaterThan(keyboardTop - 200, "the editor's last line was not scrolled far above the keyboard either");
     }
 
@@ -113,18 +113,18 @@ public class ScaffoldKeyboardContentTests(NaluApp app) : BaseUiTest(app), IAsync
 
         // Focus: the (still empty, minimum-height) editor's caret sits on its FIRST line — that line
         // must be brought above the keyboard (the editor's padded bottom may still be under it).
-        var focused = await App.WaitForBoundsAsync(editorId, b => b.Y + FirstLineHeight <= windowHeight - keyboard && b.Y >= 0, TimeSpan.FromSeconds(5));
-        (focused.Y + FirstLineHeight).Should().BeLessThanOrEqualTo(windowHeight - keyboard, $"[{mode}] focusing the editor reveals its caret line above the keyboard");
+        var focused = await App.WaitForBoundsAsync(editorId, b => b.Y + _firstLineHeight <= windowHeight - keyboard && b.Y >= 0, TimeSpan.FromSeconds(5));
+        (focused.Y + _firstLineHeight).Should().BeLessThanOrEqualTo(windowHeight - keyboard, $"[{mode}] focusing the editor reveals its caret line above the keyboard");
 
         // Typing: the editor grows under the caret — the caret line must stay above the keyboard.
         await AddLinesAsync(marker, editorId, 4);
-        var grown = await App.WaitForBoundsAsync(editorId, b => b.Bottom <= windowHeight - keyboard + CaretPaddingTolerance, TimeSpan.FromSeconds(5));
+        var grown = await App.WaitForBoundsAsync(editorId, b => b.Bottom <= windowHeight - keyboard + _caretPaddingTolerance, TimeSpan.FromSeconds(5));
         grown.Height.Should().BeGreaterThan(resting.Height + 40, "the auto-sizing editor grew with the typed lines");
         AssertCaretLineAboveKeyboard(grown, windowHeight, keyboard, $"[{mode}] the caret line follows the typing above the keyboard");
 
         // Once more: growth keeps being followed, not just the first time.
         await AddLinesAsync(marker, editorId, 2);
-        var grownAgain = await App.WaitForBoundsAsync(editorId, b => b.Bottom <= windowHeight - keyboard + CaretPaddingTolerance, TimeSpan.FromSeconds(5));
+        var grownAgain = await App.WaitForBoundsAsync(editorId, b => b.Bottom <= windowHeight - keyboard + _caretPaddingTolerance, TimeSpan.FromSeconds(5));
         AssertCaretLineAboveKeyboard(grownAgain, windowHeight, keyboard, $"[{mode}] the caret line keeps following further typing");
 
         await App.TapAsync($"{marker}HideButton");

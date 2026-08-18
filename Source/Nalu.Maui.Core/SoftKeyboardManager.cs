@@ -6,6 +6,7 @@ namespace Nalu;
 /// <summary>
 /// Manager for handling soft keyboard adjustments.
 /// </summary>
+// ReSharper disable once PartialTypeWithSinglePart
 public static partial class SoftKeyboardManager
 {
     /// <summary>
@@ -78,6 +79,7 @@ public static partial class SoftKeyboardManager
         }
     }
 
+    // ReSharper disable 2 UnusedParameter.Local
     private static void AddPlatformViewAdjustModeRef(IViewHandler handler, SoftKeyboardAdjustMode adjustMode)
     {
 #if ANDROID
@@ -86,8 +88,7 @@ public static partial class SoftKeyboardManager
             // ReSharper disable once AccessToStaticMemberViaDerivedType
             newPlatformView.SetTag(Resource.Id.nalu_soft_keyboard_adjust_mode_tag_key, (int)adjustMode);
         }
-#endif
-#if IOS
+#elif IOS
         if (handler is { PlatformView: UIKit.UIView newPlatformView })
         {
             _adjustRuleViews.AddOrUpdate(newPlatformView, new StrongBox<SoftKeyboardAdjustMode>(adjustMode));
@@ -102,6 +103,7 @@ public static partial class SoftKeyboardManager
         RemovePlatformViewAdjustModeRef(handler);
     }
 
+    // ReSharper disable once UnusedParameter.Local
     private static void RemovePlatformViewAdjustModeRef(IElementHandler handler)
     {
 #if ANDROID
@@ -109,8 +111,7 @@ public static partial class SoftKeyboardManager
         {
             oldPlatformView.SetTag(Resource.Id.nalu_soft_keyboard_adjust_mode_tag_key, null);
         }
-#endif
-#if IOS
+#elif IOS
         if (handler is { PlatformView: UIKit.UIView oldPlatformView })
         {
             _adjustRuleViews.Remove(oldPlatformView);

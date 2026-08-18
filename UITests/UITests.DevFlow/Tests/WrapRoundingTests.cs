@@ -14,12 +14,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class WrapRoundingTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Wrap Rounding Tests";
+    private const string _pageName = "Wrap Rounding Tests";
 
     [Fact]
     public async Task WrapRowDoesNotReWrapWhenCellFrameIsPixelAligned()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var a = await App.GetBoundsAsync("WrapA");
         var b = await App.GetBoundsAsync("WrapB");

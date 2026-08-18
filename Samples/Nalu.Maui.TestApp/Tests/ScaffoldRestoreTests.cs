@@ -48,18 +48,18 @@ public static class ScaffoldRestoreTestSupport
 /// </summary>
 public static class RestoreAutoNavSupport
 {
-    private const string ArmedAtKey = "RestoreAutoNavArmedAt";
+    private const string _armedAtKey = "RestoreAutoNavArmedAt";
     private static readonly DateTime _processStartUtc = DateTime.UtcNow;
 
-    public static void Arm() => Preferences.Default.Set(ArmedAtKey, DateTime.UtcNow);
+    public static void Arm() => Preferences.Default.Set(_armedAtKey, DateTime.UtcNow);
 
-    public static void Disarm() => Preferences.Default.Remove(ArmedAtKey);
+    public static void Disarm() => Preferences.Default.Remove(_armedAtKey);
 
     public static bool ShouldFire
     {
         get
         {
-            var armedAt = Preferences.Default.Get(ArmedAtKey, DateTime.MinValue);
+            var armedAt = Preferences.Default.Get(_armedAtKey, DateTime.MinValue);
 
             return armedAt != DateTime.MinValue
                    && armedAt < _processStartUtc

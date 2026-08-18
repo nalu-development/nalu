@@ -3,6 +3,7 @@ namespace Nalu;
 /// <summary>
 /// Holds the response of a background request.
 /// </summary>
+// ReSharper disable once InconsistentNaming
 public class NSUrlBackgroundResponseHandle
 {
     private readonly Task<HttpResponseMessage> _responseTask;

@@ -15,11 +15,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class VirtualScrollRefreshTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Refresh Tests";
+    private const string _pageName = "Virtual Scroll Refresh Tests";
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("R1");
     }
 

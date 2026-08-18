@@ -1,6 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Maui.Hosting;
-
 namespace Nalu.Maui.Test.ScaffoldTests;
 
 /// <summary>
@@ -12,6 +9,7 @@ namespace Nalu.Maui.Test.ScaffoldTests;
 /// </summary>
 public class ScaffoldUnsupportedPlatformTests
 {
+    // ReSharper disable once NotAccessedPositionalProperty.Local
     private sealed record SomeOverlayModel(IOverlayRef Overlay);
 
     private static IServiceProvider BuildProvider()

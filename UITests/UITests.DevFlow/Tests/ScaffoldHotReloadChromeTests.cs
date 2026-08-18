@@ -12,11 +12,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldHotReloadChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Hot Reload Tests";
+    private const string _pageName = "Scaffold Hot Reload Tests";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("HrAlphaPage", b => b.Y > 0);
     }
 

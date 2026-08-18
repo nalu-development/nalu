@@ -15,14 +15,14 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public partial class VirtualScrollEventsTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Events Tests";
+    private const string _pageName = "Virtual Scroll Events Tests";
 
     [GeneratedRegex(@"^Y:(?<y>\d+) T:(?<t>\d+) V:(?<v>\d+) P:(?<p>[\d.,]+)$")]
     private static partial Regex LastScrollRegex();
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("E1");
     }
 

@@ -18,12 +18,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldGrowingTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Growing TabBar Tests";
-    private const double Growth = 60; // TallHeight - CompactHeight in the harness.
+    private const string _pageName = "Scaffold Growing TabBar Tests";
+    private const double _growth = 60; // TallHeight - CompactHeight in the harness.
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("GrowBarPage", b => b.Y > 0);
     }
 
@@ -41,9 +41,9 @@ public class ScaffoldGrowingTabBarChromeTests(NaluApp app) : BaseUiTest(app), IA
 
         await App.TapAsync("GrowBarToggle");
 
-        await App.WaitForBoundsAsync("GrowBarRoot", b => Math.Abs(b.Height - (compact.Height + Growth)) <= 1);
+        await App.WaitForBoundsAsync("GrowBarRoot", b => Math.Abs(b.Height - (compact.Height + _growth)) <= 1);
         var tall = await App.WaitForStableBoundsAsync("GrowBarRoot");
-        tall.Y.Should().BeApproximately(compact.Y - Growth, 1, "the bar grows UPWARD from its bottom-anchored resting position");
+        tall.Y.Should().BeApproximately(compact.Y - _growth, 1, "the bar grows UPWARD from its bottom-anchored resting position");
 
         await App.TapAsync("GrowBarToggle");
 
@@ -66,7 +66,7 @@ public class ScaffoldGrowingTabBarChromeTests(NaluApp app) : BaseUiTest(app), IA
 
         await App.TapAsync("GrowBarToggle");
 
-        await App.WaitForBoundsAsync("GrowBarBottomMarker", b => Math.Abs(b.Bottom - (marker.Bottom - Growth)) <= 1);
+        await App.WaitForBoundsAsync("GrowBarBottomMarker", b => Math.Abs(b.Bottom - (marker.Bottom - _growth)) <= 1);
 
         var grownBar = await App.WaitForStableBoundsAsync("GrowBarRoot");
         var grownMarker = await App.WaitForStableBoundsAsync("GrowBarBottomMarker");
@@ -76,7 +76,7 @@ public class ScaffoldGrowingTabBarChromeTests(NaluApp app) : BaseUiTest(app), IA
         await App.WaitForBoundsAsync("GrowBarBottomMarker", b => Math.Abs(b.Bottom - marker.Bottom) <= 1);
     }
 
-    private const double NavGrowth = 44; // TallNavHeight - CompactNavHeight in the harness.
+    private const double _navGrowth = 44; // TallNavHeight - CompactNavHeight in the harness.
 
     /// <summary>
     /// The top-edge mirror: the nav bar is freely sizable (the strip takes whatever its content
@@ -89,7 +89,7 @@ public class ScaffoldGrowingTabBarChromeTests(NaluApp app) : BaseUiTest(app), IA
 
         await App.TapAsync("GrowNavToggle");
 
-        await App.WaitForBoundsAsync("GrowNavRoot", b => Math.Abs(b.Height - (compact.Height + NavGrowth)) <= 1);
+        await App.WaitForBoundsAsync("GrowNavRoot", b => Math.Abs(b.Height - (compact.Height + _navGrowth)) <= 1);
         var tall = await App.WaitForStableBoundsAsync("GrowNavRoot");
         tall.Y.Should().BeApproximately(compact.Y, 1, "a top bar grows DOWNWARD from its top-anchored resting position");
 
@@ -109,7 +109,7 @@ public class ScaffoldGrowingTabBarChromeTests(NaluApp app) : BaseUiTest(app), IA
 
         await App.TapAsync("GrowNavToggle");
 
-        await App.WaitForBoundsAsync("GrowBarTopMarker", b => Math.Abs(b.Y - (marker.Y + NavGrowth)) <= 1);
+        await App.WaitForBoundsAsync("GrowBarTopMarker", b => Math.Abs(b.Y - (marker.Y + _navGrowth)) <= 1);
 
         var grownBar = await App.WaitForStableBoundsAsync("GrowNavRoot");
         var grownMarker = await App.WaitForStableBoundsAsync("GrowBarTopMarker");

@@ -16,9 +16,9 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldPageLifecycleTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Page Lifecycle Tests";
+    private const string _pageName = "Scaffold Page Lifecycle Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 

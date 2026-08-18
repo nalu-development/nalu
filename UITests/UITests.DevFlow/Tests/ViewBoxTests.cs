@@ -9,12 +9,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ViewBoxTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "View Box Tests";
+    private const string _pageName = "View Box Tests";
 
     [Fact]
     public async Task ContentIsDisplayed()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var content = await App.WaitForElementAsync("ViewBoxContentA");
         content.IsVisible.Should().BeTrue();
@@ -24,7 +24,7 @@ public class ViewBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ContentCanBeSwappedAtRuntime()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("ViewBoxContentA");
 
         await App.TapAsync("SwapContentButton");
@@ -37,7 +37,7 @@ public class ViewBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ContentBindingContextFlowsToContent()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var animalLabel = await App.WaitForElementAsync("AnimalNameLabel");
         animalLabel.Text.Should().Be("Dog");
@@ -50,7 +50,7 @@ public class ViewBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ContentIsClippedToBounds()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("ClipContent");
 
         // The ViewBox is 100x100 while its content is 200x200: the content overflow

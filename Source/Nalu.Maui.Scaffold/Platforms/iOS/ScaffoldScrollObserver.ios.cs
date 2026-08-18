@@ -32,7 +32,7 @@ internal static partial class ScaffoldScrollObserver
             _kvo = null;
         }
 
-        /// <summary>Breadth-first, shallowest scrollable wins, bounded by <see cref="MaxSearchDepth"/>.</summary>
+        /// <summary>Breadth-first, shallowest scrollable wins, bounded by <see cref="ScaffoldScrollObserver._maxSearchDepth"/>.</summary>
         private static UIScrollView? FindScrollView(UIView root)
         {
             var queue = new Queue<(UIView View, int Depth)>();
@@ -47,7 +47,7 @@ internal static partial class ScaffoldScrollObserver
                     return scrollView;
                 }
 
-                if (depth < MaxSearchDepth)
+                if (depth < _maxSearchDepth)
                 {
                     foreach (var subview in view.Subviews)
                     {

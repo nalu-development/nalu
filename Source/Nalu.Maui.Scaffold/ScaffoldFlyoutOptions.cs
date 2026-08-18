@@ -9,7 +9,7 @@ namespace Nalu;
 public sealed class ScaffoldFlyoutOptions : BindableObject
 {
     /// <summary>The defaults used when a side has no options configured.</summary>
-    internal static readonly ScaffoldFlyoutOptions Default = new();
+    internal static readonly ScaffoldFlyoutOptions _default = new();
 
     /// <summary>Bindable property for <see cref="Width"/>.</summary>
     public static readonly BindableProperty WidthProperty =

@@ -8,7 +8,7 @@ namespace Nalu;
 internal static class ScaffoldTabBarDefaults
 {
     /// <summary>The Nalu logo wave blue: the accent behind every tab bar default value.</summary>
-    internal static readonly Color Accent = Color.FromArgb("#2C479D");
+    internal static readonly Color _accent = Color.FromArgb("#2C479D");
 }
 
 /// <summary>
@@ -38,17 +38,19 @@ internal static class ScaffoldTabBarDefaults
 public sealed class ScaffoldTabBarItemView : Grid
 {
     private readonly ScaffoldTabBarView _owner;
-    private readonly Border _pill;
-    private readonly Grid _iconHost;
+
+    // Declared NULLABLE although the ctor assigns each of them exactly once: implicit styles
+    // apply from the VisualElement BASE ctor — the propertyChanged callbacks (Apply* below) run
+    // before these subviews exist, so their null-guards are real, not redundant. The ctor
+    // seeds the final values afterward.
+    private readonly Border? _pill;
+    private readonly Grid? _iconHost;
     private readonly Image? _icon;
     private readonly HorizontalStackLayout? _dots;
-    private readonly Label _label;
-    private readonly Border _badge;
-    private readonly Label _badgeLabel;
+    private readonly Label? _label;
+    private readonly Border? _badge;
+    private readonly Label? _badgeLabel;
     private bool _selected;
-
-    // Null-guards in the Apply* methods below: implicit styles apply from the VisualElement
-    // base ctor, before the subviews exist; the ctor seeds the final values.
 
     #region Item properties
 
@@ -72,7 +74,7 @@ public sealed class ScaffoldTabBarItemView : Grid
     public static readonly BindableProperty SelectedTextColorProperty =
         GenericBindableProperty<ScaffoldTabBarItemView>.Create(
             nameof(SelectedTextColor),
-            ScaffoldTabBarDefaults.Accent,
+            ScaffoldTabBarDefaults._accent,
             propertyChanged: static item => (_, _) => item.ApplyTextColor()
         );
 
@@ -95,7 +97,7 @@ public sealed class ScaffoldTabBarItemView : Grid
     public static readonly BindableProperty SelectionPillBackgroundProperty =
         GenericBindableProperty<ScaffoldTabBarItemView>.Create<Brush?>(
             nameof(SelectionPillBackground),
-            defaultValueCreator: static _ => new SolidColorBrush(ScaffoldTabBarDefaults.Accent.WithAlpha(0.12f)),
+            defaultValueCreator: static _ => new SolidColorBrush(ScaffoldTabBarDefaults._accent.WithAlpha(0.12f)),
             propertyChanged: static item => (_, _) => item.ApplySelectionPillBackground()
         );
 
@@ -164,7 +166,7 @@ public sealed class ScaffoldTabBarItemView : Grid
     public static readonly BindableProperty BadgeBackgroundProperty =
         GenericBindableProperty<ScaffoldTabBarItemView>.Create<Brush?>(
             nameof(BadgeBackground),
-            defaultValueCreator: static _ => new SolidColorBrush(ScaffoldTabBarDefaults.Accent),
+            defaultValueCreator: static _ => new SolidColorBrush(ScaffoldTabBarDefaults._accent),
             propertyChanged: static item => (_, value) => item._badge?.Background = value
         );
 
@@ -303,26 +305,25 @@ public sealed class ScaffoldTabBarItemView : Grid
             MaxLines = 1
         };
 
-        if (root is not null)
-        {
-            _label.SetBinding(Label.TextProperty, BindingBase.Create(static (ScaffoldRoot r) => r.Title, source: root));
-        }
-        else
-        {
-            _label.SetBinding(Label.TextProperty, BindingBase.Create(static (ScaffoldTabBarView v) => v.OverflowTitle, source: owner));
-        }
+        _label.SetBinding(
+            Label.TextProperty,
+            root is not null
+                ? BindingBase.Create(static (ScaffoldRoot r) => r.Title, source: root)
+                : BindingBase.Create(static (ScaffoldTabBarView v) => v.OverflowTitle, source: owner)
+        );
 
         Add(new VerticalStackLayout
-        {
-            // The vertical padding lives here (not on the item) so the selection pill layer
-            // spans the full item bounds.
-            Margin = new Thickness(0, 8, 0, 7),
-            Spacing = 2,
-            Children = { iconHost, _label }
-        });
+            {
+                // The vertical padding lives here (not on the item) so the selection pill layer
+                // spans the full item bounds.
+                Margin = new Thickness(0, 8, 0, 7),
+                Spacing = 2,
+                Children = { iconHost, _label }
+            });
 
         var tap = new TapGestureRecognizer();
-        tap.Tapped += (_, _) => _ = tapOverride?.Invoke() ?? _owner.OnItemTappedAsync(Root);
+
+        tap.Tapped += OnTapOnTapped;
         GestureRecognizers.Add(tap);
 
         if (root is not null)
@@ -349,6 +350,10 @@ public sealed class ScaffoldTabBarItemView : Grid
         ApplyBadgeFontSize();
         ApplySelectedAppearance();
         UpdateBadgeText();
+
+        return;
+
+        void OnTapOnTapped(object? o, TappedEventArgs tappedEventArgs) => _ = tapOverride?.Invoke() ?? _owner.OnItemTappedAsync(Root);
     }
 
     internal void Unsubscribe()
@@ -371,7 +376,7 @@ public sealed class ScaffoldTabBarItemView : Grid
     /// <summary>Icon slot geometry — and the badge's fixed protrusion, which is derived from it.</summary>
     private void ApplyIconSize()
     {
-        if (_iconHost is null)
+        if (_iconHost is null || _badge is null)
         {
             return;
         }
@@ -388,11 +393,8 @@ public sealed class ScaffoldTabBarItemView : Grid
             _icon.HeightRequest = iconSize;
         }
 
-        if (_dots is not null)
-        {
-            // The dots row mimics the icon slot height so More aligns with icon items.
-            _dots.HeightRequest = iconSize;
-        }
+        // The dots row mimics the icon slot height so More aligns with icon items.
+        _dots?.HeightRequest = iconSize;
 
         // Overlap the icon's top-right corner (translation only — no layout impact; the item
         // never clips, and the fixed protrusion stays inside the bar pill's padding headroom).
@@ -402,7 +404,7 @@ public sealed class ScaffoldTabBarItemView : Grid
 
     private void ApplyFontFamily()
     {
-        if (_label is null)
+        if (_label is null || _badgeLabel is null)
         {
             return;
         }
@@ -450,7 +452,7 @@ public sealed class ScaffoldTabBarItemView : Grid
 
     private void ApplyBadgeFontSize()
     {
-        if (_badge is null)
+        if (_badge is null || _badgeLabel is null)
         {
             return;
         }
@@ -464,14 +466,19 @@ public sealed class ScaffoldTabBarItemView : Grid
     {
         ApplyTextColor();
         ApplySelectionPillBackground();
-        _label.FontAttributes = _selected ? FontAttributes.Bold : FontAttributes.None;
+        _label?.FontAttributes = _selected ? FontAttributes.Bold : FontAttributes.None;
     }
 
     private void UpdateBadgeText()
     {
+        if (_badge is null || _badgeLabel is null)
+        {
+            return;
+        }
+
         var text = Root is null ? null : ScaffoldTabBarView.GetBadgeText(Root);
         _badge.IsVisible = !string.IsNullOrEmpty(text);
-        _badgeLabel.Text = text;
+        _badgeLabel.Text = text ?? string.Empty;
     }
 
     private void OnRootPropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -18,12 +18,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class VirtualScrollPushMutationTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Push Mutation Tests";
+    private const string _pageName = "Virtual Scroll Push Mutation Tests";
     private static readonly TimeSpan _mutationTimeout = TimeSpan.FromSeconds(10);
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("PushAddButton");
     }
 

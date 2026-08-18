@@ -27,7 +27,7 @@ namespace Nalu;
 public sealed class ScaffoldNavBarAppearance : BindableObject
 {
     /// <summary>The default strip background used when no appearance in the chain sets one.</summary>
-    internal static readonly Color DefaultBackgroundColor = Color.FromArgb("#F7FFFFFF");
+    internal static readonly Color _defaultBackgroundColor = Color.FromArgb("#F7FFFFFF");
 
     /// <summary>Bindable property for <see cref="Background"/>.</summary>
     public static readonly BindableProperty BackgroundProperty =

@@ -4,6 +4,7 @@ using Xunit;
 
 namespace Nalu.Maui.UITests.Tests;
 
+// ReSharper disable once InvalidXmlDocComment
 /// <summary>
 /// Covers the §5.5 flyout completion against the "Scaffold Flyout Tests" harness: the default
 /// <see cref="Nalu.ScaffoldFlyoutMenuView"/> composition rules, engine-routed selection,
@@ -12,9 +13,9 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldFlyoutChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Flyout Tests";
+    private const string _pageName = "Scaffold Flyout Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 

@@ -27,9 +27,9 @@ internal sealed class DeterministicRandom(uint seed)
 /// </summary>
 [UsedImplicitly]
 [TestPage("Virtual Scroll Stress Tests")]
-public class VirtualScrollStressTests : ContentPage
+public sealed class VirtualScrollStressTests : ContentPage
 {
-    private const int TickCount = 120;
+    private const int _tickCount = 120;
     private static readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(24);
     private static readonly TimeSpan _scrollInterval = TimeSpan.FromMilliseconds(250);
 
@@ -158,7 +158,7 @@ public class VirtualScrollStressTests : ContentPage
         {
             Mutate();
 
-            if (++ticks >= TickCount)
+            if (++ticks >= _tickCount)
             {
                 mutationTimer.Stop();
                 scrollTimer.Stop();
@@ -296,9 +296,9 @@ public class VirtualScrollStressTests : ContentPage
 /// </summary>
 [UsedImplicitly]
 [TestPage("Virtual Scroll DynamicData Stress Tests")]
-public class VirtualScrollDynamicDataStressTests : ContentPage
+public sealed class VirtualScrollDynamicDataStressTests : ContentPage, IDisposable
 {
-    private const int TickCount = 120;
+    private const int _tickCount = 120;
     private static readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(24);
     private static readonly TimeSpan _scrollInterval = TimeSpan.FromMilliseconds(250);
 
@@ -314,6 +314,11 @@ public class VirtualScrollDynamicDataStressTests : ContentPage
     private DeterministicRandom _rng = new(54321);
     private int _nextId;
     private int _nextGroup;
+    
+    public void Dispose()
+    {
+        _subscription.Dispose();
+    }
 
     public VirtualScrollDynamicDataStressTests()
     {
@@ -433,7 +438,7 @@ public class VirtualScrollDynamicDataStressTests : ContentPage
         {
             Mutate();
 
-            if (++ticks >= TickCount)
+            if (++ticks >= _tickCount)
             {
                 mutationTimer.Stop();
                 scrollTimer.Stop();

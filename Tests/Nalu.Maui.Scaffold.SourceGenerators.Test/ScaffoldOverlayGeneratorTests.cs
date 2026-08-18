@@ -1,7 +1,7 @@
 using FluentAssertions;
-using Microsoft.CodeAnalysis;
+using Nalu.Maui.Test.SourceGenerators;
 
-namespace Nalu.Maui.Test.SourceGenerators;
+namespace Nalu.Maui.Scaffold.SourceGenerators.Test;
 
 public class ScaffoldOverlayGeneratorTests
 {

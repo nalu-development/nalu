@@ -18,9 +18,9 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class VirtualScrollPagerTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Virtual Scroll Pager Tests";
+    private const string _pageName = "Virtual Scroll Pager Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 

@@ -3,6 +3,7 @@ using Foundation;
 
 namespace Nalu;
 
+// ReSharper disable once InconsistentNaming
 internal static class NSUrlSessionTaskExtensions
 {
     public static bool IsCanceled(this NSUrlSessionTask task)

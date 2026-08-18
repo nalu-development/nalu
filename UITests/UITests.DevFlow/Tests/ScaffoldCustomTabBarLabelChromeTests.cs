@@ -13,9 +13,9 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldCustomTabBarLabelChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Custom TabBar Label Tests";
+    private const string _pageName = "Scaffold Custom TabBar Label Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 

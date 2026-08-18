@@ -77,6 +77,7 @@ internal class FadingEdgeController
             return;
         }
 
+        // ReSharper disable CompareOfFloatsByEqualityOperator
         if (_fadeGradient == fadeGradient &&
             _lastStartFadingEdgeLength == startFadingEdgeLength &&
             _lastEndFadingEdgeLength == endFadingEdgeLength &&

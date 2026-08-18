@@ -33,7 +33,7 @@ internal static class VirtualScrollViewExtensionsProxy
 /// </summary>
 public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCellsLayoutController
 #if NET10_0_OR_GREATER
-    , Microsoft.Maui.Platform.IPlatformMeasureInvalidationController
+    , IPlatformMeasureInvalidationController
 #endif
 {
     private IVirtualScrollLayoutInfo _layoutInfo;
@@ -121,7 +121,7 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
         }
 
         // Avoid triggering layout invalidation when the collection view has no size (e.g. during
-        // iPad split view / Stage Manager / rotation transitions). Otherwise the layout can run
+        // iPad split view / Stage Manager / rotation transitions). Otherwise, the layout can run
         // with a zero-width container and supplementary views may be asked for preferred size,
         // leading to NSInternalInconsistencyException ("Preferred size is ZERO for auxiliary item").
         if (Bounds.Width <= 0 || Bounds.Height <= 0)

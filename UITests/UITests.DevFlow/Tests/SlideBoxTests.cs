@@ -10,14 +10,14 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class SlideBoxTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Slide Box Tests";
+    private const string _pageName = "Slide Box Tests";
 
     private async Task<bool> IsAndroidAsync()
         => (await App.GetPlatformAsync()).Contains("android", StringComparison.OrdinalIgnoreCase);
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("SlideBox");
         await WaitDisplayedAsync("SlideA");
     }
@@ -101,7 +101,7 @@ public class SlideBoxTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         var probe = await App.WaitForTextMatchAsync("SlideProbeLabel", text => text is not null && text.StartsWith("Flush:", StringComparison.Ordinal));
 
         Assert.NotNull(probe);
-        Assert.SkipWhen(probe!.EndsWith("Inset:0", StringComparison.Ordinal), "No bottom system inset on this device: the flow-through check would be vacuous.");
+        Assert.SkipWhen(probe.EndsWith("Inset:0", StringComparison.Ordinal), "No bottom system inset on this device: the flow-through check would be vacuous.");
         Assert.StartsWith("Flush:True", probe, StringComparison.Ordinal);
     }
 
@@ -121,7 +121,7 @@ public class SlideBoxTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         // slide C must already be riding the strip there — never the box background
         // (DarkSlateGray) nor a late pop-in.
         await App.AndroidRealSwipeAsync("SlideBox", -300, 0, durationMs: 500);
-        await Task.Delay(650);
+        await Task.Delay(650, TestContext.Current.CancellationToken);
         var (r, g, b) = await App.GetPixelColorAsync("SlideBox", box.Width - 12, box.Height / 2);
 
         Assert.True(g >= 120 && r <= 110, $"Peek band mid-settle was ({r},{g},{b}) — expected slide C's LightSeaGreen, not the box background");

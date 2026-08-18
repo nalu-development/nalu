@@ -10,12 +10,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ExpanderViewBoxTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Expander Tests";
+    private const string _pageName = "Expander Tests";
 
     [Fact]
     public async Task CollapsedContentIsCappedAtCollapsedHeight()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // Content is 300 tall but CollapsedHeight is 100.
         var bounds = await App.WaitForStableBoundsAsync("ExpanderBox");
@@ -27,7 +27,7 @@ public class ExpanderViewBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ExpandingAnimatesToFullContentHeight()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForStableBoundsAsync("ExpanderBox");
 
         await App.TapAsync("ToggleExpandButton");
@@ -45,7 +45,7 @@ public class ExpanderViewBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task SmallContentDoesNotCollapse()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // Content (40) is smaller than CollapsedHeight (100): nothing to collapse.
         var bounds = await App.WaitForStableBoundsAsync("SmallExpanderBox");
@@ -57,7 +57,7 @@ public class ExpanderViewBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task GrowingContentBeyondCollapsedHeightEnablesCollapsing()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForStableBoundsAsync("SmallExpanderBox");
 
         // Grow the content from 40 to 300: the collapsed expander must cap at 100.

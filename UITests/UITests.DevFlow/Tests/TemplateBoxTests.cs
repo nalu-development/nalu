@@ -10,12 +10,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class TemplateBoxTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Template Box Tests";
+    private const string _pageName = "Template Box Tests";
 
     [Fact]
     public async Task TemplateRendersWithContentBindingContext()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var label = await App.WaitForElementAsync("TemplateALabel");
         label.Text.Should().Be("Alice");
@@ -24,7 +24,7 @@ public class TemplateBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ChangingContentBindingContextUpdatesContent()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("TemplateALabel");
 
         await App.TapAsync("SwitchPersonButton");
@@ -35,7 +35,7 @@ public class TemplateBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task SwappingTemplateReplacesContent()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("TemplateALabel");
 
         await App.TapAsync("SwapTemplateButton");
@@ -48,7 +48,7 @@ public class TemplateBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task TemplateSelectorPicksTemplateByItem()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var evenLabel = await App.WaitForElementAsync("EvenTemplateLabel");
         evenLabel.Text.Should().Be("Even item");
@@ -63,7 +63,7 @@ public class TemplateBoxTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task TemplateContentIsProjectedThroughPresenter()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var prefix = await App.WaitForElementAsync("ProjectionPrefixLabel");
         prefix.Text.Should().Be("Projected => ");

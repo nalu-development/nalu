@@ -11,14 +11,14 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollSizingStrategyTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Virtual Scroll SizingStrategy Tests";
+    private const string _pageName = "Virtual Scroll SizingStrategy Tests";
     private const double _itemExtent = 40;
     private const double _cap = 300;
 
     /// <summary>Platform dp rounding: heights are compared with a couple of dp of slack.</summary>
     private const double _tolerance = 2;
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 

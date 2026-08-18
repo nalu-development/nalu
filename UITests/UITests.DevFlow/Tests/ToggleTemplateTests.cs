@@ -10,12 +10,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ToggleTemplateTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Toggle Template Tests";
+    private const string _pageName = "Toggle Template Tests";
 
     [Fact]
     public async Task FalseValueShowsWhenFalseTemplate()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var falseLabel = await App.WaitForElementAsync("WhenFalseLabel");
         falseLabel.Text.Should().Be("FALSE");
@@ -25,7 +25,7 @@ public class ToggleTemplateTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task TogglingValueSwitchesTemplates()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("WhenFalseLabel");
 
         await App.TapAsync("ToggleValueButton");
@@ -43,7 +43,7 @@ public class ToggleTemplateTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task MissingTemplateProducesNoContent()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("ToggleOnlyTrueButton");
 
         // Value=false with no WhenFalse template: no content must be created at all.

@@ -19,7 +19,7 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
 {
     private readonly Scaffold _scaffold;
     private readonly Grid _content;
-    private readonly SolidColorBrush _defaultBackground = new(ScaffoldNavBarAppearance.DefaultBackgroundColor);
+    private readonly SolidColorBrush _defaultBackground = new(ScaffoldNavBarAppearance._defaultBackgroundColor);
 
     private View? _bar;
     private Page? _page;

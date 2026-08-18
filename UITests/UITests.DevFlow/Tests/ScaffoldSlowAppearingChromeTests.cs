@@ -11,11 +11,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldSlowAppearingChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Slow Appearing Tests";
+    private const string _pageName = "Scaffold Slow Appearing Tests";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("SlowAppearHomePage", b => b.Y > 0);
     }
 

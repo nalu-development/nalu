@@ -17,11 +17,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Orientation Tests";
+    private const string _pageName = "Scaffold Orientation Tests";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("OrRootPage", b => b.Y > 0);
     }
 

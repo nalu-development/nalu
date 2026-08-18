@@ -6,6 +6,7 @@ namespace Nalu;
 /// <remarks>
 /// Failed requests (throwing an exception) are not reported to this handler.
 /// </remarks>
+// ReSharper disable once InconsistentNaming
 public interface INSUrlBackgroundSessionLostMessageHandler
 {
     /// <summary>

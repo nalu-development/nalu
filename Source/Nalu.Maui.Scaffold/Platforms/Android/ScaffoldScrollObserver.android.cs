@@ -91,7 +91,7 @@ internal static partial class ScaffoldScrollObserver
             _onOffsetDp(_recyclerOffsetPx / _density);
         }
 
-        /// <summary>Breadth-first, shallowest scrollable wins, bounded by <see cref="MaxSearchDepth"/>.</summary>
+        /// <summary>Breadth-first, shallowest scrollable wins, bounded by <see cref="ScaffoldScrollObserver._maxSearchDepth"/>.</summary>
         private static AView? FindScrollable(AView root)
         {
             var queue = new Queue<(AView View, int Depth)>();
@@ -110,7 +110,7 @@ internal static partial class ScaffoldScrollObserver
                     return view;
                 }
 
-                if (depth < MaxSearchDepth && view is AViewGroup group)
+                if (depth < _maxSearchDepth && view is AViewGroup group)
                 {
                     for (var i = 0; i < group.ChildCount; i++)
                     {

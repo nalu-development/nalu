@@ -16,9 +16,9 @@ internal sealed record XamlLead(string ClassMetadataName, string RootName, strin
 /// </summary>
 internal static class XamlLeadParser
 {
-    private const string Xaml2009 = "http://schemas.microsoft.com/winfx/2009/xaml";
-    private const string Xaml2006 = "http://schemas.microsoft.com/winfx/2006/xaml";
-    private const string ClrNamespacePrefix = "clr-namespace:";
+    private const string _xaml2009 = "http://schemas.microsoft.com/winfx/2009/xaml";
+    private const string _xaml2006 = "http://schemas.microsoft.com/winfx/2006/xaml";
+    private const string _clrNamespacePrefix = "clr-namespace:";
 
     public static XamlLead? Parse(string? text)
     {
@@ -56,7 +56,7 @@ internal static class XamlLeadParser
 
                 while (reader.MoveToNextAttribute())
                 {
-                    if (reader.NamespaceURI is Xaml2009 or Xaml2006)
+                    if (reader.NamespaceURI is _xaml2009 or _xaml2006)
                     {
                         if (reader.LocalName == "Class")
                         {
@@ -75,9 +75,9 @@ internal static class XamlLeadParser
                     return null;
                 }
 
-                if (rootUri.StartsWith(ClrNamespacePrefix, StringComparison.Ordinal))
+                if (rootUri.StartsWith(_clrNamespacePrefix, StringComparison.Ordinal))
                 {
-                    var body = rootUri.Substring(ClrNamespacePrefix.Length);
+                    var body = rootUri.Substring(_clrNamespacePrefix.Length);
                     var end = body.IndexOf(';');
                     var clrNamespace = end < 0 ? body : body.Substring(0, end);
 

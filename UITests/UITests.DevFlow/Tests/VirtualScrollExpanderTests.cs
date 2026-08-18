@@ -12,12 +12,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollExpanderTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Expander Tests";
+    private const string _pageName = "Virtual Scroll Expander Tests";
 
     [Fact]
     public async Task ExpandingAnItemGrowsItsCellAndPushesFollowingItemsDown()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // Collapsed: the expander is capped at CollapsedHeight (60).
         var collapsed = await App.WaitForStableBoundsAsync("Expander E1");

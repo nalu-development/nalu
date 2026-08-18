@@ -9,12 +9,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class PopupTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Popup Tests";
+    private const string _pageName = "Popup Tests";
 
     [Fact]
     public async Task PopupOpensAndShowsContent()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         await App.TapAsync("OpenPopupButton");
 
@@ -26,7 +26,7 @@ public class PopupTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task PopupClosesFromContentButton()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.TapAsync("OpenPopupButton");
         await App.WaitForElementAsync("PopupContentLabel");
 
@@ -41,7 +41,7 @@ public class PopupTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ScrimTapClosesPopupWhenEnabled()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.TapAsync("OpenPopupButton");
         await App.WaitForElementAsync("PopupContentLabel");
 
@@ -53,7 +53,7 @@ public class PopupTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task ScrimTapDoesNotClosePopupWhenDisabled()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.TapAsync("OpenStubbornPopupButton");
         await App.WaitForElementAsync("PopupContentLabel");
 

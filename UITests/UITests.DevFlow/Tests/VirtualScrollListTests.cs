@@ -11,12 +11,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll List Tests";
+    private const string _pageName = "Virtual Scroll List Tests";
 
     /// <summary>Opens the inner test page (a fresh instance per call: state never leaks between tests).</summary>
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.TapAsync("OpenTestPage");
         await App.WaitForElementAsync("Item 1");
     }
@@ -24,7 +24,7 @@ public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
     [Fact]
     public async Task TestPageOpens()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         var openButton = await App.WaitForElementAsync("OpenTestPage");
         openButton.IsVisible.Should().BeTrue();
@@ -133,7 +133,7 @@ public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
         }
 
         footer.Should().NotBeNull("the footer should exist once the list is scrolled to the end");
-        footer!.IsVisible.Should().BeTrue();
+        footer.IsVisible.Should().BeTrue();
         footer.Text.Should().Be("The footer");
     }
 
@@ -152,7 +152,7 @@ public class VirtualScrollListTests(NaluApp app) : BaseUiTest(app)
         }
 
         item20.Should().NotBeNull("swiping up must reveal the bottom of the 20-item list");
-        item20!.IsVisible.Should().BeTrue();
+        item20.IsVisible.Should().BeTrue();
     }
 
     [Fact]

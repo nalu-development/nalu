@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.DevFlow.Agent;
-using Nalu.Maui.DailyHelper.Overlays;
-using Nalu.Maui.DailyHelper.PageModels;
 using Nalu.Maui.DailyHelper.Services;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 

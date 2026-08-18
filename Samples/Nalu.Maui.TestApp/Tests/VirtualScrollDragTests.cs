@@ -71,6 +71,7 @@ public class VirtualScrollDragTests : ContentPage
         void UpdateLabels()
         {
             orderLabel.Text = string.Join(",", items.Select(i => i.Name));
+            // ReSharper disable once AccessToModifiedClosure
             statusLabel.Text = $"S:{recorder.StartedCount} E:{recorder.EndedCount} M:{recorder.MoveCount}";
         }
 

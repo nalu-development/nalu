@@ -13,9 +13,9 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldSystemBarTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold System Bar Tests";
+    private const string _pageName = "Scaffold System Bar Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 
@@ -140,15 +140,15 @@ public class ScaffoldSystemBarTests(NaluApp app) : BaseUiTest(app), IAsyncLifeti
         await AssertSystemBarsAsync("Home", "dark-icons");
     }
 
-    private async Task<string> ReadBareAsync()
+    private async Task<string?> ReadBareAsync()
     {
         await App.TapAsync("SysBarsProbeBare");
 
         var value = await App.WaitForStableTextAsync("SysBarsValueBare");
         Assert.True(value is "light-icons" or "dark-icons", $"Unexpected probe value '{value}'.");
 
-        return value!;
+        return value;
     }
 
-    private static string Opposite(string style) => style == "light-icons" ? "dark-icons" : "light-icons";
+    private static string Opposite(string? style) => style == "light-icons" ? "dark-icons" : "light-icons";
 }

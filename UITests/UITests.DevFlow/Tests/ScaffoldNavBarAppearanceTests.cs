@@ -13,9 +13,9 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldNavBarAppearanceTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold NavBar Appearance Tests";
+    private const string _pageName = "Scaffold NavBar Appearance Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(PageName);
+    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 

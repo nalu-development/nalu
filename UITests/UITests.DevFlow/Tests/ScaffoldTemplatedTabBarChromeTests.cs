@@ -18,11 +18,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldTemplatedTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Templated TabBar Tests";
+    private const string _pageName = "Scaffold Templated TabBar Tests";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("TplTabHomePage", b => b.Y > 0);
     }
 

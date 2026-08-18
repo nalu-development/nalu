@@ -14,14 +14,14 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollDragTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Virtual Scroll Drag Tests";
+    private const string _pageName = "Virtual Scroll Drag Tests";
 
     private async Task<bool> IsAndroidAsync()
         => (await App.GetPlatformAsync()).Contains("android", StringComparison.OrdinalIgnoreCase);
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("DragCellA");
         await App.WaitForTextAsync("DragOrderLabel", "A,B,PIN,C,D,E,F,G");
     }

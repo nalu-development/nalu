@@ -2,6 +2,7 @@ using System.Net;
 
 namespace Nalu;
 
+// ReSharper disable once InconsistentNaming
 internal class NSUrlRequestHandle(
     string identifier,
     CookieContainer? cookieContainer,

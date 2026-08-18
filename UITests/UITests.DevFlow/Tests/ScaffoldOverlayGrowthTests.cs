@@ -12,11 +12,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldOverlayGrowthTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Overlay Growth Tests";
+    private const string _pageName = "Scaffold Overlay Growth Tests";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("OverlayGrowthHomePage", b => b.Y > 0);
     }
 

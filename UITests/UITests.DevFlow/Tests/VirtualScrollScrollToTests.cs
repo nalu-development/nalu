@@ -17,12 +17,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class VirtualScrollScrollToTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll ScrollTo Tests";
-    private const double Tolerance = 2;
+    private const string _pageName = "Virtual Scroll ScrollTo Tests";
+    private const double _tolerance = 2;
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("S0I0");
     }
 
@@ -40,10 +40,10 @@ public class VirtualScrollScrollToTests(NaluApp app) : BaseUiTest(app)
 
         var _ = expectedEdge switch
         {
-            "top" => await App.WaitForBoundsAsync(automationId, b => Math.Abs(b.Y - viewport.Y) <= Tolerance),
-            "bottom" => await App.WaitForBoundsAsync(automationId, b => Math.Abs(b.Bottom - viewport.Bottom) <= Tolerance),
-            "center" => await App.WaitForBoundsAsync(automationId, b => Math.Abs(b.CenterY - viewport.CenterY) <= Tolerance),
-            "visible" => await App.WaitForBoundsAsync(automationId, b => b.Y >= viewport.Y - Tolerance && b.Bottom <= viewport.Bottom + Tolerance),
+            "top" => await App.WaitForBoundsAsync(automationId, b => Math.Abs(b.Y - viewport.Y) <= _tolerance),
+            "bottom" => await App.WaitForBoundsAsync(automationId, b => Math.Abs(b.Bottom - viewport.Bottom) <= _tolerance),
+            "center" => await App.WaitForBoundsAsync(automationId, b => Math.Abs(b.CenterY - viewport.CenterY) <= _tolerance),
+            "visible" => await App.WaitForBoundsAsync(automationId, b => b.Y >= viewport.Y - _tolerance && b.Bottom <= viewport.Bottom + _tolerance),
             _ => throw new ArgumentOutOfRangeException(nameof(expectedEdge))
         };
     }
@@ -133,7 +133,7 @@ public class VirtualScrollScrollToTests(NaluApp app) : BaseUiTest(app)
 
         var anchor = await App.WaitForStableBoundsAsync("S2I2");
         var viewport = await App.GetBoundsAsync("STScroll");
-        anchor.Y.Should().BeApproximately(viewport.Y, Tolerance, "MakeVisible must not scroll when the target is already fully visible");
+        anchor.Y.Should().BeApproximately(viewport.Y, _tolerance, "MakeVisible must not scroll when the target is already fully visible");
     }
 
     [Fact]

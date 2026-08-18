@@ -13,7 +13,7 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Restore Tests";
+    private const string _pageName = "Scaffold Restore Tests";
 
     /// <summary>Longer than the service's 500ms write debounce: the snapshot is on disk after this.</summary>
     private static readonly TimeSpan _snapshotSettle = TimeSpan.FromMilliseconds(1300);
@@ -22,7 +22,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // A stale snapshot from an earlier (aborted) run may have replayed on open: converge
         // to the baseline — home root, empty stack — before the scenario starts.
@@ -105,7 +105,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
         await Task.Delay(_snapshotSettle);
         await App.RestartAppAsync();
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // The restorable stack restores: Home → Detail with its intent replayed through the
         // normal pipeline. The forgotten page ended the restorable stack, so neither it nor
@@ -129,7 +129,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
         await Task.Delay(_snapshotSettle);
         await App.RestartAppAsync();
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // Root selection is captured automatically: the app lands on the OTHER root (the
         // initial root — Home — ran first; the replay then switched).
@@ -148,7 +148,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
         await Task.Delay(_snapshotSettle);
         await App.RestartAppAsync();
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
 
         // The LAST restored destination (Detail) dispatched an auto-navigation from its
         // appearing: the suppression window lifted before its replay step, so it EXECUTES.
@@ -177,7 +177,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         // Restore runs ONCE PER APP LAUNCH — a later scaffold in the same process boots the
         // default destination even though a snapshot exists (a logout/login scaffold swap must
         // never resurrect old navigation).
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForSettledDisplayAsync("RestoreHomePage");
         (await App.FindElementAsync("RestoreDetailPage")).Should().BeNull("restore replays only at app launch, not on in-process scaffold swaps");
     }

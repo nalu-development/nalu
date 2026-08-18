@@ -10,11 +10,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollHorizontalTests(NaluApp app) : BaseUiTest(app)
 {
-    private const string PageName = "Virtual Scroll Horizontal Tests";
+    private const string _pageName = "Virtual Scroll Horizontal Tests";
 
     private async Task OpenPageAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForElementAsync("H1");
     }
 
@@ -60,7 +60,7 @@ public class VirtualScrollHorizontalTests(NaluApp app) : BaseUiTest(app)
         }
 
         footer.Should().NotBeNull();
-        footer!.Text.Should().Be("H-Foot");
+        footer.Text.Should().Be("H-Foot");
     }
 
     [Fact]

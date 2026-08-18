@@ -19,16 +19,16 @@ namespace Nalu.Maui.UITests.Tests;
 /// </remarks>
 public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold IME Tests";
+    private const string _pageName = "Scaffold IME Tests";
 
     /// <summary>Keyboard probe of the page a test is currently observing (Apple platforms).</summary>
-    private const string HomeKeyboardProbe = "ScaffoldImeKeyboardHome";
+    private const string _homeKeyboardProbe = "ScaffoldImeKeyboardHome";
 
-    private const string EntriesKeyboardProbe = "ScaffoldImeKeyboardEntries";
+    private const string _entriesKeyboardProbe = "ScaffoldImeKeyboardEntries";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("ScaffoldImeHome", b => b.Y > 0);
     }
 
@@ -63,11 +63,11 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
     {
         // The ROOT page presented by the scaffold on startup must receive NavigatedTo too:
         // no push involved, HideSoftInputOnTapped must already be armed.
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry", HomeKeyboardProbe);
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry", _homeKeyboardProbe);
 
         await App.RealTapAsync("ScaffoldImeHomeTapTarget");
 
-        await App.WaitForSoftKeyboardAsync(visible: false, HomeKeyboardProbe);
+        await App.WaitForSoftKeyboardAsync(visible: false, _homeKeyboardProbe);
     }
 
     [Fact]
@@ -76,24 +76,24 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         // A PLAIN entry (not virtualized): Android never dismisses the IME when the focused
         // hierarchy is torn down, so a push must hide it explicitly or it orphans over the
         // incoming page. (The programmatic push does not travel the tap-to-hide path.)
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry", HomeKeyboardProbe);
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeHomeEntry", _homeKeyboardProbe);
 
         await PushEntriesPageAsync();
 
-        await App.WaitForSoftKeyboardAsync(visible: false, EntriesKeyboardProbe);
+        await App.WaitForSoftKeyboardAsync(visible: false, _entriesKeyboardProbe);
     }
 
     [Fact]
     public async Task HideSoftInputOnTappedWorksOnScaffoldPushedPages()
     {
         await PushEntriesPageAsync();
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2", EntriesKeyboardProbe);
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2", _entriesKeyboardProbe);
 
         // A real tap on the page must dismiss the keyboard: this only works when the pushed
         // page received NavigatedTo from the scaffold host.
         await App.RealTapAsync("ScaffoldImeTapTarget");
 
-        await App.WaitForSoftKeyboardAsync(visible: false, EntriesKeyboardProbe);
+        await App.WaitForSoftKeyboardAsync(visible: false, _entriesKeyboardProbe);
     }
 
     /// <summary>
@@ -110,13 +110,13 @@ public class ScaffoldImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
         Assert.SkipWhen(await App.IsAppleAsync(), "iOS keeps the focused cell alive while scrolling: recycling does not dismiss the keyboard there.");
 
         await PushEntriesPageAsync();
-        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2", EntriesKeyboardProbe);
+        await FocusEntryRaisingKeyboardAsync("ScaffoldImeItemEntry2", _entriesKeyboardProbe);
 
-        for (var i = 0; i < 5 && await App.IsSoftKeyboardVisibleAsync(EntriesKeyboardProbe); i++)
+        for (var i = 0; i < 5 && await App.IsSoftKeyboardVisibleAsync(_entriesKeyboardProbe); i++)
         {
             await App.SwipeAsync("ScaffoldImeList", "up");
         }
 
-        await App.WaitForSoftKeyboardAsync(visible: false, EntriesKeyboardProbe);
+        await App.WaitForSoftKeyboardAsync(visible: false, _entriesKeyboardProbe);
     }
 }

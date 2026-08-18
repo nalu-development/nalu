@@ -20,7 +20,7 @@ public class VirtualScrollPushMutationTestsNavigationPage : NavigationPage
 /// </summary>
 public class VirtualScrollPushMutationController : ContentPage
 {
-    private const int TickCount = 15;
+    private const int _tickCount = 15;
     private static readonly TimeSpan _tickInterval = TimeSpan.FromMilliseconds(40);
 
     private readonly Label _rootStatusLabel;
@@ -79,7 +79,7 @@ public class VirtualScrollPushMutationController : ContentPage
         {
             mutator.Tick(ticks++);
 
-            if (ticks >= TickCount)
+            if (ticks >= _tickCount)
             {
                 timer.Stop();
                 var doneText = $"Done {page.Items.Count}";
@@ -121,7 +121,7 @@ public class VirtualScrollPushMutationController : ContentPage
             // pass, while the push animation is still running.
             mutator.Tick(ticks++);
 
-            if (ticks >= TickCount)
+            if (ticks >= _tickCount)
             {
                 timer.Stop();
                 var doneText = $"Done {page.Sections.Count}";
@@ -156,7 +156,7 @@ public class VirtualScrollPushMutationController : ContentPage
             // with Bind escalating large changesets (>25) to a Reset notification.
             mutator.Tick(scenario, ticks++);
 
-            if (ticks >= TickCount)
+            if (ticks >= _tickCount)
             {
                 timer.Stop();
                 var doneText = $"Done {page.Sections.Count}";

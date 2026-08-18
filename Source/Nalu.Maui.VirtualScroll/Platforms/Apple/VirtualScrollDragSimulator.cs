@@ -29,7 +29,7 @@ internal static class VirtualScrollDragSimulator
 
         // Mirrors HandleLongPress/Began: initiating precedes the CanMoveItem veto, which
         // UIKit evaluates inside BeginInteractiveMovementForItem.
-        ((VirtualScrollDelegate) collectionView.Delegate!).ItemDragInitiating(fromPath);
+        ((VirtualScrollDelegate) collectionView.Delegate).ItemDragInitiating(fromPath);
         collectionView.BeginInteractiveMovementForItem(fromPath);
 
         // Mirrors Changed: walk the touch point to the destination cell's center across a few
@@ -48,7 +48,7 @@ internal static class VirtualScrollDragSimulator
 
         // Mirrors Ended.
         collectionView.EndInteractiveMovement();
-        ((VirtualScrollDelegate) collectionView.Delegate!).ItemDragEnded();
+        ((VirtualScrollDelegate) collectionView.Delegate).ItemDragEnded();
     }
 
     private static UICollectionView? FindCollectionView(UIView view)

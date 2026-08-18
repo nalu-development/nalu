@@ -11,7 +11,7 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class VirtualScrollImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Virtual Scroll IME Tests";
+    private const string _pageName = "Virtual Scroll IME Tests";
 
     private async Task<bool> IsAndroidAsync()
         => (await App.GetPlatformAsync()).Contains("android", StringComparison.OrdinalIgnoreCase);
@@ -20,7 +20,7 @@ public class VirtualScrollImeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetim
     {
         Assert.SkipWhen(!await IsAndroidAsync(), "Android-only: soft-keyboard state is asserted via adb.");
 
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.TapAsync("OpenTestPage");
         await App.WaitForElementAsync("ImeItemEntry1");
     }

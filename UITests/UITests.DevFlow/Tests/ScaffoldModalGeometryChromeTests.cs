@@ -14,11 +14,11 @@ namespace Nalu.Maui.UITests.Tests;
 /// </summary>
 public class ScaffoldModalGeometryChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLifetime
 {
-    private const string PageName = "Scaffold Modal Geometry Tests";
+    private const string _pageName = "Scaffold Modal Geometry Tests";
 
     public async ValueTask InitializeAsync()
     {
-        await App.OpenTestPageAsync(PageName);
+        await App.OpenTestPageAsync(_pageName);
         await App.WaitForBoundsAsync("MgHomePage", b => b.Y > 0);
     }
 

@@ -18,7 +18,7 @@ namespace Nalu;
 /// </remarks>
 internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 {
-    internal const int SchemaVersion = 1;
+    private const int _schemaVersion = 1;
     private static readonly TimeSpan _writeDebounce = TimeSpan.FromMilliseconds(500);
 
     /// <summary>Restore-relevant state of a live page, keyed weakly by the page itself.</summary>
@@ -190,7 +190,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
             var snapshot = JsonSerializer.Deserialize(payload, NavigationRestoreJsonContext.Default.NavigationRestoreSnapshot);
 
             if (snapshot is null
-                || snapshot.SchemaVersion != SchemaVersion
+                || snapshot.SchemaVersion != _schemaVersion
                 || snapshot.AppVersion != AppVersionProvider()
                 || snapshot.RouteHash != ComputeRouteHash(shellProxy)
                 || snapshot.RootSegment is null)
@@ -590,7 +590,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
 
             var snapshot = new NavigationRestoreSnapshot
             {
-                SchemaVersion = SchemaVersion,
+                SchemaVersion = _schemaVersion,
                 AppVersion = AppVersionProvider(),
                 RouteHash = ComputeRouteHash(proxy),
                 CapturedAt = _timeProvider.GetUtcNow()
@@ -662,7 +662,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
         }
     }
 
-    /// <summary>Captures and writes immediately, bypassing the debounce (backgrounding, tests).</summary>
+    /// <summary>Captures and writes immediately, bypassing debounce (backgrounding, tests).</summary>
     internal async Task FlushAsync()
     {
         if (_writeDebounceCts is { } cts)
@@ -692,7 +692,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     private void HookWindows()
     {
         // Backgrounding is the last reliable moment before a potential process death: flush
-        // immediately, skipping the debounce. Best-effort — Application.Current is absent in
+        // immediately, skipping debounce. Best-effort — Application.Current is absent in
         // unit-test hosts, and windows created later are picked up on the next boot hook.
         try
         {

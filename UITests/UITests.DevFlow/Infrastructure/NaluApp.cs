@@ -220,7 +220,7 @@ public sealed class NaluApp : IAsyncLifetime
             // Only on-screen matches: text queries also hit abstract structure elements
             // (Shell's Tab, the Scaffold's ScaffoldRoot Title) that report IsVisible but have
             // no window bounds — tapping those spins until timeout.
-            var element = matches.FirstOrDefault(m => m.IsVisible && m.WindowBounds is { Width: > 0, Height: > 0 });
+            var element = matches.FirstOrDefault(m => m is { IsVisible: true, WindowBounds: { Width: > 0, Height: > 0 } });
 
             if (element is not null)
             {
@@ -501,7 +501,7 @@ public sealed class NaluApp : IAsyncLifetime
             // effective one and comes last) → dp scale = density / 160.
             var output = await RunAdbAsync("shell wm density").ConfigureAwait(false);
             var densityLine = output.Split('\n').Last(line => line.Contains("density:", StringComparison.OrdinalIgnoreCase));
-            scale = int.Parse(densityLine.Split(':')[^1].Trim(), System.Globalization.CultureInfo.InvariantCulture) / 160.0;
+            scale = int.Parse(densityLine.Split(':')[^1].Trim(), CultureInfo.InvariantCulture) / 160.0;
             _androidDisplayScale = scale;
         }
 
@@ -716,11 +716,10 @@ public sealed class NaluApp : IAsyncLifetime
 
         var stopwatch = Stopwatch.StartNew();
         var effectiveTimeout = timeout ?? _defaultTimeout;
-        (double Width, double Height) size = default;
 
         while (true)
         {
-            size = await GetWindowSizeAsync().ConfigureAwait(false);
+            var size = await GetWindowSizeAsync().ConfigureAwait(false);
 
             if (size.Width > size.Height == landscape)
             {
@@ -845,8 +844,7 @@ public sealed class NaluApp : IAsyncLifetime
     /// A page that is LEAVING stays on screen for the whole of its motion (both platforms hold it
     /// there; Android used to tear it down at commit, which is what made a single sample look
     /// reliable), so "is the target displayed?" asked immediately can be answered by the page
-    /// being navigated AWAY from — and a navigation that was silently dropped for arriving mid
-    /// transition then reads as successful.
+    /// being navigated AWAY from — and a navigation that was silently dropped for arriving mid-transition then reads as successful.
     /// </summary>
     public async Task WaitForSettledDisplayAsync(string automationId, TimeSpan? timeout = null)
     {
@@ -1190,7 +1188,7 @@ public sealed class NaluApp : IAsyncLifetime
 
     #region App restart (host-side process control, restore tests)
 
-    private const string TestAppId = "com.nalu.maui.testapp";
+    private const string _testAppId = "com.nalu.maui.testapp";
 
     /// <summary>
     /// KILLS and relaunches the TestApp — the §9 snapshot-restore flow needs a real process
@@ -1205,16 +1203,16 @@ public sealed class NaluApp : IAsyncLifetime
 
         if (platform.Contains("android", StringComparison.OrdinalIgnoreCase))
         {
-            await RunAdbAsync("shell", "am", "force-stop", TestAppId).ConfigureAwait(false);
-            await RunAdbAsync("shell", "monkey", "-p", TestAppId, "-c", "android.intent.category.LAUNCHER", "1").ConfigureAwait(false);
+            await RunAdbAsync("shell", "am", "force-stop", _testAppId).ConfigureAwait(false);
+            await RunAdbAsync("shell", "monkey", "-p", _testAppId, "-c", "android.intent.category.LAUNCHER", "1").ConfigureAwait(false);
         }
         else if (platform.Contains("ios", StringComparison.OrdinalIgnoreCase))
         {
             // Explicit device: 'booted' is ambiguous with a second simulator up (another run or
             // agent) — the kill/relaunch would land on the wrong one and this app would just keep running.
             var udid = await GetBootedSimulatorUdidAsync().ConfigureAwait(false);
-            await RunSimctlAsync("terminate", udid, TestAppId).ConfigureAwait(false);
-            await RunSimctlAsync("launch", udid, TestAppId).ConfigureAwait(false);
+            await RunSimctlAsync("terminate", udid, _testAppId).ConfigureAwait(false);
+            await RunSimctlAsync("launch", udid, _testAppId).ConfigureAwait(false);
         }
         else
         {
