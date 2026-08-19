@@ -93,12 +93,19 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
             multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampStart, nameof(ScaffoldNavBarContext.ScrollRampStart), appearance));
             multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampEnd, nameof(ScaffoldNavBarContext.ScrollRampEnd), appearance));
         }
+        else if (provideValueTarget.TargetObject is Element target)
+        {
+            // The scroll channel is PER PAGE: resolve the context of the page this element
+            // belongs to, so a page's parallax reads its own offset even while another page is
+            // presented over (or under) it during a transition.
+            multiBinding.Bindings.Add(NavBarContextBindings.Create(target, nameof(ScaffoldNavBarContext.ScrollOffset)));
+            multiBinding.Bindings.Add(NavBarContextBindings.Create(target, nameof(ScaffoldNavBarContext.ScrollRampStart)));
+            multiBinding.Bindings.Add(NavBarContextBindings.Create(target, nameof(ScaffoldNavBarContext.ScrollRampEnd)));
+        }
         else
         {
-            var source = new RelativeBindingSource(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
-            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollOffset, nameof(ScaffoldNavBarContext.ScrollOffset), source));
-            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampStart, nameof(ScaffoldNavBarContext.ScrollRampStart), source));
-            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampEnd, nameof(ScaffoldNavBarContext.ScrollRampEnd), source));
+            throw new InvalidOperationException(
+                $"{GetType().Name} must target an element or a {nameof(ScaffoldNavBarAppearance)} (styles/setters are not supported).");
         }
 
         multiBinding.Bindings.Add(CreateThemeTypedBinding());
@@ -133,22 +140,6 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
                Source = source
            };
     
-    private static TypedBinding<Scaffold, TProperty> CreateNavBarContextTypedBinding<TProperty>(
-        Func<ScaffoldNavBarContext, TProperty> propertyGetter,
-        string propertyName,
-        RelativeBindingSource source
-    )
-        => new(
-               a => a.NavBarContext is { } context ? (propertyGetter(context), true) : (default!, false),
-               null,
-               [
-                   Tuple.Create<Func<Scaffold, object>, string>(o => o, nameof(Scaffold.NavBarContext)),
-                   Tuple.Create<Func<Scaffold, object>, string>(o => o.NavBarContext, propertyName)
-               ]
-           )
-           {
-               Source = source
-           };
 
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
 }

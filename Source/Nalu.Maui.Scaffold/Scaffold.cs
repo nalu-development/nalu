@@ -1294,19 +1294,33 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     internal ScaffoldSystemBars SystemBars => field ??= new ScaffoldSystemBars(this);
 
     /// <summary>
-    /// Resolves the ambient <see cref="ScaffoldNavBarContext"/> from any element hosted in a
-    /// scaffold (walks the logical parents) — the code-behind counterpart of
+    /// Resolves the <see cref="ScaffoldNavBarContext"/> of the page the given element belongs to
+    /// (walks the logical parents) — the code-behind counterpart of
     /// <see cref="NavBarBindingExtension"/>, e.g. to observe
     /// <see cref="ScaffoldNavBarContext.ScrollOffset"/> for scroll-driven chrome.
-    /// Null while the element is not attached to a scaffold's tree yet.
+    /// Bar content (a hosted title view included) resolves through the bar it is mounted in,
+    /// page content through its page; an element in a scaffold but in no page falls back to the
+    /// current page's context. Null while the element is not attached to a scaffold's tree yet.
     /// </summary>
     public static ScaffoldNavBarContext? FindNavBarContext(Element? element)
     {
+        Page? page = null;
+
         while (element is not null)
         {
-            if (element is Scaffold scaffold)
+            switch (element)
             {
-                return scaffold.NavBarContext;
+                case ScaffoldNavBarHost barHost:
+                    return barHost.Context;
+
+                // The scaffold IS a page: never mistake it for a hosted one.
+                case Scaffold scaffold:
+                    return (page is not null ? scaffold.GetPageHost(page)?.Context : null) ?? scaffold.NavBarContext;
+
+                case Page hostedPage:
+                    page ??= hostedPage;
+
+                    break;
             }
 
             element = element.Parent;

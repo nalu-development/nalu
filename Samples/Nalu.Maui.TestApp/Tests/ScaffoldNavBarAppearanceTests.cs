@@ -110,7 +110,7 @@ public class AppearanceHomePage : ContentPage
         // Resolved title color (hex): the theme-change tests read the scaffold-level
         // AppThemeBinding through it.
         var titleForegroundProbe = new Label { AutomationId = "AppearanceHomeTitleForeground", FontSize = 11 };
-        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
+        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(titleForegroundProbe, nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
 
         Content = new VerticalStackLayout
         {
@@ -167,9 +167,9 @@ public class AppearanceOverlapPage : ContentPage
 
         // Probes of the resolved context colors (hex), so tests can assert the two channels apart.
         var foregroundProbe = new Label { AutomationId = "AppearanceOverlapForeground", FontSize = 11 };
-        foregroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.Foreground), converter: new ColorHexConverter()));
+        foregroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(foregroundProbe, nameof(ScaffoldNavBarContext.Foreground), converter: new ColorHexConverter()));
         var titleForegroundProbe = new Label { AutomationId = "AppearanceOverlapTitleForeground", FontSize = 11 };
-        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
+        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(titleForegroundProbe, nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
 
         var body = new VerticalStackLayout
         {
@@ -292,7 +292,7 @@ public class AppearanceScrollPage : ContentPage
             FontAttributes = FontAttributes.Bold,
             VerticalTextAlignment = TextAlignment.Center
         };
-        offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.ScrollOffset), stringFormat: "{0:F0}"));
+        offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(offsetLabel, nameof(ScaffoldNavBarContext.ScrollOffset), stringFormat: "{0:F0}"));
         Scaffold.SetTitleView(this, offsetLabel);
 
         // Diagnostic granularity: tracking the island members separately tells WHICH link leaks
