@@ -345,10 +345,10 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     /// restored page fires from its lifecycle (the prescribed <c>DispatchAsync</c> pattern)
     /// is enqueued while our navigation is still executing, so it always drains BEFORE our
     /// next replay step — deterministically inside the suppression window, deterministically
-    /// ignored. The suppression window is lifted just before the LAST replay navigation (the
-    /// only way to beat the queue: that page's dispatched auto-navigation is already ahead of
-    /// any continuation of ours), so the page the user actually was on keeps its right to
-    /// auto-navigate.
+    /// ignored. The suppression window is lifted INSIDE the last replay step, right before its
+    /// navigation runs: whatever the app dispatched earlier (the initialization root's redirect)
+    /// is ahead of that step in the queue and drains ignored, while the page the user actually
+    /// was on keeps its right to auto-navigate (its dispatched redirect is queued after).
     /// </remarks>
     internal async Task ReplayPendingAsync()
     {
@@ -413,15 +413,15 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
                     return;
                 }
 
-                if (i == navigations.Count - 1)
-                {
-                    // The LAST restored destination may auto-navigate: lift the window BEFORE
-                    // its navigation so its dispatched redirect (already ahead of any
-                    // continuation of ours in the queue) finds it open.
-                    _suppressNavigations = false;
-                }
+                // The LAST restored destination may auto-navigate: the window lifts right before
+                // its navigation runs — INSIDE the dispatched step, not here. Anything the app
+                // dispatched earlier (the initialization root's own redirect, queued during its
+                // boot appearing) sits ahead of that step in the queue and therefore still drains
+                // inside the window — deterministically ignored — while the final destination's
+                // own dispatched redirect, queued during its navigation, runs after it, open.
+                var liftSuppression = i == navigations.Count - 1;
 
-                if (!await DispatchReplayNavigationAsync(dispatcher, navigations[i].Navigation, navigations[i].Intent))
+                if (!await DispatchReplayNavigationAsync(dispatcher, navigations[i].Navigation, navigations[i].Intent, liftSuppression))
                 {
                     // Canceled/failed guard-free push should not happen; keep what landed.
                     return;
@@ -447,7 +447,7 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
     /// dispatched; the replay-bypass flag is set INSIDE the dispatched flow (AsyncLocal — it
     /// must not leak onto interleaving auto-navigations).
     /// </summary>
-    private Task<bool> DispatchReplayNavigationAsync(IDispatcher dispatcher, INavigationInfo navigation, object? intent)
+    private Task<bool> DispatchReplayNavigationAsync(IDispatcher dispatcher, INavigationInfo navigation, object? intent, bool liftSuppression)
         => dispatcher.DispatchAsync(async () =>
             {
                 _isReplayNavigation.Value = true;
@@ -457,6 +457,11 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
                     if (intent is not null)
                     {
                         await HydrateIntentAsync(intent);
+                    }
+
+                    if (liftSuppression)
+                    {
+                        _suppressNavigations = false;
                     }
 
                     return await NavigationService.GoToAsync(navigation);

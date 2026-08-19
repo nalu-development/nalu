@@ -164,6 +164,32 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.OpenTestPageAsync(_pageName);
     }
 
+    /// <summary>
+    /// A ONE-step restore (a root with an empty stack) while the initialization root dispatches
+    /// its own redirect from its boot appearing: the redirect is queued BEFORE the single replay
+    /// step, so lifting the suppression window ahead of that step let it win — the app landed
+    /// wherever the init root sent it instead of on the restored root. The window must lift
+    /// inside the replay step: the init redirect drains ignored, the restored root lands.
+    /// </summary>
+    [Fact]
+    public async Task InitRootRedirectDoesNotBeatAOneStepRestore()
+    {
+        await App.TapAsync("RestoreArmAutoNavButton");
+        await App.TapAsync("RestoreGoOtherButton");
+        await App.WaitForSettledDisplayAsync("RestoreOtherPage");
+
+        await Task.Delay(_snapshotSettle);
+        await App.RestartAppAsync();
+        await App.OpenTestPageAsync(_pageName);
+
+        // The restored root lands…
+        await App.WaitForSettledDisplayAsync("RestoreOtherPage");
+
+        // …and the initialization root's dispatched redirect was IGNORED (it reports its result
+        // on its own page, still in the tree as the Home root).
+        await App.WaitForTextAsync("RestoreHomeRedirectLabel", "redirect:False");
+    }
+
     [Fact]
     public async Task AutoNavigationsDuringReplayAreSuppressedExceptOnTheFinalDestination()
     {
@@ -185,8 +211,10 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
 
         // The INITIALIZATION root's dispatched redirect (fired from its boot appearing, the
         // classic init-flow pattern) drained inside the window: deterministically ignored.
+        // (The Other root page may still sit in the element tree from an earlier visit in this
+        // app session — roots stay alive across selections — so the label is the proof, not
+        // the page's absence.)
         await App.WaitForTextAsync("RestoreHomeRedirectLabel", "redirect:False");
-        (await App.FindElementAsync("RestoreOtherPage")).Should().BeNull("the initialization root's redirect must be suppressed during the replay");
 
         await App.TapAsync("RestoreGoHomeRootDeepButton");
         await App.WaitForSettledDisplayAsync("RestoreHomePage");
