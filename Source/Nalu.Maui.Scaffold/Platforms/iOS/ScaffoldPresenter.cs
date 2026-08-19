@@ -998,6 +998,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
 
+        // The bar shows the TARGET page's state: stamp its context before the bar (and every
+        // binding inside it, a hosted title view included) is mounted. Per-page bar hosts
+        // arrive with the platform containers; until then one strip follows the current page.
+        if (scaffold.GetPageHost(targetPage) is { } pageHost)
+        {
+            host.Context = pageHost.Context;
+        }
+
         var freshMount = host.Bar is null;
         host.SetBar(navBarView);
         host.UpdateSources(targetPage);
