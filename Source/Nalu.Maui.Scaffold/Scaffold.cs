@@ -342,7 +342,15 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
                 ? stack.PushedPages[^1].Page
                 : stack.RootPage;
 
+        var changed = !ReferenceEquals(CurrentPage, page);
         SetValue(_currentPagePropertyKey, page);
+
+        if (changed)
+        {
+            // The forwarder now points at another page's context: bindings routed through
+            // Scaffold.NavBarContext (the public escape hatch) must re-evaluate.
+            OnPropertyChanged(nameof(NavBarContext));
+        }
     }
 
     /// <summary>Gets the destination areas composing the application structure.</summary>
@@ -1227,11 +1235,53 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     public static void SetTransitionName(BindableObject bindable, string? value) => bindable.SetValue(TransitionNameProperty, value);
 
     /// <summary>
-    /// Gets the observable state the mounted nav bar view binds to (title, back/drawer button
-    /// availability, commands) — the binding context of the default template and of custom
-    /// nav bar views alike.
+    /// Gets the observable state of the CURRENT page's nav bar (title, back/drawer button
+    /// availability, commands) — "what the bar shows now".
     /// </summary>
-    public ScaffoldNavBarContext NavBarContext => field ??= new ScaffoldNavBarContext(this);
+    /// <remarks>
+    /// Each page owns its own context (the bar travels with its page, and during a transition
+    /// two are alive); this forwards to the current page's, and raises
+    /// <c>PropertyChanged("NavBarContext")</c> when the current page changes so bindings
+    /// through it re-evaluate. A bar's <c>BindingContext</c> — and every
+    /// <c>{nalu:NavBarBinding}</c> inside a page or its bar — is that PAGE's own context, not
+    /// this one; use this only when "whatever is on screen now" is genuinely what you mean.
+    /// </remarks>
+    public ScaffoldNavBarContext NavBarContext
+        => (CurrentPage is { } page ? GetPageHost(page)?.Context : null) ?? DetachedNavBarContext;
+
+    /// <summary>The context handed out before any page is presented (and for pages with no host).</summary>
+    private ScaffoldNavBarContext DetachedNavBarContext => field ??= new ScaffoldNavBarContext(this);
+
+    private readonly Dictionary<Page, ScaffoldPageHost> _pageHosts = [];
+
+    /// <summary>
+    /// Builds the page's <see cref="ScaffoldPageHost"/> and parents the page. THE one place that
+    /// establishes the logical shape — see the reversibility note on <see cref="ScaffoldPageHost"/>.
+    /// Called by <see cref="ScaffoldNavigationStack"/> when a page enters a stack.
+    /// </summary>
+    internal void AttachPage(ScaffoldRoot root, Page page)
+    {
+        if (!_pageHosts.ContainsKey(page))
+        {
+            _pageHosts[page] = new ScaffoldPageHost(this, root, page);
+        }
+
+        AddLogicalChild(page);
+    }
+
+    /// <summary>Tears the page's host down and unparents the page (the page left the stack).</summary>
+    internal void DetachPage(Page page)
+    {
+        if (_pageHosts.Remove(page, out var host))
+        {
+            host.Dispose();
+        }
+
+        RemoveLogicalChild(page);
+    }
+
+    /// <summary>The page's host, or null when the page is not in a stack of this scaffold.</summary>
+    internal ScaffoldPageHost? GetPageHost(Page page) => _pageHosts.GetValueOrDefault(page);
 
     /// <summary>
     /// Gets the observable soft-keyboard state (<see cref="ScaffoldKeyboardState.IsVisible"/>,

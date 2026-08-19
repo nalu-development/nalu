@@ -7,9 +7,10 @@ namespace Nalu;
 
 /// <summary>
 /// The binding context of the mounted nav bar view (the default template or a custom
-/// replacement): one observable object per <see cref="Scaffold"/>, updated on every navigation
-/// and live while the current page's title, title view, binding context, scroll ramp or
-/// flyout policies change.
+/// replacement): one observable object PER PAGE, created when the page enters a navigation
+/// stack and live while that page's title, title view, binding context, scroll ramp or
+/// flyout policies change. The page it describes never changes — during a transition two
+/// contexts are alive and each bar shows its OWN page's state.
 /// Custom bars bind to it directly (e.g. <c>IsVisible="{Binding CanNavigateBack}"</c>,
 /// <c>Command="{Binding BackCommand}"</c>) — the same contract the built-in
 /// <see cref="ScaffoldBackButton"/>, <see cref="ScaffoldFlyoutButton"/> and
@@ -18,7 +19,10 @@ namespace Nalu;
 public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 {
     private readonly Scaffold _scaffold;
-    private Page? _observedPage;
+    private readonly ScaffoldRoot? _root;
+
+    /// <summary>The page this context describes; null only for the scaffold's detached fallback context.</summary>
+    internal Page? Page { get; }
 
     /// <inheritdoc />
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -188,9 +192,18 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// <summary>Opens the end-edge flyout.</summary>
     public ICommand OpenFlyoutEndCommand { get; }
 
-    internal ScaffoldNavBarContext(Scaffold scaffold)
+    internal ScaffoldNavBarContext(Scaffold scaffold, Page? page = null, ScaffoldRoot? root = null)
     {
         _scaffold = scaffold;
+        Page = page;
+        _root = root;
+
+        if (page is not null)
+        {
+            // The observed page is fixed for this context's life: no re-targeting, so a page
+            // leaving the screen keeps reporting its own state while it animates away.
+            page.PropertyChanged += OnPagePropertyChanged;
+        }
 
         // Non-reentrant commands: CanExecute stays false while the operation is in flight, so
         // fast repeated taps can't queue duplicate pops / flyout openings.
@@ -206,24 +219,20 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Recomputes every value from the current navigation state. Invoked by the presenter on
-    /// each synchronization; page-level changes (Title, TitleView, flyout policies) are
-    /// observed live on the current page.
+    /// Recomputes every value from the current navigation state for THIS context's page.
+    /// Invoked when the page enters the stack and by the presenters for the incoming page on
+    /// each synchronization (stack-dependent values — back/close/drawer buttons — change with
+    /// the stack, not with the page); page-level changes (Title, TitleView, flyout policies)
+    /// are observed live.
     /// </summary>
-    internal void Update(ScaffoldRoot root, Page currentPage)
+    internal void Refresh()
     {
-        if (!ReferenceEquals(_observedPage, currentPage))
+        if (Page is not { } currentPage)
         {
-            if (_observedPage is not null)
-            {
-                _observedPage.PropertyChanged -= OnPagePropertyChanged;
-            }
-
-            _observedPage = currentPage;
-            currentPage.PropertyChanged += OnPagePropertyChanged;
+            return;
         }
 
-        var stackEmpty = root.NavigationStack.PushedPages.Count == 0;
+        var stackEmpty = (_root?.NavigationStack.PushedPages.Count ?? 0) == 0;
         var pageMode = Scaffold.GetPageMode(currentPage);
         var isModal = pageMode != ScaffoldPageMode.Default;
 
@@ -277,7 +286,7 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 
     private void OnPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is not Page page || !ReferenceEquals(page, _observedPage))
+        if (sender is not Page page || !ReferenceEquals(page, Page))
         {
             return;
         }
@@ -309,14 +318,23 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
             case "FlyoutEndButtonVisibility":
             case "FlyoutStartMode":
             case "FlyoutEndMode":
-                if (_scaffold.Proxy?.CurrentItem.CurrentSection is ScaffoldRootProxy rootProxy)
-                {
-                    Update(rootProxy.Root, page);
-                }
+                Refresh();
 
                 break;
         }
     }
+
+    /// <summary>Releases the page subscription when the page leaves the navigation stack.</summary>
+    internal void Detach()
+    {
+        if (Page is not null)
+        {
+            Page.PropertyChanged -= OnPagePropertyChanged;
+        }
+    }
+
+    /// <summary>Raises <see cref="PropertyChanged"/> for every property (the scaffold-level forwarder swap).</summary>
+    internal void RaiseAllChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

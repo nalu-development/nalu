@@ -172,8 +172,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(targetPage);
         var animated = hint != ScaffoldPresentationHint.None;
 
-        // The context must carry the target page's state before the bar (or its bindings) mount.
-        scaffold.NavBarContext.Update(root, targetPage);
+        // The incoming page's OWN context must carry its state before the bar (or its
+        // bindings) mount; the outgoing page's context is left alone — it describes the page
+        // that is still on screen, leaving.
+        scaffold.GetPageHost(targetPage)?.Refresh();
 
         // Chrome-LEVEL attached changes (scaffold/area NavBarView) must remap live, exactly
         // like the page-level ones the current-page subscription already covers.

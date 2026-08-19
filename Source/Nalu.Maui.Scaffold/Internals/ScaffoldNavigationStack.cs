@@ -10,7 +10,10 @@ namespace Nalu;
 /// <remarks>
 /// Every page entering the stack is parented as a logical child of the hosting
 /// <see cref="Scaffold"/> (MAUI requires a page's parent to be a page), so pages participate in
-/// the MAUI element tree: window resolution, visual-tree walks and tooling all work.
+/// the MAUI element tree: window resolution, visual-tree walks and tooling all work. Entering
+/// and leaving go through <see cref="Scaffold.AttachPage"/>/<see cref="Scaffold.DetachPage"/>,
+/// which also build and tear down the page's <see cref="Nalu.Internals.ScaffoldPageHost"/> — the page's own
+/// nav bar context and chrome.
 /// </remarks>
 internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
 {
@@ -32,7 +35,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
 
             if (field is not null)
             {
-                FindHostPage()?.RemoveLogicalChild(field);
+                FindScaffold()?.DetachPage(field);
                 Scaffold.CleanupPageFlyoutContent(field);
             }
 
@@ -40,7 +43,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
 
             if (value is not null)
             {
-                FindHostPage()?.AddLogicalChild(value);
+                FindScaffold()?.AttachPage(owner, value);
             }
 
             NotifyCurrentPageMayHaveChanged();
@@ -54,7 +57,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     public void Push(NavigationStackPage entry)
     {
         _pushedPages.Add(entry);
-        FindHostPage()?.AddLogicalChild(entry.Page);
+        FindScaffold()?.AttachPage(owner, entry.Page);
         NotifyCurrentPageMayHaveChanged();
     }
 
@@ -63,7 +66,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     {
         var entry = _pushedPages[^1];
         _pushedPages.RemoveAt(_pushedPages.Count - 1);
-        FindHostPage()?.RemoveLogicalChild(entry.Page);
+        FindScaffold()?.DetachPage(entry.Page);
 
         // The page's drawer overrides leave the resolution stack with it; release the
         // attached content so the page model is not retained through it.
@@ -78,9 +81,9 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     /// The scaffold's observable <see cref="Scaffold.CurrentPage"/> recomputes from the
     /// PROXY state, so mutations on non-current stacks are naturally no-ops.
     /// </summary>
-    private void NotifyCurrentPageMayHaveChanged() => (FindHostPage() as Scaffold)?.UpdateCurrentPage();
+    private void NotifyCurrentPageMayHaveChanged() => FindScaffold()?.UpdateCurrentPage();
 
-    private Page? FindHostPage()
+    private Scaffold? FindScaffold()
     {
         Element? element = owner;
 
@@ -89,7 +92,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
             element = element.Parent;
         }
 
-        return element as Page;
+        return element as Scaffold;
     }
 
     /// <summary>
