@@ -41,6 +41,15 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// <summary>Occurs when a navigation lifecycle event is triggered.</summary>
     public event EventHandler<NavigationLifecycleEventArgs>? NavigationEvent;
 
+    /// <summary>
+    /// Occurs when an overlay (popup, bottom sheet, tab bar panel, flyout) is presented or
+    /// closed — one <see cref="ScaffoldOverlayEventType.Presented"/>/<see cref="ScaffoldOverlayEventType.Closed"/>
+    /// pair per overlay instance, whatever opened or closed it, after the fact. Overlays are not
+    /// pages: they never show up in <see cref="NavigationEvent"/>; this is the hook for
+    /// overlay-level analytics and diagnostics.
+    /// </summary>
+    public event EventHandler<ScaffoldOverlayEventArgs>? OverlayEvent;
+
     internal NavigationService? NavigationService { get; private set; }
 
     internal ScaffoldProxy? Proxy { get; private set; }
@@ -491,6 +500,8 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             ScrimAutomationId = "ScaffoldFlyoutScrim"
         };
 
+        var events = new OverlayEventEmitter(this, request, content, model: null, intent: null, side);
+
         request.Cleanup = () =>
         {
             if (ReferenceEquals(_flyoutRequest, request))
@@ -499,6 +510,7 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             }
 
             OnFlyoutDismissed(side);
+            events.Closed();
         };
 
         _flyoutRequest = request;
@@ -506,10 +518,16 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
         // The guard beats a close racing the enter animation: cleanup runs (and clears the
         // request) BEFORE presentation settles, and the late presented-event must not overwrite
         // the dismissed state.
-        if (await presenter.ShowOverlayAsync(request)
-            && ReferenceEquals(_flyoutRequest, request))
+        var presented = await presenter.ShowOverlayAsync(request);
+
+        if (presented && ReferenceEquals(_flyoutRequest, request))
         {
             OnFlyoutPresented(side);
+        }
+
+        if (presented)
+        {
+            events.Presented();
         }
     }
 
@@ -559,6 +577,9 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// already closed (<see cref="IScaffoldPopup.IsOpen"/> is false).
     /// </returns>
     public async Task<IScaffoldPopup> ShowPopupAsync(View content, ScaffoldPopupOptions? options = null)
+        => await ShowPopupCoreAsync(content, options, model: null, intent: null);
+
+    internal async Task<ScaffoldPopupHandle> ShowPopupCoreAsync(View content, ScaffoldPopupOptions? options, object? model, object? intent)
     {
         var handle = new ScaffoldPopupHandle();
 
@@ -596,6 +617,8 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             ScrimAutomationId = "PopupScrim"
         };
 
+        var events = new OverlayEventEmitter(this, request, content, model, intent, flyoutSide: null);
+
         request.Cleanup = () =>
         {
             if (attach)
@@ -604,12 +627,16 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             }
 
             handle.MarkClosed();
+            events.Closed();
         };
 
         handle.Attach(this, request);
 
         // On failure the presenter has already run Cleanup — the handle comes back closed.
-        await presenter.ShowOverlayAsync(request);
+        if (await presenter.ShowOverlayAsync(request))
+        {
+            events.Presented();
+        }
 
         return handle;
     }
@@ -632,6 +659,9 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// already closed (<see cref="IScaffoldPopup.IsOpen"/> is false).
     /// </returns>
     public async Task<IScaffoldPopup> ShowBottomSheetAsync(View content, ScaffoldBottomSheetOptions? options = null)
+        => await ShowBottomSheetCoreAsync(content, options, model: null, intent: null);
+
+    internal async Task<ScaffoldPopupHandle> ShowBottomSheetCoreAsync(View content, ScaffoldBottomSheetOptions? options, object? model, object? intent)
     {
         var handle = new ScaffoldPopupHandle();
 
@@ -666,10 +696,13 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             ScrimAutomationId = "SheetScrim"
         };
 
+        var events = new OverlayEventEmitter(this, request, content, model, intent, flyoutSide: null);
+
         request.Cleanup = () =>
         {
             RemoveLogicalChild(sheetView);
             handle.MarkClosed();
+            events.Closed();
         };
 
         handle.Attach(this, request);
@@ -678,7 +711,10 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
         sheetView.SetDismissCallback(() => presenter.CloseOverlayAsync(request));
 
         // On failure the presenter has already run Cleanup — the handle comes back closed.
-        await presenter.ShowOverlayAsync(request);
+        if (await presenter.ShowOverlayAsync(request))
+        {
+            events.Presented();
+        }
 
         return handle;
     }
@@ -724,6 +760,8 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             ScrimAutomationId = "TabBarPanelScrim"
         };
 
+        var events = new OverlayEventEmitter(this, request, content, model: null, intent: null, flyoutSide: null);
+
         request.Cleanup = () =>
         {
             if (ReferenceEquals(_tabBarPanelRequest, request))
@@ -737,6 +775,7 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             }
 
             cleanup?.Invoke();
+            events.Closed();
         };
 
         var replace = _tabBarPanelRequest is not null;
@@ -744,13 +783,65 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
 
         if (replace)
         {
+            // The replaced panel's cleanup (Closed) runs inside; the replacement is presented
+            // in place, no re-animation.
             await presenter.ReplaceTabBarPanelAsync(request);
+            events.Presented();
         }
-        else
+        else if (await presenter.ShowOverlayAsync(request))
         {
-            await presenter.ShowOverlayAsync(request);
+            events.Presented();
         }
     }
+
+    /// <summary>
+    /// Guarantees the OverlayEvent contract per overlay instance: exactly one Presented/Closed
+    /// pair, in that order, and nothing at all for a presentation that failed (cleanup runs on
+    /// failure too). A close racing the enter animation has its cleanup run BEFORE the
+    /// presenter reports success: the Closed is then deferred until right after Presented.
+    /// </summary>
+    private sealed class OverlayEventEmitter(Scaffold scaffold, ScaffoldOverlayRequest request, View content, object? model, object? intent, ScaffoldFlyoutSide? flyoutSide)
+    {
+        private bool _presented;
+        private bool _closePending;
+        private bool _closed;
+
+        public void Presented()
+        {
+            if (_presented)
+            {
+                return;
+            }
+
+            _presented = true;
+            scaffold.RaiseOverlayEvent(new ScaffoldOverlayEventArgs(request.Kind, ScaffoldOverlayEventType.Presented, content, model, intent, result: null, flyoutSide));
+
+            if (_closePending)
+            {
+                Closed();
+            }
+        }
+
+        public void Closed()
+        {
+            if (_closed)
+            {
+                return;
+            }
+
+            if (!_presented)
+            {
+                _closePending = true;
+
+                return;
+            }
+
+            _closed = true;
+            scaffold.RaiseOverlayEvent(new ScaffoldOverlayEventArgs(request.Kind, ScaffoldOverlayEventType.Closed, content, model, intent, request.Result, flyoutSide));
+        }
+    }
+
+    private void RaiseOverlayEvent(ScaffoldOverlayEventArgs args) => OverlayEvent?.Invoke(this, args);
 
     /// <summary>
     /// Selects the given root through the navigation engine: switching to another root restores

@@ -81,13 +81,13 @@ internal sealed class ScaffoldOverlayServiceProvider(IServiceProvider inner, Typ
 /// </summary>
 internal abstract class ScaffoldOverlayRefBase : IOverlayRef
 {
-    private IScaffoldPopup? _handle;
+    private ScaffoldPopupHandle? _handle;
 
     /// <summary>Whether a close was requested before the presentation started.</summary>
     public bool CloseRequestedBeforePresentation { get; private set; }
 
     /// <summary>Binds the presented handle; replays a buffered early close.</summary>
-    public void Bind(IScaffoldPopup handle)
+    public void Bind(ScaffoldPopupHandle handle)
     {
         _handle = handle;
 
@@ -113,7 +113,14 @@ internal abstract class ScaffoldOverlayRefBase : IOverlayRef
     {
         SetResult(result);
 
-        return CloseAsync();
+        if (_handle is { } handle)
+        {
+            return handle.CloseAsync(result);
+        }
+
+        CloseRequestedBeforePresentation = true;
+
+        return Task.CompletedTask;
     }
 
     /// <summary>Stores (and validates) the reported result.</summary>
@@ -275,8 +282,8 @@ internal sealed class ScaffoldOverlayService(INavigationService navigationServic
                 if (!overlayRef.CloseRequestedBeforePresentation)
                 {
                     var handle = sheet
-                        ? await scaffold.ShowBottomSheetAsync(view, sheetOptions)
-                        : await scaffold.ShowPopupAsync(view, popupOptions);
+                        ? await scaffold.ShowBottomSheetCoreAsync(view, sheetOptions, model, intent)
+                        : await scaffold.ShowPopupCoreAsync(view, popupOptions, model, intent);
 
                     overlayRef.Bind(handle);
 

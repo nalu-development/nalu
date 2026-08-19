@@ -33,6 +33,17 @@ internal sealed class ScaffoldPopupHandle : IScaffoldPopup
     /// <summary>Completes <see cref="Closed"/>; wired into the request's cleanup.</summary>
     internal void MarkClosed() => _closed.TrySetResult();
 
+    /// <summary>Closes with a result (model-first overlays): recorded on the request, reported by the Closed overlay event.</summary>
+    internal Task CloseAsync(object? result)
+    {
+        if (_request is { } request)
+        {
+            request.Result = result;
+        }
+
+        return CloseAsync();
+    }
+
     public Task CloseAsync()
         => IsOpen && _scaffold is { Presenter: { } presenter } && _request is { } request
             ? presenter.CloseOverlayAsync(request)

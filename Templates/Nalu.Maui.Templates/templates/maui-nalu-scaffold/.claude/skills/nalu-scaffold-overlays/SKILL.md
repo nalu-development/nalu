@@ -25,6 +25,7 @@ Modal *pages* (`Scaffold.PageMode`) are navigation, not overlays → see skill `
 | `element.GetScaffold()` / `GetScaffoldOrDefault()` | Reach the owning scaffold from a page/view | Only after parenting — never in a constructor |
 | `IOverlayService` (singleton) | Model-first `ShowPopupAsync` / `ShowBottomSheetAsync` | `<TModel, TResult>` returns `Task<TResult?>`; `<TModel>` returns `Task` |
 | `IOverlayRef` (`CloseAsync()`, `CloseAsync(object? result)`) | Injected into the model (or view) to close itself | Result validated against `TResult` at close time |
+| `Scaffold.OverlayEvent` (`ScaffoldOverlayEventArgs`: `Kind`, `EventType` Presented/Closed, `Content`, `Model`, `Intent`, `Result`, `FlyoutSide`) | Observe overlays (analytics, diagnostics) | One Presented/Closed pair per instance, whatever closed it; overlays never appear in `NavigationEvent` |
 | `UseNaluScaffold(s => s.AddOverlays())` | Source-generated registration of this assembly's overlays | Combine with manual `AddOverlay<...>` for other assemblies |
 | `[AutoOverlay]`, `[AutoOverlay(typeof(TView))]`, `[AutoOverlay(Enabled = false)]` | Tune generator discovery | Opt in / pick view / opt out |
 

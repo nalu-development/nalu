@@ -220,6 +220,33 @@ Pass `ScaffoldBottomSheetOptions` at the call site when a geometry value is not 
 - Overlay content never self-insets (the scrim covers the whole window uniformly); sheets and
   panels manage the safe areas that matter for them.
 
+## Observing overlays: `Scaffold.OverlayEvent`
+
+Overlays are not pages: they never appear in `Scaffold.NavigationEvent`. To observe them
+(analytics, diagnostics), subscribe to `Scaffold.OverlayEvent`: one `Presented` / `Closed`
+pair per overlay instance, after the fact, **whatever opened or closed it** — handle or
+`IOverlayRef`, scrim tap, system back, sheet pull-down, navigation, tab bar panel replacement.
+
+```csharp
+OverlayEvent += (_, e) =>
+{
+    // e.Kind: Popup | BottomSheet | TabBarPanel | Flyout
+    // e.EventType: Presented | Closed
+    // e.Content: the presented view (for a sheet: your content, not the wrapper)
+    // e.Model / e.Intent: IOverlayService overlays only (null for view-level Show*Async / flyouts)
+    // e.Result: on Closed, what the model passed to IOverlayRef.CloseAsync(result); null otherwise
+    // e.FlyoutSide: Start | End for flyouts
+    var name = (e.Model ?? e.Content).GetType().Name;
+    _analytics.Track(e.EventType == ScaffoldOverlayEventType.Presented ? "overlay_open" : "overlay_close", e.Kind, name);
+};
+```
+
+Guarantees: `Presented` is raised once the presentation succeeded (for `IOverlayService`
+overlays, after `OnEnteringAsync`; a close requested in `OnEnteringAsync` skips the presentation
+and raises nothing); `Closed` is raised before the model's `OnLeavingAsync`; a failed
+presentation raises nothing; replacing the tab bar panel raises `Closed` for the old content
+and `Presented` for the new one.
+
 ## Modal pages are not overlays
 
 Full modal *pages* (with their own navigation stack semantics) are a navigation feature —

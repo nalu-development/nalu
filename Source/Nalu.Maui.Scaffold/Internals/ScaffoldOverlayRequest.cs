@@ -1,21 +1,5 @@
 namespace Nalu;
 
-/// <summary>What an overlay entry is — selects z-slot, geometry and enter/exit animation.</summary>
-internal enum ScaffoldOverlayKind
-{
-    /// <summary>An edge drawer (top layer, slides from the side). Single instance.</summary>
-    Flyout,
-
-    /// <summary>The tab bar panel (below the tab bar strip in z-order, rises above the bottom chrome). Single instance.</summary>
-    TabBarPanel,
-
-    /// <summary>A popup (top layer, placed per <see cref="ScaffoldPopupOptions"/>, fades in). Stacks freely.</summary>
-    Popup,
-
-    /// <summary>A bottom sheet (top layer, slides from the bottom edge; the sheet view owns its translation). Stacks freely.</summary>
-    BottomSheet
-}
-
 /// <summary>
 /// One overlay presentation: the §5.6 primitive generalized to a STACK. The scaffold builds
 /// requests (resolving scrims, single-instance policies and lifecycle hooks); the presenters
@@ -63,6 +47,9 @@ internal sealed class ScaffoldOverlayRequest
     /// state flags, handle completion.
     /// </summary>
     public Action? Cleanup { get; set; }
+
+    /// <summary>The result the entry is being closed with (model-first overlays); reported by the Closed overlay event.</summary>
+    public object? Result { get; set; }
 
     /// <summary>Builds the scrim view realized behind the content (fades in/out with the entry).</summary>
     public View CreateScrimView()
