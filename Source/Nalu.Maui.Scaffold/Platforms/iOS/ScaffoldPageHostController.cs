@@ -29,7 +29,7 @@ namespace Nalu;
 /// </remarks>
 internal sealed class ScaffoldPageHostController : UIViewController
 {
-    private readonly ScaffoldPageHost _host;
+    private ScaffoldPageHost? _host;
     private readonly IMauiContext _mauiContext;
     private ScaffoldNavBarStrip? _navStrip;
     private nfloat _externalBottomInset;
@@ -43,7 +43,14 @@ internal sealed class ScaffoldPageHostController : UIViewController
     public UIView PageView => PageController.View!;
 
     /// <summary>The page this container presents.</summary>
-    public Page Page => _host.Page;
+    public Page Page => Host.Page;
+
+    /// <summary>
+    /// The page host, until this container is torn down. Nothing reaches it afterwards: every
+    /// caller is either the presenter (which drops the container at the same moment) or a UIKit
+    /// callback on a view that has been unmounted.
+    /// </summary>
+    private ScaffoldPageHost Host => _host!;
 
     public ScaffoldPageHostController(ScaffoldPageHost host, IMauiContext mauiContext)
     {
@@ -68,7 +75,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
 
         // The strip belongs to the container from birth: mount it before the first layout
         // pass, so the page is laid out with its final top inset rather than jumping into it.
-        SyncNavBarAsync(animated: false).FireAndForget(_host.Scaffold.Handler);
+        SyncNavBarAsync(animated: false).FireAndForget(Host.Scaffold.Handler);
     }
 
     /// <summary>
@@ -79,7 +86,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
     /// </summary>
     public Task SyncNavBarAsync(bool animated)
     {
-        var visible = _host.IsNavBarVisible;
+        var visible = Host.IsNavBarVisible;
 
         // A page that shows no bar gets NO strip and no bar view at all. Mounting one and
         // relying on a translation to hide it cannot work: at mount the bar has not been
@@ -88,20 +95,20 @@ internal sealed class ScaffoldPageHostController : UIViewController
         if (!visible && _navStrip is null)
         {
             _navBarPresented = false;
-            _host.SetNavBarAttached(false);
+            Host.SetNavBarAttached(false);
             ApplyPageInsets();
 
             return Task.CompletedTask;
         }
 
-        var barHost = _host.EnsureNavBarHost();
+        var barHost = Host.EnsureNavBarHost();
 
         if (barHost is null)
         {
             _navStrip?.RemoveFromSuperview();
             _navStrip = null;
             _navBarPresented = false;
-            _host.SetNavBarAttached(false);
+            Host.SetNavBarAttached(false);
             View?.SetNeedsLayout();
 
             return Task.CompletedTask;
@@ -130,7 +137,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
             _navStrip.InvalidateBarMeasure();
         }
 
-        _host.SetNavBarAttached(visible);
+        Host.SetNavBarAttached(visible);
 
         return SetNavBarPresentedAsync(visible, animated);
     }
@@ -228,7 +235,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
 
     /// <summary>The strip's footprint ABOVE the system inset — what the page sees as extra top inset.</summary>
     private nfloat TopInsetContribution
-        => _navStrip is { } strip && _navBarPresented && _host.WantsNavBarInset
+        => _navStrip is { } strip && _navBarPresented && Host.WantsNavBarInset
             ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View?.SafeAreaInsets.Top ?? 0)
             : 0;
 
@@ -318,5 +325,15 @@ internal sealed class ScaffoldPageHostController : UIViewController
         PageController.RemoveFromParentViewController();
         _navStrip?.RemoveFromSuperview();
         _navStrip = null;
+
+        // Drop the managed reference chain — host -> page -> page model — and do NOT rely on
+        // Dispose to do it. This is a managed UIViewController subclass: disposing it does not
+        // clear its fields, and the object itself can outlive the call, because the GC bridge
+        // keeps a managed peer alive for as long as anything native still references it. A
+        // container that keeps holding its host therefore keeps a whole dead screen alive. This
+        // was a measured leak (ScaffoldNavigationTests asserts Leaked:0 after every test), not a
+        // precaution: teardown provably ran, the host was provably disposed, and the page model
+        // survived anyway until this line existed.
+        _host = null;
     }
 }
