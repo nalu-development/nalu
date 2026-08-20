@@ -68,6 +68,10 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
         : base(context)
     {
         _host = host;
+
+        // What the page's PREVIOUS frame measured, so this one insets correctly from its first
+        // dispatch rather than a layout pass later (see ScaffoldPageHost.LastNavBarHeightPx).
+        _lastStripHeightPx = host.LastNavBarHeightPx;
         LayoutParameters = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent);
         SetClipChildren(false);
         ViewCompat.SetOnApplyWindowInsetsListener(this, this);
@@ -172,6 +176,11 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
         if (strip.Height > 0)
         {
             _lastStripHeightPx = strip.Height;
+
+            if (_host is { } heightOwner)
+            {
+                heightOwner.LastNavBarHeightPx = strip.Height;
+            }
         }
 
         var travel = _lastStripHeightPx;
@@ -311,13 +320,25 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
 
     /// <summary>This page's chrome footprint in px, once its strip has been laid out.</summary>
     private int TopInsetPx
-        => _host?.WantsNavBarInset == true && _navBarPresented && _strip is { Height: > 0 } strip
-            ? strip.Height
+        => _host?.WantsNavBarInset == true && _navBarPresented && _strip is { } strip
+            ? strip.Height > 0 ? strip.Height : _lastStripHeightPx
             : 0;
 
     protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
     {
         base.OnLayout(changed, left, top, right, bottom);
+
+        // Remembered for the NEXT frame this page gets: a covered page is torn down and rebuilt,
+        // and the rebuild must know the footprint before it can measure it.
+        if (_strip is { Height: > 0 } measured)
+        {
+            _lastStripHeightPx = measured.Height;
+
+            if (_host is { } host)
+            {
+                host.LastNavBarHeightPx = measured.Height;
+            }
+        }
 
         // The strip's height is only known after it has been laid out, so the page's inset is
         // published from here — and only when it actually changed, or every pass would

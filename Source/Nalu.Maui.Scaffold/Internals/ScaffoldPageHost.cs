@@ -69,6 +69,18 @@ internal sealed class ScaffoldPageHost : IDisposable
     /// <summary>
     /// Whether the page's bar is presented: a bar view resolves for it AND the page wants one.
     /// </summary>
+    /// <summary>
+    /// The last measured height of this page's bar, in platform pixels — 0 until one is measured.
+    /// It lives on the HOST because the host outlives the platform chrome: Android destroys a
+    /// covered page's view (and with it the frame that owns the strip) and rebuilds both on the
+    /// way back, and a rebuilt frame must inset its page from its FIRST insets dispatch, before
+    /// any layout pass has given the new strip a height. Dispatching a zero footprint and
+    /// correcting it a pass later is only invisible while the page re-reads insets: a scrollable
+    /// that latches the first value it is given keeps the wrong padding, and its content sits
+    /// under the bar for good. iOS keeps its container across a cover, so nothing there needs it.
+    /// </summary>
+    internal int LastNavBarHeightPx { get; set; }
+
     public bool IsNavBarVisible
         => Scaffold.ResolveNavBarTemplate(Page) is not null && Scaffold.GetIsNavBarVisible(Page);
 
