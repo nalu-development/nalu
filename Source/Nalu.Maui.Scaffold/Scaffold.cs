@@ -169,7 +169,44 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// every page its own VALUE instead of sharing one mutable object.
     /// </remarks>
     public static readonly BindableProperty NavBarBackgroundProperty =
-        BindableProperty.CreateAttached("NavBarBackground", typeof(Brush), typeof(Scaffold), new SolidColorBrush(_defaultNavBarBackgroundColor));
+        BindableProperty.CreateAttached(
+            "NavBarBackground",
+            typeof(Brush),
+            typeof(Scaffold),
+            new SolidColorBrush(_defaultNavBarBackgroundColor),
+            propertyChanged: OnNavBarBackgroundChanged
+        );
+
+    /// <summary>
+    /// A brush handed to us as a property value must live in the element tree, parented to the
+    /// element that declared it, or its OWN bindings go dead.
+    /// </summary>
+    /// <remarks>
+    /// <c>AppThemeBinding</c> is the case that proves it: it tracks the theme through an internal
+    /// proxy that resolves a DYNAMIC RESOURCE and listens to its parent's resource chain, so a
+    /// brush with <c>SetAppThemeColor</c> only follows the theme while it is connected to a tree
+    /// reaching the <see cref="Application"/>. Parenting to the declaring element (rather than to
+    /// whichever bar happens to paint with it) keeps a scaffold-level brush alive for the app and
+    /// a page-level one alive for its page, with no re-parenting when several bars share it.
+    /// </remarks>
+    private static void OnNavBarBackgroundChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        if (bindable is not Element element)
+        {
+            return;
+        }
+
+        if (oldValue is Brush previous && ReferenceEquals(previous.Parent, element))
+        {
+            element.RemoveLogicalChild(previous);
+        }
+
+        // A brush shared through a style keeps its first parent, which is equally live.
+        if (newValue is Brush brush && brush.Parent is null)
+        {
+            element.AddLogicalChild(brush);
+        }
+    }
 
     /// <summary>
     /// Attached property setting the nav bar surface opacity (1 by default). Same resolution as
