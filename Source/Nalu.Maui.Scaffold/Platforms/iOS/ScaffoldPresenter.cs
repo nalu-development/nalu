@@ -53,37 +53,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
-    /// THE teardown of everything a page owned once it left the stack: its container (page
-    /// controller + strip) and then its host (context, bar host, bar view).
+    /// Releases the container of a page the scaffold has retired. The scaffold decides WHEN
+    /// (see <see cref="Scaffold.FlushRetiredPages"/>); the presenter only owns platform state.
     /// </summary>
-    /// <remarks>
-    /// Two triggers, one body, because a page leaves in one of two ways and both must be
-    /// covered exactly once:
-    /// a POP mutates the stack while the leaving animation still needs the page's chrome, so it
-    /// is released when the transition that carried it away has settled; a ROOT SWITCH destroys
-    /// the previous root's page AFTER the presenter has synchronized, outside any transition,
-    /// so it is released as soon as the scaffold reports the detach. Idempotent — it releases
-    /// whatever currently has no host, and nothing else.
-    /// </remarks>
-    private void ReleaseDetachedPages()
+    public void ReleasePage(Page page)
     {
-
-        foreach (var page in _containers.Keys.Where(page => scaffold.GetPageHost(page) is null).ToArray())
+        if (!_containers.Remove(page, out var container))
         {
-            var container = _containers[page];
-            _containers.Remove(page);
-
-            if (!ReferenceEquals(container, _currentController))
-            {
-                container.TearDown();
-                container.Dispose();
-            }
+            return;
         }
 
-        scaffold.DisposeRetiredPageHosts();
+        if (ReferenceEquals(container, _currentController))
+        {
+            _currentController = null;
+        }
 
-        // ...and only the presented page keeps its bar in the element tree.
-        scaffold.SettleNavBarAttachments();
+        container.TearDown();
+        container.Dispose();
     }
 
     private ScaffoldEdgePanRecognizer? _edgeGesture;
@@ -263,8 +249,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         await Task.WhenAll(chromeTask, pageTask);
 
-        // The transition settled: pages carried away by it can be released now.
-        ReleaseDetachedPages();
+        // The transition settled: pages it carried away are no longer on screen.
+        scaffold.FlushRetiredPages();
+
+        // ...and only the presented page keeps its bar in the element tree.
+        scaffold.SettleNavBarAttachments();
 
         // Presentation at rest: the pixels under the status bar are final — read fresh.
         scaffold.SystemBars.OnPresentationSettled();
@@ -1166,6 +1155,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         _containers.Clear();
         _currentController = null;
+
+        // Anything the scaffold retired and never got to flush goes now.
+        scaffold.FlushRetiredPages();
     }
 
     /// <summary>

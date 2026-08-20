@@ -23,6 +23,36 @@ public class NavBarContextBindingTests
         return (scaffold, root);
     }
 
+    /// <summary>Puts a page in the root's stack the way navigation does — the scaffold reconciles from there.</summary>
+    private static void Attach(ScaffoldRoot root, Page page)
+    {
+        var stack = root.NavigationStack;
+
+        if (stack.RootPage is null)
+        {
+            stack.RootPage = page;
+
+            return;
+        }
+
+        stack.Push(new NavigationStackPage("/", page.GetType().Name, page, false));
+    }
+
+    /// <summary>Takes it back out again (root or pushed).</summary>
+    private static void Detach(ScaffoldRoot root, Page page)
+    {
+        var stack = root.NavigationStack;
+
+        if (ReferenceEquals(stack.RootPage, page))
+        {
+            stack.RootPage = null;
+
+            return;
+        }
+
+        stack.RemoveFromTop(1);
+    }
+
     [Fact(DisplayName = "Every public ScaffoldNavBarContext property compiles to a typed binding")]
     public void TypedSwitchCoversTheWholeContext()
     {
@@ -49,8 +79,8 @@ public class NavBarContextBindingTests
         first.Content = firstLabel;
         second.Content = secondLabel;
 
-        scaffold.AttachPage(root, first);
-        scaffold.AttachPage(root, second);
+        Attach(root, first);
+        Attach(root, second);
 
         firstLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(firstLabel, nameof(ScaffoldNavBarContext.Title)));
         secondLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(secondLabel, nameof(ScaffoldNavBarContext.Title)));
@@ -64,7 +94,7 @@ public class NavBarContextBindingTests
     {
         var (scaffold, root) = BuildScaffold();
         var page = new ContentPage { Title = "Late" };
-        scaffold.AttachPage(root, page);
+        Attach(root, page);
 
         var label = new Label();
         label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, nameof(ScaffoldNavBarContext.Title)));
@@ -83,7 +113,7 @@ public class NavBarContextBindingTests
     {
         var (scaffold, root) = BuildScaffold();
         var page = new ContentPage { Title = "Barred" };
-        scaffold.AttachPage(root, page);
+        Attach(root, page);
 
         var barHost = new ScaffoldNavBarHost(scaffold) { Context = scaffold.GetPageHost(page)!.Context };
         var titleView = new Label();
@@ -101,8 +131,8 @@ public class NavBarContextBindingTests
         var (scaffold, root) = BuildScaffold();
         var first = new ContentPage { Title = "First" };
         var second = new ContentPage { Title = "Second" };
-        scaffold.AttachPage(root, first);
-        scaffold.AttachPage(root, second);
+        Attach(root, first);
+        Attach(root, second);
 
         var barHost = new ScaffoldNavBarHost(scaffold) { Context = scaffold.GetPageHost(first)!.Context };
         var titleView = new Label();
@@ -123,7 +153,7 @@ public class NavBarContextBindingTests
         var page = new ContentPage { Title = "Deep" };
         var label = new Label();
         page.Content = label;
-        scaffold.AttachPage(root, page);
+        Attach(root, page);
 
         // PageBindingContext.Title: two hops past the context — beyond anything a typed map
         // could express.
@@ -141,8 +171,8 @@ public class NavBarContextBindingTests
         var second = new ContentPage();
         var firstLabel = new Label();
         first.Content = firstLabel;
-        scaffold.AttachPage(root, first);
-        scaffold.AttachPage(root, second);
+        Attach(root, first);
+        Attach(root, second);
 
         Scaffold.FindNavBarContext(firstLabel).Should().BeSameAs(scaffold.GetPageHost(first)!.Context);
 
@@ -171,12 +201,12 @@ public class NavBarContextBindingTests
     {
         var (scaffold, root) = BuildScaffold();
         var page = new ContentPage { Title = "Transient" };
-        scaffold.AttachPage(root, page);
+        Attach(root, page);
 
         var context = scaffold.GetPageHost(page)!.Context;
         context.Title.Should().Be("Transient");
 
-        scaffold.DetachPage(page);
+        Detach(root, page);
 
         // Unreachable as a host straight away — but NOT torn down: a pop mutates the stack
         // before the presenter animates it, and the popped page is on screen, with its bar, for
@@ -185,7 +215,7 @@ public class NavBarContextBindingTests
         page.Title = "StillLeaving";
         context.Title.Should().Be("StillLeaving", "the departing page's bar must keep showing its own state");
 
-        scaffold.DisposeRetiredPageHosts();
+        scaffold.FlushRetiredPages();
 
         page.Title = "Gone";
         context.Title.Should().Be("StillLeaving", "once the transition settled, the context stops observing");

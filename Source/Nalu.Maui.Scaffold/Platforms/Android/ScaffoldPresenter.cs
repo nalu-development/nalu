@@ -144,6 +144,15 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     public bool IsOverlayPresented(ScaffoldOverlayRequest request) => FindEntry(request) is not null;
 
+    /// <summary>
+    /// Nothing per-page to release yet: this presenter still mounts a single shared strip, so a
+    /// retired page owns no platform state here. Per-page frames arrive with the Android
+    /// container work.
+    /// </summary>
+    public void ReleasePage(Page page)
+    {
+    }
+
     private OverlayEntry? FindEntry(ScaffoldOverlayRequest request)
         => _overlays.Find(entry => ReferenceEquals(entry.Request, request));
 
@@ -534,9 +543,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Presentation at rest: the pixels under the status bar are final — read fresh.
         scaffold.SystemBars.OnPresentationSettled();
 
-        // The transition has settled: pages that left the stack kept their chrome for the whole
-        // leaving animation and can now be destroyed.
-        scaffold.DisposeRetiredPageHosts();
+        // The transition has settled: pages it carried away kept their chrome for the whole
+        // leaving animation and are no longer on screen.
+        scaffold.FlushRetiredPages();
 
         // ...and only the presented page keeps its bar in the element tree.
         scaffold.SettleNavBarAttachments();

@@ -1260,44 +1260,143 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     private ScaffoldNavBarContext DetachedNavBarContext => field ??= new ScaffoldNavBarContext(this);
 
     private readonly Dictionary<Page, ScaffoldPageHost> _pageHosts = [];
+    private readonly List<ScaffoldPageHost> _retiredPageHosts = [];
 
     /// <summary>
-    /// Builds the page's <see cref="ScaffoldPageHost"/> and parents the page. THE one place that
-    /// establishes the logical shape — see the reversibility note on <see cref="ScaffoldPageHost"/>.
-    /// Called by <see cref="ScaffoldNavigationStack"/> when a page enters a stack.
+    /// Brings page hosts and element-tree parenting in line with what the navigation stacks now
+    /// contain. Invoked by <see cref="ScaffoldNavigationStack"/> on every membership change.
     /// </summary>
-    internal void AttachPage(ScaffoldRoot root, Page page)
+    /// <remarks>
+    /// A set difference, deliberately, rather than "handle the page that just moved": a page can
+    /// leave one stack and join another in the same breath (<c>AdoptStackFrom</c> does exactly
+    /// that when XAML hot reload replaces the structure), and comparing sets makes that a
+    /// non-event instead of a destroy-then-resurrect. It also makes the reconcile idempotent, so
+    /// running it per mutation during a multi-push batch is free of order effects.
+    /// <para>
+    /// Asymmetric on purpose: entering pages are attached NOW, because a page must be in the tree
+    /// before it can be presented; leaving pages are only RETIRED, because they are still on
+    /// screen — a pop animates the departing page out, and unparenting it here would strip its
+    /// binding context, resource resolution and window mid-animation. They are released by
+    /// <see cref="FlushRetiredPages"/> once nothing is showing them.
+    /// </para>
+    /// </remarks>
+    internal void OnNavigationStackChanged()
     {
-        if (!_pageHosts.ContainsKey(page))
+        UpdateCurrentPage();
+        ReconcilePages();
+    }
+
+    private void ReconcilePages()
+    {
+        var live = new HashSet<Page>();
+
+        foreach (var area in Areas)
         {
-            _pageHosts[page] = new ScaffoldPageHost(this, root, page);
+            foreach (var root in area.Roots)
+            {
+                var stack = root.NavigationStack;
+
+                if (stack.RootPage is { } rootPage)
+                {
+                    live.Add(rootPage);
+                    EnsurePageHost(root, rootPage);
+                }
+
+                foreach (var entry in stack.PushedPages)
+                {
+                    live.Add(entry.Page);
+                    EnsurePageHost(root, entry.Page);
+                }
+            }
         }
 
+        foreach (var page in _pageHosts.Keys.Where(page => !live.Contains(page)).ToArray())
+        {
+            var host = _pageHosts[page];
+            _pageHosts.Remove(page);
+            _retiredPageHosts.Add(host);
+        }
+    }
+
+    /// <summary>
+    /// Gives the page a host and a place in the tree. A page returning from retirement keeps its
+    /// host — and with it its nav bar state — unless it changed root, in which case the host
+    /// describes the wrong stack and is rebuilt.
+    /// </summary>
+    private void EnsurePageHost(ScaffoldRoot root, Page page)
+    {
+        if (_pageHosts.TryGetValue(page, out var current))
+        {
+            if (ReferenceEquals(current.Root, root))
+            {
+                return;
+            }
+
+            _pageHosts.Remove(page);
+            _retiredPageHosts.Add(current);
+        }
+        else if (_retiredPageHosts.FirstOrDefault(host => ReferenceEquals(host.Page, page)) is { } retired)
+        {
+            _retiredPageHosts.Remove(retired);
+
+            if (ReferenceEquals(retired.Root, root))
+            {
+                _pageHosts[page] = retired;
+
+                return;
+            }
+
+            retired.Dispose();
+        }
+
+        _pageHosts[page] = new ScaffoldPageHost(this, root, page);
         AddLogicalChild(page);
     }
 
     /// <summary>
-    /// The page left the stack: it stops being a logical child and its host stops being
-    /// reachable — but the host is RETIRED, not destroyed.
+    /// Releases every page that left the navigation model and is no longer being shown: its
+    /// platform state first (the presenter can still reach the page), then its chrome, its
+    /// attached flyout content and finally its place in the element tree.
     /// </summary>
     /// <remarks>
-    /// A pop mutates the stack BEFORE the presenter animates it, and the popped page is on
-    /// screen for the whole leaving animation. Disposing its host here would tear its nav bar
-    /// down mid-flight, so the page would slide away bare. The presenter disposes retired hosts
-    /// through <see cref="DisposeRetiredPageHosts"/> once the transition has settled — the same
-    /// rule that keeps the popped page's own platform view alive until then.
+    /// Called at the three moments a page can stop being shown: the end of a synchronization
+    /// (the transition that carried it away has settled), <c>ScaffoldRootProxy.DestroyContent</c>
+    /// (a root's page is destroyed a few cycles AFTER that synchronization, so nothing earlier
+    /// would catch it) and scaffold teardown. Safe to call at any of them, in any order, twice:
+    /// a page that came back to life was already un-retired by <see cref="ReconcilePages"/>, and
+    /// the guard below re-checks it.
     /// </remarks>
-    internal void DetachPage(Page page)
+    internal void FlushRetiredPages()
     {
-        if (_pageHosts.Remove(page, out var host))
+        if (_retiredPageHosts.Count == 0)
         {
-            _retiredPageHosts.Add(host);
+            return;
         }
 
-        RemoveLogicalChild(page);
+        var flushed = _retiredPageHosts.ToArray();
+        _retiredPageHosts.Clear();
+
+        foreach (var host in flushed)
+        {
+            var page = host.Page;
+
+            if (_pageHosts.ContainsKey(page))
+            {
+                continue;
+            }
+
+            Presenter?.ReleasePage(page);
+            host.Dispose();
+
+            // The page's drawer overrides leave the resolution stack with it; release the
+            // attached content so the page model is not retained through it.
+            CleanupPageFlyoutContent(page);
+            RemoveLogicalChild(page);
+        }
     }
 
-    private readonly List<ScaffoldPageHost> _retiredPageHosts = [];
+    /// <summary>The page's host, or null when the page is not in a stack of this scaffold.</summary>
+    internal ScaffoldPageHost? GetPageHost(Page page) => _pageHosts.GetValueOrDefault(page);
 
     /// <summary>
     /// Settles which bars are in the element tree once a transition has finished: the CURRENT
@@ -1317,23 +1416,6 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             host.SetNavBarAttached(ReferenceEquals(host.Page, CurrentPage) && host.IsNavBarVisible);
         }
     }
-
-    /// <summary>
-    /// Destroys the hosts of pages that left the stack. Called by the presenter once the
-    /// transition that carried them away has settled, never before.
-    /// </summary>
-    internal void DisposeRetiredPageHosts()
-    {
-        foreach (var host in _retiredPageHosts)
-        {
-            host.Dispose();
-        }
-
-        _retiredPageHosts.Clear();
-    }
-
-    /// <summary>The page's host, or null when the page is not in a stack of this scaffold.</summary>
-    internal ScaffoldPageHost? GetPageHost(Page page) => _pageHosts.GetValueOrDefault(page);
 
     /// <summary>
     /// Gets the observable soft-keyboard state (<see cref="ScaffoldKeyboardState.IsVisible"/>,

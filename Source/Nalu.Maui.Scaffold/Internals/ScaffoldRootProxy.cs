@@ -57,6 +57,13 @@ internal sealed class ScaffoldRootProxy : IShellSectionProxy, IShellContentProxy
         {
             PageNavigationContext.Dispose(page);
             stack.RootPage = null;
+
+            // This runs a few cycles AFTER the synchronization that presented the replacement —
+            // the engine disposes departed content once the navigation has committed — so the
+            // flush at the end of that synchronization has already been and gone. Without this
+            // the page would keep its host, its parenting and its platform state until some
+            // later navigation happened to flush them.
+            Root.GetScaffoldOrDefault()?.FlushRetiredPages();
         }
     }
 

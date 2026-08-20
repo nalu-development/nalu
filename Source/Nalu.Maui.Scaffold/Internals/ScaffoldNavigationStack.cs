@@ -2,18 +2,20 @@ namespace Nalu;
 
 /// <summary>
 /// The live navigation stack of a <see cref="ScaffoldRoot"/>: the lazily created root page plus
-/// the entries pushed onto it (modals included, always on top). Pure cross-platform state —
+/// the entries pushed onto it (modals included, always on top). Pure cross-platform STATE —
 /// the Scaffold's navigation proxies mutate it freely during a navigation batch (multiple
 /// pushes/pops per commit are normal in Nalu), then the platform presenter
 /// (<see cref="IScaffoldPresenter"/>) synchronizes to it once. It never touches platform APIs.
 /// </summary>
 /// <remarks>
-/// Every page entering the stack is parented as a logical child of the hosting
-/// <see cref="Scaffold"/> (MAUI requires a page's parent to be a page), so pages participate in
-/// the MAUI element tree: window resolution, visual-tree walks and tooling all work. Entering
-/// and leaving go through <see cref="Scaffold.AttachPage"/>/<see cref="Scaffold.DetachPage"/>,
-/// which also build and tear down the page's <see cref="Nalu.Internals.ScaffoldPageHost"/> — the page's own
-/// nav bar context and chrome.
+/// It owns the stack and NOTHING else. Element-tree parenting and per-page platform state are
+/// the <see cref="Scaffold"/>'s business: this type only reports that its membership changed,
+/// and the scaffold reconciles. That separation is deliberate — mutating the tree from here got
+/// the timing wrong in both directions. A pop used to unparent the departing page BEFORE the
+/// presenter animated it away, so a page still on screen lost its binding context, its resource
+/// resolution and its window; a root switch clears <see cref="RootPage"/> AFTER the presenter
+/// has synchronized, so anything cleaned up at the end of a synchronization missed it entirely.
+/// Membership is a fact the stack knows; when it is safe to tear a page down is not.
 /// </remarks>
 internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
 {
@@ -33,20 +35,8 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
                 return;
             }
 
-            if (field is not null)
-            {
-                FindScaffold()?.DetachPage(field);
-                Scaffold.CleanupPageFlyoutContent(field);
-            }
-
             field = value;
-
-            if (value is not null)
-            {
-                FindScaffold()?.AttachPage(owner, value);
-            }
-
-            NotifyCurrentPageMayHaveChanged();
+            NotifyStackChanged();
         }
     }
 
@@ -57,8 +47,7 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     public void Push(NavigationStackPage entry)
     {
         _pushedPages.Add(entry);
-        FindScaffold()?.AttachPage(owner, entry.Page);
-        NotifyCurrentPageMayHaveChanged();
+        NotifyStackChanged();
     }
 
     /// <summary>Removes and returns the top page.</summary>
@@ -66,22 +55,17 @@ internal sealed class ScaffoldNavigationStack(ScaffoldRoot owner)
     {
         var entry = _pushedPages[^1];
         _pushedPages.RemoveAt(_pushedPages.Count - 1);
-        FindScaffold()?.DetachPage(entry.Page);
-
-        // The page's drawer overrides leave the resolution stack with it; release the
-        // attached content so the page model is not retained through it.
-        Scaffold.CleanupPageFlyoutContent(entry.Page);
-
-        NotifyCurrentPageMayHaveChanged();
+        NotifyStackChanged();
 
         return entry;
     }
 
     /// <summary>
-    /// The scaffold's observable <see cref="Scaffold.CurrentPage"/> recomputes from the
-    /// PROXY state, so mutations on non-current stacks are naturally no-ops.
+    /// Membership changed: the scaffold recomputes <see cref="Scaffold.CurrentPage"/> (which
+    /// derives from the PROXY state, so mutations on non-current stacks are naturally no-ops)
+    /// and reconciles page hosts and parenting against the new membership.
     /// </summary>
-    private void NotifyCurrentPageMayHaveChanged() => FindScaffold()?.UpdateCurrentPage();
+    private void NotifyStackChanged() => FindScaffold()?.OnNavigationStackChanged();
 
     private Scaffold? FindScaffold()
     {

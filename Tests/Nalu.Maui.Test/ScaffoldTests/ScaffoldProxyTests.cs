@@ -90,6 +90,10 @@ public class ScaffoldProxyTests
         public bool HasOverlay => false;
 
         public bool IsOverlayPresented(ScaffoldOverlayRequest request) => false;
+
+        public void ReleasePage(Page page)
+        {
+        }
     }
 
     private readonly ServiceProvider _serviceProvider;
