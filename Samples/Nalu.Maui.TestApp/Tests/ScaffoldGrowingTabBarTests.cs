@@ -20,7 +20,7 @@ public class GrowBarPage : ContentPage
 
         // The page gets the GROWING nav bar too: same runtime-height contract, top edge.
         Scaffold.SetIsNavBarVisible(this, true);
-        Scaffold.SetNavBarView(this, GrowingBarScaffold.CreateNavBar());
+        Scaffold.SetNavBarTemplate(this, new DataTemplate(GrowingBarScaffold.CreateNavBar));
 
         var toggle = new Button { Text = "Toggle bar height", AutomationId = "GrowBarToggle", FontSize = 12 };
         toggle.Clicked += (_, _) => GrowingBarScaffold.ToggleBand();

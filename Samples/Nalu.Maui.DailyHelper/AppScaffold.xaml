@@ -4,8 +4,16 @@
                xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
                xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
                x:Class="Nalu.Maui.DailyHelper.AppScaffold"
-               nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}"
                nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+
+    <!-- The bar is a TEMPLATE: every page realizes its own instance, because the bar travels
+         with its page and two are on screen during any transition. This is the scaffold-level
+         default; a page or an area can override it with its own template. -->
+    <nalu:Scaffold.NavBarTemplate>
+        <DataTemplate>
+            <nalu:ScaffoldNavBarView />
+        </DataTemplate>
+    </nalu:Scaffold.NavBarTemplate>
 
     <!-- The whole application structure: one tab bar, three roots, each hosting its own
          navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->

@@ -129,19 +129,26 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
         BindableProperty.CreateAttached("TitleView", typeof(View), typeof(Scaffold), null);
 
     /// <summary>
-    /// Attached property holding the navigation bar view. Resolution, most specific wins:
+    /// Attached property holding the navigation bar TEMPLATE. Resolution, most specific wins:
     /// current <see cref="Page"/> → current <see cref="ScaffoldArea"/> → the
-    /// <see cref="Scaffold"/> itself, whose value defaults to a <see cref="ScaffoldNavBarView"/>
-    /// (the default template carrying the whole styling surface) via the default value factory.
-    /// The mounted view's binding context is the scaffold's <see cref="NavBarContext"/>.
+    /// <see cref="Scaffold"/> itself, whose value defaults to a template of
+    /// <see cref="ScaffoldNavBarView"/> (the built-in bar carrying the whole styling surface).
+    /// Set it to null on the <see cref="Scaffold"/> to suppress the bar entirely.
+    /// The mounted view's binding context is its own page's <see cref="ScaffoldNavBarContext"/>.
     /// </summary>
-    public static readonly BindableProperty NavBarViewProperty =
+    /// <remarks>
+    /// A TEMPLATE rather than a view, because the bar belongs to the page: every page realizes
+    /// its own instance. A shared view instance cannot work — during any transition two bars are
+    /// on screen at once, and MAUI would re-parent the single view to whichever page mounted it
+    /// last, blanking the other.
+    /// </remarks>
+    public static readonly BindableProperty NavBarTemplateProperty =
         BindableProperty.CreateAttached(
-            "NavBarView",
-            typeof(View),
+            "NavBarTemplate",
+            typeof(DataTemplate),
             typeof(Scaffold),
             null,
-            defaultValueCreator: bindable => bindable is Scaffold ? new ScaffoldNavBarView() : null
+            defaultValueCreator: bindable => bindable is Scaffold ? new DataTemplate(static () => new ScaffoldNavBarView()) : null
         );
 
     /// <summary>
@@ -1049,11 +1056,11 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// <summary>Sets the navigation bar title view attached to a page.</summary>
     public static void SetTitleView(BindableObject bindable, View? value) => bindable.SetValue(TitleViewProperty, value);
 
-    /// <summary>Gets the navigation bar view attached to an element.</summary>
-    public static View? GetNavBarView(BindableObject bindable) => (View?)bindable.GetValue(NavBarViewProperty);
+    /// <summary>Gets the navigation bar template attached to an element.</summary>
+    public static DataTemplate? GetNavBarTemplate(BindableObject bindable) => (DataTemplate?)bindable.GetValue(NavBarTemplateProperty);
 
-    /// <summary>Sets the navigation bar view attached to an element.</summary>
-    public static void SetNavBarView(BindableObject bindable, View? value) => bindable.SetValue(NavBarViewProperty, value);
+    /// <summary>Sets the navigation bar template attached to an element.</summary>
+    public static void SetNavBarTemplate(BindableObject bindable, DataTemplate? value) => bindable.SetValue(NavBarTemplateProperty, value);
 
     /// <summary>Gets the nav bar appearance attached to an element.</summary>
     public static ScaffoldNavBarAppearance? GetNavBarAppearance(BindableObject bindable) => (ScaffoldNavBarAppearance?)bindable.GetValue(NavBarAppearanceProperty);
@@ -1269,15 +1276,41 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
         AddLogicalChild(page);
     }
 
-    /// <summary>Tears the page's host down and unparents the page (the page left the stack).</summary>
+    /// <summary>
+    /// The page left the stack: it stops being a logical child and its host stops being
+    /// reachable — but the host is RETIRED, not destroyed.
+    /// </summary>
+    /// <remarks>
+    /// A pop mutates the stack BEFORE the presenter animates it, and the popped page is on
+    /// screen for the whole leaving animation. Disposing its host here would tear its nav bar
+    /// down mid-flight, so the page would slide away bare. The presenter disposes retired hosts
+    /// through <see cref="DisposeRetiredPageHosts"/> once the transition has settled — the same
+    /// rule that keeps the popped page's own platform view alive until then.
+    /// </remarks>
     internal void DetachPage(Page page)
     {
         if (_pageHosts.Remove(page, out var host))
         {
-            host.Dispose();
+            _retiredPageHosts.Add(host);
         }
 
         RemoveLogicalChild(page);
+    }
+
+    private readonly List<ScaffoldPageHost> _retiredPageHosts = [];
+
+    /// <summary>
+    /// Destroys the hosts of pages that left the stack. Called by the presenter once the
+    /// transition that carried them away has settled, never before.
+    /// </summary>
+    internal void DisposeRetiredPageHosts()
+    {
+        foreach (var host in _retiredPageHosts)
+        {
+            host.Dispose();
+        }
+
+        _retiredPageHosts.Clear();
     }
 
     /// <summary>The page's host, or null when the page is not in a stack of this scaffold.</summary>
@@ -1330,14 +1363,15 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     }
 
     /// <summary>
-    /// Resolves the nav bar view for the given page: page attachment → current area attachment
-    /// → the scaffold's own value (defaulting to the built-in <see cref="ScaffoldNavBarView"/>).
-    /// The resolved view is attached to this scaffold's element tree on mount.
+    /// Resolves the nav bar template for the given page: page attachment → current area
+    /// attachment → the scaffold's own value (defaulting to the built-in
+    /// <see cref="ScaffoldNavBarView"/>). Null means the page shows no bar at all.
+    /// Each page realizes its OWN view from the resolved template.
     /// </summary>
-    internal View? ResolveNavBarView(Page currentPage)
-        => GetNavBarView(currentPage)
-           ?? (CurrentArea is { } area ? GetNavBarView(area) : null)
-           ?? GetNavBarView(this);
+    internal DataTemplate? ResolveNavBarTemplate(Page currentPage)
+        => GetNavBarTemplate(currentPage)
+           ?? (CurrentArea is { } area ? GetNavBarTemplate(area) : null)
+           ?? GetNavBarTemplate(this);
 
     /// <summary>Gets the tab bar visibility policy attached to a page.</summary>
     public static ScaffoldTabBarVisibility GetTabBarVisibility(BindableObject bindable) => (ScaffoldTabBarVisibility)bindable.GetValue(TabBarVisibilityProperty);

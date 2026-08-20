@@ -202,7 +202,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var tabBarArea = root.Parent as ScaffoldTabBar;
         var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
-        var navBarView = scaffold.ResolveNavBarView(targetPage);
+        var navBarView = scaffold.GetPageHost(targetPage)?.BarView;
         var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(targetPage);
 
         // Overlap mode: the bar still presents, but its footprint is not applied to the page —
@@ -215,7 +215,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // that is still on screen, leaving.
         scaffold.GetPageHost(targetPage)?.Refresh();
 
-        // Chrome-LEVEL attached changes (scaffold/area NavBarView) must remap live, exactly
+        // Chrome-LEVEL attached changes (scaffold/area NavBarTemplate) must remap live, exactly
         // like the page-level ones the current-page subscription already covers.
         EnsureScaffoldObserver();
         ObserveNavBarArea(scaffold.CurrentArea);
@@ -533,6 +533,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // Presentation at rest: the pixels under the status bar are final — read fresh.
         scaffold.SystemBars.OnPresentationSettled();
+
+        // The transition has settled: pages that left the stack kept their chrome for the whole
+        // leaving animation and can now be destroyed.
+        scaffold.DisposeRetiredPageHosts();
     }
 
     // 1:1 with BackEvent progress: the page follows the finger (iOS parity), revealing exactly
@@ -591,7 +595,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // be hidden while the revealed root brings it back), so the peek registers its OWN
         // intent, computed exactly like the sync will compute it on commit.
         var belowTabVisible = _currentRoot.Parent is ScaffoldTabBar && Scaffold.ComputeTabBarVisible(_currentRoot, belowPage);
-        var belowNavBarVisible = scaffold.ResolveNavBarView(belowPage) is not null && Scaffold.GetIsNavBarVisible(belowPage);
+        var belowNavBarVisible = scaffold.GetPageHost(belowPage)?.IsNavBarVisible ?? false;
         var belowNavBarInsets = belowNavBarVisible && !Scaffold.GetNavBarOverlapsContent(belowPage);
 
         pageLayer.SetPeekInsetIntent(
@@ -1506,7 +1510,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
     }
 
-    /// <summary>Follows the current area (chrome-level NavBarView changes on it remap live).</summary>
+    /// <summary>Follows the current area (chrome-level NavBarTemplate changes on it remap live).</summary>
     private void ObserveNavBarArea(ScaffoldArea? area)
     {
         if (ReferenceEquals(_observedNavBarArea, area))
@@ -1531,7 +1535,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     {
         // Appearance changes are observed by the host itself; only the mounted-bar resolution
         // needs the presenter.
-        if (e.PropertyName == "NavBarView")
+        if (e.PropertyName == "NavBarTemplate")
         {
             RefreshNavBarChrome();
         }
@@ -1565,7 +1569,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             return;
         }
 
-        var navBarView = scaffold.ResolveNavBarView(page);
+        var navBarView = scaffold.GetPageHost(page)?.BarView;
         var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
         var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(page);
 
@@ -1789,7 +1793,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             }
 
             case "IsNavBarVisible":
-            case "NavBarView":
+            case "NavBarTemplate":
             case "NavBarOverlapsContent":
                 RefreshNavBarChrome();
 

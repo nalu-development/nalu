@@ -83,9 +83,20 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
     /// </summary>
     public void SetThemeRefresher(Action? themeRefresher) => _themeRefresher = themeRefresher;
 
-    /// <summary>The nav bar host pushes the current page + the LIVE effective bar background here (per-frame safe).</summary>
+    /// <summary>
+    /// A nav bar host pushes its page + the LIVE effective bar background here (per-frame safe).
+    /// Every live page has its own bar host, so several push — but the system bars describe what
+    /// covers the status bar RIGHT NOW, which is the CURRENT page's bar. A page that is covered,
+    /// or one still animating away, is ignored; the incoming page re-pushes when its host
+    /// refreshes, which happens before it is presented.
+    /// </summary>
     public void UpdateBar(Page? page, Brush? barBackground, double barOpacity)
     {
+        if (page is not null && scaffold.CurrentPage is { } currentPage && !ReferenceEquals(page, currentPage))
+        {
+            return;
+        }
+
         if (!ReferenceEquals(_page, page))
         {
             // New page: its pixels are not on screen yet — the stale sample must not linger.

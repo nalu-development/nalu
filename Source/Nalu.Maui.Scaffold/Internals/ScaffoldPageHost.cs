@@ -44,6 +44,19 @@ internal sealed class ScaffoldPageHost : IDisposable
     /// <summary>This page's nav bar state — the binding context of the bar mounted for it.</summary>
     public ScaffoldNavBarContext Context { get; }
 
+    /// <summary>
+    /// This page's nav bar realization, once the page has resolved a bar view. One per page —
+    /// never shared, because two pages can be on screen at once during a transition, each
+    /// showing its own bar. Null while the page resolves no bar view.
+    /// </summary>
+    public ScaffoldNavBarHost? NavBarHost { get; private set; }
+
+    /// <summary>The template this page's bar was realized from, so a template swap rebuilds it.</summary>
+    private DataTemplate? _barTemplate;
+
+    /// <summary>This page's OWN bar view, realized from the resolved template. Never shared.</summary>
+    private View? _barView;
+
     public ScaffoldPageHost(Scaffold scaffold, ScaffoldRoot root, Page page)
     {
         Scaffold = scaffold;
@@ -57,7 +70,35 @@ internal sealed class ScaffoldPageHost : IDisposable
     /// Whether the page's bar is presented: a bar view resolves for it AND the page wants one.
     /// </summary>
     public bool IsNavBarVisible
-        => Scaffold.ResolveNavBarView(Page) is not null && Scaffold.GetIsNavBarVisible(Page);
+        => Scaffold.ResolveNavBarTemplate(Page) is not null && Scaffold.GetIsNavBarVisible(Page);
+
+    /// <summary>
+    /// This page's bar view, realized from the resolved template and cached. A template change
+    /// (a runtime swap, XAML hot reload) rebuilds it; the template is never shared as an
+    /// instance, which is the whole reason the attached property is a template.
+    /// </summary>
+    private View? ResolveBarView()
+    {
+        var template = Scaffold.ResolveNavBarTemplate(Page);
+
+        if (template is null)
+        {
+            _barTemplate = null;
+            _barView = null;
+
+            return null;
+        }
+
+        if (!ReferenceEquals(_barTemplate, template) || _barView is null)
+        {
+            _barTemplate = template;
+            _barView = template.CreateContent() as View
+                       ?? throw new InvalidOperationException(
+                           $"{nameof(Scaffold)}.NavBarTemplate must create a {nameof(View)}.");
+        }
+
+        return _barView;
+    }
 
     /// <summary>
     /// Whether the page takes the bar's footprint as a top inset. Overlap mode still presents
@@ -66,11 +107,82 @@ internal sealed class ScaffoldPageHost : IDisposable
     public bool WantsNavBarInset => IsNavBarVisible && !Scaffold.GetNavBarOverlapsContent(Page);
 
     /// <summary>
-    /// Recomputes the stack-dependent context values for this page (back/close/drawer buttons).
-    /// The presenters call it for the INCOMING page on every synchronization; a page on its way
-    /// out keeps the state it had, because that is what it is still showing.
+    /// Recomputes the stack-dependent context values for this page (back/close/drawer buttons)
+    /// and re-resolves its bar. The presenters call it for the INCOMING page on every
+    /// synchronization; a page on its way out keeps the state it had, because that is what it
+    /// is still showing.
     /// </summary>
     public void Refresh() => Context.Refresh();
 
-    public void Dispose() => Context.Detach();
+    /// <summary>
+    /// This page's own realized bar view. Exposed for the platform layers that mount the view
+    /// directly rather than through <see cref="EnsureNavBarHost"/>.
+    /// </summary>
+    public View? BarView => ResolveBarView();
+
+    /// <summary>
+    /// Creates or updates this page's bar host from the resolved bar view (page → area →
+    /// scaffold → the built-in default, which is instantiated PER HOST), tearing it down if the
+    /// page resolves no bar at all. Returns the host, or null when the page has no bar.
+    /// </summary>
+    public ScaffoldNavBarHost? EnsureNavBarHost()
+    {
+        if (ResolveBarView() is not { } barView)
+        {
+            DisposeNavBarHost();
+
+            return null;
+        }
+
+        var host = NavBarHost ??= new ScaffoldNavBarHost(Scaffold) { Context = Context };
+        host.SetBar(barView);
+        host.UpdateSources(Page);
+
+        return host;
+    }
+
+    /// <summary>
+    /// The element tree reflects PRESENTED chrome: the bar host is a logical child of the
+    /// scaffold while this page's bar is visible and detached while it is hidden (the platform
+    /// view stays alive offscreen either way). A sibling of the page, never a child of it —
+    /// library chrome must stay out of the page's resource scope.
+    /// </summary>
+    public void SetNavBarAttached(bool attached)
+    {
+        if (NavBarHost is not { } host)
+        {
+            return;
+        }
+
+        switch (attached)
+        {
+            case true when host.Parent is null:
+                Scaffold.AddLogicalChild(host);
+
+                break;
+
+            case false when ReferenceEquals(host.Parent, Scaffold):
+                Scaffold.RemoveLogicalChild(host);
+
+                break;
+        }
+    }
+
+    private void DisposeNavBarHost()
+    {
+        if (NavBarHost is not { } host)
+        {
+            return;
+        }
+
+        SetNavBarAttached(false);
+        host.Dispose();
+        NavBarHost = null;
+    }
+
+    public void Dispose()
+    {
+        DisposeNavBarHost();
+        Context.Detach();
+    }
 }

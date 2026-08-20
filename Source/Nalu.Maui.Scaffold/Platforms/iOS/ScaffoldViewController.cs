@@ -191,14 +191,11 @@ internal sealed class ScaffoldViewController : UIViewController
 
     private readonly UIViewController _contentHost = new();
     private ScaffoldTabBarStrip? _tabBarStrip;
-    private ScaffoldNavBarStrip? _navBarStrip;
     private CGRect _lastBounds;
     private nfloat _lastSafeBottom = -1;
     private nfloat _lastSafeTop = -1;
     private bool _barPresented;
     private int _barAnimating;
-    private bool _navBarPresented;
-    private int _navBarAnimating;
 
     /// <summary>
     /// The scaffold page hosted by this controller. MAUI's PageHandler-driven appearing
@@ -216,17 +213,15 @@ internal sealed class ScaffoldViewController : UIViewController
     public UIView ContentContainer => _contentHost.View!;
 
     /// <summary>
-    /// The current page's controller — the carrier of the bar's
-    /// <see cref="UIViewController.AdditionalSafeAreaInsets"/> contribution. Set by the
-    /// presenter on every transition; bar animations update its insets in the same animation.
+    /// The presented page's container (page + its own nav bar). Set by the presenter on every
+    /// transition. The container owns the write of the page's
+    /// <see cref="UIViewController.AdditionalSafeAreaInsets"/>: this controller only tells it
+    /// the BOTTOM contribution (tab bar, keyboard) it alone knows about.
     /// </summary>
-    public UIViewController? CurrentPageController { get; set; }
+    public ScaffoldPageHostController? CurrentPageContainer { get; set; }
 
     /// <summary>Whether the current page sees the bar footprint as extra bottom inset.</summary>
     public bool CurrentPageWantsBarInset { get; set; }
-
-    /// <summary>Whether the current page sees the nav bar footprint as extra top inset.</summary>
-    public bool CurrentPageWantsNavBarInset { get; set; }
 
     /// <summary>
     /// The current page's soft-keyboard policy (resolved by the presenter, live: the attached
@@ -445,7 +440,10 @@ internal sealed class ScaffoldViewController : UIViewController
     /// </summary>
     private void ApplyCurrentPageKeyboard()
     {
-        if (CurrentPageController?.View is not { } pageView)
+        // The PAGE view, not the container: a keyboard pan must not drag the page's nav bar up
+        // under the status bar. The bar travels with the page through NAVIGATION, not through
+        // the keyboard getting out of the way of an input.
+        if (CurrentPageContainer?.PageView is not { } pageView)
         {
             return;
         }
@@ -639,144 +637,6 @@ internal sealed class ScaffoldViewController : UIViewController
     }
 
     /// <summary>
-    /// Mounts the nav bar strip at the top edge (measured synchronously — the presenter needs
-    /// the footprint BEFORE mounting the target page). Mounted BELOW the tab bar strip in
-    /// z-order so behind-chrome overlay scrims dim the nav bar while keeping the tab bar
-    /// interactive. The strip stays mounted across visibility changes (hidden = translated
-    /// above the screen edge).
-    /// </summary>
-    public void MountNavBar(UIView barPlatformView, bool startHidden)
-    {
-        if (ReferenceEquals(_navBarStrip?.Bar, barPlatformView))
-        {
-            return;
-        }
-
-        _navBarStrip?.RemoveFromSuperview();
-
-        var strip = new ScaffoldNavBarStrip(barPlatformView);
-        _navBarStrip = strip;
-
-        if (_tabBarStrip is { } tabBarStrip)
-        {
-            View!.InsertSubviewBelow(strip, tabBarStrip);
-        }
-        else
-        {
-            View!.AddSubview(strip);
-        }
-
-        var bounds = View.Bounds;
-        strip.Measure(bounds.Width);
-        PositionNavStrip(strip, bounds);
-        strip.Transform = startHidden ? CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip)) : CGAffineTransform.MakeIdentity();
-        _navBarPresented = !startHidden;
-    }
-
-    /// <summary>
-    /// Re-measures the nav bar strip after a VIRTUAL bar swap (the platform host stays mounted, so
-    /// nothing else tells the strip its content changed).
-    /// </summary>
-    public void InvalidateNavBarMeasure() => _navBarStrip?.InvalidateBarMeasure();
-
-    /// <summary>Removes the nav bar strip entirely (nav bar view swap / teardown).</summary>
-    public void UnmountNavBar()
-    {
-        _navBarStrip?.RemoveFromSuperview();
-        _navBarStrip = null;
-        _navBarPresented = false;
-        View!.SetNeedsLayout();
-    }
-
-    /// <summary>Full strip height: whatever the bar measured, system inset region included.</summary>
-    private nfloat NavStripHeight(ScaffoldNavBarStrip strip) => strip.BarHeight;
-
-    private void PositionNavStrip(ScaffoldNavBarStrip strip, CGRect containerBounds)
-    {
-        var stripHeight = NavStripHeight(strip);
-
-        PositionChromeStrip(
-            strip,
-            new CGRect(0, 0, containerBounds.Width, stripHeight),
-            new CGPoint(containerBounds.Width / 2, stripHeight / 2)
-        );
-    }
-
-    /// <summary>
-    /// Slides the nav bar strip in or out — interruptible, same retargeting model as the
-    /// tab bar strip.
-    /// </summary>
-    public async Task SetNavBarPresentedAsync(bool presented, bool animated)
-    {
-        if (_navBarStrip is not { } strip)
-        {
-            return;
-        }
-
-        _navBarPresented = presented;
-
-        // Bar-INTERNAL layout changes (e.g. the back button appearing via the context binding)
-        // settle instantly: flushing them inside the animation block below would make UIKit
-        // interpolate the button from its never-arranged zero frame — a nonsense fly-in.
-        // Only the strip transform and the page inset relayout are meant to animate.
-        UIView.PerformWithoutAnimation(strip.LayoutIfNeeded);
-
-        // The hidden translation is the strip's CURRENT height — read when the transform is
-        // written, never earlier: a bar swap issued with this call leaves the strip dirty, and its
-        // re-measure runs in the controller's layout pass (flushed by the presenter before it
-        // stages the page, i.e. before the animation below starts on the next turn). A target
-        // captured here would hide the strip by the PREVIOUS bar's height and leave the new,
-        // taller bar peeking over the page.
-        CGAffineTransform TargetTransform()
-            => presented ? CGAffineTransform.MakeIdentity() : CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
-
-        if (!animated)
-        {
-            strip.Transform = TargetTransform();
-            ApplyCurrentPageInsets();
-
-            return;
-        }
-
-        var wasAtRestHidden = _navBarAnimating == 0 && strip.Transform.y0 != 0;
-        _navBarAnimating++;
-
-        try
-        {
-            await AnimateChromeAsync(
-                () =>
-                {
-                    strip.Transform = TargetTransform();
-                    ApplyCurrentPageInsets();
-                    View!.LayoutIfNeeded();
-                },
-                prepare: () =>
-                {
-                    // Sliding IN a strip that rested hidden: it rests hidden by the height it HAD;
-                    // after a bar swap it may be far shorter (or taller) now — start the slide
-                    // exactly one current height above the edge, or a short bar spends most of
-                    // the slide offscreen and just pops in at the end.
-                    if (presented && wasAtRestHidden)
-                    {
-                        strip.Transform = CGAffineTransform.MakeTranslation(0, -NavStripHeight(strip));
-                    }
-                }
-            );
-        }
-        finally
-        {
-            _navBarAnimating--;
-
-            // Settle: a strip re-measured DURING the slide (its target was read at start) must
-            // rest exactly offscreen / at identity for the state it is in now.
-            if (_navBarAnimating == 0 && _navBarPresented == presented)
-            {
-                strip.Transform = TargetTransform();
-            }
-        }
-    }
-
-    /// <summary>
     /// Runs a chrome slide, completing when UIKit reports it finished.
     /// Deliberately NOT <c>UIView.AnimateNotifyAsync</c>: starting the animation inline can block
     /// and never return (iOS 18.x, observed while a cross-area switch mounted a strip), and a
@@ -784,7 +644,7 @@ internal sealed class ScaffoldViewController : UIViewController
     /// incoming page unpresented and its Appearing unraised. Posting to the main queue starts the
     /// animation on the NEXT turn instead, and its completion handler resolves the task.
     /// </summary>
-    private static Task AnimateChromeAsync(Action animation, Action? prepare = null)
+    internal static Task AnimateChromeAsync(Action animation, Action? prepare = null)
     {
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -921,12 +781,6 @@ internal sealed class ScaffoldViewController : UIViewController
         }
     }
 
-    /// <summary>The nav bar's top inset contribution above the system inset: the bar's content height.</summary>
-    private nfloat NavBarInsetContribution
-        => _navBarStrip is { } strip && _navBarPresented
-            ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View!.SafeAreaInsets.Top)
-            : 0;
-
     /// <summary>
     /// Applies the current page's chrome inset contributions to its own controller — and, under
     /// <see cref="ScaffoldKeyboardMode.Resize"/>, the soft keyboard: the keyboard becomes the page's
@@ -936,10 +790,9 @@ internal sealed class ScaffoldViewController : UIViewController
     /// </summary>
     public void ApplyCurrentPageInsets()
     {
-        if (CurrentPageController is { } pageController)
+        if (CurrentPageContainer is { } container)
         {
             var bottom = CurrentPageWantsBarInset && _barPresented && _tabBarStrip is not null ? BarHeight : 0;
-            var top = CurrentPageWantsNavBarInset ? NavBarInsetContribution : 0;
             var systemBottom = View?.SafeAreaInsets.Bottom ?? 0;
 
             if (CurrentPageKeyboardMode?.Invoke() == ScaffoldKeyboardMode.Resize && PageKeyboardOverlap is var keyboard && keyboard > 0)
@@ -957,14 +810,10 @@ internal sealed class ScaffoldViewController : UIViewController
                 bottom += (nfloat)Math.Min(_currentPagePan, (double)systemBottom);
             }
 
-            var insets = new UIEdgeInsets(top, 0, bottom, 0);
-
-            // Only on change: writing AdditionalSafeAreaInsets re-dirties the page subtree even
-            // when the value is identical, and this runs on EVERY host layout pass.
-            if (pageController.AdditionalSafeAreaInsets != insets)
-            {
-                pageController.AdditionalSafeAreaInsets = insets;
-            }
+            // The container composes this with its own strip's top contribution and performs
+            // the single write (it skips no-op writes, which matters: this runs on EVERY host
+            // layout pass and writing re-dirties the page subtree).
+            container.SetExternalBottomInset(bottom);
         }
     }
 
@@ -998,21 +847,6 @@ internal sealed class ScaffoldViewController : UIViewController
             if (_barAnimating == 0 && !_barPresented)
             {
                 strip.Transform = CGAffineTransform.MakeTranslation(0, stripHeight);
-            }
-        }
-
-        if (_navBarStrip is { } navStrip)
-        {
-            if (navStrip.NeedsMeasure || boundsOrInsetsChanged)
-            {
-                navStrip.Measure(bounds.Width);
-            }
-
-            PositionNavStrip(navStrip, bounds);
-
-            if (_navBarAnimating == 0 && !_navBarPresented)
-            {
-                navStrip.Transform = CGAffineTransform.MakeTranslation(0, -NavStripHeight(navStrip));
             }
         }
 

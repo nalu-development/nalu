@@ -164,8 +164,8 @@ public class NavBarContextBindingTests
         scaffold.NavBarContext.Should().BeSameAs(scaffold.NavBarContext, "the fallback is stable");
     }
 
-    [Fact(DisplayName = "A popped page's host is disposed and its context released")]
-    public void PoppedPageHostIsDisposed()
+    [Fact(DisplayName = "A popped page keeps its chrome until the transition settles, then is released")]
+    public void PoppedPageHostIsRetiredThenDisposed()
     {
         var (scaffold, root) = BuildScaffold();
         var page = new ContentPage { Title = "Transient" };
@@ -176,9 +176,16 @@ public class NavBarContextBindingTests
 
         scaffold.DetachPage(page);
 
+        // Unreachable as a host straight away — but NOT torn down: a pop mutates the stack
+        // before the presenter animates it, and the popped page is on screen, with its bar, for
+        // the whole leaving animation.
         scaffold.GetPageHost(page).Should().BeNull();
+        page.Title = "StillLeaving";
+        context.Title.Should().Be("StillLeaving", "the departing page's bar must keep showing its own state");
 
-        page.Title = "Changed";
-        context.Title.Should().Be("Transient", "the detached context stops observing its page");
+        scaffold.DisposeRetiredPageHosts();
+
+        page.Title = "Gone";
+        context.Title.Should().Be("StillLeaving", "once the transition settled, the context stops observing");
     }
 }

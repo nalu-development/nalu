@@ -4,7 +4,7 @@ namespace Nalu;
 
 /// <summary>
 /// The default Nalu navigation bar component, created automatically as the
-/// <see cref="Scaffold.NavBarViewProperty"/> default at the scaffold level. Slots, in order:
+/// <see cref="Scaffold.NavBarTemplateProperty"/> default at the scaffold level. Slots, in order:
 /// start-drawer button, back button, title (or the page's
 /// <see cref="Scaffold.TitleViewProperty"/> content), end-drawer button, close button — all
 /// driven by the <see cref="ScaffoldNavBarContext"/> binding context. Style it or replace it
