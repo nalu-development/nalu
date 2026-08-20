@@ -336,23 +336,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             // A settled predictive-back preview already placed the revealed page at rest: the
             // incoming fragment must not replay the reveal motion on top of it.
-            // A shared-element navigation does NOT slide the incoming page — iOS parity, and the
-            // reason is geometric: the flights aim at the destination element's rect, captured on
-            // the incoming page. Slide that page while they fly and the target is still moving,
-            // so every flight chases it and lands sideways. The flights carry the eye; the page
-            // behind still plays its Behind motion.
-            var enterTransition = predictivelySettled || sharedNames.Count > 0
-                ? ScaffoldPageTransition.None
-                : pageTransition;
+            var enterTransition = predictivelySettled ? ScaffoldPageTransition.None : pageTransition;
             var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, enterTransition);
 
             // Depth cues for STACKED motions only (side-by-side root switches get neither):
             // a push slides the incoming page ABOVE with a shadow while the covered page dims;
             // a pop reveals the incoming page dimmed, brightening as the leaving page departs
             // with its own shadow (see PrepareLeavingPage).
-            // Depth cues follow the NAVIGATION, not the entering page's motion: a shared-element
-            // push animates without sliding its incoming page, and the covered page still dims.
-            var depthPush = hint == ScaffoldPresentationHint.Push && (enterTransition.IsAnimated || sharedNames.Count > 0);
+            var depthPush = hint == ScaffoldPresentationHint.Push && enterTransition.IsAnimated;
             var depthPop = hint == ScaffoldPresentationHint.Pop && !predictivelySettled && animated;
 
             // The page must see the chrome-rewritten insets (nav bar / tab bar footprints) before
@@ -873,6 +864,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         var startProgress = _backProgress;
+        var behind = _backPeekBehind;
         var width = topView.Width > 0 ? topView.Width : 1;
         var settle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, width)!;
@@ -903,6 +895,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             if (weakCommitPeek is not null && weakCommitPeek.TryGetTarget(out var peek))
             {
                 ScaffoldPageDepth.SetDim(peek, 1f - flightProgress);
+
+                // ...and the peek finishes travelling home. The finger left it part-way through
+                // its Behind -> rest path; without this it held that offset for the whole settle
+                // and then snapped into place when the commit's sync remounted it.
+                ApplyPeekMotion(peek, behind, 1f - flightProgress, peek.Parent as AView ?? peek);
             }
         };
 
