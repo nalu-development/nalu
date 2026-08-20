@@ -427,6 +427,10 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             // The forwarder now points at another page's context: bindings routed through
             // Scaffold.NavBarContext (the public escape hatch) must re-evaluate.
             OnPropertyChanged(nameof(NavBarContext));
+
+            // The system bars read the presented page's own declaration and surface — a page
+            // with no nav bar has nothing else to tell them about itself.
+            SystemBars.SetPage(page);
         }
     }
 

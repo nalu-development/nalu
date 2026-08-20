@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace Nalu.Internals;
 
 /// <summary>Everything the system-bar style resolution looks at, as one immutable snapshot (unit-testable).</summary>
@@ -84,11 +86,52 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
     public void SetThemeRefresher(Action? themeRefresher) => _themeRefresher = themeRefresher;
 
     /// <summary>
-    /// A nav bar host pushes its page + the LIVE effective bar background here (per-frame safe).
-    /// Every live page has its own bar host, so several push — but the system bars describe what
-    /// covers the status bar RIGHT NOW, which is the CURRENT page's bar. A page that is covered,
-    /// or one still animating away, is ignored; the incoming page re-pushes when its host
-    /// refreshes, which happens before it is presented.
+    /// The presented page, pushed by the scaffold whenever <see cref="Scaffold.CurrentPage"/>
+    /// changes. It carries the page's own declaration
+    /// (<see cref="Scaffold.SystemBarStyleProperty"/>) and its top-of-screen surface, so it
+    /// cannot come from the nav bar host: a bar-less page has no host, and reading the previous
+    /// page's declaration is how a page that declares one gets ignored.
+    /// </summary>
+    public void SetPage(Page? page)
+    {
+        if (ReferenceEquals(_page, page))
+        {
+            return;
+        }
+
+        if (_page is not null)
+        {
+            _page.PropertyChanged -= OnPagePropertyChanged;
+        }
+
+        _page = page;
+
+        if (page is not null)
+        {
+            page.PropertyChanged += OnPagePropertyChanged;
+        }
+
+        // New page: its pixels are not on screen yet — the stale sample must not linger.
+        _sampledLuminance = null;
+        ScheduleSample();
+        Recompute();
+    }
+
+    /// <summary>A page may declare its style at any time, including while it is presented.</summary>
+    private void OnPagePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == "SystemBarStyle")
+        {
+            Recompute();
+        }
+    }
+
+    /// <summary>
+    /// A nav bar host pushes the LIVE effective bar background here (per-frame safe). Every live
+    /// page has its own bar host, so several push — but the system bars describe what covers the
+    /// status bar RIGHT NOW, which is the CURRENT page's bar. A page that is covered, or one
+    /// still animating away, is ignored; the incoming page re-pushes when its host refreshes,
+    /// which happens before it is presented.
     /// </summary>
     public void UpdateBar(Page? page, Brush? barBackground, double barOpacity)
     {
@@ -97,13 +140,6 @@ internal sealed class ScaffoldSystemBars(Scaffold scaffold)
             return;
         }
 
-        if (!ReferenceEquals(_page, page))
-        {
-            // New page: its pixels are not on screen yet — the stale sample must not linger.
-            _sampledLuminance = null;
-        }
-
-        _page = page;
         _barBackground = barBackground;
         _barOpacity = barOpacity;
         ScheduleSample();

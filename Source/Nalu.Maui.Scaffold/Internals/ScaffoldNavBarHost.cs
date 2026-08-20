@@ -156,10 +156,6 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
                 UpdateScrollTracking();
 
                 break;
-            case "SystemBarStyle":
-                _scaffold.SystemBars.Recompute();
-
-                break;
         }
     }
 
