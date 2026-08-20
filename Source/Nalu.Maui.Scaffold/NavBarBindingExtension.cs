@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using Nalu.Internals;
 
 namespace Nalu;
@@ -17,6 +16,18 @@ namespace Nalu;
 /// Paths naming a <see cref="ScaffoldNavBarContext"/> property compile to a typed binding;
 /// deeper paths (e.g. <c>CurrentPage.BindingContext.SomeCommand</c>) are evaluated by
 /// reflection, with the reflected surface preserved under trimming.
+/// </remarks>
+/// <remarks>
+/// NOT supported in a <see cref="Style"/> setter: one binding instance serves every styled
+/// element, so there is no single target to resolve a page from. Note that a relay-based
+/// binding cannot be retrofitted there — <c>Setter.Apply</c> clones the binding per target, but
+/// <c>Binding.Clone</c> copies <c>Source</c> (and <c>MultiBinding.Clone</c> its converter) BY
+/// REFERENCE, so every clone would share one relay and resolve one page for all of them. The
+/// route that would work is a <c>TypedBinding&lt;Page, T&gt;</c> over
+/// <c>RelativeBindingSource(FindAncestor, typeof(Page))</c> — MAUI resolves that per applied
+/// target — whose getter reaches the page's host through <c>GetScaffold()</c>. It covers page
+/// content only (a style on bar content has no page ancestor), which is why it is not built
+/// until something needs it.
 /// </remarks>
 [ContentProperty(nameof(Path))]
 [RequireService([typeof(IProvideValueTarget)])]
@@ -40,14 +51,16 @@ public sealed class NavBarBindingExtension : IMarkupExtension<BindingBase>
     /// <inheritdoc />
     public BindingBase ProvideValue(IServiceProvider serviceProvider)
     {
-        // The target element is what the context is resolved FROM; without one (a Style setter,
-        // a non-element target) there is no page to resolve, and the binding falls back to
-        // whatever the scaffold currently presents.
-        var target = (serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget)?.TargetObject as Element;
+        // The target element is what the page is resolved FROM. A Style setter has none — one
+        // binding instance serves every styled element — so there is nothing to walk from and
+        // no honest answer to give. Saying so beats silently binding whatever page happens to
+        // be current, which is the very bug the per-page context exists to remove.
+        var target = (serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget)?.TargetObject as Element
+            ?? throw new InvalidOperationException(
+                $"{nameof(NavBarBindingExtension)} must be used directly on an element's bindable property "
+                + "(styles/setters are not supported).");
 
-        return target is not null
-            ? NavBarContextBindings.Create(target, Path, Mode, Converter, ConverterParameter, StringFormat)
-            : NavBarBindings.CreateForCurrentPage(Path, Mode, Converter, ConverterParameter, StringFormat);
+        return NavBarContextBindings.Create(target, Path, Mode, Converter, ConverterParameter, StringFormat);
     }
 
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
@@ -93,34 +106,4 @@ public static class NavBarBindings
         object? converterParameter = null,
         string? stringFormat = null)
         => NavBarContextBindings.Create(target, path, mode, converter, converterParameter, stringFormat);
-
-    /// <summary>
-    /// The current-page fallback, used only when no target element is available to resolve a
-    /// page from: a <see cref="Style"/> setter (one binding instance serves many elements, so
-    /// there is no single target to walk from) or another non-element target. Everything with a
-    /// real target goes through <see cref="Create(Element,string,BindingMode,IValueConverter?,object?,string?)"/>.
-    /// </summary>
-    // Runtime string-path bindings resolve via reflection; the dependencies keep the reflected
-    // property surfaces alive under trimming/AOT (see maui-binding gotcha: unpreserved
-    // library-type string bindings silently die in consumer Release builds).
-    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(Scaffold))]
-    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(ScaffoldNavBarContext))]
-    internal static BindingBase CreateForCurrentPage(
-        string path,
-        BindingMode mode,
-        IValueConverter? converter,
-        object? converterParameter,
-        string? stringFormat)
-    {
-        var contextPath = nameof(Scaffold.NavBarContext);
-        var fullPath = path is "." or "" ? contextPath : $"{contextPath}.{path}";
-
-        return new Binding(fullPath, mode, converter, converterParameter, stringFormat)
-        {
-            Source = _scaffoldAncestor
-        };
-    }
-
-    private static readonly RelativeBindingSource _scaffoldAncestor
-        = new(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
 }
