@@ -62,6 +62,23 @@ The engines (custom on both platforms) are built for **truthful flights**:
   constant mid-flight.
 - Unmatched pairs and not-yet-laid-out targets gracefully fall back to the plain slide.
 
+> [!IMPORTANT]
+> **Size a shared element to its content.** A flight travels between the two views' *bounds*,
+> and the rendered copy is stretched to fill them. A `Label` left at its container's default
+> `HorizontalOptions="Fill"` is mostly empty space: paired across two pages it is the same width
+> on both, so a font-size change makes the pair differ only in HEIGHT — and the glyphs stretch
+> vertically instead of scaling. Give both sides `HorizontalOptions="Start"` (or `Center`/`End`,
+> or an explicit size) so the bounds actually describe the text:
+>
+> ```xml
+> <!-- Both pages: bounds that track the glyphs, so the morph scales instead of stretching -->
+> <Label nalu:Scaffold.TransitionName="heroTitle" Text="Bot hero"
+>        FontSize="14" HorizontalOptions="Start" />
+> ```
+>
+> The same applies to any pair whose two sides differ on only one axis — a box that changes
+> height but not width will squash rather than grow.
+
 ## Depth cues
 
 Stacked motions (push, pop, and both interactive gestures) carry one automatic depth cue,

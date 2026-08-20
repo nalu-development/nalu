@@ -232,6 +232,19 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
         }
     }
 
+    /// <summary>
+    /// Hands the page's view back, still alive: the predictive-back peek builds a throwaway
+    /// frame around a page that the commit then re-parents into its real fragment frame.
+    /// </summary>
+    public void ReleasePageView()
+    {
+        if (_pageView is { } pageView)
+        {
+            RemoveView(pageView);
+            _pageView = null;
+        }
+    }
+
     private void ReleaseStrip()
     {
         if (_strip is not { } strip)

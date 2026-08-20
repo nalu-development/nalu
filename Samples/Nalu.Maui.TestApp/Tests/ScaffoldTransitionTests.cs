@@ -51,6 +51,10 @@ public class TransitionGridPage : ContentPage
             Text = "Bot hero",
             FontSize = 14,
             FontAttributes = FontAttributes.Bold,
+            // Start, not the stack's default Fill: a shared element flies its VIEW bounds, and a
+            // Fill label is mostly empty space, so the pair would differ only in height and the
+            // glyphs would stretch vertically instead of scaling.
+            HorizontalOptions = LayoutOptions.Start,
             AutomationId = "GridHeroTitle"
         };
         Scaffold.SetTransitionName(heroTitle, "heroTitle");
@@ -98,6 +102,8 @@ public class TransitionDetailPage : ContentPage
             Text = "Bot hero",
             FontSize = 30,
             FontAttributes = FontAttributes.Bold,
+            // Start on BOTH sides of the pair — see the grid page.
+            HorizontalOptions = LayoutOptions.Start,
             AutomationId = "DetailHeroTitle"
         };
         Scaffold.SetTransitionName(heroTitle, "heroTitle");

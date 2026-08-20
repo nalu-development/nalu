@@ -336,14 +336,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             // A settled predictive-back preview already placed the revealed page at rest: the
             // incoming fragment must not replay the reveal motion on top of it.
-            var enterTransition = predictivelySettled ? ScaffoldPageTransition.None : pageTransition;
+            // A shared-element navigation does NOT slide the incoming page — iOS parity, and the
+            // reason is geometric: the flights aim at the destination element's rect, captured on
+            // the incoming page. Slide that page while they fly and the target is still moving,
+            // so every flight chases it and lands sideways. The flights carry the eye; the page
+            // behind still plays its Behind motion.
+            var enterTransition = predictivelySettled || sharedNames.Count > 0
+                ? ScaffoldPageTransition.None
+                : pageTransition;
             var fragment = new ScaffoldPageFragment(mauiContext, targetPage, hint, container, enterTransition);
 
             // Depth cues for STACKED motions only (side-by-side root switches get neither):
             // a push slides the incoming page ABOVE with a shadow while the covered page dims;
             // a pop reveals the incoming page dimmed, brightening as the leaving page departs
             // with its own shadow (see PrepareLeavingPage).
-            var depthPush = hint == ScaffoldPresentationHint.Push && enterTransition.IsAnimated;
+            // Depth cues follow the NAVIGATION, not the entering page's motion: a shared-element
+            // push animates without sliding its incoming page, and the covered page still dims.
+            var depthPush = hint == ScaffoldPresentationHint.Push && (enterTransition.IsAnimated || sharedNames.Count > 0);
             var depthPop = hint == ScaffoldPresentationHint.Pop && !predictivelySettled && animated;
 
             // The page must see the chrome-rewritten insets (nav bar / tab bar footprints) before
@@ -579,8 +588,22 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             return;
         }
 
-        var belowView = belowPage.ToPlatform(mauiContext);
-        (belowView.Parent as AViewGroup)?.RemoveView(belowView);
+        if (scaffold.GetPageHost(belowPage) is not { } belowHost)
+        {
+            return;
+        }
+
+        var belowPlatform = belowPage.ToPlatform(mauiContext);
+        (belowPlatform.Parent as AViewGroup)?.RemoveView(belowPlatform);
+
+        // The peek is the below page's FRAME, not its bare view: the frame is what carries that
+        // page's nav bar and what rewrites its top inset. Mounting the raw page view previewed a
+        // page with no bar and no chrome padding, and the commit snapped both into place.
+        var belowFrame = new ScaffoldPageFrame(pageLayer.Context!, belowHost);
+        belowFrame.SetPageView(belowPlatform);
+        belowFrame.SyncNavBar(mauiContext);
+
+        var belowView = (AView) belowFrame;
         belowView.TranslationZ = 0f;
 
         // The revealed page comes back FROM the popped page's Behind state, scrubbed by the
@@ -589,6 +612,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         _backPeekBehind = scaffold.ResolvePageTransition(topPage).Behind;
         ApplyPeekMotion(belowView, _backPeekBehind, 1f, pageLayer);
         pageLayer.AddView(belowView, 0, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
+        _backPeekFrame = belowFrame;
 
         // The preview spans a transition for the inset machinery too: the flag parks the
         // scrubbed transforms for the span of any insets dispatch (so nothing gets padded for
@@ -688,6 +712,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     private ScaffoldTransitionMotion _backPeekBehind = new();
+
+    /// <summary>The frame built for the peek; released when the preview ends (committed or not).</summary>
+    private ScaffoldPageFrame? _backPeekFrame;
 
     /// <summary>Predictive back, gesture progressing: page motion + shared-element flights, finger-driven.</summary>
     public void UpdateBackPreview(float progress)
@@ -1089,6 +1116,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     private void RemovePeek(AView? peekView)
     {
+        // The peek's frame is the presenter's own scaffolding: the commit builds a REAL frame in
+        // the incoming fragment and re-parents the page view into it, so this one is always
+        // scrap. Released explicitly — a managed view subclass outlives its Dispose.
+        if (_backPeekFrame is { } peekFrame)
+        {
+            _backPeekFrame = null;
+            peekFrame.ReleasePageView();
+            peekFrame.Release();
+        }
+
         // The commit sync re-parents this exact platform view into the new fragment — never
         // detach it once it is no longer OUR peek (it may already be the presented page).
         if (peekView is not null && ReferenceEquals(peekView.Parent, _pageLayer))
