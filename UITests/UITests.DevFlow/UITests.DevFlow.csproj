@@ -10,6 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- UI tests drive one shared app instance: the runner must never overlap them.
+         The config file is what Rider/VS read; BaseUiTest.cs carries the same settings as
+         assembly attributes for plain `dotnet test`. -->
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Experimental preview: version pinned on purpose, bump deliberately.
          All usages of the Driver API must go through Infrastructure/NaluApp.cs
          so preview breaking changes only affect one file. -->
