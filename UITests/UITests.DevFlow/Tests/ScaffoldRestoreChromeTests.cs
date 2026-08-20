@@ -103,7 +103,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestorePushDeepButton");
         await App.WaitForSettledDisplayAsync("RestoreDeepPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -127,7 +127,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestoreGoOtherButton");
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -153,7 +153,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestoreGoOtherButton");
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(standaloneHarness);
 
@@ -178,7 +178,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestoreGoOtherButton");
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -200,7 +200,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.WaitForSettledDisplayAsync("RestoreDetailPage");
         await App.WaitForTextAsync("RestoreDetailIntentLabel", "ctx-42");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -227,7 +227,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         // reset: the harness scaffold is disposed, the app keeps running).
         await App.TapAsync("RestorePushDetailButton");
         await App.WaitForSettledDisplayAsync("RestoreDetailPage");
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.ResetAsync();
 
         // Restore runs ONCE PER APP LAUNCH — a later scaffold in the same process boots the

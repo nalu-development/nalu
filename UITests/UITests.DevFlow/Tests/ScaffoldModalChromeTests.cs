@@ -92,7 +92,7 @@ public class ScaffoldModalChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLife
 
         // A plain Modal blocks system back entirely: the press is consumed, nothing pops.
         await App.SystemBackAsync();
-        await Task.Delay(800);
+        await Task.Delay(800, TestContext.Current.CancellationToken);
         await WaitDisplayedAsync("PlainModalPage");
 
         // Programmatic close remains the only dismissal.
