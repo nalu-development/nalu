@@ -31,10 +31,15 @@ public sealed record ScaffoldTransitionMotion(double FractionX = 0, double Fract
 /// <param name="DurationSeconds">Transition duration in seconds. Defaults to 0.25.</param>
 public sealed record ScaffoldPageTransition(ScaffoldTransitionMotion Enter, ScaffoldTransitionMotion Behind, double DurationSeconds = 0.25)
 {
-    /// <summary>The stock navigation slide: in from the right edge, behind page static.</summary>
+    /// <summary>
+    /// The stock navigation slide: the incoming page comes in from the right edge while the
+    /// page behind counter-slides a third of the way out to the left — pushing moves it TO that
+    /// offset, popping brings it back FROM it. The depth cue (dimming) is applied separately by
+    /// the presenters, so this is pure translation.
+    /// </summary>
     public static ScaffoldPageTransition Default { get; } = new(
         new ScaffoldTransitionMotion(FractionX: 1),
-        new ScaffoldTransitionMotion());
+        new ScaffoldTransitionMotion(FractionX: -0.35));
 
     /// <summary>iOS-navigation style: slide in from the right edge, behind page parallaxes away.</summary>
     public static ScaffoldPageTransition SlideFromRight { get; } = new(

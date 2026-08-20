@@ -1,8 +1,26 @@
 # Scaffold Nav Bar
 
 The nav bar is a plain MAUI view strip: same layout, same styling, same behavior on iOS and
-Android. The default bar is mounted out of the box — set `Scaffold.NavBarView` only to
-restyle-by-instance, replace it with a custom view, or remove it with `{x:Null}`.
+Android. It belongs to the **page**, not to the scaffold: every page realizes its own bar and
+that bar travels with it through every motion the scaffold performs — push and pop slides,
+custom transition specs, shared elements, the interactive edge pop, Android predictive back.
+During a transition two bars are on screen, each showing its own page's state.
+
+The default bar is mounted out of the box. Set `Scaffold.NavBarTemplate` only to replace it
+with a custom bar, or clear it with `{x:Null}` on the scaffold to remove the bar entirely:
+
+```xml
+<nalu:Scaffold.NavBarTemplate>
+    <DataTemplate>
+        <nalu:ScaffoldNavBarView />
+    </DataTemplate>
+</nalu:Scaffold.NavBarTemplate>
+```
+
+It is a **template**, not a view, precisely because the bar belongs to the page: a single view
+instance cannot be in two places at once, and MAUI would re-parent it to whichever page mounted
+it last, blanking the other page's bar. Resolution is unchanged — page → current area →
+scaffold, most specific wins.
 
 The default bar composes three columns: leading (start-drawer button, back button), center
 (title, or the page's `TitleView` in its place), trailing (end-drawer button, close button).
@@ -24,8 +42,10 @@ the page:
 ```
 
 The `TitleView`'s `BindingContext` is the **page model** — bind your own state directly. To
-read nav-bar ambient state (foreground color, scroll offset) use the `NavBarBinding` markup
-extension, which binds against the scaffold's `ScaffoldNavBarContext`:
+read nav-bar state (foreground color, scroll offset) use the `NavBarBinding` markup extension.
+It binds against the `ScaffoldNavBarContext` of the page the target element belongs to — page
+content through its page, bar content (a hosted title view included) through the bar it is
+mounted in — so during a transition each of the two live pages reads its OWN state:
 
 ```xml
 <Label Text="{nalu:NavBarBinding Path=Title}"
@@ -35,6 +55,16 @@ extension, which binds against the scaffold's `ScaffoldNavBarContext`:
 In code-behind, the `NavBarBindings` utility is the counterpart. Pass the element the binding
 is applied to — it is what the page is resolved from:
 `label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "Title"))`.
+
+Paths naming a `ScaffoldNavBarContext` property compile to a typed binding (no reflection, so
+they survive trimming); deeper paths such as `CurrentPage.BindingContext.SaveCommand` are
+evaluated by reflection. `{nalu:NavBarBinding}` is not supported inside a `Style` setter: one
+binding instance serves every styled element, so there is no single target to resolve a page
+from.
+
+`Scaffold.NavBarContext` remains available and means "what the bar shows now" — the CURRENT
+page's context. Prefer the per-page resolution above; the scaffold-level one is only correct
+while a single page is on screen.
 
 ## Appearance — a per-property merge chain
 
