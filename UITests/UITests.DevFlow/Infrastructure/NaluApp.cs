@@ -1297,26 +1297,55 @@ public sealed class NaluApp : IAsyncLifetime
     /// Brings the app back to the test-selection page.
     /// Uses the "ResetButton" overlay added by the TestApp to every test page.
     /// </summary>
+    /// <remarks>
+    /// Retried, because a test hands the app over mid-flight more often than not: an async
+    /// navigation the test did not wait for can still be settling, and while it is, the page it
+    /// is leaving is a second live copy of everything the reset looks for — same automation ids,
+    /// same "Exit" text, and a tap on the departing copy does nothing at all. A second attempt a
+    /// moment later finds only the page that stayed. A reset that gave up after one silent tap
+    /// failed the test that had already passed, and every test after it until the app drifted
+    /// back on its own.
+    /// </remarks>
     public async Task ResetAsync()
     {
-        // Already on the main page?
-        if (await FindElementAsync("TestName").ConfigureAwait(false) is not null)
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            return;
+            // Already on the main page?
+            if (await FindElementAsync("TestName").ConfigureAwait(false) is not null)
+            {
+                return;
+            }
+
+            await TryResetOnceAsync().ConfigureAwait(false);
+
+            if (await WaitForElementOrDefaultAsync("TestName", TimeSpan.FromSeconds(4)).ConfigureAwait(false) is not null)
+            {
+                return;
+            }
         }
 
+        // Nothing worked: fail with the tree, which says what the app is actually showing.
+        await WaitForElementAsync("TestName", TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+    }
+
+    /// <summary>One reset attempt: the decorated overlay, the Shell-style "Exit" button, or back.</summary>
+    private async Task TryResetOnceAsync()
+    {
         var resetButton = await WaitForElementOrDefaultAsync("ResetButton", TimeSpan.FromSeconds(2)).ConfigureAwait(false);
 
         if (resetButton is null)
         {
-            // Shell-based test pages (e.g. "Navigation Tests") have no decorated ResetButton:
-            // they expose an app-reset button with text "Exit" on every page instead.
-            var exitButton = (await _client.QueryAsync(text: "Exit").ConfigureAwait(false)).FirstOrDefault(e => e.IsVisible);
+            // Scaffold- and Shell-based test pages have no decorated ResetButton: they expose an
+            // app-reset button with text "Exit" on every page instead.
+            var exitButtons = (await _client.QueryAsync(text: "Exit").ConfigureAwait(false))
+                              .Where(e => e.IsVisible)
+                              .ToList();
 
-            if (exitButton is not null)
+            if (exitButtons.Count > 0)
             {
-                await _client.TapAsync(exitButton.Id).ConfigureAwait(false);
-                await WaitForElementAsync("TestName").ConfigureAwait(false);
+                // LAST, not first: when a departing page overlaps the arriving one, the tree
+                // still carries both and the arriving page is the later of the two.
+                await _client.TapAsync(exitButtons[^1].Id).ConfigureAwait(false);
 
                 return;
             }
@@ -1330,8 +1359,6 @@ public sealed class NaluApp : IAsyncLifetime
         {
             await _client.TapAsync(resetButton.Id).ConfigureAwait(false);
         }
-
-        await WaitForElementAsync("TestName").ConfigureAwait(false);
     }
 
     /// <summary>Resets the app and opens the test page registered with the given [TestPage] name.</summary>

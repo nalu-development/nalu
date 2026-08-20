@@ -23,16 +23,9 @@ public partial class App : Application
     /// Used by the cross-platform "ResetButton" overlay added to every test page,
     /// so UI tests can reset the app state without restarting it.
     /// </summary>
-    internal async void ResetToMainPage()
+    internal void ResetToMainPage()
     {
-        // Close any modal pages (e.g. popups left open by a failed test) before swapping the page.
         var currentPage = Windows[0].Page;
-        var navigation = currentPage?.Navigation;
-
-        while (navigation?.ModalStack.Count > 0)
-        {
-            await navigation.PopModalAsync(false);
-        }
 
         Windows[0].Page = new MainPage(_serviceProvider);
 
@@ -48,6 +41,10 @@ public partial class App : Application
 
             // MAUI does not reliably disconnect the old page's handler tree when Window.Page
             // is swapped; without this the native view hierarchy keeps the page graph alive.
+            // This is also what retires whatever the outgoing page still had presented — modals
+            // and popups included. Popping them one by one first would be both redundant and
+            // wrong: a Scaffold holds several navigation stacks at once, and only one of them
+            // is the window's Navigation.
             currentPage?.DisconnectHandlers();
         }
         finally
