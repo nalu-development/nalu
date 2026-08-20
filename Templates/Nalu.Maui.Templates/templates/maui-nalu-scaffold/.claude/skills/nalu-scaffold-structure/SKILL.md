@@ -90,12 +90,20 @@ Full-bleed / materializing nav bar and parallax headers → skill `nalu-scaffold
 Chrome theming = implicit styles in `Resources/Styles/Styles.xaml` (template already has entries):
 
 ```xml
+<!-- ApplyToDerivedTypes is REQUIRED here: AppScaffold DERIVES from Scaffold and MAUI matches
+     implicit styles on the exact type, so without it the whole style is silently skipped and
+     the bar keeps the library defaults — theme changes included. -->
+<Style TargetType="nalu:Scaffold" ApplyToDerivedTypes="True"><Setter Property="nalu:Scaffold.NavBarForeground" Value="{StaticResource Accent}" /></Style>
 <Style TargetType="nalu:ScaffoldNavBarButtonBase" ApplyToDerivedTypes="True"><Setter Property="IconColor" Value="{StaticResource Accent}" /></Style>
 <Style TargetType="nalu:ScaffoldTabBarView"><Setter Property="BarBackground" Value="{StaticResource CardLight}" /></Style>
 ```
 
+The same applies to any chrome type you subclass; the ones above with no opt-in are instantiated
+by the library itself, so an exact-type match is what you want there.
+
 ## Rules & gotchas
 
+- An implicit `Style TargetType="nalu:Scaffold"` needs `ApplyToDerivedTypes="True"` — `AppScaffold` derives from `Scaffold`. Symptom when missing: page content follows the app theme but the nav bar never does, and flipping the theme changes nothing.
 - `PageType` must be a registered page (or page-model) type; unset/unknown throws at startup. Same for `InitialRootPageType`.
 - Selecting the active root pops its stack to root; selecting another root preserves the outgoing stack. Removing the current root at runtime auto-navigates to a fallback first.
 - Tab bar icons render untinted: put color on the `ImageSource` (`FontImageSource.Color`) — hence the template's separate `Icon`/`SelectedIcon`.
