@@ -15,7 +15,7 @@ namespace Nalu.Internals;
 /// failure mode this library has been bitten by — a string binding over library types silently
 /// dying in a consumer's Release build), and a renamed property breaks the build instead of
 /// returning null. Anything the switch does not know — notably the documented
-/// <c>CurrentPage.BindingContext.SomeCommand</c> escape hatch — falls back to a reflection
+/// <c>PageBindingContext.SomeCommand</c> escape hatch — falls back to a reflection
 /// <see cref="Binding"/> over the same relay, which keeps working precisely because the relay is
 /// a real source object.
 /// </remarks>
@@ -85,7 +85,6 @@ internal static class NavBarContextBindings
             ) { Source = relay },
             nameof(ScaffoldNavBarContext.Title) => Typed(relay, path, c => c.Title),
             nameof(ScaffoldNavBarContext.TitleView) => Typed(relay, path, c => c.TitleView),
-            nameof(ScaffoldNavBarContext.CurrentPage) => Typed(relay, path, c => c.CurrentPage),
             nameof(ScaffoldNavBarContext.PageBindingContext) => Typed(relay, path, c => c.PageBindingContext),
             nameof(ScaffoldNavBarContext.Foreground) => Typed(relay, path, c => c.Foreground),
             nameof(ScaffoldNavBarContext.TitleForeground) => Typed(relay, path, c => c.TitleForeground),

@@ -57,7 +57,7 @@ is applied to — it is what the page is resolved from:
 `label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "Title"))`.
 
 Paths naming a `ScaffoldNavBarContext` property compile to a typed binding (no reflection, so
-they survive trimming); deeper paths such as `CurrentPage.BindingContext.SaveCommand` are
+they survive trimming); deeper paths such as `PageBindingContext.SaveCommand` are
 evaluated by reflection. `{nalu:NavBarBinding}` is not supported inside a `Style` setter: one
 binding instance serves every styled element, so there is no single target to resolve a page
 from.

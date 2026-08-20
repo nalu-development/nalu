@@ -125,10 +125,12 @@ public class NavBarContextBindingTests
         page.Content = label;
         scaffold.AttachPage(root, page);
 
-        // CurrentPage.Title: two hops past the context — beyond anything a typed map could express.
-        label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "CurrentPage.Title"));
+        // PageBindingContext.Title: two hops past the context — beyond anything a typed map
+        // could express.
+        page.BindingContext = new ContentPage { Title = "Deep" };
+        label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "PageBindingContext.Title"));
 
-        label.Text.Should().Be("Deep", "the documented CurrentPage.BindingContext.X escape hatch must survive");
+        label.Text.Should().Be("Deep", "the documented PageBindingContext.X escape hatch must survive");
     }
 
     [Fact(DisplayName = "FindNavBarContext resolves per page, and falls back to the current page outside one")]

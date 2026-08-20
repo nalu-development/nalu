@@ -42,17 +42,6 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets the page currently on top of the presented stack — the escape hatch for custom
-    /// bars binding page-specific state (e.g. <c>CurrentPage.BindingContext.SomeCommand</c>;
-    /// such paths are reflection-mode bindings, not compilable).
-    /// </summary>
-    public Page? CurrentPage
-    {
-        get;
-        internal set => SetField(ref field, value);
-    }
-
-    /// <summary>
     /// Gets the current page's binding context: the title slot propagates it to hosted
     /// <see cref="TitleView"/> content, which is page content and binds the page model —
     /// not this context.
@@ -237,7 +226,6 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         var isModal = pageMode != ScaffoldPageMode.Default;
 
         Title = currentPage.Title;
-        CurrentPage = currentPage;
         PageBindingContext = currentPage.BindingContext;
         TitleView = Scaffold.GetTitleView(currentPage);
         (ScrollRampStart, ScrollRampEnd) = _scaffold.ResolveScrollRamp(currentPage);
@@ -332,9 +320,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// Dropping the references matters as much as unsubscribing. This context is reachable from
     /// objects that outlive the page — a bar host subscribes to the scaffold and the area, a
     /// binding relay is held by the ancestors it walked — and it holds the page
-    /// (<see cref="CurrentPage"/>), the page's MODEL (<see cref="PageBindingContext"/>) and the
-    /// page's <see cref="TitleView"/>. Left set, any one of those keeps a dead screen's whole
-    /// object graph alive.
+    /// the page's MODEL (<see cref="PageBindingContext"/>) and the page's
+    /// <see cref="TitleView"/>. Left set, either keeps a dead screen's whole object graph alive.
     /// </remarks>
     internal void Detach()
     {
@@ -343,7 +330,6 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
             Page.PropertyChanged -= OnPagePropertyChanged;
         }
 
-        CurrentPage = null;
         PageBindingContext = null;
         TitleView = null;
     }

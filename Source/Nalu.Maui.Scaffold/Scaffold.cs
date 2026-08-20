@@ -1295,7 +1295,21 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
         }
 
         RemoveLogicalChild(page);
+
+        // A page is destroyed AFTER the navigation that carried it away: the engine synchronizes
+        // the presenter first and disposes the departed root's content afterwards
+        // (NavigationService -> IShellContentProxy.DestroyContent). Anything the presenter keyed
+        // by page therefore outlives its host unless it is told here — a sweep at the end of the
+        // sync runs a whole navigation too early.
+        PageDetached?.Invoke();
     }
+
+    /// <summary>
+    /// Raised once a page has left the stack and its host has been retired. The presenter uses
+    /// it to release that page's platform state at the only moment it can be sure the page is
+    /// gone for good.
+    /// </summary>
+    internal Action? PageDetached { get; set; }
 
     private readonly List<ScaffoldPageHost> _retiredPageHosts = [];
 
