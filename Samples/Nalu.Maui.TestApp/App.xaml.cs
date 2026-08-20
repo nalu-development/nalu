@@ -23,9 +23,23 @@ public partial class App : Application
     /// Used by the cross-platform "ResetButton" overlay added to every test page,
     /// so UI tests can reset the app state without restarting it.
     /// </summary>
-    internal void ResetToMainPage()
+    internal async void ResetToMainPage()
     {
         var currentPage = Windows[0].Page;
+
+        // Modals are the one thing DisconnectHandlers below cannot reach: they are presented by
+        // the WINDOW, not by the page, so a popup left open by a test outlives the swap and ends
+        // up covering the new MainPage. The next test then opens its own popup over the leftover
+        // one and closes only half of what it can see — PopupTests fails exactly that way
+        // without these lines, and stays broken for every run after it.
+        // This is the window's MODAL stack, not a navigation stack: nothing here pops a page
+        // from the Scaffold's own stacks, of which there may be several in parallel.
+        var navigation = currentPage?.Navigation;
+
+        while (navigation?.ModalStack.Count > 0)
+        {
+            await navigation.PopModalAsync(false);
+        }
 
         Windows[0].Page = new MainPage(_serviceProvider);
 
@@ -41,10 +55,6 @@ public partial class App : Application
 
             // MAUI does not reliably disconnect the old page's handler tree when Window.Page
             // is swapped; without this the native view hierarchy keeps the page graph alive.
-            // This is also what retires whatever the outgoing page still had presented — modals
-            // and popups included. Popping them one by one first would be both redundant and
-            // wrong: a Scaffold holds several navigation stacks at once, and only one of them
-            // is the window's Navigation.
             currentPage?.DisconnectHandlers();
         }
         finally
