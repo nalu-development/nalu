@@ -72,6 +72,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         scaffold.DisposeRetiredPageHosts();
+
+        // ...and only the presented page keeps its bar in the element tree.
+        scaffold.SettleNavBarAttachments();
     }
 
     private ScaffoldEdgePanRecognizer? _edgeGesture;
@@ -234,6 +237,12 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             await targetContainer.SyncNavBarAsync(animated: false);
         }
+
+        // The tree shows the INCOMING page's bar from the moment the transition starts: the
+        // outgoing bar keeps rendering (its platform view lives in its own container) but leaves
+        // the element tree, so automation ids stay unique and tooling reads the page being
+        // navigated TO rather than whichever bar happens to be enumerated first.
+        scaffold.SettleNavBarAttachments();
 
         // The tab bar is SHARED bottom chrome and still animates concurrently with the page: an
         // Auto-hiding bar slides away while the pushed page slides in.

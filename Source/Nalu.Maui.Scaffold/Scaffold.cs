@@ -1300,6 +1300,25 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     private readonly List<ScaffoldPageHost> _retiredPageHosts = [];
 
     /// <summary>
+    /// Settles which bars are in the element tree once a transition has finished: the CURRENT
+    /// page's, and only it.
+    /// </summary>
+    /// <remarks>
+    /// Every live page owns a bar, but the tree reflects PRESENTED chrome — the rule that keeps
+    /// automation ids unique and lets tooling read "what is on screen". During a transition two
+    /// bars are legitimately attached (both are on screen, each showing its own page); this
+    /// re-establishes the single-bar steady state afterwards. A covered page's bar re-attaches
+    /// when its container syncs on the way back in.
+    /// </remarks>
+    internal void SettleNavBarAttachments()
+    {
+        foreach (var host in _pageHosts.Values)
+        {
+            host.SetNavBarAttached(ReferenceEquals(host.Page, CurrentPage) && host.IsNavBarVisible);
+        }
+    }
+
+    /// <summary>
     /// Destroys the hosts of pages that left the stack. Called by the presenter once the
     /// transition that carried them away has settled, never before.
     /// </summary>

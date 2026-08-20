@@ -537,6 +537,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // The transition has settled: pages that left the stack kept their chrome for the whole
         // leaving animation and can now be destroyed.
         scaffold.DisposeRetiredPageHosts();
+
+        // ...and only the presented page keeps its bar in the element tree.
+        scaffold.SettleNavBarAttachments();
     }
 
     // 1:1 with BackEvent progress: the page follows the finger (iOS parity), revealing exactly
