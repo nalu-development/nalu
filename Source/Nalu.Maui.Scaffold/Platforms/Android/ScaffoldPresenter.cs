@@ -352,6 +352,16 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             // under the nav bar strip.
             fragment.OnViewMounted = view =>
             {
+                // A committed preview hands its page over to THIS frame — the peek's own frame is
+                // scrap from the moment the real one exists, and this is that moment (the page
+                // view moved in OnCreateView, one call earlier). Dropping it here rather than at
+                // commit time costs no frame: the peek stays on screen right up to the traversal
+                // that draws its replacement.
+                if (predictivelySettled)
+                {
+                    RemovePeek(_backPeekFrame);
+                }
+
                 _pageLayer!.ApplyInsetsTo(view);
 
                 if (depthPush)

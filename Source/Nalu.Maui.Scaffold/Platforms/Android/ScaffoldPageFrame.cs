@@ -245,6 +245,26 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
         }
     }
 
+    /// <summary>
+    /// A frame insets the page view it HOSTS, and only that one. The page's platform view
+    /// outlives any single frame — the predictive-back peek builds one around it and the commit
+    /// re-parents it into the fragment's real frame — and re-parenting is a plain
+    /// <c>removeView</c> on this side. Without letting go here, the emptied frame keeps
+    /// answering window dispatches by rewriting insets onto a view another frame now owns: two
+    /// writers, and the page's top padding becomes whichever one the traversal happens to reach
+    /// last. That is a page whose content sits under its nav bar on one device and not on
+    /// another.
+    /// </summary>
+    public override void OnViewRemoved(AView? child)
+    {
+        base.OnViewRemoved(child);
+
+        if (child is not null && ReferenceEquals(child, _pageView))
+        {
+            _pageView = null;
+        }
+    }
+
     private void ReleaseStrip()
     {
         if (_strip is not { } strip)
