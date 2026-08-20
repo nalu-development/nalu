@@ -55,14 +55,14 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     private WindowInsetsCompat? _lastRawInsets;
 
     /// <summary>
-    /// The predictive-back peek and its OWN chrome intent. The layer-wide intent
-    /// (<see cref="ScaffoldLayout.PageTopInsetPx"/>/<see cref="ScaffoldLayout.PageBottomInsetPx"/>)
-    /// belongs to the scrubbed TOP page for the whole gesture, so a peeked page whose chrome
-    /// differs (nav bar shown vs overlapped, tab bar back vs hidden) gets its rewrite
-    /// re-dispatched directly to its subtree after every layer-level dispatch — it must be
-    /// padded for where it will LAND, or the commit jumps.
+    /// The predictive-back peek and its own BOTTOM chrome intent. The layer-wide intent
+    /// (<see cref="ScaffoldLayout.PageBottomInsetPx"/>) belongs to the scrubbed TOP page for the
+    /// whole gesture, so a peeked page whose tab bar differs gets its rewrite re-dispatched
+    /// directly to its subtree — it must be padded for where it will LAND, or the commit jumps.
+    /// The nav bar needs no such special case any more: every page's frame insets its own
+    /// content, so a peeked page already carries its own top intent.
     /// </summary>
-    private (AView View, int TopInsetPx, int BottomInsetPx)? _peekIntent;
+    private (AView View, int BottomInsetPx)? _peekIntent;
 
     public ScaffoldPageLayerLayout(IntPtr javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
@@ -164,8 +164,8 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     }
 
     /// <summary>Registers the peek's chrome intent; cleared via <see cref="ClearPeekInsetIntent(AView)"/> (or the parameterless overload).</summary>
-    public void SetPeekInsetIntent(AView peekView, int topInsetPx, int bottomInsetPx)
-        => _peekIntent = (peekView, topInsetPx, bottomInsetPx);
+    public void SetPeekInsetIntent(AView peekView, int bottomInsetPx)
+        => _peekIntent = (peekView, bottomInsetPx);
 
     /// <summary>Clears the peek intent, tolerating stale calls for a view that is no longer the peek.</summary>
     public void ClearPeekInsetIntent(AView peekView)
@@ -188,7 +188,7 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     {
         if (_peekIntent is { } peek && _lastRawInsets is { } raw)
         {
-            ViewCompat.DispatchApplyWindowInsets(peek.View, Rewrite(raw, peek.TopInsetPx, peek.BottomInsetPx));
+            ViewCompat.DispatchApplyWindowInsets(peek.View, Rewrite(raw, peek.BottomInsetPx));
         }
     }
 
@@ -326,7 +326,7 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
         if (_lastRawInsets is { } raw)
         {
             var rewritten = _peekIntent is { } peek && ReferenceEquals(peek.View, pageView)
-                ? Rewrite(raw, peek.TopInsetPx, peek.BottomInsetPx)
+                ? Rewrite(raw, peek.BottomInsetPx)
                 : Rewrite(raw);
 
             ViewCompat.DispatchApplyWindowInsets(pageView, rewritten);
@@ -349,7 +349,7 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 
     private WindowInsetsCompat Rewrite(WindowInsetsCompat insets)
         => Parent is ScaffoldLayout { } scaffoldLayout
-            ? Rewrite(insets, scaffoldLayout.PageTopInsetPx, scaffoldLayout.PageBottomInsetPx)
+            ? Rewrite(insets, scaffoldLayout.PageBottomInsetPx)
             : insets;
 
     /// <summary>
@@ -359,7 +359,7 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
     /// own SoftInput handling does not double-pad; under Pan the IME is zeroed (the layer slides
     /// instead); under None the insets pass through untouched (MAUI's SoftInput semantics apply).
     /// </summary>
-    private WindowInsetsCompat Rewrite(WindowInsetsCompat insets, int topInsetPx, int bottomInsetPx)
+    private WindowInsetsCompat Rewrite(WindowInsetsCompat insets, int bottomInsetPx)
     {
         var scaffoldLayout = Parent as ScaffoldLayout;
         var mode = scaffoldLayout?.PageKeyboardMode?.Invoke() ?? ScaffoldKeyboardMode.Resize;
@@ -367,7 +367,7 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 
         if (mode == ScaffoldKeyboardMode.None)
         {
-            return RewriteChrome(insets, topInsetPx, bottomInsetPx);
+            return RewriteChrome(insets, bottomInsetPx);
         }
 
         var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
@@ -380,7 +380,7 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
 
         var modifiedSystemBarInsets = Insets.Of(
             systemBarInsets.Left,
-            topInsetPx > 0 ? topInsetPx : systemBarInsets.Top,
+            systemBarInsets.Top,
             systemBarInsets.Right,
             bottom
         )!;
@@ -395,17 +395,17 @@ internal sealed class ScaffoldPageLayerLayout : FrameLayout, AndroidX.Core.View.
                ?? insets;
     }
 
-    private static WindowInsetsCompat RewriteChrome(WindowInsetsCompat insets, int topInsetPx, int bottomInsetPx)
+    private static WindowInsetsCompat RewriteChrome(WindowInsetsCompat insets, int bottomInsetPx)
     {
-        if (topInsetPx > 0 || bottomInsetPx > 0)
+        if (bottomInsetPx > 0)
         {
             var systemBarInsets = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
 
             var modifiedSystemBarInsets = Insets.Of(
                 systemBarInsets.Left,
-                topInsetPx > 0 ? topInsetPx : systemBarInsets.Top,
+                systemBarInsets.Top,
                 systemBarInsets.Right,
-                bottomInsetPx > 0 ? bottomInsetPx : systemBarInsets.Bottom
+                bottomInsetPx
             )!;
 
             using var builder = new WindowInsetsCompat.Builder(insets);

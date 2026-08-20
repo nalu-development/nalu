@@ -3,8 +3,7 @@
                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
                xmlns:pages="clr-namespace:Nalu.Maui.DailyHelper.Pages"
-               x:Class="Nalu.Maui.DailyHelper.AppScaffold"
-               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+               x:Class="Nalu.Maui.DailyHelper.AppScaffold">
 
     <!-- The whole application structure: one tab bar, three roots, each hosting its own
          navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->

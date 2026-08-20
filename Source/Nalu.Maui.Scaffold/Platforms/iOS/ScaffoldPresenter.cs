@@ -715,24 +715,26 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         Task? coverDim = null;
 
+        var duration = pushSpec.DurationSeconds;
+
         if (pushAnimates)
         {
             ScaffoldPageDepth.SetDim(coveredView!, 0f);
-            coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, _transitionDurationSeconds);
+            coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, duration);
         }
 
         // Shared elements (§8): matching Scaffold.TransitionName pairs fly between the
         // pages while the standard slide plays (the flight math assumes it); pages
         // without pairs play their resolved ScaffoldPageTransition spec (§8.2).
         var handled = previousPage is not null && previousController?.View is { } prevPushView
-            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, _transitionDurationSeconds);
+            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, duration);
 
         if (!handled && pushSpec.IsAnimated)
         {
             var previousView = previousController?.View;
             ApplyMotion(newView, pushSpec.Enter, container.Bounds);
 
-            await UIView.AnimateAsync(pushSpec.DurationSeconds, () =>
+            await UIView.AnimateAsync(duration, () =>
             {
                 ResetMotion(newView);
 
@@ -778,21 +780,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0);
 
         Task? revealDim = null;
+        
+        var duration = popSpec.DurationSeconds;
 
         if (popAnimates)
         {
             ScaffoldPageDepth.SetDim(newView, 1f);
-            revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, _transitionDurationSeconds);
+            revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, duration);
         }
 
         var handled = previousPage is not null
-            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, _transitionDurationSeconds);
+            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, duration);
 
         if (!handled && popSpec.IsAnimated)
         {
             ApplyMotion(newView, popSpec.Behind, container.Bounds);
 
-            await UIView.AnimateAsync(popSpec.DurationSeconds, () =>
+            await UIView.AnimateAsync(duration, () =>
             {
                 ResetMotion(newView);
                 ApplyMotion(previousView, popSpec.Enter, container.Bounds);

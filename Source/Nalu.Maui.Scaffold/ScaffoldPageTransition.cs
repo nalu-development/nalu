@@ -33,30 +33,21 @@ public sealed record ScaffoldPageTransition(ScaffoldTransitionMotion Enter, Scaf
 {
     /// <summary>
     /// The stock navigation slide: the incoming page comes in from the right edge while the
-    /// page behind counter-slides a third of the way out to the left — pushing moves it TO that
-    /// offset, popping brings it back FROM it. The depth cue (dimming) is applied separately by
-    /// the presenters, so this is pure translation.
+    /// page behind counter-slides a third of the way out to the left.
     /// </summary>
     public static ScaffoldPageTransition Default { get; } = new(
         new ScaffoldTransitionMotion(FractionX: 1),
         new ScaffoldTransitionMotion(FractionX: -0.35));
 
-    /// <summary>iOS-navigation style: slide in from the right edge, behind page parallaxes away.</summary>
-    public static ScaffoldPageTransition SlideFromRight { get; } = new(
-        new ScaffoldTransitionMotion(FractionX: 1),
-        new ScaffoldTransitionMotion(FractionX: -0.3, Opacity: 0.9));
-
     /// <summary>Subtle slide-up + fade in; the behind page dims and recedes.</summary>
     public static ScaffoldPageTransition SlideUpFade { get; } = new(
-        new ScaffoldTransitionMotion(FractionY: 0.03, Opacity: 0),
-        new ScaffoldTransitionMotion(Scale: 0.97, Opacity: 0.85),
-        0.38);
+        new ScaffoldTransitionMotion(FractionY: 0.1, Opacity: 0),
+        new ScaffoldTransitionMotion(FractionY: -0.1, Opacity: 0.85));
 
     /// <summary>Material-ish zoom: scale up + fade in; the behind page grows and dims.</summary>
     public static ScaffoldPageTransition ZoomFade { get; } = new(
         new ScaffoldTransitionMotion(Scale: 0.85, Opacity: 0),
-        new ScaffoldTransitionMotion(Scale: 1.05, Opacity: 0.6),
-        0.3);
+        new ScaffoldTransitionMotion(Scale: 1.05, Opacity: 0.6));
 
     /// <summary>
     /// Modal presentation: slide up from the bottom edge; the behind page recedes slightly.
@@ -64,8 +55,7 @@ public sealed record ScaffoldPageTransition(ScaffoldTransitionMotion Enter, Scaf
     /// </summary>
     public static ScaffoldPageTransition SlideFromBottom { get; } = new(
         new ScaffoldTransitionMotion(FractionY: 1),
-        new ScaffoldTransitionMotion(Scale: 0.97, Opacity: 0.9),
-        0.3);
+        new ScaffoldTransitionMotion(FractionY: -0.35));
 
     /// <summary>No animation: pages swap instantly.</summary>
     public static ScaffoldPageTransition None { get; } = new(
