@@ -324,13 +324,28 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
         }
     }
 
-    /// <summary>Releases the page subscription when the page leaves the navigation stack.</summary>
+    /// <summary>
+    /// Releases everything this context held once its page is gone for good: the page
+    /// subscription AND every field that references the page or its model.
+    /// </summary>
+    /// <remarks>
+    /// Dropping the references matters as much as unsubscribing. This context is reachable from
+    /// objects that outlive the page — a bar host subscribes to the scaffold and the area, a
+    /// binding relay is held by the ancestors it walked — and it holds the page
+    /// (<see cref="CurrentPage"/>), the page's MODEL (<see cref="PageBindingContext"/>) and the
+    /// page's <see cref="TitleView"/>. Left set, any one of those keeps a dead screen's whole
+    /// object graph alive.
+    /// </remarks>
     internal void Detach()
     {
         if (Page is not null)
         {
             Page.PropertyChanged -= OnPagePropertyChanged;
         }
+
+        CurrentPage = null;
+        PageBindingContext = null;
+        TitleView = null;
     }
 
     /// <summary>Raises <see cref="PropertyChanged"/> for every property (the scaffold-level forwarder swap).</summary>

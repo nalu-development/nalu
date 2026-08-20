@@ -127,6 +127,7 @@ internal sealed class ScaffoldPageHost : IDisposable
     /// </summary>
     public ScaffoldNavBarHost? EnsureNavBarHost()
     {
+
         if (ResolveBarView() is not { } barView)
         {
             DisposeNavBarHost();

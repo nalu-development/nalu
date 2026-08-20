@@ -53,12 +53,21 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>
-    /// Drops the containers of pages that left the stack, and only then destroys their hosts —
-    /// the popped page kept its bar for the whole leaving animation (see
-    /// <see cref="Scaffold.DetachPage"/>).
+    /// THE teardown of everything a page owned once it left the stack: its container (page
+    /// controller + strip) and then its host (context, bar host, bar view).
     /// </summary>
-    private void PruneContainers()
+    /// <remarks>
+    /// Two triggers, one body, because a page leaves in one of two ways and both must be
+    /// covered exactly once:
+    /// a POP mutates the stack while the leaving animation still needs the page's chrome, so it
+    /// is released when the transition that carried it away has settled; a ROOT SWITCH destroys
+    /// the previous root's page AFTER the presenter has synchronized, outside any transition,
+    /// so it is released as soon as the scaffold reports the detach. Idempotent — it releases
+    /// whatever currently has no host, and nothing else.
+    /// </remarks>
+    private void ReleaseDetachedPages()
     {
+
         foreach (var page in _containers.Keys.Where(page => scaffold.GetPageHost(page) is null).ToArray())
         {
             var container = _containers[page];
@@ -254,7 +263,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         await Task.WhenAll(chromeTask, pageTask);
 
-        PruneContainers();
+        // The transition settled: pages carried away by it can be released now.
+        ReleaseDetachedPages();
 
         // Presentation at rest: the pixels under the status bar are final — read fresh.
         scaffold.SystemBars.OnPresentationSettled();
