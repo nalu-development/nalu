@@ -69,17 +69,17 @@ Background="{nalu:ThemeScrollValue FromLight=Transparent,
 
 They work on any element inside the scaffold's tree **and** on
 [`ScaffoldNavBarAppearance`](scaffold-navbar.md) properties, and must target a bindable
-property directly (styles/setters are not supported). In code-behind, bind the ambient values
-with the `NavBarBindings` utility — string path or fully typed:
+property directly (styles/setters are not supported). In code-behind, bind the values with the
+`NavBarBindings` utility, passing the element the binding is applied to — that is what the page
+is resolved from, so the binding reads *that element's own page*:
 
 ```csharp
-offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create("ScrollOffset", stringFormat: "{0:F0}"));
-
-// Typed and compiled (trimming/AOT-safe):
 offsetLabel.SetBinding(Label.TextProperty,
-    static (Scaffold s) => s.NavBarContext.ScrollOffset,
-    source: NavBarBindings.ScaffoldAncestor);
+    NavBarBindings.Create(offsetLabel, "ScrollOffset", stringFormat: "{0:F0}"));
 ```
+
+Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
+paths are evaluated by reflection.
 
 ## Recipe: parallax header
 

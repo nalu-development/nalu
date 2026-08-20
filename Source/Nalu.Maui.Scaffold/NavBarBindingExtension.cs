@@ -55,37 +55,19 @@ public sealed class NavBarBindingExtension : IMarkupExtension<BindingBase>
 
 /// <summary>
 /// The code-behind counterpart of <see cref="NavBarBindingExtension"/>: builds bindings to the
-/// ambient <see cref="ScaffoldNavBarContext"/> from anywhere inside the scaffold's element tree.
+/// <see cref="ScaffoldNavBarContext"/> of the page a given element belongs to.
 /// </summary>
 /// <remarks>
-/// Two flavors:
+/// The element the binding will be applied to is passed in: it is what the page is resolved
+/// FROM, so the binding reads that element's own page — correct while two pages are on screen.
 /// <code>
-/// // String path (same reflection semantics as {nalu:NavBarBinding}):
-/// label.SetBinding(Label.TextProperty, NavBarBindings.Create("Title"));
-///
-/// // Fully typed and compiled (trimming/AOT-safe — the interceptor rewrites YOUR call site):
-/// label.SetBinding(Label.TextProperty,
-///     static (Scaffold s) => s.NavBarContext.Title,
-///     source: NavBarBindings.ScaffoldAncestor);
+/// label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "Title"));
 /// </code>
+/// Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
+/// paths such as <c>CurrentPage.BindingContext.SomeCommand</c> are evaluated by reflection.
 /// </remarks>
 public static class NavBarBindings
 {
-    /// <summary>
-    /// The relative source resolving the nearest ancestor <see cref="Scaffold"/> — combine it
-    /// with the typed <c>SetBinding(property, static (Scaffold s) =&gt; s.NavBarContext.…,
-    /// source: NavBarBindings.ScaffoldAncestor)</c> for fully typed, compiled context bindings.
-    /// </summary>
-    /// <remarks>
-    /// This resolves the scaffold, whose <see cref="Scaffold.NavBarContext"/> is the CURRENT
-    /// page's — not the context of the page the bound element belongs to. Prefer
-    /// <see cref="Create(Element,string,BindingMode,IValueConverter?,object?,string?)"/>, which
-    /// resolves the element's own page and is therefore correct while two pages are on screen.
-    /// </remarks>
-    [Obsolete("Resolves the CURRENT page's context, not the bound element's own page. Use NavBarBindings.Create(target, path, ...) instead.")]
-    public static RelativeBindingSource ScaffoldAncestor { get; }
-        = new(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
-
     /// <summary>
     /// Builds a binding into the <see cref="ScaffoldNavBarContext"/> of the page
     /// <paramref name="target"/> belongs to — page content through its page, bar content (and a
@@ -112,25 +94,11 @@ public static class NavBarBindings
         string? stringFormat = null)
         => NavBarContextBindings.Create(target, path, mode, converter, converterParameter, stringFormat);
 
-    /// <summary>Builds a string-path binding into the CURRENT page's <see cref="ScaffoldNavBarContext"/>.</summary>
-    /// <param name="path">The path within the context ("." binds the context itself).</param>
-    /// <param name="mode">The binding mode.</param>
-    /// <param name="converter">The converter.</param>
-    /// <param name="converterParameter">The converter parameter.</param>
-    /// <param name="stringFormat">The string format.</param>
-    [Obsolete("Resolves the CURRENT page's context, which is wrong while two pages are on screen. Use Create(target, path, ...).")]
-    public static BindingBase Create(
-        string path = ".",
-        BindingMode mode = BindingMode.Default,
-        IValueConverter? converter = null,
-        object? converterParameter = null,
-        string? stringFormat = null)
-        => CreateForCurrentPage(path, mode, converter, converterParameter, stringFormat);
-
     /// <summary>
-    /// The current-page fallback: used when no target element is available to resolve a page
-    /// from (a Style setter, a non-element target, or the obsolete target-less
-    /// <see cref="Create(string,BindingMode,IValueConverter?,object?,string?)"/>).
+    /// The current-page fallback, used only when no target element is available to resolve a
+    /// page from: a <see cref="Style"/> setter (one binding instance serves many elements, so
+    /// there is no single target to walk from) or another non-element target. Everything with a
+    /// real target goes through <see cref="Create(Element,string,BindingMode,IValueConverter?,object?,string?)"/>.
     /// </summary>
     // Runtime string-path bindings resolve via reflection; the dependencies keep the reflected
     // property surfaces alive under trimming/AOT (see maui-binding gotcha: unpreserved
@@ -147,11 +115,12 @@ public static class NavBarBindings
         var contextPath = nameof(Scaffold.NavBarContext);
         var fullPath = path is "." or "" ? contextPath : $"{contextPath}.{path}";
 
-#pragma warning disable CS0618 // the fallback is exactly what ScaffoldAncestor still provides
         return new Binding(fullPath, mode, converter, converterParameter, stringFormat)
         {
-            Source = ScaffoldAncestor
+            Source = _scaffoldAncestor
         };
-#pragma warning restore CS0618
     }
+
+    private static readonly RelativeBindingSource _scaffoldAncestor
+        = new(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
 }

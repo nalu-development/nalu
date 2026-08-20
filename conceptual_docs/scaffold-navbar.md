@@ -32,9 +32,9 @@ extension, which binds against the scaffold's `ScaffoldNavBarContext`:
        TextColor="{nalu:NavBarBinding Path=Foreground}" />
 ```
 
-In code-behind, the `NavBarBindings` utility is the counterpart — `NavBarBindings.Create("Title")`
-for a string path, or fully typed:
-`SetBinding(Label.TextProperty, static (Scaffold s) => s.NavBarContext.Title, source: NavBarBindings.ScaffoldAncestor)`.
+In code-behind, the `NavBarBindings` utility is the counterpart. Pass the element the binding
+is applied to — it is what the page is resolved from:
+`label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "Title"))`.
 
 ## Appearance — a per-property merge chain
 
