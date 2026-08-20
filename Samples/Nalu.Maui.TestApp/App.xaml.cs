@@ -34,7 +34,11 @@ public partial class App : Application
         // without these lines, and stays broken for every run after it.
         // This is the window's MODAL stack, not a navigation stack: nothing here pops a page
         // from the Scaffold's own stacks, of which there may be several in parallel.
-        var navigation = currentPage?.Navigation;
+        // NEVER for a Scaffold, and not merely because it has no window modals to pop (its
+        // INavigation refuses PushModalAsync outright): a Scaffold owns its overlays and must be
+        // taken down by DisconnectHandlers alone. Draining anything on its behalf here would
+        // stand in for the teardown these tests exist to exercise, and hide the day it breaks.
+        var navigation = currentPage is Scaffold ? null : currentPage?.Navigation;
 
         while (navigation?.ModalStack.Count > 0)
         {
