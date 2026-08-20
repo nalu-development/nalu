@@ -79,8 +79,22 @@ internal sealed class ScaffoldPageHostController : UIViewController
     /// </summary>
     public Task SyncNavBarAsync(bool animated)
     {
-        var barHost = _host.EnsureNavBarHost();
         var visible = _host.IsNavBarVisible;
+
+        // A page that shows no bar gets NO strip and no bar view at all. Mounting one and
+        // relying on a translation to hide it cannot work: at mount the bar has not been
+        // arranged, so its height is unknown, and a strip translated by an unknown height is a
+        // VISIBLE strip for the length of the transition.
+        if (!visible && _navStrip is null)
+        {
+            _navBarPresented = false;
+            _host.SetNavBarAttached(false);
+            ApplyPageInsets();
+
+            return Task.CompletedTask;
+        }
+
+        var barHost = _host.EnsureNavBarHost();
 
         if (barHost is null)
         {
@@ -101,14 +115,13 @@ internal sealed class ScaffoldPageHostController : UIViewController
             _navStrip = strip;
             View!.AddSubview(strip);
 
-            var bounds = View.Bounds;
-            strip.Measure(bounds.Width);
-            PositionStrip(strip, bounds);
-
             // A page enters with its bar already at rest: the bar travels WITH the page, so it
             // must not also slide in on its own.
-            strip.Transform = visible ? CGAffineTransform.MakeIdentity() : CGAffineTransform.MakeTranslation(0, -strip.BarHeight);
             _navBarPresented = visible;
+
+            // Hidden is the resting state of a bar that is not presented — NOT a translation by
+            // its height, which is unknown until the bar has been arranged.
+            strip.Hidden = !visible;
         }
         else
         {
@@ -150,11 +163,15 @@ internal sealed class ScaffoldPageHostController : UIViewController
 
         if (!animated)
         {
+            strip.Hidden = !presented;
             strip.Transform = Target();
             ApplyPageInsets();
 
             return;
         }
+
+        // Sliding needs the strip on screen for the whole flight, whichever way it is going.
+        strip.Hidden = false;
 
         var wasAtRestHidden = _navBarAnimating == 0 && strip.Transform.y0 != 0;
         _navBarAnimating++;
@@ -188,6 +205,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
             if (_navBarAnimating == 0 && _navBarPresented == presented)
             {
                 strip.Transform = Target();
+                strip.Hidden = !presented;
             }
         }
     }
@@ -272,9 +290,14 @@ internal sealed class ScaffoldPageHostController : UIViewController
 
             // Keep a hidden strip fully offscreen after a size change (rotation) — but never
             // touch the transform while a presentation animation is retargeting it.
-            if (_navBarAnimating == 0 && !_navBarPresented)
+            if (_navBarAnimating == 0)
             {
-                strip.Transform = CGAffineTransform.MakeTranslation(0, -strip.BarHeight);
+                strip.Hidden = !_navBarPresented;
+
+                if (!_navBarPresented)
+                {
+                    strip.Transform = CGAffineTransform.MakeTranslation(0, -strip.BarHeight);
+                }
             }
         }
 
