@@ -293,7 +293,7 @@ internal sealed class ScaffoldFlightSession(
         var animator = ValueAnimator.OfFloat(0f, 1f)!;
         animator.SetDuration((long)(durationSeconds * 1000));
         animator.SetInterpolator(new AccelerateDecelerateInterpolator());
-        animator.Update += (_, args) => Seek((float)args.Animation.AnimatedValue!, 0);
+        animator.Update += (_, args) => Seek((float)args.Animation.AnimatedValue!);
         animator.AnimationEnd += (_, _) => Finish();
         animator.Start();
     }
@@ -320,11 +320,17 @@ internal sealed class ScaffoldFlightSession(
     }
 
     /// <summary>
-    /// Applies the flight state for a progress in [0,1]. <paramref name="sourceDx"/> carries a
-    /// moving SOURCE page (the predictive-back scrub translates it): the flights ride the
-    /// shift, decaying to zero as they approach their destination.
+    /// Applies the flight state for a progress in [0,1] — purely source rect to destination
+    /// rect, independent of what the pages beneath are doing.
     /// </summary>
-    public void Seek(float progress, float sourceDx)
+    /// <remarks>
+    /// Flights used to ride the departing page's translation (decaying to zero at the
+    /// destination), which made a predictive-back scrub drag them sideways while they were also
+    /// trying to reach their target — the two motions fought and elements landed off-position.
+    /// iOS never coupled the two, and a flight's whole point is to travel between two KNOWN
+    /// geometries: the page's own motion is not one of them.
+    /// </remarks>
+    public void Seek(float progress)
     {
         if (_flights is not { } flights)
         {
@@ -336,16 +342,6 @@ internal sealed class ScaffoldFlightSession(
         foreach (var flight in flights)
         {
             flight.Apply(progress);
-        }
-
-        if (_flightViews is { } views)
-        {
-            var shift = sourceDx * (1 - progress);
-
-            foreach (var view in views)
-            {
-                view.TranslationX = shift;
-            }
         }
     }
 

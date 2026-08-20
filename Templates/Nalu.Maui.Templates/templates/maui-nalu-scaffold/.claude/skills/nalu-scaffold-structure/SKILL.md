@@ -30,12 +30,12 @@ attached properties `nalu:Scaffold.*` on the `ContentPage`; most resolve page �
 | `IScaffoldFlyoutController` (DI, page-scoped) | `OpenAsync(ScaffoldFlyoutSide)`, `CloseAsync()` | Also `scaffold.OpenFlyoutAsync/CloseFlyoutAsync`, `IsFlyoutStartOpen/EndOpen`, `FlyoutStartOpened/Closed` events. |
 | `nalu:Scaffold.FlyoutStartButtonVisibility` / `End…` | Nav-bar drawer button: `Auto` (roots) / `Visible` / `Hidden` | page → area → scaffold. |
 | Page `Title` / `nalu:Scaffold.TitleView` | Nav bar center | `TitleView.BindingContext` = page model. |
-| `nalu:Scaffold.NavBarView` | Bar view; page → area → scaffold | Default `ScaffoldNavBarView` (`BarHeight` 48, `BarPadding` 8,0, `Spacing` 8). `{x:Null}` = no bar. |
-| `nalu:Scaffold.NavBarAppearance` (`ScaffoldNavBarAppearance`) | Strip surface: `Background`, `Foreground` (buttons + title fallback), `TitleForeground` (title only), `Opacity`, `OffsetY` | Each property resolves independently page → area → scaffold (delta). Live/bindable. |
+| `nalu:Scaffold.NavBarTemplate` | Bar TEMPLATE; page → area → scaffold | Default a template of `ScaffoldNavBarView` (`BarHeight` 48, `BarPadding` 8,0, `Spacing` 8). `{x:Null}` on the scaffold = no bar. A template, not a view: every page realizes its own bar, because the bar travels with its page and two are on screen during a transition. |
+| `nalu:Scaffold.NavBarBackground` / `NavBarForeground` / `NavBarTitleForeground` / `NavBarOpacity` / `NavBarOffsetY` | Strip surface (foreground = buttons + title fallback; title foreground = title only) | Attached properties on real elements: each resolves independently page → area → scaffold (delta), and binds, themes and scroll-animates with no extra machinery. A `Style` setter gives every element its own value. |
 | `nalu:Scaffold.IsNavBarVisible` (bool) / `NavBarOverlapsContent` (bool) | Hide bar / draw bar OVER content | Overlap = full-bleed header recipe. |
 | Primitives `ScaffoldNavBarTitle`, `ScaffoldBackButton`, `ScaffoldCloseButton`, `ScaffoldFlyoutButton` (`Side`), base `ScaffoldNavBarButtonBase` (`Icon`, `IconColor`, `PressedBrush`) | Style via implicit styles | Same styles apply in custom bars. |
 | `ScaffoldNavBarContext` (`{nalu:NavBarBinding Path=…}`) | Ambient bar state | `Title`, `TitleView`, `Foreground`, `TitleForeground`, `ScrollOffset`, `IsScrolledUnder`, `ScrollRampStart/End`, `CanNavigateBack`, `BackCommand`, `IsFlyoutStart/EndButtonVisible`, `OpenFlyoutStart/EndCommand`, `IsModal`, `IsCloseButtonVisible`, `CurrentPage`, `PageBindingContext`. |
-| `NavBarBindings.Create(path, …)` / `NavBarBindings.ScaffoldAncestor` / `Scaffold.FindNavBarContext(element)` | Code-behind counterparts | Typed: `SetBinding(prop, static (Scaffold s) => s.NavBarContext.X, source: NavBarBindings.ScaffoldAncestor)`. |
+| `NavBarBindings.Create(target, path, …)` / `Scaffold.FindNavBarContext(element)` | Code-behind counterparts | Pass the element the binding is applied to — it is what the PAGE is resolved from, so the binding reads that element's own page. |
 | `nalu:Scaffold.SystemBarStyle` | `Auto` (default) / `LightContent` (white icons) / `DarkContent` | page → area → scaffold; describes the PAGE surface. |
 | `nalu:Scaffold.ScrollTracker`, `ScrollRampStart/End`, `{nalu:ScrollValue}`, `{nalu:ThemeScrollValue}` | Scroll-driven chrome / parallax | → skill `nalu-scaffold-scroll`. |
 | `nalu:Scaffold.PageMode`, `PageTransition`, `TransitionName` | Modals / transitions | → skill `nalu-scaffold-transitions`. |
@@ -80,12 +80,12 @@ Nav bar: TitleView + per-page appearance delta + hidden tab bar on a pushed page
     <nalu:Scaffold.TitleView>
         <Label Text="{Binding OrderNumber}" TextColor="{nalu:NavBarBinding Path=Foreground}" VerticalTextAlignment="Center" />
     </nalu:Scaffold.TitleView>
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance Foreground="White" TitleForeground="White" Background="{StaticResource Accent}" />
-    </nalu:Scaffold.NavBarAppearance>
+    nalu:Scaffold.NavBarForeground="White"
+    nalu:Scaffold.NavBarTitleForeground="White"
+    nalu:Scaffold.NavBarBackground="{StaticResource Accent}"
 ```
 
-Full-bleed / materializing nav bar and parallax headers → skill `nalu-scaffold-scroll` (uses `NavBarOverlapsContent`, `NavBarAppearance` and `SystemBarStyle` from here).
+Full-bleed / materializing nav bar and parallax headers → skill `nalu-scaffold-scroll` (uses `NavBarOverlapsContent`, the nav bar appearance properties and `SystemBarStyle` from here).
 
 Chrome theming = implicit styles in `Resources/Styles/Styles.xaml` (template already has entries):
 
@@ -104,7 +104,7 @@ Chrome theming = implicit styles in `Resources/Styles/Styles.xaml` (template alr
 - Chrome footprints (nav bar incl. status inset, tab bar) reach the page as safe-area insets. Template pages set page-level `SafeAreaEdges="None"` so the `ScrollView` pads instead: content scrolls UNDER the floating tab bar and rests clear of it; keep the Android clip-to-padding workaround in `MauiProgram.cs`. `NavBarOverlapsContent` removes only the top footprint; the page's `SafeAreaEdges` then rules the raw system insets.
 - Drawer = content AND a non-`Disabled` mode. `OpenFlyoutAsync`/`OpenAsync` no-op when unavailable (safe to call). Navigation closes an open drawer; scrim tap / system back close it. Options (`Width`, `Scrim`) are scaffold-level only.
 - A page-level `FlyoutStart` inherits that page's `BindingContext` and is cleaned up when the page leaves; pushes that do not set it keep the older page's/area's/scaffold's drawer.
-- `NavBarAppearance` never writes into view properties; its colors are the primitives' FALLBACK: buttons ← `Foreground`; title ← level-wise `TitleForeground` ?? `Foreground` (the first of page/area/scaffold that sets either wins, so a page's `Foreground` alone recolors the title too). An explicit (or styled) `IconColor`/`TextColor` on a primitive wins and PINS it — the template styles neither (scaffold-level `Foreground` = accent for buttons, `TitleForeground` = text-primary for the title), so a page can recolor both with its own appearance. Do not add `TextColor`/`IconColor` setters to `ScaffoldNavBarTitle`/`ScaffoldNavBarButtonBase` styles unless the color must never follow the page. Defaults: `Background` #F7FFFFFF, `Opacity` 1, `OffsetY` 0. An appearance inside a shared `Style` is one object for all pages — constants only.
+- The nav bar appearance properties never write into view properties; their colors are the primitives' FALLBACK: buttons ← `NavBarForeground`; title ← level-wise `NavBarTitleForeground` ?? `NavBarForeground` (the first of page/area/scaffold that sets either wins, so a page's `NavBarForeground` alone recolors the title too). An explicit (or styled) `IconColor`/`TextColor` on a primitive wins and PINS it — the template styles neither (scaffold-level `NavBarForeground` = accent for buttons, `NavBarTitleForeground` = text-primary for the title), so a page can recolor both with its own values. Do not add `TextColor`/`IconColor` setters to `ScaffoldNavBarTitle`/`ScaffoldNavBarButtonBase` styles unless the color must never follow the page. Defaults: `NavBarBackground` #F7FFFFFF, `NavBarOpacity` 1, `NavBarOffsetY` 0. A `Style` setter is fine for any of them — each element gets its own VALUE, nothing is shared.
 - `TitleView` binds the page model, NOT the context; use `{nalu:NavBarBinding}` for `Foreground`/`ScrollOffset`/`Title`. Custom nav bars get `ScaffoldNavBarContext` as `BindingContext` and own the top safe area themselves (default bar consumes the status inset).
 - `SystemBarStyle` describes your content only: an opaque nav bar or open drawer covering the status bar always wins with its own luminance. `Auto` samples real pixels — declare `LightContent` on photo headers with white chrome so the sky doesn't flip icons.
 - Never use `Shell.*`/`NavigationPage.*` attached properties (`Shell.TabBarIsVisible`, `NavigationPage.HasNavigationBar`, `Shell.TitleView`…): use the `nalu:Scaffold.*` equivalents.

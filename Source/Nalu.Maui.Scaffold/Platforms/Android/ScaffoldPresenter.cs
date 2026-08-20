@@ -674,7 +674,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             {
                 // A previously-presented page kept its layout: destination geometry is valid now.
                 flightSession.TryBuild();
-                flightSession.Seek(0f, 0f);
+                flightSession.Seek(0f);
             }
             else
             {
@@ -685,7 +685,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                         {
                             if (ReferenceEquals(_backFlightSession, flightSession) && flightSession.TryBuild())
                             {
-                                flightSession.Seek(_backProgress, topView.TranslationX);
+                                flightSession.Seek(_backProgress);
                             }
                         }
                     )
@@ -723,7 +723,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             _backProgress = progress;
             topView.TranslationX = progress * _backPreviewMaxShift * (topView.Width > 0 ? topView.Width : 0);
-            _backFlightSession?.Seek(progress, topView.TranslationX);
+            _backFlightSession?.Seek(progress);
 
             if (_backPeekView is { } peekView)
             {
@@ -782,7 +782,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             if (weakCancelSession is not null && weakCancelSession.TryGetTarget(out var session))
             {
-                session.Seek(flightProgress, top.TranslationX);
+                session.Seek(flightProgress);
             }
 
             if (weakCancelPeek is not null && weakCancelPeek.TryGetTarget(out var peek))
@@ -897,7 +897,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
             if (weakCommitSession is not null && weakCommitSession.TryGetTarget(out var session))
             {
-                session.Seek(flightProgress, top.TranslationX);
+                session.Seek(flightProgress);
             }
 
             if (weakCommitPeek is not null && weakCommitPeek.TryGetTarget(out var peek))

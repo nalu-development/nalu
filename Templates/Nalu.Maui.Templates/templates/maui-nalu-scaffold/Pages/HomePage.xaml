@@ -9,20 +9,16 @@
              nalu:Scaffold.ScrollRampStart="40"
              nalu:Scaffold.ScrollRampEnd="160"
              SafeAreaEdges="None"
+             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollValue FromLight={StaticResource BackgroundLight},
+                                                                    ToLight={StaticResource CardLight},
+                                                                    FromDark={StaticResource BackgroundDark},
+                                                                    ToDark={StaticResource CardDark}}"
              Title="Home">
 
     <!-- Scroll-driven chrome, fully declarative: the page declares its interpolation ramp
          ONCE (ScrollRampStart/ScrollRampEnd above) and every {ScrollValue}/{ThemeScrollValue}
          below rides it. Here the nav bar rests blended with the page background and
          materializes into a card surface as content scrolls under it. -->
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance
-            Background="{nalu:ThemeScrollValue FromLight={StaticResource BackgroundLight},
-                                               ToLight={StaticResource CardLight},
-                                               FromDark={StaticResource BackgroundDark},
-                                               ToDark={StaticResource CardDark}}" />
-    </nalu:Scaffold.NavBarAppearance>
-
     <ScrollView x:Name="HomeScroll">
         <VerticalStackLayout Padding="24,32" Spacing="24">
 
