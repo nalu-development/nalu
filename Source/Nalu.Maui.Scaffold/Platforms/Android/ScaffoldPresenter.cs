@@ -1453,8 +1453,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // Same-page toggle (IsNavBarVisible / NavBarTemplate / NavBarOverlapsContent): the strip
         // lives in the page's own frame, so only that frame changes — and it re-insets its own
-        // page content from its own layout pass.
-        _currentFragment?.Frame?.SyncNavBar(mauiContext);
+        // page content from its own layout pass. Animated, because this is a bar changing state
+        // on a page that is standing still: it slides, as iOS does through
+        // ScaffoldPageHostController.SetNavBarPresentedAsync. A bar arriving WITH its page is
+        // the other case, and that one must not slide on its own (see ScaffoldPageFragment).
+        _currentFragment?.Frame?.SyncNavBar(mauiContext, animated: true);
     }
 
     /// <summary>Hides the soft keyboard when an input on the outgoing page holds focus.</summary>

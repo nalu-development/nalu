@@ -44,11 +44,20 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
 {
     private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
 
+    /// <summary>Same slide length as every other piece of scaffold chrome.</summary>
+    private const int _chromeDurationMs = 250;
+
     private ScaffoldPageHost? _host;
     private ScaffoldNavBarStripLayout? _strip;
     private AView? _pageView;
     private WindowInsetsCompat? _lastInsets;
     private int _appliedTopInsetPx = -1;
+    private bool _navBarPresented;
+
+    /// <summary>Where the bar is HEADED — <see cref="_navBarPresented"/> is what the page is padded for.</summary>
+    private bool _navBarTarget;
+    private int _lastStripHeightPx;
+    private Android.Animation.ObjectAnimator? _stripAnimator;
 
     public ScaffoldPageFrame(IntPtr javaReference, JniHandleOwnership transfer)
         : base(javaReference, transfer)
@@ -84,7 +93,7 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
     /// page view: the bar always draws over page content, and an overlapping page simply gets no
     /// top inset.
     /// </summary>
-    public void SyncNavBar(IMauiContext mauiContext)
+    public void SyncNavBar(IMauiContext mauiContext, bool animated = false)
     {
         if (_host is not { } host)
         {
@@ -127,8 +136,7 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
             AddView(strip);
         }
 
-        // Hidden is GONE, never a translation by a height nobody has measured yet.
-        _strip.Visibility = visible ? ViewStates.Visible : ViewStates.Gone;
+        SetNavBarPresented(visible, animated);
         host.SetNavBarAttached(visible);
 
         // The tree shows the INCOMING page's bar from the moment it mounts, and every other
@@ -138,6 +146,105 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
         host.Scaffold.SettleNavBarAttachments();
 
         RequestLayout();
+    }
+
+    /// <summary>
+    /// Drives this page's bar between shown and hidden. A SAME-PAGE toggle slides it out through
+    /// the top edge (and back in from there), the way the tab bar strip slides through the
+    /// bottom one — a bar that only blinks out of existence reads as a glitch, not a change.
+    /// Interruptible: a toggle mid-flight retargets from where the strip currently sits.
+    /// </summary>
+    /// <remarks>
+    /// The page's inset follows the TARGET state, not the strip's current offset (see
+    /// <see cref="_navBarPresented"/> in <see cref="TopInsetPx"/>): the content reflows once, at
+    /// the start, and the bar travels over it. Re-dispatching insets per animation frame would
+    /// re-pad the page — and everything MAUI lays out inside it — sixty times a second.
+    /// A bar whose height nobody has measured yet cannot slide by it, so the first sync of a
+    /// page (and any hidden-at-mount bar) still snaps: there is nothing to travel.
+    /// </remarks>
+    private void SetNavBarPresented(bool presented, bool animated)
+    {
+        if (_strip is not { } strip)
+        {
+            return;
+        }
+
+        if (strip.Height > 0)
+        {
+            _lastStripHeightPx = strip.Height;
+        }
+
+        var travel = _lastStripHeightPx;
+        var wasPresented = _navBarPresented;
+        _navBarTarget = presented;
+
+        // The inset SHRINKS only once the bar has travelled, and GROWS before it arrives: either
+        // way the page reflows while the strip is off the screen rather than under the reader's
+        // eye. It also keeps the relayout out of the animation's way — publishing it as the
+        // slide starts blocked the UI thread for ~150ms a time and the 250ms flight rendered
+        // three frames.
+        if (presented)
+        {
+            _navBarPresented = true;
+        }
+
+        // Dropped BEFORE the cancel: Cancel() raises AnimationEnd, and an end handler that still
+        // recognised itself as current would settle the strip for a flight that was superseded.
+        var superseded = _stripAnimator;
+        _stripAnimator = null;
+        superseded?.Cancel();
+
+        if (!animated || travel <= 0 || wasPresented == presented)
+        {
+            // Hidden at rest is GONE, never a translation by a height nobody has measured yet.
+            _navBarPresented = presented;
+            strip.TranslationY = 0;
+            strip.Visibility = presented ? ViewStates.Visible : ViewStates.Gone;
+
+            return;
+        }
+
+        // On screen for the whole flight, whichever way it is going.
+        strip.Visibility = ViewStates.Visible;
+
+        if (presented && strip.TranslationY == 0)
+        {
+            strip.TranslationY = -travel;
+        }
+
+        var animator = Android.Animation.ObjectAnimator.OfFloat(strip, "translationY", strip.TranslationY, presented ? 0f : -travel)!;
+        animator.SetDuration(_chromeDurationMs);
+
+        animator.AnimationEnd += (_, _) =>
+        {
+            // Only the flight that is still the current one may settle anything: a toggle
+            // mid-flight cancels this animator, and cancelling raises this very event.
+            if (!ReferenceEquals(_stripAnimator, animator))
+            {
+                return;
+            }
+
+            _stripAnimator = null;
+
+            // A bar that has finished travelling out is HIDDEN, not merely parked offscreen.
+            // A translated-but-visible strip is the MoRootPage bug: the page it belongs to gets
+            // pushed with a slide-up spec, the whole frame travels, and a bar that is only
+            // transformed rides back into view on the way.
+            if (_navBarTarget || _strip is not { } settled)
+            {
+                return;
+            }
+
+            settled.Visibility = ViewStates.Gone;
+            settled.TranslationY = 0;
+
+            // ...and only now does the page grow into the space the bar has left.
+            _navBarPresented = false;
+            RequestLayout();
+        };
+
+        _stripAnimator = animator;
+        animator.Start();
     }
 
     /// <summary>
@@ -204,7 +311,7 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
 
     /// <summary>This page's chrome footprint in px, once its strip has been laid out.</summary>
     private int TopInsetPx
-        => _host?.WantsNavBarInset == true && _strip is { Visibility: ViewStates.Visible, Height: > 0 } strip
+        => _host?.WantsNavBarInset == true && _navBarPresented && _strip is { Height: > 0 } strip
             ? strip.Height
             : 0;
 
@@ -285,6 +392,8 @@ internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApp
     public void Release()
     {
         ViewCompat.SetOnApplyWindowInsetsListener(this, null);
+        _stripAnimator?.Cancel();
+        _stripAnimator = null;
         ReleaseStrip();
         _pageView = null;
         _lastInsets = null;

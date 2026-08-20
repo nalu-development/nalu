@@ -69,7 +69,12 @@ public class ScaffoldNavBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         await WaitDisplayedAsync("NavBarPageDetail");
         await App.WaitForTextAsync("NavBarTitleLabel", "Detail Title");
 
-        var back = await App.WaitForBoundsAsync("NavBarBackButton", b => b.Width >= 40 && b.Height >= 40);
+        // Materialized AND settled. The bar travels WITH its page now, so a back button read
+        // while the push is still sliding sits wherever the page had got to — comparing it with
+        // a settled title slot is comparing two different moments, and the overlap it reports is
+        // not one that ever exists on screen.
+        await App.WaitForBoundsAsync("NavBarBackButton", b => b.Width >= 40 && b.Height >= 40);
+        var back = await App.WaitForStableBoundsAsync("NavBarBackButton");
         var title = await App.WaitForStableBoundsAsync("NavBarTitleLabel");
         var titleSlot = await App.WaitForStableBoundsAsync("NavBarTitle");
 
