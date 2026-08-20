@@ -1488,6 +1488,14 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             // attached content so the page model is not retained through it.
             CleanupPageFlyoutContent(page);
             RemoveLogicalChild(page);
+
+            // ...and the page's handler goes with it. Leaving the logical tree does not tear the
+            // platform side down: the page keeps a connected handler, so its view stays mounted
+            // in the native hierarchy — visible to anything that reads it (accessibility,
+            // automation) as a second, parentless copy of a page the app has left behind.
+            // A page that came back to life never reaches here (the guard above skips it), so
+            // this only ever disconnects what is genuinely gone.
+            DisconnectHandlerHelper.DisconnectHandlers(page);
         }
     }
 

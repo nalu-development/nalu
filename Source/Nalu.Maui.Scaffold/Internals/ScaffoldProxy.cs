@@ -290,7 +290,7 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
         }
     }
 
-    private static void DisposeRemovedRoot(ScaffoldRootProxy rootProxy)
+    private void DisposeRemovedRoot(ScaffoldRootProxy rootProxy)
     {
         foreach (var entry in rootProxy.Root.NavigationStack.RemoveFromTop())
         {
@@ -303,6 +303,13 @@ internal sealed class ScaffoldProxy : IShellProxy, IDisposable
             DisconnectHandlerHelper.DisconnectHandlers(rootPage);
             rootProxy.DestroyContent();
         }
+
+        // The flush cannot come from the root: a REMOVED root is already off the tree, so its
+        // own DestroyContent finds no scaffold to ask (the parent walk ends at nothing) and the
+        // pages it just disposed keep their hosts — and their parenting to the scaffold. They
+        // stay in the visual tree as a second copy of a page the app has moved on from,
+        // duplicating every AutomationId under it. Asked here, where the scaffold is known.
+        _scaffold.FlushRetiredPages();
     }
 
     /// <summary>Resolves the initial content segment from an optional page (or page-model) type.</summary>
