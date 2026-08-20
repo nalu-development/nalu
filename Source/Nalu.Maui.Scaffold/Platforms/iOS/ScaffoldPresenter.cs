@@ -727,7 +727,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // pages while the standard slide plays (the flight math assumes it); pages
         // without pairs play their resolved ScaffoldPageTransition spec (§8.2).
         var handled = previousPage is not null && previousController?.View is { } prevPushView
-            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, duration);
+            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, pushSpec.Behind, duration);
 
         if (!handled && pushSpec.IsAnimated)
         {
@@ -790,7 +790,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         var handled = previousPage is not null
-            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, duration);
+            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, popSpec.Behind, duration);
 
         if (!handled && popSpec.IsAnimated)
         {
@@ -850,7 +850,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>Applies a §8.2 motion state: scale about center + fractional translation + opacity.</summary>
-    private static void ApplyMotion(UIView view, ScaffoldTransitionMotion motion, CGRect bounds)
+    internal static void ApplyMotion(UIView view, ScaffoldTransitionMotion motion, CGRect bounds)
     {
         var transform = CGAffineTransform.MakeScale((nfloat)motion.Scale, (nfloat)motion.Scale);
         transform.Tx = (nfloat)(motion.FractionX * bounds.Width);
@@ -859,7 +859,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         view.Alpha = (nfloat)motion.Opacity;
     }
 
-    private static void ResetMotion(UIView view)
+    internal static void ResetMotion(UIView view)
     {
         view.Transform = CGAffineTransform.MakeIdentity();
         view.Alpha = 1;

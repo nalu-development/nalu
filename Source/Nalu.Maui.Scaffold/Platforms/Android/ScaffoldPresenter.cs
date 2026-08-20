@@ -581,8 +581,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var belowView = belowPage.ToPlatform(mauiContext);
         (belowView.Parent as AViewGroup)?.RemoveView(belowView);
-        belowView.TranslationX = 0f;
         belowView.TranslationZ = 0f;
+
+        // The revealed page comes back FROM the popped page's Behind state, scrubbed by the
+        // finger — the same path a programmatic pop animates and the iOS interactive pop
+        // scrubs. Pinned at rest it was the odd one out.
+        _backPeekBehind = scaffold.ResolvePageTransition(topPage).Behind;
+        ApplyPeekMotion(belowView, _backPeekBehind, 1f, pageLayer);
         pageLayer.AddView(belowView, 0, new AViewGroup.LayoutParams(AViewGroup.LayoutParams.MatchParent, AViewGroup.LayoutParams.MatchParent));
 
         // The preview spans a transition for the inset machinery too: the flag parks the
@@ -665,6 +670,25 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
     }
 
+    /// <summary>
+    /// Places the peek between its Behind state (<paramref name="amount"/> 1) and rest (0) —
+    /// the scrubbed counterpart of the motion a programmatic pop animates.
+    /// </summary>
+    private static void ApplyPeekMotion(AView view, ScaffoldTransitionMotion behind, float amount, AView container)
+    {
+        // The CONTAINER's geometry, never the peek's own: the peek is placed before its first
+        // layout, so its width is still zero and the offset would collapse to nothing.
+        view.TranslationX = (float) (behind.FractionX * container.Width * amount);
+        view.TranslationY = (float) (behind.FractionY * container.Height * amount);
+
+        var scale = (float) (1 + ((behind.Scale - 1) * amount));
+        view.ScaleX = scale;
+        view.ScaleY = scale;
+        view.Alpha = (float) (1 + ((behind.Opacity - 1) * amount));
+    }
+
+    private ScaffoldTransitionMotion _backPeekBehind = new();
+
     /// <summary>Predictive back, gesture progressing: page motion + shared-element flights, finger-driven.</summary>
     public void UpdateBackPreview(float progress)
     {
@@ -677,6 +701,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             if (_backPeekView is { } peekView)
             {
                 ScaffoldPageDepth.SetDim(peekView, 1f - progress);
+                ApplyPeekMotion(peekView, _backPeekBehind, 1f - progress, peekView.Parent as AView ?? peekView);
             }
         }
     }
@@ -709,6 +734,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         var startProgress = _backProgress;
+        var behind = _backPeekBehind;
         var animator = Android.Animation.ObjectAnimator.OfFloat(topView, "translationX", topView.TranslationX, 0f)!;
         animator.SetDuration(150);
 
@@ -735,6 +761,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             if (weakCancelPeek is not null && weakCancelPeek.TryGetTarget(out var peek))
             {
                 ScaffoldPageDepth.SetDim(peek, 1f - flightProgress);
+                ApplyPeekMotion(peek, behind, 1f - flightProgress, peek.Parent as AView ?? peek);
             }
         };
 

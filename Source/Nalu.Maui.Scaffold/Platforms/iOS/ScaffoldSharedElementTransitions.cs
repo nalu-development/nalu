@@ -35,7 +35,7 @@ internal static class ScaffoldSharedElementTransitions
     /// matches or the incoming views never got laid out — the caller falls back to the plain
     /// slide. The incoming platform view must already be mounted at its final frame.
     /// </summary>
-    public static async Task<bool> AnimatePushAsync(UIView container, IMauiContext mauiContext, Page outgoingPage, Page incomingPage, UIView outgoingView, UIView incomingView, double durationSeconds)
+    public static async Task<bool> AnimatePushAsync(UIView container, IMauiContext mauiContext, Page outgoingPage, Page incomingPage, UIView outgoingView, UIView incomingView, ScaffoldTransitionMotion behind, double durationSeconds)
     {
         var pairs = MatchPairs(mauiContext, outgoingPage, incomingPage);
 
@@ -59,6 +59,7 @@ internal static class ScaffoldSharedElementTransitions
             movingView: incomingView,
             movingFromOffscreen: true,
             counterpartView: outgoingView,
+            behind,
             durationSeconds
         );
 
@@ -70,7 +71,7 @@ internal static class ScaffoldSharedElementTransitions
     /// page while the popped page slides out. Returns false when no pair matches or the
     /// revealed views never got laid out.
     /// </summary>
-    public static async Task<bool> AnimatePopAsync(UIView container, IMauiContext mauiContext, Page poppedPage, Page revealedPage, UIView poppedView, UIView revealedView, double durationSeconds)
+    public static async Task<bool> AnimatePopAsync(UIView container, IMauiContext mauiContext, Page poppedPage, Page revealedPage, UIView poppedView, UIView revealedView, ScaffoldTransitionMotion behind, double durationSeconds)
     {
         var pairs = MatchPairs(mauiContext, poppedPage, revealedPage);
 
@@ -94,6 +95,7 @@ internal static class ScaffoldSharedElementTransitions
             movingView: poppedView,
             movingFromOffscreen: false,
             counterpartView: revealedView,
+            behind,
             durationSeconds
         );
 
@@ -327,11 +329,35 @@ internal static class ScaffoldSharedElementTransitions
     /// One transition session: an overlay carrying the flights + the page slide, all inside a
     /// single UIViewPropertyAnimator (seekable by construction — the interactive-pop hook).
     /// </summary>
-    private static async Task RunSessionAsync(UIView container, List<TagPair> pairs, UIView movingView, bool movingFromOffscreen, UIView counterpartView, double durationSeconds)
+    private static async Task RunSessionAsync(
+        UIView container,
+        List<TagPair> pairs,
+        UIView movingView,
+        bool movingFromOffscreen,
+        UIView counterpartView,
+        ScaffoldTransitionMotion behind,
+        double durationSeconds)
     {
-        _ = counterpartView; // stays put — matches the plain slide choreography
-
         var (animator, completion) = BuildSession(container, pairs, movingView, movingFromOffscreen, durationSeconds);
+
+        // The counterpart travels EXACTLY as it does without shared elements: a push moves the
+        // covered page TO the spec's Behind state, a pop brings the revealed page back FROM it.
+        // It used to be pinned in place, which was right only while Behind was identity — once
+        // the stock spec counter-slid, a shared-element push left the page behind frozen while a
+        // plain one moved it, and the interactive pop (which scrubs Behind -> identity) moved it
+        // too. Three paths, two behaviours.
+        if (!behind.IsIdentity)
+        {
+            if (movingFromOffscreen)
+            {
+                animator.AddAnimations(() => ScaffoldPresenter.ApplyMotion(counterpartView, behind, container.Bounds));
+            }
+            else
+            {
+                ScaffoldPresenter.ApplyMotion(counterpartView, behind, container.Bounds);
+                animator.AddAnimations(() => ScaffoldPresenter.ResetMotion(counterpartView));
+            }
+        }
 
         // The moving page was (re)mounted this very runloop tick: its first layout+render commit
         // is expensive and would otherwise land AFTER the animator's clock starts, eating the

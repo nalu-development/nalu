@@ -52,8 +52,7 @@ internal static class ScaffoldSharedElementTransitions
         foreach (var name in names)
         {
             if (!fromTagged.TryGetValue(name, out var fromElement)
-                || fromElement.Handler?.PlatformView is not AView fromPlatform
-                || !fromPlatform.IsAttachedToWindow
+                || fromElement.Handler?.PlatformView is not AView { IsAttachedToWindow: true } fromPlatform
                 || fromPlatform.Width < 1
                 || fromPlatform.Height < 1)
             {
