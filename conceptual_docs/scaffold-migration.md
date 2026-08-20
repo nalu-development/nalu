@@ -18,7 +18,7 @@ swapping a few Shell-specific chrome features for their Scaffold equivalents.
 | Shell tab bar visibility | `nalu:Scaffold.TabBarVisibility` (`Auto`/`Visible`/`Hidden`) |
 | NaluTabBar (`UseNaluTabBar` + `SetTabBarView`) | Built-in default tab bar (or `ScaffoldTabBar.TabBarView`) |
 | Shell modal routes / `PresentationMode` | `nalu:Scaffold.PageMode` (`Modal`/`DismissableModal`) |
-| Native nav bar styling (`Shell.BackgroundColor`, …) | `ScaffoldNavBarAppearance` (per-property page → area → scaffold merge) |
+| Native nav bar styling (`Shell.BackgroundColor`, …) | `Scaffold.NavBarBackground`/`NavBarForeground`/… attached properties (per-property page → area → scaffold merge) |
 | Native page transitions | `Scaffold.PageTransition` specs + `Scaffold.TransitionName` shared elements |
 
 ## Step by step

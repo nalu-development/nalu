@@ -1327,7 +1327,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// mounted while a bar view resolves (hidden = translated above the screen edge) and
     /// retargeting slides. The strip hosts the library-owned <see cref="ScaffoldNavBarHost"/>
     /// (mounted once): bar-view resolution changes swap the bar VIRTUALLY inside it (instant,
-    /// no strip re-mount), and the effective <see cref="ScaffoldNavBarAppearance"/> lands on
+    /// no strip re-mount), and the effective the resolved nav bar appearance values lands on
     /// the host — never on the bar view.
     /// </summary>
     private Task UpdateNavBarChromeAsync(ScaffoldLayout platformView, IMauiContext mauiContext, Page targetPage, View? navBarView, bool navBarVisible, bool animated)

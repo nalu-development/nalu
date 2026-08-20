@@ -23,8 +23,8 @@ public enum ScrollValueExtrapolation
 /// <see cref="ThemeScrollValueExtension"/>: builds the multi-binding over the ambient
 /// scroll channel (<see cref="ScaffoldNavBarContext.ScrollOffset"/> plus the page-level
 /// <see cref="Scaffold.ScrollRampStartProperty"/>/<see cref="Scaffold.ScrollRampEndProperty"/> ramp
-/// defaults and the app theme), targeting elements in the scaffold's tree and
-/// <see cref="ScaffoldNavBarAppearance"/> objects alike. Not derivable outside this library —
+/// defaults and the app theme), targeting any element in the scaffold's tree — a page carrying
+/// the attached nav bar appearance properties included. Not derivable outside this library —
 /// use <see cref="ScrollValueExtension"/> or <see cref="ThemeScrollValueExtension"/>.
 /// </summary>
 public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
@@ -52,7 +52,6 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
     // property surfaces alive under trimming/AOT.
     [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(Scaffold))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(ScaffoldNavBarContext))]
-    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(ScaffoldNavBarAppearance))]
     [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(ScrollValueThemeListener))]
     public BindingBase ProvideValue(IServiceProvider serviceProvider)
     {
@@ -83,17 +82,9 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
             Easing = Easing
         };
 
-        // Appearance objects live outside the visual tree: they carry the ambient context as a
-        // stamped property instead of resolving it through ancestors.
         var multiBinding = new MultiBinding { Converter = converter, Mode = BindingMode.OneWay };
 
-        if (provideValueTarget.TargetObject is ScaffoldNavBarAppearance appearance)
-        {
-            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollOffset, nameof(ScaffoldNavBarContext.ScrollOffset), appearance));
-            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampStart, nameof(ScaffoldNavBarContext.ScrollRampStart), appearance));
-            multiBinding.Bindings.Add(CreateNavBarContextTypedBinding(ctx => ctx.ScrollRampEnd, nameof(ScaffoldNavBarContext.ScrollRampEnd), appearance));
-        }
-        else if (provideValueTarget.TargetObject is Element target)
+        if (provideValueTarget.TargetObject is Element target)
         {
             // The scroll channel is PER PAGE: resolve the context of the page this element
             // belongs to, so a page's parallax reads its own offset even while another page is
@@ -105,7 +96,7 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
         else
         {
             throw new InvalidOperationException(
-                $"{GetType().Name} must target an element or a {nameof(ScaffoldNavBarAppearance)} (styles/setters are not supported).");
+                $"{GetType().Name} must be used directly on an element's bindable property (styles/setters are not supported).");
         }
 
         multiBinding.Bindings.Add(CreateThemeTypedBinding());
@@ -123,24 +114,6 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
                Source = ScrollValueThemeListener.Instance
            };
 
-    private static TypedBinding<ScaffoldNavBarAppearance, TProperty> CreateNavBarContextTypedBinding<TProperty>(
-        Func<ScaffoldNavBarContext, TProperty> propertyGetter,
-        string propertyName,
-        ScaffoldNavBarAppearance source
-    )
-        => new(
-               a => a.Context is { } context ? (propertyGetter(context), true) : (default!, false),
-               null,
-               [
-                   Tuple.Create<Func<ScaffoldNavBarAppearance, object>, string>(o => o, nameof(ScaffoldNavBarAppearance.Context)),
-                   Tuple.Create<Func<ScaffoldNavBarAppearance, object>, string>(o => o.Context!, propertyName)
-               ]
-           )
-           {
-               Source = source
-           };
-    
-
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
 }
 
@@ -151,7 +124,7 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 /// <see cref="ScrollValueExtensionBase.RampEnd"/>] window (defaulting to the page-level
 /// <see cref="Scaffold.ScrollRampStartProperty"/>/<see cref="Scaffold.ScrollRampEndProperty"/> ramp).
 /// Works on numeric, <see cref="Color"/> and solid <see cref="Brush"/> properties, on any
-/// element inside the scaffold's tree and on <see cref="ScaffoldNavBarAppearance"/>:
+/// element inside the scaffold's tree:
 /// <c>Opacity="{nalu:ScrollValue From=0, To=1}"</c>. Must be applied directly on the target's
 /// bindable property — Style setters are not supported. For theme-dependent endpoints use
 /// <see cref="ThemeScrollValueExtension"/>.

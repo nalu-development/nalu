@@ -15,8 +15,8 @@ namespace Nalu;
 /// The component spans the whole top strip and opts into the safe area itself, so its content
 /// sits below the status inset while the bar contributes its footprint to the page.
 /// The strip BACKGROUND is not the bar's concern: it belongs to the chrome and is driven by the
-/// effective <see cref="ScaffoldNavBarAppearance"/> (attached via
-/// <see cref="Scaffold.NavBarAppearanceProperty"/>) — the same is true for any custom bar.
+/// effective the attached nav bar appearance properties (attached via
+/// <c>Scaffold.NavBarBackground</c>) — the same is true for any custom bar.
 /// </para>
 /// <para>
 /// It owns ONLY the strip metrics (height, padding, spacing). Title and button appearance

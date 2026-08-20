@@ -151,23 +151,57 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
             defaultValueCreator: bindable => bindable is Scaffold ? new DataTemplate(static () => new ScaffoldNavBarView()) : null
         );
 
+    /// <summary>The built-in bar surface: a near-opaque white.</summary>
+    internal static readonly Color _defaultNavBarBackgroundColor = Color.FromArgb("#F7FFFFFF");
+
     /// <summary>
-    /// Attached property holding the nav bar strip presentation
-    /// (<see cref="ScaffoldNavBarAppearance"/>). Each appearance property resolves
-    /// INDEPENDENTLY, most specific set value wins: current <see cref="Page"/> → current
-    /// <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> → built-in defaults — a
-    /// page-level appearance is a delta over the global one. The attached object inherits the
-    /// binding context of its element, so its properties can be bound (and animated) from
-    /// page state.
+    /// Attached property painting the nav bar SURFACE — the strip behind the bar, never the bar
+    /// view's own background. Resolution, most specific SET value wins: <see cref="Page"/> →
+    /// current <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> → the built-in default.
     /// </summary>
-    public static readonly BindableProperty NavBarAppearanceProperty =
-        BindableProperty.CreateAttached(
-            "NavBarAppearance",
-            typeof(ScaffoldNavBarAppearance),
-            typeof(Scaffold),
-            null,
-            propertyChanged: OnNavBarAppearanceChanged
-        );
+    /// <remarks>
+    /// The nav bar appearance is expressed as attached properties on real elements rather than
+    /// as a settable object. The bar used to be ONE view shared by every page, so per-page
+    /// styling could not live on it and needed a side-channel object; now that each page
+    /// realizes its own bar from <see cref="NavBarTemplateProperty"/> that reason is gone. Set on
+    /// a page — an element already in the visual tree — these bind, resolve dynamic resources and
+    /// animate from scroll with no machinery of their own, and a <see cref="Style"/> setter gives
+    /// every page its own VALUE instead of sharing one mutable object.
+    /// </remarks>
+    public static readonly BindableProperty NavBarBackgroundProperty =
+        BindableProperty.CreateAttached("NavBarBackground", typeof(Brush), typeof(Scaffold), new SolidColorBrush(_defaultNavBarBackgroundColor));
+
+    /// <summary>
+    /// Attached property setting the nav bar surface opacity (1 by default). Same resolution as
+    /// <see cref="NavBarBackgroundProperty"/>. Pair a transparent surface with
+    /// <see cref="NavBarOverlapsContentProperty"/> for a bar that materializes on scroll.
+    /// </summary>
+    public static readonly BindableProperty NavBarOpacityProperty =
+        BindableProperty.CreateAttached("NavBarOpacity", typeof(double), typeof(Scaffold), 1.0);
+
+    /// <summary>
+    /// Attached property translating the nav bar surface vertically (0 by default): the channel
+    /// for scroll-driven collapses. Same resolution as <see cref="NavBarBackgroundProperty"/>.
+    /// </summary>
+    public static readonly BindableProperty NavBarOffsetYProperty =
+        BindableProperty.CreateAttached("NavBarOffsetY", typeof(double), typeof(Scaffold), 0.0);
+
+    /// <summary>
+    /// Attached property giving every bar primitive (glyphs, and the title unless
+    /// <see cref="NavBarTitleForegroundProperty"/> overrides it) its color fallback — a color set
+    /// directly or by style ON a primitive still wins. Null (the default) leaves primitives on
+    /// their built-in color. Same resolution as <see cref="NavBarBackgroundProperty"/>.
+    /// </summary>
+    public static readonly BindableProperty NavBarForegroundProperty =
+        BindableProperty.CreateAttached("NavBarForeground", typeof(Color), typeof(Scaffold), null);
+
+    /// <summary>
+    /// Attached property giving the nav bar TITLE its color. Resolved level by level: the first
+    /// of <see cref="Page"/> → current <see cref="ScaffoldArea"/> → <see cref="Scaffold"/> that
+    /// sets either this or <see cref="NavBarForegroundProperty"/> wins, its title color first.
+    /// </summary>
+    public static readonly BindableProperty NavBarTitleForegroundProperty =
+        BindableProperty.CreateAttached("NavBarTitleForeground", typeof(Color), typeof(Scaffold), null);
 
     /// <summary>
     /// Attached property controlling navigation bar visibility for a <see cref="Page"/>.
@@ -210,9 +244,8 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// nav bar: the bar's footprint is not applied as a top inset — content starts at the very
     /// top edge (the page's own <c>SafeAreaEdges</c> decides how it treats the raw system
     /// insets) and the bar draws over it. Pair with a page-level
-    /// <see cref="NavBarAppearanceProperty"/> (e.g. a transparent <see
-    /// cref="ScaffoldNavBarAppearance.Background"/>) for full-bleed headers whose bar
-    /// materializes on scroll.
+    /// <see cref="NavBarBackgroundProperty"/> (e.g. a transparent brush) for full-bleed
+    /// headers whose bar materializes on scroll.
     /// </summary>
     public static readonly BindableProperty NavBarOverlapsContentProperty =
         BindableProperty.CreateAttached("NavBarOverlapsContent", typeof(bool), typeof(Scaffold), false);
@@ -1062,63 +1095,89 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// <summary>Sets the navigation bar template attached to an element.</summary>
     public static void SetNavBarTemplate(BindableObject bindable, DataTemplate? value) => bindable.SetValue(NavBarTemplateProperty, value);
 
-    /// <summary>Gets the nav bar appearance attached to an element.</summary>
-    public static ScaffoldNavBarAppearance? GetNavBarAppearance(BindableObject bindable) => (ScaffoldNavBarAppearance?)bindable.GetValue(NavBarAppearanceProperty);
+    /// <summary>Gets the nav bar surface brush attached to an element.</summary>
+    public static Brush? GetNavBarBackground(BindableObject bindable) => (Brush?)bindable.GetValue(NavBarBackgroundProperty);
 
-    /// <summary>Sets the nav bar appearance attached to an element.</summary>
-    public static void SetNavBarAppearance(BindableObject bindable, ScaffoldNavBarAppearance? value) => bindable.SetValue(NavBarAppearanceProperty, value);
+    /// <summary>Sets the nav bar surface brush attached to an element.</summary>
+    public static void SetNavBarBackground(BindableObject bindable, Brush? value) => bindable.SetValue(NavBarBackgroundProperty, value);
+
+    /// <summary>Gets the nav bar surface opacity attached to an element.</summary>
+    public static double GetNavBarOpacity(BindableObject bindable) => (double)bindable.GetValue(NavBarOpacityProperty);
+
+    /// <summary>Sets the nav bar surface opacity attached to an element.</summary>
+    public static void SetNavBarOpacity(BindableObject bindable, double value) => bindable.SetValue(NavBarOpacityProperty, value);
+
+    /// <summary>Gets the nav bar surface vertical offset attached to an element.</summary>
+    public static double GetNavBarOffsetY(BindableObject bindable) => (double)bindable.GetValue(NavBarOffsetYProperty);
+
+    /// <summary>Sets the nav bar surface vertical offset attached to an element.</summary>
+    public static void SetNavBarOffsetY(BindableObject bindable, double value) => bindable.SetValue(NavBarOffsetYProperty, value);
+
+    /// <summary>Gets the nav bar foreground color attached to an element.</summary>
+    public static Color? GetNavBarForeground(BindableObject bindable) => (Color?)bindable.GetValue(NavBarForegroundProperty);
+
+    /// <summary>Sets the nav bar foreground color attached to an element.</summary>
+    public static void SetNavBarForeground(BindableObject bindable, Color? value) => bindable.SetValue(NavBarForegroundProperty, value);
+
+    /// <summary>Gets the nav bar title color attached to an element.</summary>
+    public static Color? GetNavBarTitleForeground(BindableObject bindable) => (Color?)bindable.GetValue(NavBarTitleForegroundProperty);
+
+    /// <summary>Sets the nav bar title color attached to an element.</summary>
+    public static void SetNavBarTitleForeground(BindableObject bindable, Color? value) => bindable.SetValue(NavBarTitleForegroundProperty, value);
 
     /// <summary>
-    /// The attached appearance inherits its element's binding context (the same treatment MAUI
-    /// gives <see cref="VisualElement.Shadow"/>) so its properties can be bound to page state.
-    /// The handler subscription is idempotent (remove-then-add) and dropped when cleared.
+    /// Every appearance property resolves INDEPENDENTLY, most specific SET value wins: the page
+    /// → the current area → the scaffold → the property's declared default. A page-level value
+    /// is a delta over the scaffold-wide one, not a replacement.
     /// </summary>
-    private static void OnNavBarAppearanceChanged(BindableObject bindable, object oldValue, object newValue)
+    /// <remarks>
+    /// <c>IsSet</c>, not a comparison against the default: a value explicitly set TO the default
+    /// must still shadow an outer level (an opacity of 1 on a page beats 0.5 on the scaffold).
+    /// </remarks>
+    internal object? ResolveNavBarValue(Page? page, BindableProperty property)
     {
-        if (bindable is not Element element)
+        if (page is not null && page.IsSet(property))
         {
-            return;
+            return page.GetValue(property);
         }
 
-        element.BindingContextChanged -= OnAppearanceHostBindingContextChanged;
-
-        if (oldValue is ScaffoldNavBarAppearance previous && ReferenceEquals(previous.Parent, element))
+        if (CurrentArea is { } area && area.IsSet(property))
         {
-            element.RemoveLogicalChild(previous);
+            return area.GetValue(property);
         }
 
-        if (newValue is ScaffoldNavBarAppearance appearance)
+        return GetValue(property);
+    }
+
+    /// <summary>
+    /// The title color, resolved level by level rather than property by property: the first of
+    /// page → area → scaffold that sets EITHER <see cref="NavBarTitleForegroundProperty"/> or
+    /// <see cref="NavBarForegroundProperty"/> decides, its title color first. So a level that
+    /// only sets a foreground tints the title too, and an outer level's title color does not
+    /// leak past it.
+    /// </summary>
+    internal Color? ResolveNavBarTitleForeground(Page? page)
+    {
+        foreach (var level in (ReadOnlySpan<BindableObject?>)[page, CurrentArea, this])
         {
-            // As a logical child the appearance (and its brush) sits in the element tree, where
-            // MAUI delivers theme/resource changes; a style-shared instance keeps its first parent.
-            if (appearance.Parent is null)
+            if (level is null)
             {
-                element.AddLogicalChild(appearance);
+                continue;
             }
 
-            SetInheritedBindingContext(appearance, element.BindingContext);
-            element.BindingContextChanged += OnAppearanceHostBindingContextChanged;
-        }
-    }
+            if (level.IsSet(NavBarTitleForegroundProperty))
+            {
+                return GetNavBarTitleForeground(level);
+            }
 
-    private static void OnAppearanceHostBindingContextChanged(object? sender, EventArgs e)
-    {
-        if (sender is Element element && GetNavBarAppearance(element) is { } appearance)
-        {
-            SetInheritedBindingContext(appearance, element.BindingContext);
+            if (level.IsSet(NavBarForegroundProperty))
+            {
+                return GetNavBarForeground(level);
+            }
         }
-    }
 
-    /// <summary>
-    /// The appearance chain for the given page, most specific first — each appearance property
-    /// resolves independently through it (see <see cref="ScaffoldNavBarAppearance.Resolve{T}"/>).
-    /// </summary>
-    internal (ScaffoldNavBarAppearance? Page, ScaffoldNavBarAppearance? Area, ScaffoldNavBarAppearance? Scaffold) GetNavBarAppearanceChain(Page? currentPage)
-        => (
-            currentPage is null ? null : GetNavBarAppearance(currentPage),
-            CurrentArea is { } area ? GetNavBarAppearance(area) : null,
-            GetNavBarAppearance(this)
-        );
+        return null;
+    }
 
     /// <summary>Gets whether the navigation bar is visible for a page.</summary>
     public static bool GetIsNavBarVisible(BindableObject bindable) => (bool)bindable.GetValue(IsNavBarVisibleProperty);

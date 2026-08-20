@@ -53,7 +53,7 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Gets the effective <see cref="ScaffoldNavBarAppearance.Foreground"/>: the color
+    /// Gets the effective <see cref="Scaffold.NavBarForegroundProperty"/>: the color
     /// fallback of every primitive (title text, glyphs) — a color set directly or via style
     /// on a primitive wins over it. Null when no appearance in the chain sets one, in which
     /// case primitives use their built-in default color.
@@ -66,8 +66,8 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 
     /// <summary>
     /// Gets the effective title color from the appearance chain: level by level, the first
-    /// appearance setting <see cref="ScaffoldNavBarAppearance.TitleForeground"/> or
-    /// <see cref="ScaffoldNavBarAppearance.Foreground"/> wins (its title color first). Null when
+    /// appearance setting <see cref="Scaffold.NavBarTitleForegroundProperty"/> or
+    /// <see cref="Scaffold.NavBarForegroundProperty"/> wins (its title color first). Null when
     /// no appearance sets either — the title then uses its built-in default.
     /// </summary>
     public Color? TitleForeground

@@ -65,19 +65,25 @@
 
     <!-- Scaffold chrome. Every styling property of the default components carries a real
          default value, so plain implicit styles override it — no palette resolver, no theme
-         subscriptions, just AppThemeBinding where it belongs. The nav bar STRIP surface
-         (background/opacity/offset) is not a component property: it is the scaffold-level
-         ScaffoldNavBarAppearance set in AppScaffold.xaml (pages override per property). -->
+         subscriptions, just AppThemeBinding where it belongs. -->
+
+    <!-- The nav bar STRIP surface. These are attached properties on real elements, so the
+         app-wide look belongs here with the rest of the styling rather than in the structure
+         file — and a Style setter gives every scaffold its own VALUE, nothing is shared.
+         Any page overrides them one property at a time; the rest keep inheriting these. -->
+    <Style TargetType="nalu:Scaffold">
+        <Setter Property="nalu:Scaffold.NavBarForeground" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+        <Setter Property="nalu:Scaffold.NavBarBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <Style TargetType="nalu:ScaffoldNavBarTitle">
         <Setter Property="FontFamily" Value="SemiBold" />
         <Setter Property="FontSize" Value="20" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
     </Style>
-
-    <!-- Button glyph color comes from the scaffold-level appearance Foreground (AppScaffold):
-         a styled IconColor would WIN over per-page appearance overrides (weather hero) —
-         appearance is the color surface, styles carry typography. -->
 
     <!-- The bar itself: pill container only. -->
     <Style TargetType="nalu:ScaffoldTabBarView">

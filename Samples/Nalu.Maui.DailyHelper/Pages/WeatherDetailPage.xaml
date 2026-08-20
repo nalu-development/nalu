@@ -13,6 +13,12 @@
              nalu:Scaffold.ScrollTracker="{x:Reference DetailScroll}"
              nalu:Scaffold.ScrollRampStart="100"
              nalu:Scaffold.ScrollRampEnd="200"
+             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollValue FromLight=Transparent,
+                                                                   ToLight={StaticResource BackgroundLight},
+                                                                   ToDark={StaticResource BackgroundDark}}"
+             nalu:Scaffold.NavBarForeground="{nalu:ThemeScrollValue FromLight=White,
+                                                                    ToLight={StaticResource TextPrimaryLight},
+                                                                    ToDark={StaticResource TextPrimaryDark}}"
              Title="Weather">
 
     <!-- Scroll-driven chrome (§5.2), fully declarative: the page declares its interpolation
@@ -20,15 +26,6 @@
          below rides it. The strip starts transparent over the full-bleed photo
          (NavBarOverlapsContent removes the top inset) and materializes with scroll,
          theme-aware endpoints included. -->
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance
-            Background="{nalu:ThemeScrollValue FromLight=Transparent,
-                                               ToLight={StaticResource BackgroundLight},
-                                               ToDark={StaticResource BackgroundDark}}"
-            Foreground="{nalu:ThemeScrollValue FromLight=White,
-                                               ToLight={StaticResource TextPrimaryLight},
-                                               ToDark={StaticResource TextPrimaryDark}}" />
-    </nalu:Scaffold.NavBarAppearance>
 
     <!-- The title fades in on the page ramp. -->
     <nalu:Scaffold.TitleView>
