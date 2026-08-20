@@ -75,7 +75,7 @@
     <!-- App-wide nav bar surface. Attached properties on a real element, so a Style setter gives
          every scaffold its own VALUE — nothing is shared — and any page overrides one property
          at a time while the rest keep inheriting these. -->
-    <Style TargetType="nalu:Scaffold">
+    <Style TargetType="nalu:Scaffold" ApplyToDerivedTypes="True">
         <Setter Property="nalu:Scaffold.NavBarForeground" Value="{StaticResource Accent}" />
         <Setter Property="nalu:Scaffold.NavBarTitleForeground"
                 Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />

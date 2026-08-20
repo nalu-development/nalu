@@ -71,7 +71,7 @@
          app-wide look belongs here with the rest of the styling rather than in the structure
          file — and a Style setter gives every scaffold its own VALUE, nothing is shared.
          Any page overrides them one property at a time; the rest keep inheriting these. -->
-    <Style TargetType="nalu:Scaffold">
+    <Style TargetType="nalu:Scaffold" ApplyToDerivedTypes="True">
         <Setter Property="nalu:Scaffold.NavBarForeground" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
         <Setter Property="nalu:Scaffold.NavBarBackground">
             <Setter.Value>

@@ -87,6 +87,40 @@ public class ScaffoldNavBarAppearanceTests
         scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(0.25);
     }
 
+    /// <summary>
+    /// The shape every real app has: <c>AppScaffold</c> derives from <see cref="Scaffold"/>, and
+    /// the app-wide chrome arrives as an IMPLICIT style. MAUI matches implicit styles on the
+    /// EXACT type, so such a style never reaches the app's scaffold unless it opts in — and the
+    /// bar silently keeps the library defaults, immune to everything the style says, theme
+    /// changes included. Nothing else here catches that: the other tests assign values (or a
+    /// style) to the instance directly, which always applies.
+    /// </summary>
+    [Fact(DisplayName = "An implicit style reaches a DERIVED scaffold only with ApplyToDerivedTypes")]
+    public void ImplicitStyleReachesADerivedScaffoldOnlyWhenItOptsIn()
+    {
+        static double ResolveThroughImplicitStyle(bool applyToDerivedTypes)
+        {
+            var scaffold = new DerivedScaffold();
+            scaffold.Areas.Add(new ScaffoldArea());
+
+            scaffold.Resources = new ResourceDictionary
+            {
+                new Style(typeof(Scaffold))
+                {
+                    ApplyToDerivedTypes = applyToDerivedTypes,
+                    Setters = { new Setter { Property = Scaffold.NavBarOpacityProperty, Value = 0.25 } }
+                }
+            };
+
+            return (double) scaffold.ResolveNavBarValue(new ContentPage(), Scaffold.NavBarOpacityProperty)!;
+        }
+
+        ResolveThroughImplicitStyle(false).Should().Be(1.0, "an exact-type implicit style skips the subclass, leaving the declared default");
+        ResolveThroughImplicitStyle(true).Should().Be(0.25, "ApplyToDerivedTypes is what carries app-wide chrome onto the app's own scaffold");
+    }
+
+    private sealed class DerivedScaffold : Scaffold;
+
     [Fact(DisplayName = "The title color takes the first level that set EITHER title or foreground")]
     public void ResolveTitleForegroundIsLevelByLevel()
     {

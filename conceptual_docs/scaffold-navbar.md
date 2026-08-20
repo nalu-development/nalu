@@ -73,8 +73,10 @@ Set them on a page, an area or the scaffold; **each resolves independently** thr
 → scaffold, so a page-level value is a delta, not a replacement:
 
 ```xml
-<!-- Scaffold-wide surface, typically in your Styles.xaml -->
-<Style TargetType="nalu:Scaffold">
+<!-- Scaffold-wide surface, typically in your Styles.xaml.
+     ApplyToDerivedTypes is REQUIRED: your AppScaffold derives from Scaffold, and MAUI matches
+     implicit styles on the exact type — without it this style never reaches your scaffold. -->
+<Style TargetType="nalu:Scaffold" ApplyToDerivedTypes="True">
     <Setter Property="nalu:Scaffold.NavBarForeground" Value="{StaticResource Accent}" />
     <Setter Property="nalu:Scaffold.NavBarTitleForeground"
             Value="{AppThemeBinding Light={StaticResource TextPrimaryLight},
@@ -91,6 +93,13 @@ Set them on a page, an area or the scaffold; **each resolves independently** thr
 They are attached properties on real elements, so they bind, resolve `StaticResource` and
 `AppThemeBinding`, and animate from scroll with no machinery of their own — and a `Style` setter
 gives every element its own value rather than sharing one object.
+
+> [!WARNING]
+> An implicit style targeting `nalu:Scaffold` needs `ApplyToDerivedTypes="True"`. A XAML
+> `AppScaffold` *derives* from `Scaffold`, and MAUI matches implicit styles on the exact type, so
+> without it the style is silently skipped and the bar keeps the built-in defaults — including
+> through theme changes, which is what the symptom usually looks like: page content follows the
+> theme (its `ContentPage` style has `ApplyToDerivedTypes`), the bar never does.
 
 | Property | Effect |
 |----------|--------|
