@@ -183,17 +183,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         };
         controller.OverlayOwnsKeyboard ??= () => KeyboardOwner is not null;
 
-        // The second trigger of ReleaseDetachedPages: a page destroyed outside a transition.
-        // While one is in flight the leaving page still needs its chrome, so the release waits
-        // for the transition to settle instead.
-        scaffold.PageDetached ??= () =>
-        {
-            if (!_syncInFlight)
-            {
-                ReleaseDetachedPages();
-            }
-        };
-
         // A navigation arriving while a finger is still scrubbing (programmatic push, tab
         // selection) invalidates the preview: cancel the recognizer — its Cancelled callback
         // reverses the session and unmounts the peek before we proceed.
