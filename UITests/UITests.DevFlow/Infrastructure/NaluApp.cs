@@ -148,6 +148,35 @@ public sealed class NaluApp : IAsyncLifetime
                || platform.Contains("catalyst", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>TEMPORARY diagnostic: every element carrying an automation id, with its path.</summary>
+    public async Task<string> DiagnoseAsync(string automationId)
+    {
+        var tree = await _client.GetTreeAsync().ConfigureAwait(false);
+        var lines = new List<string>();
+
+        void Walk(IEnumerable<ElementInfo> elements, string path)
+        {
+            foreach (var element in elements)
+            {
+                var here = $"{path}/{element.Type}";
+
+                if (element.AutomationId == automationId)
+                {
+                    lines.Add($"  {here} [id={element.Id} y={element.WindowBounds?.Y} h={element.WindowBounds?.Height}]");
+                }
+
+                if (element.Children is { } children)
+                {
+                    Walk(children, here);
+                }
+            }
+        }
+
+        Walk(tree, string.Empty);
+
+        return string.Join("\n", lines);
+    }
+
     /// <summary>Finds a single element by AutomationId, or null when not present.</summary>
     public async Task<ElementInfo?> FindElementAsync(string automationId)
     {
