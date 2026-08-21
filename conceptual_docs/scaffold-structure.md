@@ -49,8 +49,10 @@ The default bar is styled with plain MAUI implicit styles (`ScaffoldTabBarView`,
 `ScaffoldTabBarItemView`, `ScaffoldTabBarOverflowView` are public types) — colors, pill
 background, spacing and fonts are all standard setters. Notable knobs on `ScaffoldTabBarView`:
 `ItemWidth`, `OverflowIcon`/`OverflowTitle` ("More"), `BarBackground`, `BarCornerRadius`,
-`BarMargin`, `BarPadding`, `BarShadow` — and the `ScaffoldTabBarView.BadgeText` attached
-property for per-root badges (set it on the `ScaffoldRoot`).
+`BarMargin`, `BarPadding`, `BarShadow`, `LabelOpacity` (the bar items' label opacity — a natural
+[scroll-effect](scaffold-scroll.md) target for collapsing the bar to icons while reading) — and
+the `ScaffoldTabBarView.BadgeText` attached property for per-root badges (set it on the
+`ScaffoldRoot`).
 
 ### Replacing the bar entirely
 

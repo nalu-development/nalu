@@ -1382,8 +1382,12 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// </remarks>
     internal void OnNavigationStackChanged()
     {
-        UpdateCurrentPage();
+        // Hosts first: UpdateCurrentPage raises CurrentPage/NavBarContext notifications, and
+        // whoever re-reads NavBarContext on them (the tab bar's scroll-driven chrome, the public
+        // escape hatch) must find the NEW page's host — not the detached fallback of a host that
+        // does not exist yet.
         ReconcilePages();
+        UpdateCurrentPage();
     }
 
     private void ReconcilePages()

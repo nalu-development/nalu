@@ -140,6 +140,11 @@ Notes:
 - The ramp plays no part here — direction values ignore `ScrollRampStart`/`ScrollRampEnd`.
 - Recycler-backed trackers are fully reliable: the state machine runs on scroll *deltas*, the
   one thing they report exactly.
+- Scaffold-level chrome works too: a value bound on the **tab bar** (e.g.
+  `ScaffoldTabBarView.LabelOpacity`, `BarBackground`) sits under no page, so it follows the
+  channel of the **currently presented page** — pages without a tracker read a resting offset
+  and keep the deactivated look. The Daily Helper's Forecast tab is the worked example: labels
+  fade out and the pill background fades to a bottom-transparent gradient while reading on.
 
 ## Recipe: parallax header
 

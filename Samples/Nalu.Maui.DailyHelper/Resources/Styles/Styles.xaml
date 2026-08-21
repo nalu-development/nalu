@@ -94,6 +94,18 @@
         </Setter>
     </Style>
 
+    <!-- The reading-mode tab bar surface: the pill fades from the solid card color at its top
+         edge (y = 0) to fully transparent at the bottom. Activated endpoints of the
+         ScrollDirectionValue on AppScaffold's tab bar. -->
+    <LinearGradientBrush x:Key="TabBarFadeLight" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource CardLight}" Offset="0" />
+        <GradientStop Color="#00FFFFFF" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="TabBarFadeDark" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource CardDark}" Offset="0" />
+        <GradientStop Color="#001B222B" Offset="1" />
+    </LinearGradientBrush>
+
     <!-- Item + badge appearance: applies to bar items AND overflow rows (same component). -->
     <Style TargetType="nalu:ScaffoldTabBarItemView">
         <Setter Property="FontFamily" Value="Regular" />

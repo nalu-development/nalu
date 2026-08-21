@@ -39,6 +39,7 @@ Style with implicit styles (`Resources/Styles/Styles.xaml`). Defaults in parenth
 | `BarMargin` (Thickness) | 8,0,8,4 | Around the pill, relative to the safe area (bottom measured from the top of the system inset). Part of the footprint. Style THIS, not `Padding`. |
 | `BarPadding` | 4 | Inside the pill. |
 | `BarShadow` (Shadow) | soft shadow | |
+| `LabelOpacity` | 1 | Opacity of the BAR items' labels (More included; overflow rows unaffected). Bind e.g. `{nalu:ScrollDirectionValue Deactivated=1, Activated=0}` to collapse to icons while reading (→ `nalu-scaffold-scroll`). |
 | `ItemWidth` | 68 | Single layout input: as many items as fit are shown, rest → overflow. Bar hugs `shown × ItemWidth + padding`, centered. |
 | `OverflowIcon` (ImageSource) | drawn ••• glyph | |
 | `OverflowTitle` | "More" | |

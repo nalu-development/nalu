@@ -10,6 +10,7 @@
              x:DataType="pm:ForecastPageModel"
              x:Name="Self"
              nalu:Scaffold.FlyoutEndMode="Auto"
+             nalu:Scaffold.ScrollTracker="{x:Reference Scroll}"
              Title="Forecast">
 
     <!-- Per-page END flyout, explicitly enabled via FlyoutEndMode (§5.5): the nav bar shows
