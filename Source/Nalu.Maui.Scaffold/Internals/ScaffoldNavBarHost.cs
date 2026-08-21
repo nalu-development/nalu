@@ -86,12 +86,16 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
             SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None),
 
             // The SURFACE is what you can see of the bar, so the surface is what takes the touch.
-            // A recognizer that does nothing is the whole mechanism: a MAUI view carrying one
-            // consumes touches on both platforms, and it travels with the view — a bar moved out
-            // of the band by NavBarOffsetY stops claiming the space it no longer occupies, with
-            // no platform code deciding where the bar "really" is.
-            // Without it Android leaked every touch its children did not take through to the page
-            // underneath, so a tap on a visible bar could operate content hidden behind it.
+            // A recognizer that does nothing is the whole mechanism, and it is load-bearing on
+            // ANDROID: a MAUI layout consumes nothing there by default, so without this the strip
+            // passed on every touch its children did not take and a tap on a visible bar operated
+            // the page hidden behind it (removing it fails
+            // ScaffoldChromeHitChromeTests.AnOffsetNavBarPassesTouchesThrough on its first
+            // assertion). UIKit already gives a view every touch inside its bounds, so on iOS this
+            // changes nothing — it is here so both platforms say the same thing in one place.
+            // Being a recognizer on the SURFACE is what makes it travel: an offset bar stops
+            // claiming the band by construction, with no platform code deciding where the bar
+            // "really" is.
             GestureRecognizers = { new TapGestureRecognizer() }
         };
 
