@@ -206,6 +206,10 @@ public class TabBarScaffold : Scaffold
     private static readonly Color _iconColor = Color.FromArgb("#8A8A8E");
     private static readonly Color _selectedIconColor = Color.FromArgb("#4A7DD1");
 
+    /// <summary>Nav bar surface per theme — distinctive enough for a pixel assertion.</summary>
+    internal static readonly Color _lightBarColor = Color.FromArgb("#E8F0FE");
+    internal static readonly Color _darkBarColor = Color.FromArgb("#101827");
+
     public TabBarScaffold(INavigationService navigationService)
     {
         _ = navigationService;
@@ -224,6 +228,22 @@ public class TabBarScaffold : Scaffold
                 Setters = { new Setter { Property = ScaffoldTabBarItemView.SelectionPillBackgroundProperty, Value = pillBrush } }
             });
         }
+
+        // The NAV bar's theming, in the shape every real app uses: an implicit style, on a
+        // scaffold that DERIVES from Scaffold, with the opt-in that makes MAUI apply it at all.
+        // Scaffold-scoped rather than app-level on purpose — several suites sample chrome pixels
+        // and an app-wide repaint would move their ground truth.
+        var barBrush = new SolidColorBrush();
+        barBrush.SetAppThemeColor(SolidColorBrush.ColorProperty, _lightBarColor, _darkBarColor);
+
+        Resources = new ResourceDictionary
+                    {
+                        new Style(typeof(Scaffold))
+                        {
+                            ApplyToDerivedTypes = true,
+                            Setters = { new Setter { Property = NavBarBackgroundProperty, Value = barBrush } }
+                        }
+                    };
 
         var alpha = MakeRoot<TabAlphaPage>("Alpha", "\ue88a"); // home
         var bravo = MakeRoot<TabBravoPage>("Bravo", "\ue8b6"); // search
