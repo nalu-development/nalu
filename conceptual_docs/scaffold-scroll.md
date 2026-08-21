@@ -4,7 +4,9 @@ The Scaffold has a built-in **scroll channel**: one page-attached property conne
 scrollable to the scaffold, and from that moment any numeric, `Color`, or solid-`Brush`
 property — on chrome *or* page content — can be driven from the live scroll offset with
 plain markup. Materializing nav bars, fading titles, and parallax headers all ride the same
-three concepts: a **tracker**, a **ramp**, and the **`ScrollValue`** extensions.
+three concepts: a **tracker**, a **ramp**, and the **`ScrollValue`** extensions — plus the
+direction-driven **`ScrollDirectionValue`** for chrome that hides as you read on and returns
+the moment you scroll back.
 
 <img src="assets/images/scaffold-scroll-chrome.gif" width="340" alt="Nav bar materializing and title fading in as the page scrolls, photo parallaxing behind" />
 
@@ -86,6 +88,42 @@ offsetLabel.SetBinding(Label.TextProperty,
 
 Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
 paths are evaluated by reflection.
+
+## 4. `ScrollDirectionValue` and `ThemeScrollDirectionValue`
+
+Where `ScrollValue` maps the absolute offset, **`ScrollDirectionValue`** watches the scroll
+**direction**: scrolling *down* by `ActivateThreshold` dp latches an **activated** state,
+scrolling back *up* by `DeactivateThreshold` dp latches back to **deactivated** (the initial
+state) — wherever in the content that movement happens. Each flip animates the target between
+the two endpoint values over a real duration, so the effect reads as a mode change, not a
+scrub — the classic "toolbar slips away as you read on, returns the moment you scroll back":
+
+```xml
+<!-- The bottom action bar slides out after 48dp of reading on, back in after 24dp upward. -->
+TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80,
+                                         ActivateThreshold=48, DeactivateThreshold=24,
+                                         ActivateDuration=250, Easing={x:Static Easing.SinInOut}}"
+```
+
+| Parameter | Purpose |
+|-----------|---------|
+| `Deactivated` / `Activated` | Endpoint values (numeric, `Color`, or a solid `Brush`); the state starts deactivated. |
+| `DeactivatedLight/ActivatedLight/DeactivatedDark/ActivatedDark` | Theme-aware endpoints (`ThemeScrollDirectionValue`); dark values fall back to the light ones. |
+| `ActivateThreshold` | Downward travel (dp) that latches activated (default 100). Travel accumulates only while the scroll keeps moving down — any upward movement restarts the count; `0` latches on the first downward frame. |
+| `DeactivateThreshold` | Upward travel that latches back (defaults to `ActivateThreshold`). |
+| `ActivateDuration` / `DeactivateDuration` | Transition lengths in milliseconds (default 250; `DeactivateDuration` defaults to `ActivateDuration`; `0` snaps). An interrupted transition reverses from where it is, at the same perceived speed. |
+| `Easing` | Time curve of the transitions (default linear). |
+| `DeactivateBelow` | Offset at or below which deactivated is always restored (default 0 — the content top). |
+
+Notes:
+
+- The content **top always restores deactivated**, even after a fast fling — resting at the
+  top never leaves the mode stuck on. Top over-scroll (the iOS bounce) feeds no travel.
+- The bottom bounce *does* rebound upward: keep `DeactivateThreshold` above the typical
+  rebound if the mode must survive hitting the end of the content.
+- The ramp plays no part here — direction values ignore `ScrollRampStart`/`ScrollRampEnd`.
+- Recycler-backed trackers are fully reliable: the state machine runs on scroll *deltas*, the
+  one thing they report exactly.
 
 ## Recipe: parallax header
 

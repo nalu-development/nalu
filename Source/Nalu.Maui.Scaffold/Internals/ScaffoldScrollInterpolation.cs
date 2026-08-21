@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Maui.Controls.Internals;
 
 namespace Nalu.Internals;
 
@@ -8,6 +9,72 @@ internal enum ScrollValueKind
     Double,
     Color,
     Brush
+}
+
+/// <summary>
+/// Shared math of the scroll-value converters: endpoint coercion, typed lerps and the
+/// target-property → <see cref="ScrollValueKind"/> mapping.
+/// </summary>
+internal static class ScrollValueMath
+{
+    public static T ValueOrDefault<T>(object?[]? values, int index, T fallback)
+        => values is not null && values.Length > index && values[index] is T value ? value : fallback;
+
+    public static double Lerp(double from, double to, double t) => from + ((to - from) * t);
+
+    public static Color LerpColor(Color from, Color to, double t)
+    {
+        var amount = (float)Math.Clamp(t, 0, 1);
+
+        return new Color(
+            from.Red + ((to.Red - from.Red) * amount),
+            from.Green + ((to.Green - from.Green) * amount),
+            from.Blue + ((to.Blue - from.Blue) * amount),
+            from.Alpha + ((to.Alpha - from.Alpha) * amount)
+        );
+    }
+
+    public static object Interpolate(ScrollValueKind kind, object? from, object? to, double t)
+        => kind switch
+        {
+            ScrollValueKind.Double => Lerp(ToDouble(from), ToDouble(to), t),
+            ScrollValueKind.Color => LerpColor(ToColor(from), ToColor(to), t),
+            _ => new SolidColorBrush(LerpColor(ToColor(from), ToColor(to), t))
+        };
+
+    public static double ToDouble(object? value)
+        => value switch
+        {
+            double d => d,
+            IConvertible convertible => convertible.ToDouble(CultureInfo.InvariantCulture),
+            _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a number.")
+        };
+
+    public static Color ToColor(object? value)
+        => value switch
+        {
+            Color color => color,
+            SolidColorBrush brush => brush.Color,
+            string text when Color.TryParse(text, out var parsed) => parsed,
+            null => Colors.Transparent,
+            _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a color (or solid brush).")
+        };
+
+    /// <summary>Maps a target property type onto the lerp semantics (null = unsupported).</summary>
+    public static ScrollValueKind? KindFor(Type targetType)
+    {
+        if (targetType == typeof(double) || targetType == typeof(float) || targetType == typeof(int))
+        {
+            return ScrollValueKind.Double;
+        }
+
+        if (targetType == typeof(Color))
+        {
+            return ScrollValueKind.Color;
+        }
+
+        return typeof(Brush).IsAssignableFrom(targetType) ? ScrollValueKind.Brush : null;
+    }
 }
 
 /// <summary>
@@ -38,10 +105,10 @@ internal sealed class ScrollInterpolationConverter : IMultiValueConverter
 
     public object? Convert(object?[]? values, Type targetType, object? parameter, CultureInfo culture)
     {
-        var offset = ValueOrDefault(values, 0, 0.0);
-        var yFrom = RampStart ?? ValueOrDefault(values, 1, 0.0);
-        var yTo = RampEnd ?? ValueOrDefault(values, 2, 100.0);
-        var dark = ValueOrDefault(values, 3, AppTheme.Light) == AppTheme.Dark;
+        var offset = ScrollValueMath.ValueOrDefault(values, 0, 0.0);
+        var yFrom = RampStart ?? ScrollValueMath.ValueOrDefault(values, 1, 0.0);
+        var yTo = RampEnd ?? ScrollValueMath.ValueOrDefault(values, 2, 100.0);
+        var dark = ScrollValueMath.ValueOrDefault(values, 3, AppTheme.Light) == AppTheme.Dark;
 
         var from = dark ? FromDark ?? FromLight : FromLight;
         var to = dark ? ToDark ?? ToLight : ToLight;
@@ -61,67 +128,11 @@ internal sealed class ScrollInterpolationConverter : IMultiValueConverter
             t = Easing.Ease(t);
         }
 
-        return Kind switch
-        {
-            ScrollValueKind.Double => Lerp(ToDouble(from), ToDouble(to), t),
-            ScrollValueKind.Color => LerpColor(ToColor(from), ToColor(to), t),
-            _ => new SolidColorBrush(LerpColor(ToColor(from), ToColor(to), t))
-        };
+        return ScrollValueMath.Interpolate(Kind, from, to, t);
     }
 
     public object?[]? ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();
-
-    private static T ValueOrDefault<T>(object?[]? values, int index, T fallback)
-        => values is not null && values.Length > index && values[index] is T value ? value : fallback;
-
-    private static double Lerp(double from, double to, double t) => from + ((to - from) * t);
-
-    private static Color LerpColor(Color from, Color to, double t)
-    {
-        var amount = (float)Math.Clamp(t, 0, 1);
-
-        return new Color(
-            from.Red + ((to.Red - from.Red) * amount),
-            from.Green + ((to.Green - from.Green) * amount),
-            from.Blue + ((to.Blue - from.Blue) * amount),
-            from.Alpha + ((to.Alpha - from.Alpha) * amount)
-        );
-    }
-
-    private static double ToDouble(object? value)
-        => value switch
-        {
-            double d => d,
-            IConvertible convertible => convertible.ToDouble(CultureInfo.InvariantCulture),
-            _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a number.")
-        };
-
-    private static Color ToColor(object? value)
-        => value switch
-        {
-            Color color => color,
-            SolidColorBrush brush => brush.Color,
-            string text when Color.TryParse(text, out var parsed) => parsed,
-            null => Colors.Transparent,
-            _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a color (or solid brush).")
-        };
-
-    /// <summary>Maps a target property type onto the lerp semantics (null = unsupported).</summary>
-    public static ScrollValueKind? KindFor(Type targetType)
-    {
-        if (targetType == typeof(double) || targetType == typeof(float) || targetType == typeof(int))
-        {
-            return ScrollValueKind.Double;
-        }
-
-        if (targetType == typeof(Color))
-        {
-            return ScrollValueKind.Color;
-        }
-
-        return typeof(Brush).IsAssignableFrom(targetType) ? ScrollValueKind.Brush : null;
-    }
 }
 
 /// <summary>
@@ -140,6 +151,17 @@ internal sealed class ScrollValueThemeListener : BindableObject
     public static ScrollValueThemeListener Instance { get; } = new();
 
     public AppTheme Theme => (AppTheme)GetValue(ThemeProperty);
+
+    /// <summary>The theme leg of a scroll-value multi-binding.</summary>
+    public static TypedBinding<ScrollValueThemeListener, AppTheme> CreateBinding()
+        => new(
+               tl => (tl.Theme, true),
+               null,
+               [Tuple.Create<Func<ScrollValueThemeListener, object>, string>(o => o, nameof(Theme))]
+           )
+           {
+               Source = Instance
+           };
 
     private ScrollValueThemeListener()
     {

@@ -105,9 +105,9 @@ public class ScrollValueTests
     [Fact(DisplayName = "KindFor maps numeric, Color and Brush targets and rejects others")]
     public void KindForMapsTargetTypes()
     {
-        ScrollInterpolationConverter.KindFor(typeof(double)).Should().Be(ScrollValueKind.Double);
-        ScrollInterpolationConverter.KindFor(typeof(Color)).Should().Be(ScrollValueKind.Color);
-        ScrollInterpolationConverter.KindFor(typeof(Brush)).Should().Be(ScrollValueKind.Brush);
-        ScrollInterpolationConverter.KindFor(typeof(string)).Should().BeNull();
+        ScrollValueMath.KindFor(typeof(double)).Should().Be(ScrollValueKind.Double);
+        ScrollValueMath.KindFor(typeof(Color)).Should().Be(ScrollValueKind.Color);
+        ScrollValueMath.KindFor(typeof(Brush)).Should().Be(ScrollValueKind.Brush);
+        ScrollValueMath.KindFor(typeof(string)).Should().BeNull();
     }
 }

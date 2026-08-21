@@ -63,7 +63,7 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
                 $"{GetType().Name} must be used directly on a bindable property (styles/setters are not supported).");
         }
 
-        var kind = ScrollInterpolationConverter.KindFor(targetProperty.ReturnType)
+        var kind = ScrollValueMath.KindFor(targetProperty.ReturnType)
             ?? throw new InvalidOperationException(
                 $"{GetType().Name} cannot target '{targetProperty.PropertyName}' ({targetProperty.ReturnType.Name}): only numeric, Color and solid Brush properties are supported.");
 
@@ -99,20 +99,10 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
                 $"{GetType().Name} must be used directly on an element's bindable property (styles/setters are not supported).");
         }
 
-        multiBinding.Bindings.Add(CreateThemeTypedBinding());
+        multiBinding.Bindings.Add(ScrollValueThemeListener.CreateBinding());
 
         return multiBinding;
     }
-
-    private static TypedBinding<ScrollValueThemeListener, AppTheme> CreateThemeTypedBinding()
-        => new(
-               tl => (tl.Theme, true),
-               null,
-               [Tuple.Create<Func<ScrollValueThemeListener, object>, string>(o => o, nameof(ScrollValueThemeListener.Theme))]
-           )
-           {
-               Source = ScrollValueThemeListener.Instance
-           };
 
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
 }

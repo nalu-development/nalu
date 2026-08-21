@@ -1,6 +1,6 @@
 ---
 name: nalu-scaffold-scroll
-description: Nalu.Maui.Scaffold scroll-driven effects — Scaffold.ScrollTracker + ramp, {nalu:ScrollValue}/{nalu:ThemeScrollValue} bindings for parallax headers, materializing nav bars, fading titles; load when a value must follow the page scroll offset.
+description: Nalu.Maui.Scaffold scroll-driven effects — Scaffold.ScrollTracker + ramp, {nalu:ScrollValue}/{nalu:ThemeScrollValue} bindings for parallax headers, materializing nav bars, fading titles, and {nalu:ScrollDirectionValue} for hide-on-scroll-down/show-on-scroll-up chrome; load when a value must follow the page scroll offset or direction.
 ---
 # Scaffold scroll-driven effects (ScrollValue / parallax)
 
@@ -20,6 +20,8 @@ properties themselves → skill `nalu-scaffold-structure`.
 | `nalu:Scaffold.ScrollRampStart` / `ScrollRampEnd` (page → area → scaffold) | Page-wide ramp, default 0 / 100 | Every `ScrollValue` without its own `RampStart/RampEnd` rides it. |
 | `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, `Color`, or solid `Brush` (types must match the target). |
 | `{nalu:ThemeScrollValue FromLight, ToLight, FromDark?, ToDark?, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Theme-aware endpoints | Dark values fall back to the light ones; theme change re-evaluates immediately. |
+| `{nalu:ScrollDirectionValue Deactivated, Activated, ActivateThreshold?, DeactivateThreshold?, ActivateDuration?, DeactivateDuration?, Easing?, DeactivateBelow?}` | Scroll DIRECTION → two-state value | Down `ActivateThreshold` dp (default 100) latches activated, up `DeactivateThreshold` dp (defaults to activate) latches back; each flip ANIMATES between the endpoints over `ActivateDuration`/`DeactivateDuration` ms (default 250, 0 snaps, `Easing` = time curve). Starts deactivated; ignores the ramp. |
+| `{nalu:ThemeScrollDirectionValue DeactivatedLight, ActivatedLight, DeactivatedDark?, ActivatedDark?, …}` | Theme-aware direction endpoints | Same knobs; dark values fall back to the light ones. |
 | `Extrapolate` (`ScrollValueExtrapolation`) | `Clamp` (default: hold endpoints outside the ramp) / `Extend` (continue linearly) | `Extend` on numeric targets only; colors/brushes always clamp. |
 | `Easing` | Shapes the ramp interior | `Easing="{x:Static Easing.CubicOut}"`. |
 | `ScaffoldNavBarContext.ScrollOffset` / `IsScrolledUnder` | Raw channel values | `{nalu:NavBarBinding Path=ScrollOffset}` in XAML; `IsScrolledUnder` for threshold checks (e.g. a divider). |
@@ -90,6 +92,18 @@ Fade-out + drift of a hero element in normal content (template `HomePage.xaml`):
 Threshold-style effects: `IsVisible="{nalu:NavBarBinding Path=IsScrolledUnder}"` on a divider under a
 custom bar; or `Opacity="{nalu:ScrollValue RampStart=0, RampEnd=1, From=0, To=1}"` for a hard switch.
 
+Hide-on-scroll chrome (direction, not position — a bottom action bar that slides out after 48dp of
+reading on, back in after 24dp of scrolling up, animated over 250ms):
+
+```xml
+<Grid VerticalOptions="End"
+      TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80,
+                                               ActivateThreshold=48, DeactivateThreshold=24,
+                                               Easing={x:Static Easing.SinInOut}}">
+    <!-- bar content -->
+</Grid>
+```
+
 ## Rules & gotchas
 
 - The extensions must target a **bindable property directly** on an element — not inside a `Style`
@@ -116,6 +130,10 @@ custom bar; or `Opacity="{nalu:ScrollValue RampStart=0, RampEnd=1, From=0, To=1}
   values ride it; give parallax values their own ramp so both can coexist on one page.
 - Materializing bar over a photo: also set `nalu:Scaffold.SystemBarStyle="LightContent"` for the white-chrome
   state; the scaffold flips status-bar icons automatically as the bar becomes opaque (→ `nalu-scaffold-structure`).
+- `ScrollDirectionValue`: starts deactivated; the content top always restores deactivated (even after a
+  fast fling), and top over-scroll feeds no travel — but the iOS BOTTOM bounce rebounds upward, so keep
+  `DeactivateThreshold` above the typical rebound if the mode must survive hitting the end. Ignores the
+  ramp entirely; delta-based, so recycler-backed trackers are fully reliable here.
 - Nothing to dispose: bindings live with the page. Do not add your own `Scrolled` handlers for the same job.
 
 ## See also
