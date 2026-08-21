@@ -79,7 +79,7 @@
                    FontFamily="SemiBold"
                    FontSize="20"
                    VerticalOptions="Center"
-                   TextColor="{nalu:NavBarBinding ForegroundColor}"/>
+                   TextColor="{nalu:NavBarBinding TitleForeground}"/>
             <Border Grid.Column="1"
                     StrokeThickness="0"
                     StrokeShape="RoundRectangle 14"

@@ -94,18 +94,6 @@
         </Setter>
     </Style>
 
-    <!-- The reading-mode nav bar surface: solid at its top edge (y = 0), fading to fully
-         transparent at the bottom. Activated endpoints of the ScrollDirectionValue on the
-         Forecast page's NavBarBackground. -->
-    <LinearGradientBrush x:Key="NavBarFadeLight" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="{StaticResource BackgroundLight}" Offset="0" />
-        <GradientStop Color="#00F4F6FA" Offset="1" />
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="NavBarFadeDark" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="{StaticResource BackgroundDark}" Offset="0" />
-        <GradientStop Color="#000F1216" Offset="1" />
-    </LinearGradientBrush>
-
     <!-- Item + badge appearance: applies to bar items AND overflow rows (same component). -->
     <Style TargetType="nalu:ScaffoldTabBarItemView">
         <Setter Property="FontFamily" Value="Regular" />
