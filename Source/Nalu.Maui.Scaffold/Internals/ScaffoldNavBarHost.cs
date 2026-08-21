@@ -3,11 +3,11 @@ using System.ComponentModel;
 namespace Nalu.Internals;
 
 /// <summary>
-/// The library-owned virtual realization of the nav bar strip: hosts the resolved bar view
-/// (default or custom) and applies the effective <see cref="ScaffoldNavBarAppearance"/> to
-/// itself — never to the mounted bar, whose own properties (and styles) stay untouched.
-/// One instance per presenter lifetime; the platform strip mounts its platform view once and
-/// bar swaps happen virtually through <see cref="SetBar"/>.
+/// The library-owned realization of ONE page's nav bar strip: hosts the bar view realized from
+/// that page's <see cref="Scaffold.NavBarTemplateProperty"/> and paints the resolved appearance
+/// on its own surface — never on the mounted bar, whose properties and styles stay untouched.
+/// One instance per page; a bar view change swaps virtually through <see cref="SetBar"/>,
+/// keeping the platform strip in place.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,19 +27,41 @@ namespace Nalu.Internals;
 /// </remarks>
 internal sealed class ScaffoldNavBarHost : Grid, IDisposable
 {
+
     private readonly Scaffold _scaffold;
     private readonly Grid _content;
-    private readonly SolidColorBrush _defaultBackground = new(ScaffoldNavBarAppearance._defaultBackgroundColor);
-
     private View? _bar;
     private Page? _page;
     private ScaffoldArea? _area;
     private IDisposable? _scrollObservation;
-    private ScaffoldNavBarAppearance? _pageAppearance;
-    private ScaffoldNavBarAppearance? _areaAppearance;
-    private ScaffoldNavBarAppearance? _scaffoldAppearance;
 
     public View? Bar => _bar;
+
+    /// <summary>
+    /// The context this bar shows — its page's. <c>NavBarContextRelay</c> resolves it for every
+    /// binding inside the bar subtree (a hosted <see cref="Scaffold.TitleViewProperty"/> view
+    /// included), and re-resolves when it is replaced, so bar content never reads another page's
+    /// state.
+    /// </summary>
+    public ScaffoldNavBarContext Context
+    {
+        get => field ?? _scaffold.NavBarContext;
+        set
+        {
+            if (ReferenceEquals(field, value))
+            {
+                return;
+            }
+
+            field = value;
+            OnPropertyChanged();
+
+            _bar?.BindingContext = value;
+
+            UpdateScrollTracking();
+            RefreshAppearanceChain();
+        }
+    }
 
     public ScaffoldNavBarHost(Scaffold scaffold)
     {
@@ -86,7 +108,7 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         if (bar is not null)
         {
             // The bar binds the context — the documented contract for default and custom bars.
-            bar.BindingContext = _scaffold.NavBarContext;
+            bar.BindingContext = Context;
             _content.Add(bar);
         }
     }
@@ -119,19 +141,21 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
 
     private void OnElementPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // "NavBarAppearance" covers attachment replacement at any level; "CurrentArea" retargets
-        // the area subscription when navigation switches areas.
-        if (e.PropertyName is "NavBarAppearance" or nameof(Scaffold.CurrentArea))
+        switch (e.PropertyName)
         {
-            RefreshAppearanceChain();
-        }
-        else if (e.PropertyName == "ScrollTracker")
-        {
-            UpdateScrollTracking();
-        }
-        else if (e.PropertyName == "SystemBarStyle")
-        {
-            _scaffold.SystemBars.Recompute();
+            // The five appearance values are attached properties on the page, the area and the
+            // scaffold, so a change arrives as a PropertyChanged on the element it was set on —
+            // including per frame while a scroll-driven binding animates one. "CurrentArea"
+            // retargets the area subscription when navigation switches areas.
+            case "NavBarBackground" or "NavBarOpacity" or "NavBarOffsetY"
+                or "NavBarForeground" or "NavBarTitleForeground" or nameof(Scaffold.CurrentArea):
+                RefreshAppearanceChain();
+
+                break;
+            case "ScrollTracker":
+                UpdateScrollTracking();
+
+                break;
         }
     }
 
@@ -144,7 +168,7 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         _scrollObservation?.Dispose();
         _scrollObservation = null;
 
-        var context = _scaffold.NavBarContext;
+        var context = Context;
 
         if (_page is not null && Scaffold.GetScrollTracker(_page) is { } trackedView)
         {
@@ -175,56 +199,8 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
             }
         }
 
-        var (page, areaAppearance, scaffoldAppearance) = _scaffold.GetNavBarAppearanceChain(_page);
-        SwapAppearanceSubscription(ref _pageAppearance, page, _page);
-        SwapAppearanceSubscription(ref _areaAppearance, areaAppearance, _area);
-        SwapAppearanceSubscription(ref _scaffoldAppearance, scaffoldAppearance, _scaffold);
-
         ApplyEffectiveAppearance();
     }
-
-    private void SwapAppearanceSubscription(ref ScaffoldNavBarAppearance? field, ScaffoldNavBarAppearance? value, Element? owner)
-    {
-        if (ReferenceEquals(field, value))
-        {
-            return;
-        }
-
-        if (field is not null)
-        {
-            field.PropertyChanged -= OnAppearancePropertyChanged;
-
-            // Only clear the ambient-context stamp when the object left the chain entirely
-            // (one instance can sit at two levels of the chain at once).
-            if (!IsInChain(field))
-            {
-                field.SetContext(null);
-            }
-        }
-
-        field = value;
-
-        if (value is not null)
-        {
-            value.PropertyChanged += OnAppearancePropertyChanged;
-            value.SetContext(_scaffold.NavBarContext);
-
-            // Entering the chain: the appearance must hang from a live element so its theme /
-            // dynamic-resource bindings (and its brush's) are current — see EnsureRooted.
-            if (owner is not null)
-            {
-                value.EnsureRooted(owner);
-            }
-        }
-    }
-
-    private bool IsInChain(ScaffoldNavBarAppearance appearance)
-        => ReferenceEquals(_pageAppearance, appearance)
-            || ReferenceEquals(_areaAppearance, appearance)
-            || ReferenceEquals(_scaffoldAppearance, appearance);
-
-    private void OnAppearancePropertyChanged(object? sender, PropertyChangedEventArgs e)
-        => ApplyEffectiveAppearance();
 
     /// <summary>
     /// Recomputes and applies every effective value — cheap enough (four resolutions over at
@@ -233,19 +209,11 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
     /// </summary>
     private void ApplyEffectiveAppearance()
     {
-        _content.Background = ScaffoldNavBarAppearance.Resolve<Brush?>(
-            ScaffoldNavBarAppearance.BackgroundProperty, _pageAppearance, _areaAppearance, _scaffoldAppearance, _defaultBackground);
-
-        _content.Opacity = ScaffoldNavBarAppearance.Resolve(
-            ScaffoldNavBarAppearance.OpacityProperty, _pageAppearance, _areaAppearance, _scaffoldAppearance, 1.0);
-
-        _content.TranslationY = ScaffoldNavBarAppearance.Resolve(
-            ScaffoldNavBarAppearance.OffsetYProperty, _pageAppearance, _areaAppearance, _scaffoldAppearance, 0.0);
-
-        _scaffold.NavBarContext.Foreground = ScaffoldNavBarAppearance.Resolve<Color?>(
-            ScaffoldNavBarAppearance.ForegroundProperty, _pageAppearance, _areaAppearance, _scaffoldAppearance, null);
-
-        _scaffold.NavBarContext.TitleForeground = ScaffoldNavBarAppearance.ResolveTitleForeground(_pageAppearance, _areaAppearance, _scaffoldAppearance);
+        _content.Background = (Brush?)_scaffold.ResolveNavBarValue(_page, Scaffold.NavBarBackgroundProperty);
+        _content.Opacity = (double)_scaffold.ResolveNavBarValue(_page, Scaffold.NavBarOpacityProperty)!;
+        _content.TranslationY = (double)_scaffold.ResolveNavBarValue(_page, Scaffold.NavBarOffsetYProperty)!;
+        Context.Foreground = (Color?)_scaffold.ResolveNavBarValue(_page, Scaffold.NavBarForegroundProperty);
+        Context.TitleForeground = _scaffold.ResolveNavBarTitleForeground(_page);
 
         // The system-bar icon style tracks the LIVE bar surface (this runs per-frame during
         // scroll-driven appearance animation — the icons flip exactly when the bar materializes).
@@ -258,9 +226,6 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         _scrollObservation?.Dispose();
         _scrollObservation = null;
         UpdateSources(null);
-        SwapAppearanceSubscription(ref _pageAppearance, null, null);
-        SwapAppearanceSubscription(ref _areaAppearance, null, null);
-        SwapAppearanceSubscription(ref _scaffoldAppearance, null, null);
 
         if (_area is not null)
         {

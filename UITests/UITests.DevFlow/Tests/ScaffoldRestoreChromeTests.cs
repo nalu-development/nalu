@@ -35,7 +35,11 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         // (the Exit path disposes the harness scaffold, turning restore off for other suites).
         try
         {
-            await ConvergeToHomeAsync();
+            // Best-effort: this is hygiene for the NEXT run, and InitializeAsync converges
+            // strictly before any scenario starts. A tired emulator that needs longer than the
+            // budget must not fail the test whose assertions already passed — it fails the next
+            // one's setup instead, where a genuine inability to converge belongs.
+            await ConvergeToHomeAsync(mustConverge: false);
             await Task.Delay(_snapshotSettle);
         }
         finally
@@ -68,25 +72,53 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         throw new TimeoutException("No restore harness page became displayed.");
     }
 
-    private async Task ConvergeToHomeAsync()
+    /// <summary>
+    /// Brings the harness to its baseline — home root, empty stack — and does not return until it
+    /// STAYS there. Arriving is not converging: this suite persists a snapshot and replays it on
+    /// open, so a replay still in flight navigates away from a Home the convergence just reached,
+    /// a few hundred milliseconds later. Every flake in this class was that: the tap landed, Home
+    /// appeared, the settle re-check found it gone.
+    /// A replay's suppression window also ignores taps outright, so the tap itself is retried.
+    /// </summary>
+    private async Task ConvergeToHomeAsync(bool mustConverge = true)
     {
-        var displayed = await WaitForAnyRestorePageAsync();
+        // Generous, because these scenarios KILL and relaunch the app: a cold start plus the
+        // replay that follows it can take most of this on a loaded emulator, and the budget only
+        // exists to end with a good error rather than to police the app's speed.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
 
-        if (displayed != "Home")
+        while (DateTime.UtcNow < deadline)
         {
-            // A replay may still be in flight (its suppression window ignores taps): retry
-            // until the convergence navigation actually lands.
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            var displayed = await WaitForAnyRestorePageAsync();
 
-            while (DateTime.UtcNow < deadline && displayed != "Home")
+            if (displayed != "Home")
             {
                 await App.TapAsync($"RestoreGoHomeRoot{displayed}Button");
                 await Task.Delay(350);
-                displayed = await WaitForAnyRestorePageAsync();
+
+                continue;
+            }
+
+            // Home, and still Home once anything already in flight would have landed.
+            await Task.Delay(400);
+
+            if (await IsDisplayedAsync("RestoreHomePage"))
+            {
+                return;
             }
         }
 
-        await App.WaitForSettledDisplayAsync("RestoreHomePage");
+        if (!mustConverge)
+        {
+            return;
+        }
+
+        // Out of budget. The bounds alone say "not displayed", which is the one thing already
+        // known — so say what the app IS showing instead, and where each harness page sits.
+        var tree = await App.DiagnoseAsync("RestoreHomePage");
+        var others = string.Join("\n", await Task.WhenAll(_pageNames.Select(async name => $"  Restore{name}Page: {await App.DiagnoseAsync($"Restore{name}Page")}")));
+
+        Assert.Fail($"Never converged to the home root.\nRestoreHomePage:\n{tree}\nAll harness pages:\n{others}");
     }
 
     [Fact]
@@ -103,7 +135,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestorePushDeepButton");
         await App.WaitForSettledDisplayAsync("RestoreDeepPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -127,7 +159,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestoreGoOtherButton");
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -153,7 +185,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestoreGoOtherButton");
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(standaloneHarness);
 
@@ -178,7 +210,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.TapAsync("RestoreGoOtherButton");
         await App.WaitForSettledDisplayAsync("RestoreOtherPage");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -200,7 +232,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await App.WaitForSettledDisplayAsync("RestoreDetailPage");
         await App.WaitForTextAsync("RestoreDetailIntentLabel", "ctx-42");
 
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.RestartAppAsync();
         await App.OpenTestPageAsync(_pageName);
 
@@ -227,7 +259,7 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         // reset: the harness scaffold is disposed, the app keeps running).
         await App.TapAsync("RestorePushDetailButton");
         await App.WaitForSettledDisplayAsync("RestoreDetailPage");
-        await Task.Delay(_snapshotSettle);
+        await Task.Delay(_snapshotSettle, TestContext.Current.CancellationToken);
         await App.ResetAsync();
 
         // Restore runs ONCE PER APP LAUNCH — a later scaffold in the same process boots the

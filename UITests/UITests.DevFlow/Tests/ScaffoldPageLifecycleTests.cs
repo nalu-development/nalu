@@ -100,7 +100,7 @@ public class ScaffoldPageLifecycleTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         await WaitForLogAsync("One", "One+");
 
         // A settled presentation must not keep firing: give the layout a moment and re-read.
-        await Task.Delay(1000);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
 
         (await App.FindElementAsync("LifecycleLogOne"))!.Text.Should().Be("One+");
     }

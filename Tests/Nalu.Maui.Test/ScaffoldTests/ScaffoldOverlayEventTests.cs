@@ -74,7 +74,11 @@ public class ScaffoldOverlayEventTests
 
         public bool HasOverlay => _presented.Count > 0;
 
-        public bool IsOverlayPresented(ScaffoldOverlayRequest request) => _presented.Contains(request);
+        public void ReleasePage(Page page)
+    {
+    }
+
+    public bool IsOverlayPresented(ScaffoldOverlayRequest request) => _presented.Contains(request);
     }
 
     private readonly StubPresenter _presenter = new();

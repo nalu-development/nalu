@@ -65,6 +65,13 @@ internal interface IScaffoldPresenter
 
     /// <summary>Gets whether the given entry is currently presented.</summary>
     bool IsOverlayPresented(ScaffoldOverlayRequest request);
+
+    /// <summary>
+    /// Releases the platform state the presenter holds for a page that has left the navigation
+    /// model for good. Called by <see cref="Scaffold.FlushRetiredPages"/> BEFORE the page is
+    /// unparented, so the presenter can still reach it; a page it never materialized is a no-op.
+    /// </summary>
+    void ReleasePage(Page page);
 }
 
 /// <summary>How a <see cref="IScaffoldPresenter.SynchronizeAsync"/> pass should be animated.</summary>

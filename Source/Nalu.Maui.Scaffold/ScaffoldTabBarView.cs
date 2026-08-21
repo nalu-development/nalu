@@ -66,7 +66,7 @@ public sealed class ScaffoldTabBarView : Grid
     public static readonly BindableProperty BarMarginProperty =
         GenericBindableProperty<ScaffoldTabBarView>.Create(
             nameof(BarMargin),
-            new Thickness(10, 0, 10, 10),
+            new Thickness(8, 0, 8, 4),
             propertyChanged: static view => (_, value) => view._insetHost?.Padding = value
         );
 
@@ -74,7 +74,7 @@ public sealed class ScaffoldTabBarView : Grid
     public static readonly BindableProperty BarPaddingProperty =
         GenericBindableProperty<ScaffoldTabBarView>.Create(
             nameof(BarPadding),
-            new Thickness(6),
+            new Thickness(4),
             propertyChanged: static view => (_, value) => view._pill?.Padding = value
         );
 
@@ -140,7 +140,7 @@ public sealed class ScaffoldTabBarView : Grid
     public static readonly BindableProperty ItemWidthProperty =
         GenericBindableProperty<ScaffoldTabBarView>.Create(
             nameof(ItemWidth),
-            76.0,
+            68.0,
             propertyChanged: static view => (_, _) => view._items?.InvalidateMeasure()
         );
 

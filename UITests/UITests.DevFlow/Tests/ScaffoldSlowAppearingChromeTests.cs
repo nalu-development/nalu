@@ -35,7 +35,7 @@ public class ScaffoldSlowAppearingChromeTests(NaluApp app) : BaseUiTest(app), IA
         // window rect). Neither must happen while OnAppearingAsync is still running.
         var restHome = (await App.FindElementAsync("SlowAppearHomePage"))?.WindowBounds;
         await App.PredictiveBackHoldAsync();
-        await Task.Delay(300);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
         (await App.GetBoundsAsync("SlowAppearDetailPage")).X.Should().BeApproximately(detail.X, 1, "the top page must not be scrubbed while the navigation is in flight");
         ((await App.FindElementAsync("SlowAppearHomePage"))?.WindowBounds?.Width ?? 0).Should().Be(restHome?.Width ?? 0, "the page below must not be peeked while the navigation is in flight");
         await App.PredictiveBackReleaseAsync(commit: false);

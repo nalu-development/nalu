@@ -20,12 +20,57 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
     private Page? _currentPage;
     private ScaffoldRoot? _currentRoot;
-    private UIViewController? _currentController;
+    private ScaffoldPageHostController? _currentController;
     private ScaffoldTabBar? _currentTabBarArea;
     private View? _currentBarView;
-    private ScaffoldNavBarHost? _navBarHost;
     private ScaffoldArea? _observedNavBarArea;
     private bool _scaffoldObserved;
+
+    /// <summary>
+    /// One platform container per live page: the page's controller plus ITS nav bar strip. Keyed
+    /// by page and kept while the page stays in a stack, so a covered page keeps its bar exactly
+    /// as it keeps its own state — and so a pop reveals it already assembled.
+    /// </summary>
+    private readonly Dictionary<Page, ScaffoldPageHostController> _containers = [];
+
+    /// <summary>The container for a page, built on first use from the page's shared host.</summary>
+    private ScaffoldPageHostController? GetContainer(Page page, IMauiContext mauiContext)
+    {
+        if (_containers.TryGetValue(page, out var existing))
+        {
+            return existing;
+        }
+
+        if (scaffold.GetPageHost(page) is not { } host)
+        {
+            return null;
+        }
+
+        var container = new ScaffoldPageHostController(host, mauiContext);
+        _containers[page] = container;
+
+        return container;
+    }
+
+    /// <summary>
+    /// Releases the container of a page the scaffold has retired. The scaffold decides WHEN
+    /// (see <see cref="Scaffold.FlushRetiredPages"/>); the presenter only owns platform state.
+    /// </summary>
+    public void ReleasePage(Page page)
+    {
+        if (!_containers.Remove(page, out var container))
+        {
+            return;
+        }
+
+        if (ReferenceEquals(container, _currentController))
+        {
+            _currentController = null;
+        }
+
+        container.TearDown();
+        container.Dispose();
+    }
 
     private ScaffoldEdgePanRecognizer? _edgeGesture;
     private InteractivePopState? _interactivePop;
@@ -164,33 +209,51 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         var tabBarArea = root.Parent as ScaffoldTabBar;
         var barVisible = tabBarArea is not null && Scaffold.ComputeTabBarVisible(root, targetPage);
-        var navBarView = scaffold.ResolveNavBarView(targetPage);
-        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(targetPage);
-
-        // Overlap mode: the bar still presents, but its footprint is not applied to the page —
-        // content lays out from the top edge and the bar draws over it.
-        var navBarInsets = navBarVisible && !Scaffold.GetNavBarOverlapsContent(targetPage);
         var animated = hint != ScaffoldPresentationHint.None;
 
-        // The context must carry the target page's state before the bar (or its bindings) mount.
-        scaffold.NavBarContext.Update(root, targetPage);
+        // The incoming page's OWN context must carry its state before the bar (or its
+        // bindings) mount; the outgoing page's context is left alone — it describes the page
+        // that is still on screen, leaving.
+        scaffold.GetPageHost(targetPage)?.Refresh();
 
-        // Chrome-LEVEL attached changes (scaffold/area NavBarView) must remap live, exactly
+        // Chrome-LEVEL attached changes (scaffold/area NavBarTemplate) must remap live, exactly
         // like the page-level ones the current-page subscription already covers.
         EnsureScaffoldObserver();
         ObserveNavBarArea(scaffold.CurrentArea);
 
-        // Chrome and page animate CONCURRENTLY: an Auto-hiding bar slides away while the pushed
-        // page slides in (and back in sync on pop) — no sequential two-phase motion.
-        // Nav bar first: its strip must sit BELOW the tab bar strip in z-order.
-        var navChromeTask = UpdateNavBarChromeAsync(controller, mauiContext, targetPage, navBarView, navBarVisible, animated);
+        UpdateSystemBarNavState(controller, targetPage);
+
+        // The incoming page's bar is assembled INSIDE its container, unanimated: it travels with
+        // the page, so it must be at rest before the page transition starts rather than sliding
+        // in on its own.
+        var targetContainer = GetContainer(targetPage, mauiContext);
+
+        if (targetContainer is not null)
+        {
+            await targetContainer.SyncNavBarAsync(animated: false);
+        }
+
+        // The tree shows the INCOMING page's bar from the moment the transition starts: the
+        // outgoing bar keeps rendering (its platform view lives in its own container) but leaves
+        // the element tree, so automation ids stay unique and tooling reads the page being
+        // navigated TO rather than whichever bar happens to be enumerated first.
+        scaffold.SettleNavBarAttachments();
+
+        // The tab bar is SHARED bottom chrome and still animates concurrently with the page: an
+        // Auto-hiding bar slides away while the pushed page slides in.
         var chromeTask = UpdateTabBarChromeAsync(controller, mauiContext, tabBarArea, barVisible, animated);
 
         var pageTask = ReferenceEquals(targetPage, _currentPage)
             ? Task.CompletedTask
-            : TransitionToPageAsync(controller, mauiContext, targetPage, hint, barVisible, navBarInsets);
+            : TransitionToPageAsync(controller, mauiContext, targetPage, hint, barVisible);
 
-        await Task.WhenAll(navChromeTask, chromeTask, pageTask);
+        await Task.WhenAll(chromeTask, pageTask);
+
+        // The transition settled: pages it carried away are no longer on screen.
+        scaffold.FlushRetiredPages();
+
+        // ...and only the presented page keeps its bar in the element tree.
+        scaffold.SettleNavBarAttachments();
 
         // Presentation at rest: the pixels under the status bar are final — read fresh.
         scaffold.SystemBars.OnPresentationSettled();
@@ -326,7 +389,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         var container = controller.ContentContainer;
-        var belowView = belowPage.ToUIViewController(mauiContext).View!;
+        // The peek is the below page's CONTAINER — bar included: the revealed page must preview
+        // with the chrome it will land with, or the commit snaps a bar into place.
+        if (GetContainer(belowPage, mauiContext) is not { } belowContainer)
+        {
+            return;
+        }
+
+        var belowView = belowContainer.View!;
 
         // Peek mount: presentation-only — no controller containment, no page lifecycle. The
         // engine still owns the stack; only the pixels preview the pop.
@@ -428,7 +498,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
     }
 
-    private async Task TransitionToPageAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, ScaffoldPresentationHint hint, bool barVisible, bool wantsNavBarInset)
+    private async Task TransitionToPageAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, ScaffoldPresentationHint hint, bool barVisible)
     {
         var parentController = controller.ContentHost;
         var container = controller.ContentContainer;
@@ -453,7 +523,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // layout — UIKit would resign it anyway on unmount, but only mid-transition.
         previousController?.View?.EndEditing(true);
 
-        var newController = targetPage.ToUIViewController(mauiContext);
+        // The CONTAINER is what gets mounted and moved: the page's bar is inside it, so every
+        // choreography below carries the bar with the page for free.
+        var newController = GetContainer(targetPage, mauiContext)!;
         _currentPage = targetPage;
         _currentController = newController;
         targetPage.PropertyChanged += OnCurrentPagePropertyChanged;
@@ -468,19 +540,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // §5.4 per-page inset application: each page is laid out with the insets matching its
         // own chrome visibility from birth — the outgoing page keeps its insets while leaving.
-        controller.CurrentPageController = newController;
+        // The TOP inset is the container's own business (it owns the page's bar); only the
+        // bottom contribution is pushed down from here.
+        controller.CurrentPageContainer = newController;
         controller.CurrentPageWantsBarInset = barVisible;
-        controller.CurrentPageWantsNavBarInset = wantsNavBarInset;
         controller.CurrentPageKeyboardMode ??= () => scaffold.ResolvePageKeyboardMode(_currentPage);
 
-        // The chrome update issued alongside this transition may have left the strips dirty (a
-        // nav bar swap re-measures in the controller's layout pass): flush that pass NOW, with the
-        // incoming page already the inset target and still unmounted, so the strips reach their
-        // final geometry and the page's insets are FINAL before it is staged. Left pending, the
-        // pass would run inside the transition's animation block and UIKit would animate both
-        // the strip surface and the page's inset relayout (a page sliding in while its content
-        // also drifts down).
+        // The chrome update issued alongside this transition may have left strips dirty (a bar
+        // swap re-measures in a layout pass): flush NOW, with the incoming page already the inset
+        // target and still unmounted, so geometry and insets are FINAL before it is staged. Left
+        // pending, the pass would run inside the transition's animation block and UIKit would
+        // animate both the strip surface and the page's inset relayout (a page sliding in while
+        // its content also drifts down).
         controller.View!.LayoutIfNeeded();
+        newController.View!.LayoutIfNeeded();
         controller.ApplyCurrentPageInsets();
 
         parentController.AddChildViewController(newController);
@@ -642,24 +715,26 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         Task? coverDim = null;
 
+        var duration = pushSpec.DurationSeconds;
+
         if (pushAnimates)
         {
             ScaffoldPageDepth.SetDim(coveredView!, 0f);
-            coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, _transitionDurationSeconds);
+            coverDim = ScaffoldPageDepth.AnimateDimAsync(coveredView!, 1f, duration);
         }
 
         // Shared elements (§8): matching Scaffold.TransitionName pairs fly between the
         // pages while the standard slide plays (the flight math assumes it); pages
         // without pairs play their resolved ScaffoldPageTransition spec (§8.2).
         var handled = previousPage is not null && previousController?.View is { } prevPushView
-            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, _transitionDurationSeconds);
+            && await ScaffoldSharedElementTransitions.AnimatePushAsync(container, mauiContext, previousPage, targetPage, prevPushView, newView, pushSpec.Behind, duration);
 
         if (!handled && pushSpec.IsAnimated)
         {
             var previousView = previousController?.View;
             ApplyMotion(newView, pushSpec.Enter, container.Bounds);
 
-            await UIView.AnimateAsync(pushSpec.DurationSeconds, () =>
+            await UIView.AnimateAsync(duration, () =>
             {
                 ResetMotion(newView);
 
@@ -705,21 +780,23 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 && ScaffoldTransitions.MatchingNames(ScaffoldTransitions.Collect(previousPage), ScaffoldTransitions.Collect(targetPage)).Count > 0);
 
         Task? revealDim = null;
+        
+        var duration = popSpec.DurationSeconds;
 
         if (popAnimates)
         {
             ScaffoldPageDepth.SetDim(newView, 1f);
-            revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, _transitionDurationSeconds);
+            revealDim = ScaffoldPageDepth.AnimateDimAsync(newView, 0f, duration);
         }
 
         var handled = previousPage is not null
-            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, _transitionDurationSeconds);
+            && await ScaffoldSharedElementTransitions.AnimatePopAsync(container, mauiContext, previousPage, targetPage, previousView, newView, popSpec.Behind, duration);
 
         if (!handled && popSpec.IsAnimated)
         {
             ApplyMotion(newView, popSpec.Behind, container.Bounds);
 
-            await UIView.AnimateAsync(popSpec.DurationSeconds, () =>
+            await UIView.AnimateAsync(duration, () =>
             {
                 ResetMotion(newView);
                 ApplyMotion(previousView, popSpec.Enter, container.Bounds);
@@ -773,7 +850,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     }
 
     /// <summary>Applies a §8.2 motion state: scale about center + fractional translation + opacity.</summary>
-    private static void ApplyMotion(UIView view, ScaffoldTransitionMotion motion, CGRect bounds)
+    internal static void ApplyMotion(UIView view, ScaffoldTransitionMotion motion, CGRect bounds)
     {
         var transform = CGAffineTransform.MakeScale((nfloat)motion.Scale, (nfloat)motion.Scale);
         transform.Tx = (nfloat)(motion.FractionX * bounds.Width);
@@ -782,7 +859,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         view.Alpha = (nfloat)motion.Opacity;
     }
 
-    private static void ResetMotion(UIView view)
+    internal static void ResetMotion(UIView view)
     {
         view.Transform = CGAffineTransform.MakeIdentity();
         view.Alpha = 1;
@@ -879,7 +956,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             }
 
             case "IsNavBarVisible":
-            case "NavBarView":
+            case "NavBarTemplate":
             case "NavBarOverlapsContent":
                 RefreshNavBarChrome();
 
@@ -897,7 +974,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
     }
 
-    /// <summary>Follows the current area (chrome-level NavBarView changes on it remap live).</summary>
+    /// <summary>Follows the current area (chrome-level NavBarTemplate changes on it remap live).</summary>
     private void ObserveNavBarArea(ScaffoldArea? area)
     {
         if (ReferenceEquals(_observedNavBarArea, area))
@@ -922,7 +999,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     {
         // Appearance changes are observed by the host itself; only the mounted-bar resolution
         // needs the presenter.
-        if (e.PropertyName == "NavBarView")
+        if (e.PropertyName == "NavBarTemplate")
         {
             RefreshNavBarChrome();
         }
@@ -956,86 +1033,22 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             return;
         }
 
-        var navBarView = scaffold.ResolveNavBarView(page);
-        var navBarVisible = navBarView is not null && Scaffold.GetIsNavBarVisible(page);
-        controller.CurrentPageWantsNavBarInset = navBarVisible && !Scaffold.GetNavBarOverlapsContent(page);
-        UpdateNavBarChromeAsync(controller, mauiContext, page, navBarView, navBarVisible, animated: true).FireAndForget(scaffold.Handler);
+        UpdateSystemBarNavState(controller, page);
+
+        // Same-page change (IsNavBarVisible / NavBarTemplate / NavBarOverlapsContent): the page's own
+        // container re-resolves its bar and slides it, animating the page's inset with it.
+        GetContainer(page, mauiContext)?.SyncNavBarAsync(animated: true).FireAndForget(scaffold.Handler);
     }
 
     /// <summary>
-    /// Brings the nav bar chrome to the desired state — same model as the tab bar: the strip
-    /// stays mounted while a bar view is resolved (hidden = translated above the screen edge)
-    /// and visibility changes retarget in-flight slides. The strip hosts the library-owned
-    /// <see cref="ScaffoldNavBarHost"/> (mounted once): bar-view resolution changes swap the
-    /// bar VIRTUALLY inside it (instant, no strip re-mount), and the effective
-    /// <see cref="ScaffoldNavBarAppearance"/> lands on the host — never on the bar view.
+    /// The nav bar is the PAGE's chrome now: each container owns its page's strip and syncs it
+    /// itself. All that is left at presenter level is the system-bar sampling flag, which
+    /// describes what covers the status bar RIGHT NOW — the current page's bar.
     /// </summary>
-    private Task UpdateNavBarChromeAsync(ScaffoldViewController controller, IMauiContext mauiContext, Page targetPage, View? navBarView, bool navBarVisible, bool animated)
+    private void UpdateSystemBarNavState(ScaffoldViewController controller, Page page)
     {
         EnsureSystemBarApplier(controller);
-        scaffold.SystemBars.NavBarVisible = navBarView is not null && navBarVisible;
-
-        if (navBarView is null)
-        {
-            if (_navBarHost is { } clearedHost)
-            {
-                if (clearedHost.Bar is not null)
-                {
-                    controller.UnmountNavBar();
-                    DetachNavBarHost(clearedHost);
-                    clearedHost.SetBar(null);
-                }
-
-                // The host keeps tracking the CURRENT page even bar-less: the previous page's
-                // scroll observation (KVO / listeners) must not outlive its page.
-                clearedHost.UpdateSources(targetPage);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        var host = _navBarHost ??= new ScaffoldNavBarHost(scaffold);
-
-        var freshMount = host.Bar is null;
-        host.SetBar(navBarView);
-        host.UpdateSources(targetPage);
-
-        if (freshMount)
-        {
-            // A freshly appearing strip starts above the edge and slides in.
-            controller.MountNavBar(host.ToPlatform(mauiContext), startHidden: animated);
-        }
-        else
-        {
-            // The strip keeps the same platform host across swaps, so its measure still describes
-            // the PREVIOUS bar: a shorter custom bar would be centered inside the taller strip it
-            // replaced. MAUI's own measure invalidation stops at the native strip, so ask here.
-            controller.InvalidateNavBarMeasure();
-        }
-
-        // The element tree reflects presented chrome: attached while visible, detached while
-        // hidden (the strip and platform view stay alive offscreen either way).
-        if (navBarVisible)
-        {
-            if (host.Parent is null)
-            {
-                scaffold.AddLogicalChild(host);
-            }
-        }
-        else
-        {
-            DetachNavBarHost(host);
-        }
-
-        return controller.SetNavBarPresentedAsync(navBarVisible, animated);
-    }
-
-    private void DetachNavBarHost(ScaffoldNavBarHost host)
-    {
-        if (ReferenceEquals(host.Parent, scaffold))
-        {
-            scaffold.RemoveLogicalChild(host);
-        }
+        scaffold.SystemBars.NavBarVisible = scaffold.GetPageHost(page)?.IsNavBarVisible ?? false;
     }
 
     /// <summary>
@@ -1135,8 +1148,20 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         }
 
         ObserveNavBarArea(null);
-        _navBarHost?.Dispose();
-        _navBarHost = null;
+
+        // The containers are the presenter's own; the bar hosts inside them belong to the page
+        // hosts and are disposed with their pages.
+        foreach (var container in _containers.Values)
+        {
+            container.TearDown();
+            container.Dispose();
+        }
+
+        _containers.Clear();
+        _currentController = null;
+
+        // Anything the scaffold retired and never got to flush goes now.
+        scaffold.FlushRetiredPages();
     }
 
     /// <summary>

@@ -61,7 +61,12 @@ public static class KeyboardBindings
     /// with the typed <c>SetBinding(property, static (Scaffold s) =&gt; s.KeyboardState.…,
     /// source: KeyboardBindings.ScaffoldAncestor)</c> for fully typed, compiled bindings.
     /// </summary>
-    public static RelativeBindingSource ScaffoldAncestor => NavBarBindings.ScaffoldAncestor;
+    /// <remarks>
+    /// The keyboard state is scaffold-level (one soft keyboard per window), so unlike the nav
+    /// bar context there is nothing per-page to resolve here.
+    /// </remarks>
+    public static RelativeBindingSource ScaffoldAncestor { get; }
+        = new(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
 
     /// <summary>Builds a string-path binding into the ambient <see cref="ScaffoldKeyboardState"/>.</summary>
     /// <param name="path">The path within the state ("." binds the state object itself).</param>

@@ -23,7 +23,7 @@ properties themselves → skill `nalu-scaffold-structure`.
 | `Extrapolate` (`ScrollValueExtrapolation`) | `Clamp` (default: hold endpoints outside the ramp) / `Extend` (continue linearly) | `Extend` on numeric targets only; colors/brushes always clamp. |
 | `Easing` | Shapes the ramp interior | `Easing="{x:Static Easing.CubicOut}"`. |
 | `ScaffoldNavBarContext.ScrollOffset` / `IsScrolledUnder` | Raw channel values | `{nalu:NavBarBinding Path=ScrollOffset}` in XAML; `IsScrolledUnder` for threshold checks (e.g. a divider). |
-| `NavBarBindings.Create("ScrollOffset", stringFormat: …)` / `SetBinding(prop, static (Scaffold s) => s.NavBarContext.ScrollOffset, source: NavBarBindings.ScaffoldAncestor)` | Code-behind counterparts | Typed form is trim/AOT-safe. |
+| `NavBarBindings.Create("ScrollOffset", stringFormat: …)` / `label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "ScrollOffset"))` | Code-behind counterparts | Typed form is trim/AOT-safe. |
 
 Math: `t = ease((offset − RampStart) / (RampEnd − RampStart))`, clamped to 0..1 unless `Extend`;
 value = `From + (To − From) × t`. With `Extend`, `To/(RampEnd − RampStart)` is a **speed factor**;
@@ -36,12 +36,10 @@ Materializing nav bar + fading title (page-wide ramp drives the chrome):
 ```xml
 <ContentPage xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
              nalu:Scaffold.ScrollTracker="{x:Reference Scroll}"
-             nalu:Scaffold.ScrollRampStart="40" nalu:Scaffold.ScrollRampEnd="160" Title="Home">
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance
-            Background="{nalu:ThemeScrollValue FromLight={StaticResource BackgroundLight}, ToLight={StaticResource CardLight},
-                                               FromDark={StaticResource BackgroundDark}, ToDark={StaticResource CardDark}}" />
-    </nalu:Scaffold.NavBarAppearance>
+             nalu:Scaffold.ScrollRampStart="40" nalu:Scaffold.ScrollRampEnd="160"
+             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollValue FromLight={StaticResource BackgroundLight}, ToLight={StaticResource CardLight},
+                                                                    FromDark={StaticResource BackgroundDark}, ToDark={StaticResource CardDark}}"
+             Title="Home">
     <nalu:Scaffold.TitleView>
         <Label Text="Home" Opacity="{nalu:ScrollValue From=0, To=1}" />
     </nalu:Scaffold.TitleView>
@@ -70,13 +68,10 @@ Full-bleed photo header (transparent bar over the photo, materializes on scroll;
 <ContentPage nalu:Scaffold.NavBarOverlapsContent="True"
              nalu:Scaffold.SystemBarStyle="LightContent"
              nalu:Scaffold.ScrollTracker="{x:Reference Scroll}"
-             nalu:Scaffold.ScrollRampStart="100" nalu:Scaffold.ScrollRampEnd="200">
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance
-            Background="{nalu:ThemeScrollValue FromLight=Transparent, ToLight={StaticResource BackgroundLight}, ToDark={StaticResource BackgroundDark}}"
-            Foreground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource Accent}, ToDark={StaticResource Accent}}"
-            TitleForeground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource TextPrimaryLight}, ToDark={StaticResource TextPrimaryDark}}" />
-    </nalu:Scaffold.NavBarAppearance>
+             nalu:Scaffold.ScrollRampStart="100" nalu:Scaffold.ScrollRampEnd="200"
+             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollValue FromLight=Transparent, ToLight={StaticResource BackgroundLight}, ToDark={StaticResource BackgroundDark}}"
+             nalu:Scaffold.NavBarForeground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource Accent}, ToDark={StaticResource Accent}}"
+             nalu:Scaffold.NavBarTitleForeground="{nalu:ThemeScrollValue FromLight=White, ToLight={StaticResource TextPrimaryLight}, ToDark={StaticResource TextPrimaryDark}}">
     <ScrollView x:Name="Scroll" SafeAreaEdges="None,None,None,Default">
         <VerticalStackLayout>
             <!-- parallax hero as above -->
@@ -99,7 +94,7 @@ custom bar; or `Opacity="{nalu:ScrollValue RampStart=0, RampEnd=1, From=0, To=1}
 
 - The extensions must target a **bindable property directly** on an element — not inside a `Style`
   setter, not on plain CLR properties. Works on any element in the scaffold's tree (page content, `TitleView`,
-  custom nav/tab bars) and on `ScaffoldNavBarAppearance` properties.
+  custom nav/tab bars) — a page carrying the attached nav bar appearance properties included.
 - Endpoint types must match the target: numeric ↔ `double`/`int` properties, `Color` ↔ `Color`,
   `Brush` ↔ `Brush` (solid only). `From=Transparent, To={StaticResource X}` on a `Brush` property works
   (color literals convert to solid brushes).
@@ -125,5 +120,5 @@ custom bar; or `Opacity="{nalu:ScrollValue RampStart=0, RampEnd=1, From=0, To=1}
 
 ## See also
 
-- `nalu-scaffold-structure` — `NavBarAppearance`, `NavBarOverlapsContent`, `TitleView`, `SystemBarStyle`, `NavBarBinding`.
+- `nalu-scaffold-structure` — the nav bar appearance properties, `NavBarOverlapsContent`, `TitleView`, `SystemBarStyle`, `NavBarBinding`.
 - `nalu-scaffold-transitions` — `TransitionName` shared elements pair well with parallax hero images.

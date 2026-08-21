@@ -241,6 +241,42 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (finalProbe.Y + finalProbe.Height).Should().BeLessThanOrEqualTo(barBounds.Y + 1, "the bottom probe must settle above the tab bar");
     }
 
+    [Fact(DisplayName = "An in-app theme change repaints the nav bar surface")]
+    public async Task InAppThemeChangeRepaintsTheNavBarSurface()
+    {
+        await WaitDisplayedAsync("TabPageAlpha");
+        await SelectTabAsync("TabBravo", "TabPageBravo");
+
+        try
+        {
+            // The harness styles the bar through an implicit style on a DERIVED scaffold — the
+            // shape a real app uses, and the one that silently applies to nothing when the
+            // ApplyToDerivedTypes opt-in is missing. A bar stuck on the library's fixed light
+            // default is neither of these colours and fails here.
+            static bool IsHarnessLight((byte R, byte G, byte B) c) => IsClose(c, 0xE8, 0xF0, 0xFE);
+            static bool IsHarnessDark((byte R, byte G, byte B) c) => IsClose(c, 0x10, 0x18, 0x27);
+
+            var start = await App.WaitForPixelColorAsync("NavBarSurface", 10, 10, c => IsHarnessLight(c) || IsHarnessDark(c));
+
+            // Which one it STARTS as is the device's business — a simulator or emulator set to
+            // dark appearance is a normal state to find, and this test is about the bar following
+            // a theme CHANGE, not about which theme the machine happens to be in.
+            var startedLight = IsHarnessLight(start);
+
+            await App.TapAsync("ToggleThemeBravo");
+            await App.WaitForPixelColorAsync("NavBarSurface", 10, 10, c => startedLight ? IsHarnessDark(c) : IsHarnessLight(c));
+
+            // And back: both directions must repaint live.
+            await App.TapAsync("ToggleThemeBravo");
+            await App.WaitForPixelColorAsync("NavBarSurface", 10, 10, c => startedLight ? IsHarnessLight(c) : IsHarnessDark(c));
+        }
+        finally
+        {
+            // Never leak a forced theme into the next test.
+            await App.TapAsync("ResetThemeBravo");
+        }
+    }
+
     [Fact(Skip = "Upstream MAUI Android bug: a Border nested inside a shadowed Border (the bar pill) never repaints "
                  + "when its Background brush mutates in place, which is what AppThemeBinding does on UserAppTheme changes. "
                  + "Re-enable when https://github.com/dotnet/maui/issues/37289 is fixed and the MAUI version is bumped.")]

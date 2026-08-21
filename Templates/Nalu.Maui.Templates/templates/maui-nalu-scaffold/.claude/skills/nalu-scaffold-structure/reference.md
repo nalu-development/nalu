@@ -36,10 +36,10 @@ Style with implicit styles (`Resources/Styles/Styles.xaml`). Defaults in parenth
 |---|---|---|
 | `BarBackground` (Brush) | #F2FFFFFF | Pill surface. |
 | `BarCornerRadius` | 26 | |
-| `BarMargin` (Thickness) | 10,0,10,10 | Around the pill, relative to the safe area (bottom measured from the top of the system inset). Part of the footprint. Style THIS, not `Padding`. |
-| `BarPadding` | 6 | Inside the pill. |
+| `BarMargin` (Thickness) | 8,0,8,4 | Around the pill, relative to the safe area (bottom measured from the top of the system inset). Part of the footprint. Style THIS, not `Padding`. |
+| `BarPadding` | 4 | Inside the pill. |
 | `BarShadow` (Shadow) | soft shadow | |
-| `ItemWidth` | 76 | Single layout input: as many items as fit are shown, rest → overflow. Bar hugs `shown × ItemWidth + padding`, centered. |
+| `ItemWidth` | 68 | Single layout input: as many items as fit are shown, rest → overflow. Bar hugs `shown × ItemWidth + padding`, centered. |
 | `OverflowIcon` (ImageSource) | drawn ••• glyph | |
 | `OverflowTitle` | "More" | |
 | attached `ScaffoldTabBarView.BadgeText` | null | Set on a `ScaffoldRoot`; null/empty hides the badge. Bindable. |
@@ -164,9 +164,9 @@ Default `ScaffoldNavBarView` (a `Grid`, sealed): slots start-drawer button, back
 (or `TitleView`), end-drawer button, close button. Owns ONLY strip metrics: `BarHeight` (48, excludes
 status inset), `BarPadding` (8,0), `Spacing` (8, gap around the title column; icon buttons sit flush,
 44dp tap targets). It consumes the top safe area itself (`SafeAreaEdges=Container`) — a custom bar must do
-the same. The strip BACKGROUND is not the bar's: it comes from the effective `ScaffoldNavBarAppearance`.
+the same. The strip BACKGROUND is not the bar's: it comes from the resolved `Scaffold.NavBarBackground`.
 
-The template's `AppScaffold.xaml` sets `nalu:Scaffold.NavBarView="{nalu:ScaffoldNavBarView}"` explicitly
+The template's `AppScaffold.xaml` sets `nalu:Scaffold.NavBarTemplate` to a `DataTemplate` of `ScaffoldNavBarView` explicitly
 (same as the default; the place to set `BarHeight` etc. by instance). `{x:Null}` removes the bar
 scaffold-wide; per page prefer `nalu:Scaffold.IsNavBarVisible="False"` (animated, inset change).
 
@@ -187,15 +187,15 @@ built-in default. The template pins neither primitive (scaffold-level `Foregroun
 `TitleForeground` = text-primary), so page-level appearances recolor title and buttons — together with
 `Foreground` alone, or separately with both; a styled `TextColor`/`IconColor` would pin that primitive.
 
-`ScaffoldNavBarAppearance` (`BindableObject`, inherits the `BindingContext` of the element it is attached
+The nav bar appearance properties are attached to the element they are set on (so they inherit its `BindingContext`
 to): `Background` (Brush, default #F7FFFFFF), `Foreground` (Color), `TitleForeground` (Color, title only; per level
 falls back to that level's `Foreground`), `Opacity` (1), `OffsetY` (0). Each
 property resolves independently page → area → scaffold → defaults. Bind or animate `Opacity`/`OffsetY`
 (hide-on-scroll) or a `SolidColorBrush.Color` inside `Background`; changes apply per frame.
 
-Custom nav bar (`nalu:Scaffold.NavBarView` on page/area/scaffold): `BindingContext` =
+Custom nav bar (`nalu:Scaffold.NavBarTemplate` on page/area/scaffold): `BindingContext` =
 `ScaffoldNavBarContext`; drop in the primitives freely (they bind the inherited context). Read
-page-specific state through `CurrentPage.BindingContext.X` (reflection binding) or bind `TitleView`.
+page-specific state through `PageBindingContext.X` (reflection binding) or bind `TitleView`.
 `PageBindingContext` is what the title slot hands to `TitleView` content.
 
 `ScaffoldNavBarContext` members: `Title`, `TitleView`, `CurrentPage`, `PageBindingContext`,
@@ -205,9 +205,9 @@ page-specific state through `CurrentPage.BindingContext.X` (reflection binding) 
 `OpenFlyoutEndCommand`.
 
 `{nalu:NavBarBinding Path=…, Mode, Converter, ConverterParameter, StringFormat}` binds against the
-context from anywhere in the scaffold tree. Code: `NavBarBindings.Create(path, mode, converter,
+context from anywhere in the scaffold tree. Code: `NavBarBindings.Create(target, path, mode, converter,
 converterParameter, stringFormat)` (string path, "." = the context) or typed
-`SetBinding(prop, static (Scaffold s) => s.NavBarContext.ScrollOffset, source: NavBarBindings.ScaffoldAncestor)`
+`label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "ScrollOffset"))`
 (trimming/AOT-safe).
 
 ## 6. Scroll channel

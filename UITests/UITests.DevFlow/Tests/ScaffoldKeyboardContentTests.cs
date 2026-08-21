@@ -26,9 +26,14 @@ public class ScaffoldKeyboardContentTests(NaluApp app) : BaseUiTest(app), IAsync
     /// <summary>
     /// How far below the keyboard's top edge the EDITOR's bottom may sit while its caret line is
     /// still fully visible: the platforms reveal the caret rect (the glyph box of the last 14pt
-    /// line, ~20dp above the editor's padded bottom), not the editor's bottom padding.
+    /// line), not the editor's bottom padding, and that padding differs per platform. 21 was
+    /// calibrated on iOS; Android's editor carries a deeper bottom — measured 21.7dp below the
+    /// keyboard top in Pan mode, where PanGap already holds the caret 8dp ABOVE it, so ~30dp of
+    /// padding and descender below the caret line against iOS's ~20.
+    /// Kept tight enough to matter: an editor that genuinely stayed under the keyboard misses by
+    /// tens of dp, not by two.
     /// </summary>
-    private const double _caretPaddingTolerance = 21;
+    private const double _caretPaddingTolerance = 24;
 
     /// <summary>Top padding + one 14pt line of the harness editors — where the caret of an empty editor sits.</summary>
     private const double _firstLineHeight = 30;

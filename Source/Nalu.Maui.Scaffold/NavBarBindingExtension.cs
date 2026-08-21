@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+using Nalu.Internals;
 
 namespace Nalu;
 
@@ -9,12 +9,28 @@ namespace Nalu;
 /// <c>IsVisible="{nalu:NavBarBinding CanNavigateBack}"</c>.
 /// </summary>
 /// <remarks>
-/// Resolves through the nearest ancestor <see cref="Scaffold"/>, so it only binds while the
-/// target is attached to the scaffold's tree (mounted chrome always is). The path is evaluated
-/// by reflection (not compiled) — the reflected surface is preserved under trimming.
+/// Resolves the context of the page the target belongs to — page content through its page, bar
+/// content (and a hosted title view) through the bar it is mounted in — so during a transition
+/// each of the two live pages reads its OWN state. Resolution happens when the target is
+/// parented, so declaring the binding before the element is in the tree is fine.
+/// Paths naming a <see cref="ScaffoldNavBarContext"/> property compile to a typed binding;
+/// deeper paths (e.g. <c>CurrentPage.BindingContext.SomeCommand</c>) are evaluated by
+/// reflection, with the reflected surface preserved under trimming.
+/// </remarks>
+/// <remarks>
+/// NOT supported in a <see cref="Style"/> setter: one binding instance serves every styled
+/// element, so there is no single target to resolve a page from. Note that a relay-based
+/// binding cannot be retrofitted there — <c>Setter.Apply</c> clones the binding per target, but
+/// <c>Binding.Clone</c> copies <c>Source</c> (and <c>MultiBinding.Clone</c> its converter) BY
+/// REFERENCE, so every clone would share one relay and resolve one page for all of them. The
+/// route that would work is a <c>TypedBinding&lt;Page, T&gt;</c> over
+/// <c>RelativeBindingSource(FindAncestor, typeof(Page))</c> — MAUI resolves that per applied
+/// target — whose getter reaches the page's host through <c>GetScaffold()</c>. It covers page
+/// content only (a style on bar content has no page ancestor), which is why it is not built
+/// until something needs it.
 /// </remarks>
 [ContentProperty(nameof(Path))]
-[AcceptEmptyServiceProvider]
+[RequireService([typeof(IProvideValueTarget)])]
 public sealed class NavBarBindingExtension : IMarkupExtension<BindingBase>
 {
     /// <summary>Gets or sets the path within the <see cref="ScaffoldNavBarContext"/> ('.', the default, binds the context itself).</summary>
@@ -34,61 +50,60 @@ public sealed class NavBarBindingExtension : IMarkupExtension<BindingBase>
 
     /// <inheritdoc />
     public BindingBase ProvideValue(IServiceProvider serviceProvider)
-        => NavBarBindings.Create(Path, Mode, Converter, ConverterParameter, StringFormat);
+    {
+        // The target element is what the page is resolved FROM. A Style setter has none — one
+        // binding instance serves every styled element — so there is nothing to walk from and
+        // no honest answer to give. Saying so beats silently binding whatever page happens to
+        // be current, which is the very bug the per-page context exists to remove.
+        var target = (serviceProvider.GetService(typeof(IProvideValueTarget)) as IProvideValueTarget)?.TargetObject as Element
+            ?? throw new InvalidOperationException(
+                $"{nameof(NavBarBindingExtension)} must be used directly on an element's bindable property "
+                + "(styles/setters are not supported).");
+
+        return NavBarContextBindings.Create(target, Path, Mode, Converter, ConverterParameter, StringFormat);
+    }
 
     object IMarkupExtension.ProvideValue(IServiceProvider serviceProvider) => ProvideValue(serviceProvider);
 }
 
 /// <summary>
 /// The code-behind counterpart of <see cref="NavBarBindingExtension"/>: builds bindings to the
-/// ambient <see cref="ScaffoldNavBarContext"/> from anywhere inside the scaffold's element tree.
+/// <see cref="ScaffoldNavBarContext"/> of the page a given element belongs to.
 /// </summary>
 /// <remarks>
-/// Two flavors:
+/// The element the binding will be applied to is passed in: it is what the page is resolved
+/// FROM, so the binding reads that element's own page — correct while two pages are on screen.
 /// <code>
-/// // String path (same reflection semantics as {nalu:NavBarBinding}):
-/// label.SetBinding(Label.TextProperty, NavBarBindings.Create("Title"));
-///
-/// // Fully typed and compiled (trimming/AOT-safe — the interceptor rewrites YOUR call site):
-/// label.SetBinding(Label.TextProperty,
-///     static (Scaffold s) => s.NavBarContext.Title,
-///     source: NavBarBindings.ScaffoldAncestor);
+/// label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "Title"));
 /// </code>
+/// Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
+/// paths such as <c>CurrentPage.BindingContext.SomeCommand</c> are evaluated by reflection.
 /// </remarks>
 public static class NavBarBindings
 {
     /// <summary>
-    /// The relative source resolving the nearest ancestor <see cref="Scaffold"/> — combine it
-    /// with the typed <c>SetBinding(property, static (Scaffold s) =&gt; s.NavBarContext.…,
-    /// source: NavBarBindings.ScaffoldAncestor)</c> for fully typed, compiled context bindings.
+    /// Builds a binding into the <see cref="ScaffoldNavBarContext"/> of the page
+    /// <paramref name="target"/> belongs to — page content through its page, bar content (and a
+    /// hosted title view) through the bar it is mounted in. Correct while two pages are on
+    /// screen during a transition.
     /// </summary>
-    public static RelativeBindingSource ScaffoldAncestor { get; }
-        = new(RelativeBindingSourceMode.FindAncestor, typeof(Scaffold));
-
-    /// <summary>Builds a string-path binding into the ambient <see cref="ScaffoldNavBarContext"/>.</summary>
+    /// <param name="target">The element the binding will be applied to.</param>
     /// <param name="path">The path within the context ("." binds the context itself).</param>
     /// <param name="mode">The binding mode.</param>
     /// <param name="converter">The converter.</param>
     /// <param name="converterParameter">The converter parameter.</param>
     /// <param name="stringFormat">The string format.</param>
-    // Runtime string-path bindings resolve via reflection; the dependencies keep the reflected
-    // property surfaces alive under trimming/AOT (see maui-binding gotcha: unpreserved
-    // library-type string bindings silently die in consumer Release builds).
-    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(Scaffold))]
-    [DynamicDependency(DynamicallyAccessedMemberTypes.PublicProperties, typeof(ScaffoldNavBarContext))]
+    /// <remarks>
+    /// The target need not be parented yet: the context resolves when it enters the tree, and
+    /// re-resolves if it is moved. Paths naming a context property compile to a typed binding;
+    /// deeper paths are evaluated by reflection.
+    /// </remarks>
     public static BindingBase Create(
+        Element target,
         string path = ".",
         BindingMode mode = BindingMode.Default,
         IValueConverter? converter = null,
         object? converterParameter = null,
         string? stringFormat = null)
-    {
-        var contextPath = nameof(Scaffold.NavBarContext);
-        var fullPath = path is "." or "" ? contextPath : $"{contextPath}.{path}";
-
-        return new Binding(fullPath, mode, converter, converterParameter, stringFormat)
-        {
-            Source = ScaffoldAncestor
-        };
-    }
+        => NavBarContextBindings.Create(target, path, mode, converter, converterParameter, stringFormat);
 }

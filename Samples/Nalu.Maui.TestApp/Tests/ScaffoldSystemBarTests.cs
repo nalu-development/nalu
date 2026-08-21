@@ -142,14 +142,8 @@ public class SysBarsDarkBarPage : ContentPage
         BindingContext = model;
         Title = "Dark Bar";
 
-        Scaffold.SetNavBarAppearance(
-            this,
-            new ScaffoldNavBarAppearance
-            {
-                Background = new SolidColorBrush(Colors.MidnightBlue),
-                Foreground = Colors.White
-            }
-        );
+        Scaffold.SetNavBarBackground(this, new SolidColorBrush(Colors.MidnightBlue));
+        Scaffold.SetNavBarForeground(this, Colors.White);
 
         Content = new VerticalStackLayout
         {
@@ -183,15 +177,11 @@ public class SysBarsDeclaredPage : ContentPage
         Scaffold.SetNavBarOverlapsContent(this, true);
         Scaffold.SetSystemBarStyle(this, ScaffoldSystemBarStyle.LightContent);
 
-        var appearance = new ScaffoldNavBarAppearance
-        {
-            Background = new SolidColorBrush(Colors.Transparent),
-            Foreground = Colors.White
-        };
-        Scaffold.SetNavBarAppearance(this, appearance);
+        Scaffold.SetNavBarBackground(this, new SolidColorBrush(Colors.Transparent));
+        Scaffold.SetNavBarForeground(this, Colors.White);
 
         var materializeButton = new Button { Text = "Materialize bar", AutomationId = "SysBarsMaterialize", FontSize = 11 };
-        materializeButton.Clicked += (_, _) => appearance.Background = new SolidColorBrush(Colors.White);
+        materializeButton.Clicked += (_, _) => Scaffold.SetNavBarBackground(this, new SolidColorBrush(Colors.White));
 
         var grid = new Grid
         {
@@ -321,13 +311,7 @@ public class SystemBarScaffold : Scaffold
         // Drawers are opt-in (modes default to Disabled).
         SetFlyoutStartMode(this, ScaffoldFlyoutMode.Flyout);
 
-        SetNavBarAppearance(
-            this,
-            new ScaffoldNavBarAppearance
-            {
-                Background = new SolidColorBrush(Colors.WhiteSmoke)
-            }
-        );
+        SetNavBarBackground(this, new SolidColorBrush(Colors.WhiteSmoke));
 
         var closeFlyoutButton = new Button { Text = "Close", AutomationId = "SysBarsFlyoutClose", FontSize = 11 };
         closeFlyoutButton.Clicked += (_, _) => _ = CloseFlyoutAsync();

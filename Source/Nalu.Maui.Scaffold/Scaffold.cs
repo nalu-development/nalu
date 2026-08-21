@@ -129,38 +129,116 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
         BindableProperty.CreateAttached("TitleView", typeof(View), typeof(Scaffold), null);
 
     /// <summary>
-    /// Attached property holding the navigation bar view. Resolution, most specific wins:
+    /// Attached property holding the navigation bar TEMPLATE. Resolution, most specific wins:
     /// current <see cref="Page"/> → current <see cref="ScaffoldArea"/> → the
-    /// <see cref="Scaffold"/> itself, whose value defaults to a <see cref="ScaffoldNavBarView"/>
-    /// (the default template carrying the whole styling surface) via the default value factory.
-    /// The mounted view's binding context is the scaffold's <see cref="NavBarContext"/>.
+    /// <see cref="Scaffold"/> itself, whose value defaults to a template of
+    /// <see cref="ScaffoldNavBarView"/> (the built-in bar carrying the whole styling surface).
+    /// Set it to null on the <see cref="Scaffold"/> to suppress the bar entirely.
+    /// The mounted view's binding context is its own page's <see cref="ScaffoldNavBarContext"/>.
     /// </summary>
-    public static readonly BindableProperty NavBarViewProperty =
+    /// <remarks>
+    /// A TEMPLATE rather than a view, because the bar belongs to the page: every page realizes
+    /// its own instance. A shared view instance cannot work — during any transition two bars are
+    /// on screen at once, and MAUI would re-parent the single view to whichever page mounted it
+    /// last, blanking the other.
+    /// </remarks>
+    public static readonly BindableProperty NavBarTemplateProperty =
         BindableProperty.CreateAttached(
-            "NavBarView",
-            typeof(View),
+            "NavBarTemplate",
+            typeof(DataTemplate),
             typeof(Scaffold),
             null,
-            defaultValueCreator: bindable => bindable is Scaffold ? new ScaffoldNavBarView() : null
+            defaultValueCreator: bindable => bindable is Scaffold ? new DataTemplate(static () => new ScaffoldNavBarView()) : null
+        );
+
+    /// <summary>The built-in bar surface: a near-opaque white.</summary>
+    internal static readonly Color _defaultNavBarBackgroundColor = Color.FromArgb("#F7FFFFFF");
+
+    /// <summary>
+    /// Attached property painting the nav bar SURFACE — the strip behind the bar, never the bar
+    /// view's own background. Resolution, most specific SET value wins: <see cref="Page"/> →
+    /// current <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> → the built-in default.
+    /// </summary>
+    /// <remarks>
+    /// The nav bar appearance is expressed as attached properties on real elements rather than
+    /// as a settable object. The bar used to be ONE view shared by every page, so per-page
+    /// styling could not live on it and needed a side-channel object; now that each page
+    /// realizes its own bar from <see cref="NavBarTemplateProperty"/> that reason is gone. Set on
+    /// a page — an element already in the visual tree — these bind, resolve dynamic resources and
+    /// animate from scroll with no machinery of their own, and a <see cref="Style"/> setter gives
+    /// every page its own VALUE instead of sharing one mutable object.
+    /// </remarks>
+    public static readonly BindableProperty NavBarBackgroundProperty =
+        BindableProperty.CreateAttached(
+            "NavBarBackground",
+            typeof(Brush),
+            typeof(Scaffold),
+            new SolidColorBrush(_defaultNavBarBackgroundColor),
+            propertyChanged: OnNavBarBackgroundChanged
         );
 
     /// <summary>
-    /// Attached property holding the nav bar strip presentation
-    /// (<see cref="ScaffoldNavBarAppearance"/>). Each appearance property resolves
-    /// INDEPENDENTLY, most specific set value wins: current <see cref="Page"/> → current
-    /// <see cref="ScaffoldArea"/> → the <see cref="Scaffold"/> → built-in defaults — a
-    /// page-level appearance is a delta over the global one. The attached object inherits the
-    /// binding context of its element, so its properties can be bound (and animated) from
-    /// page state.
+    /// A brush handed to us as a property value must live in the element tree, parented to the
+    /// element that declared it, or its OWN bindings go dead.
     /// </summary>
-    public static readonly BindableProperty NavBarAppearanceProperty =
-        BindableProperty.CreateAttached(
-            "NavBarAppearance",
-            typeof(ScaffoldNavBarAppearance),
-            typeof(Scaffold),
-            null,
-            propertyChanged: OnNavBarAppearanceChanged
-        );
+    /// <remarks>
+    /// <c>AppThemeBinding</c> is the case that proves it: it tracks the theme through an internal
+    /// proxy that resolves a DYNAMIC RESOURCE and listens to its parent's resource chain, so a
+    /// brush with <c>SetAppThemeColor</c> only follows the theme while it is connected to a tree
+    /// reaching the <see cref="Application"/>. Parenting to the declaring element (rather than to
+    /// whichever bar happens to paint with it) keeps a scaffold-level brush alive for the app and
+    /// a page-level one alive for its page, with no re-parenting when several bars share it.
+    /// </remarks>
+    private static void OnNavBarBackgroundChanged(BindableObject bindable, object oldValue, object newValue)
+    {
+        if (bindable is not Element element)
+        {
+            return;
+        }
+
+        if (oldValue is Brush previous && ReferenceEquals(previous.Parent, element))
+        {
+            element.RemoveLogicalChild(previous);
+        }
+
+        // A brush shared through a style keeps its first parent, which is equally live.
+        if (newValue is Brush brush && brush.Parent is null)
+        {
+            element.AddLogicalChild(brush);
+        }
+    }
+
+    /// <summary>
+    /// Attached property setting the nav bar surface opacity (1 by default). Same resolution as
+    /// <see cref="NavBarBackgroundProperty"/>. Pair a transparent surface with
+    /// <see cref="NavBarOverlapsContentProperty"/> for a bar that materializes on scroll.
+    /// </summary>
+    public static readonly BindableProperty NavBarOpacityProperty =
+        BindableProperty.CreateAttached("NavBarOpacity", typeof(double), typeof(Scaffold), 1.0);
+
+    /// <summary>
+    /// Attached property translating the nav bar surface vertically (0 by default): the channel
+    /// for scroll-driven collapses. Same resolution as <see cref="NavBarBackgroundProperty"/>.
+    /// </summary>
+    public static readonly BindableProperty NavBarOffsetYProperty =
+        BindableProperty.CreateAttached("NavBarOffsetY", typeof(double), typeof(Scaffold), 0.0);
+
+    /// <summary>
+    /// Attached property giving every bar primitive (glyphs, and the title unless
+    /// <see cref="NavBarTitleForegroundProperty"/> overrides it) its color fallback — a color set
+    /// directly or by style ON a primitive still wins. Null (the default) leaves primitives on
+    /// their built-in color. Same resolution as <see cref="NavBarBackgroundProperty"/>.
+    /// </summary>
+    public static readonly BindableProperty NavBarForegroundProperty =
+        BindableProperty.CreateAttached("NavBarForeground", typeof(Color), typeof(Scaffold), null);
+
+    /// <summary>
+    /// Attached property giving the nav bar TITLE its color. Resolved level by level: the first
+    /// of <see cref="Page"/> → current <see cref="ScaffoldArea"/> → <see cref="Scaffold"/> that
+    /// sets either this or <see cref="NavBarForegroundProperty"/> wins, its title color first.
+    /// </summary>
+    public static readonly BindableProperty NavBarTitleForegroundProperty =
+        BindableProperty.CreateAttached("NavBarTitleForeground", typeof(Color), typeof(Scaffold), null);
 
     /// <summary>
     /// Attached property controlling navigation bar visibility for a <see cref="Page"/>.
@@ -203,9 +281,8 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// nav bar: the bar's footprint is not applied as a top inset — content starts at the very
     /// top edge (the page's own <c>SafeAreaEdges</c> decides how it treats the raw system
     /// insets) and the bar draws over it. Pair with a page-level
-    /// <see cref="NavBarAppearanceProperty"/> (e.g. a transparent <see
-    /// cref="ScaffoldNavBarAppearance.Background"/>) for full-bleed headers whose bar
-    /// materializes on scroll.
+    /// <see cref="NavBarBackgroundProperty"/> (e.g. a transparent brush) for full-bleed
+    /// headers whose bar materializes on scroll.
     /// </summary>
     public static readonly BindableProperty NavBarOverlapsContentProperty =
         BindableProperty.CreateAttached("NavBarOverlapsContent", typeof(bool), typeof(Scaffold), false);
@@ -342,7 +419,19 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
                 ? stack.PushedPages[^1].Page
                 : stack.RootPage;
 
+        var changed = !ReferenceEquals(CurrentPage, page);
         SetValue(_currentPagePropertyKey, page);
+
+        if (changed)
+        {
+            // The forwarder now points at another page's context: bindings routed through
+            // Scaffold.NavBarContext (the public escape hatch) must re-evaluate.
+            OnPropertyChanged(nameof(NavBarContext));
+
+            // The system bars read the presented page's own declaration and surface — a page
+            // with no nav bar has nothing else to tell them about itself.
+            SystemBars.SetPage(page);
+        }
     }
 
     /// <summary>Gets the destination areas composing the application structure.</summary>
@@ -1041,69 +1130,95 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     /// <summary>Sets the navigation bar title view attached to a page.</summary>
     public static void SetTitleView(BindableObject bindable, View? value) => bindable.SetValue(TitleViewProperty, value);
 
-    /// <summary>Gets the navigation bar view attached to an element.</summary>
-    public static View? GetNavBarView(BindableObject bindable) => (View?)bindable.GetValue(NavBarViewProperty);
+    /// <summary>Gets the navigation bar template attached to an element.</summary>
+    public static DataTemplate? GetNavBarTemplate(BindableObject bindable) => (DataTemplate?)bindable.GetValue(NavBarTemplateProperty);
 
-    /// <summary>Sets the navigation bar view attached to an element.</summary>
-    public static void SetNavBarView(BindableObject bindable, View? value) => bindable.SetValue(NavBarViewProperty, value);
+    /// <summary>Sets the navigation bar template attached to an element.</summary>
+    public static void SetNavBarTemplate(BindableObject bindable, DataTemplate? value) => bindable.SetValue(NavBarTemplateProperty, value);
 
-    /// <summary>Gets the nav bar appearance attached to an element.</summary>
-    public static ScaffoldNavBarAppearance? GetNavBarAppearance(BindableObject bindable) => (ScaffoldNavBarAppearance?)bindable.GetValue(NavBarAppearanceProperty);
+    /// <summary>Gets the nav bar surface brush attached to an element.</summary>
+    public static Brush? GetNavBarBackground(BindableObject bindable) => (Brush?)bindable.GetValue(NavBarBackgroundProperty);
 
-    /// <summary>Sets the nav bar appearance attached to an element.</summary>
-    public static void SetNavBarAppearance(BindableObject bindable, ScaffoldNavBarAppearance? value) => bindable.SetValue(NavBarAppearanceProperty, value);
+    /// <summary>Sets the nav bar surface brush attached to an element.</summary>
+    public static void SetNavBarBackground(BindableObject bindable, Brush? value) => bindable.SetValue(NavBarBackgroundProperty, value);
+
+    /// <summary>Gets the nav bar surface opacity attached to an element.</summary>
+    public static double GetNavBarOpacity(BindableObject bindable) => (double)bindable.GetValue(NavBarOpacityProperty);
+
+    /// <summary>Sets the nav bar surface opacity attached to an element.</summary>
+    public static void SetNavBarOpacity(BindableObject bindable, double value) => bindable.SetValue(NavBarOpacityProperty, value);
+
+    /// <summary>Gets the nav bar surface vertical offset attached to an element.</summary>
+    public static double GetNavBarOffsetY(BindableObject bindable) => (double)bindable.GetValue(NavBarOffsetYProperty);
+
+    /// <summary>Sets the nav bar surface vertical offset attached to an element.</summary>
+    public static void SetNavBarOffsetY(BindableObject bindable, double value) => bindable.SetValue(NavBarOffsetYProperty, value);
+
+    /// <summary>Gets the nav bar foreground color attached to an element.</summary>
+    public static Color? GetNavBarForeground(BindableObject bindable) => (Color?)bindable.GetValue(NavBarForegroundProperty);
+
+    /// <summary>Sets the nav bar foreground color attached to an element.</summary>
+    public static void SetNavBarForeground(BindableObject bindable, Color? value) => bindable.SetValue(NavBarForegroundProperty, value);
+
+    /// <summary>Gets the nav bar title color attached to an element.</summary>
+    public static Color? GetNavBarTitleForeground(BindableObject bindable) => (Color?)bindable.GetValue(NavBarTitleForegroundProperty);
+
+    /// <summary>Sets the nav bar title color attached to an element.</summary>
+    public static void SetNavBarTitleForeground(BindableObject bindable, Color? value) => bindable.SetValue(NavBarTitleForegroundProperty, value);
 
     /// <summary>
-    /// The attached appearance inherits its element's binding context (the same treatment MAUI
-    /// gives <see cref="VisualElement.Shadow"/>) so its properties can be bound to page state.
-    /// The handler subscription is idempotent (remove-then-add) and dropped when cleared.
+    /// Every appearance property resolves INDEPENDENTLY, most specific SET value wins: the page
+    /// → the current area → the scaffold → the property's declared default. A page-level value
+    /// is a delta over the scaffold-wide one, not a replacement.
     /// </summary>
-    private static void OnNavBarAppearanceChanged(BindableObject bindable, object oldValue, object newValue)
+    /// <remarks>
+    /// <c>IsSet</c>, not a comparison against the default: a value explicitly set TO the default
+    /// must still shadow an outer level (an opacity of 1 on a page beats 0.5 on the scaffold).
+    /// </remarks>
+    internal object? ResolveNavBarValue(Page? page, BindableProperty property)
     {
-        if (bindable is not Element element)
+        if (page is not null && page.IsSet(property))
         {
-            return;
+            return page.GetValue(property);
         }
 
-        element.BindingContextChanged -= OnAppearanceHostBindingContextChanged;
-
-        if (oldValue is ScaffoldNavBarAppearance previous && ReferenceEquals(previous.Parent, element))
+        if (CurrentArea is { } area && area.IsSet(property))
         {
-            element.RemoveLogicalChild(previous);
+            return area.GetValue(property);
         }
 
-        if (newValue is ScaffoldNavBarAppearance appearance)
+        return GetValue(property);
+    }
+
+    /// <summary>
+    /// The title color, resolved level by level rather than property by property: the first of
+    /// page → area → scaffold that sets EITHER <see cref="NavBarTitleForegroundProperty"/> or
+    /// <see cref="NavBarForegroundProperty"/> decides, its title color first. So a level that
+    /// only sets a foreground tints the title too, and an outer level's title color does not
+    /// leak past it.
+    /// </summary>
+    internal Color? ResolveNavBarTitleForeground(Page? page)
+    {
+        foreach (var level in (ReadOnlySpan<BindableObject?>)[page, CurrentArea, this])
         {
-            // As a logical child the appearance (and its brush) sits in the element tree, where
-            // MAUI delivers theme/resource changes; a style-shared instance keeps its first parent.
-            if (appearance.Parent is null)
+            if (level is null)
             {
-                element.AddLogicalChild(appearance);
+                continue;
             }
 
-            SetInheritedBindingContext(appearance, element.BindingContext);
-            element.BindingContextChanged += OnAppearanceHostBindingContextChanged;
-        }
-    }
+            if (level.IsSet(NavBarTitleForegroundProperty))
+            {
+                return GetNavBarTitleForeground(level);
+            }
 
-    private static void OnAppearanceHostBindingContextChanged(object? sender, EventArgs e)
-    {
-        if (sender is Element element && GetNavBarAppearance(element) is { } appearance)
-        {
-            SetInheritedBindingContext(appearance, element.BindingContext);
+            if (level.IsSet(NavBarForegroundProperty))
+            {
+                return GetNavBarForeground(level);
+            }
         }
-    }
 
-    /// <summary>
-    /// The appearance chain for the given page, most specific first — each appearance property
-    /// resolves independently through it (see <see cref="ScaffoldNavBarAppearance.Resolve{T}"/>).
-    /// </summary>
-    internal (ScaffoldNavBarAppearance? Page, ScaffoldNavBarAppearance? Area, ScaffoldNavBarAppearance? Scaffold) GetNavBarAppearanceChain(Page? currentPage)
-        => (
-            currentPage is null ? null : GetNavBarAppearance(currentPage),
-            CurrentArea is { } area ? GetNavBarAppearance(area) : null,
-            GetNavBarAppearance(this)
-        );
+        return null;
+    }
 
     /// <summary>Gets whether the navigation bar is visible for a page.</summary>
     public static bool GetIsNavBarVisible(BindableObject bindable) => (bool)bindable.GetValue(IsNavBarVisibleProperty);
@@ -1227,11 +1342,188 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     public static void SetTransitionName(BindableObject bindable, string? value) => bindable.SetValue(TransitionNameProperty, value);
 
     /// <summary>
-    /// Gets the observable state the mounted nav bar view binds to (title, back/drawer button
-    /// availability, commands) — the binding context of the default template and of custom
-    /// nav bar views alike.
+    /// Gets the observable state of the CURRENT page's nav bar (title, back/drawer button
+    /// availability, commands) — "what the bar shows now".
     /// </summary>
-    public ScaffoldNavBarContext NavBarContext => field ??= new ScaffoldNavBarContext(this);
+    /// <remarks>
+    /// Each page owns its own context (the bar travels with its page, and during a transition
+    /// two are alive); this forwards to the current page's, and raises
+    /// <c>PropertyChanged("NavBarContext")</c> when the current page changes so bindings
+    /// through it re-evaluate. A bar's <c>BindingContext</c> — and every
+    /// <c>{nalu:NavBarBinding}</c> inside a page or its bar — is that PAGE's own context, not
+    /// this one; use this only when "whatever is on screen now" is genuinely what you mean.
+    /// </remarks>
+    public ScaffoldNavBarContext NavBarContext
+        => (CurrentPage is { } page ? GetPageHost(page)?.Context : null) ?? DetachedNavBarContext;
+
+    /// <summary>The context handed out before any page is presented (and for pages with no host).</summary>
+    private ScaffoldNavBarContext DetachedNavBarContext => field ??= new ScaffoldNavBarContext(this);
+
+    private readonly Dictionary<Page, ScaffoldPageHost> _pageHosts = [];
+    private readonly List<ScaffoldPageHost> _retiredPageHosts = [];
+
+    /// <summary>
+    /// Brings page hosts and element-tree parenting in line with what the navigation stacks now
+    /// contain. Invoked by <see cref="ScaffoldNavigationStack"/> on every membership change.
+    /// </summary>
+    /// <remarks>
+    /// A set difference, deliberately, rather than "handle the page that just moved": a page can
+    /// leave one stack and join another in the same breath (<c>AdoptStackFrom</c> does exactly
+    /// that when XAML hot reload replaces the structure), and comparing sets makes that a
+    /// non-event instead of a destroy-then-resurrect. It also makes the reconcile idempotent, so
+    /// running it per mutation during a multi-push batch is free of order effects.
+    /// <para>
+    /// Asymmetric on purpose: entering pages are attached NOW, because a page must be in the tree
+    /// before it can be presented; leaving pages are only RETIRED, because they are still on
+    /// screen — a pop animates the departing page out, and unparenting it here would strip its
+    /// binding context, resource resolution and window mid-animation. They are released by
+    /// <see cref="FlushRetiredPages"/> once nothing is showing them.
+    /// </para>
+    /// </remarks>
+    internal void OnNavigationStackChanged()
+    {
+        UpdateCurrentPage();
+        ReconcilePages();
+    }
+
+    private void ReconcilePages()
+    {
+        var live = new HashSet<Page>();
+
+        foreach (var area in Areas)
+        {
+            foreach (var root in area.Roots)
+            {
+                var stack = root.NavigationStack;
+
+                if (stack.RootPage is { } rootPage)
+                {
+                    live.Add(rootPage);
+                    EnsurePageHost(root, rootPage);
+                }
+
+                foreach (var entry in stack.PushedPages)
+                {
+                    live.Add(entry.Page);
+                    EnsurePageHost(root, entry.Page);
+                }
+            }
+        }
+
+        foreach (var page in _pageHosts.Keys.Where(page => !live.Contains(page)).ToArray())
+        {
+            var host = _pageHosts[page];
+            _pageHosts.Remove(page);
+            _retiredPageHosts.Add(host);
+        }
+    }
+
+    /// <summary>
+    /// Gives the page a host and a place in the tree. A page returning from retirement keeps its
+    /// host — and with it its nav bar state — unless it changed root, in which case the host
+    /// describes the wrong stack and is rebuilt.
+    /// </summary>
+    private void EnsurePageHost(ScaffoldRoot root, Page page)
+    {
+        if (_pageHosts.TryGetValue(page, out var current))
+        {
+            if (ReferenceEquals(current.Root, root))
+            {
+                return;
+            }
+
+            _pageHosts.Remove(page);
+            _retiredPageHosts.Add(current);
+        }
+        else if (_retiredPageHosts.FirstOrDefault(host => ReferenceEquals(host.Page, page)) is { } retired)
+        {
+            _retiredPageHosts.Remove(retired);
+
+            if (ReferenceEquals(retired.Root, root))
+            {
+                _pageHosts[page] = retired;
+
+                return;
+            }
+
+            retired.Dispose();
+        }
+
+        _pageHosts[page] = new ScaffoldPageHost(this, root, page);
+        AddLogicalChild(page);
+    }
+
+    /// <summary>
+    /// Releases every page that left the navigation model and is no longer being shown: its
+    /// platform state first (the presenter can still reach the page), then its chrome, its
+    /// attached flyout content and finally its place in the element tree.
+    /// </summary>
+    /// <remarks>
+    /// Called at the three moments a page can stop being shown: the end of a synchronization
+    /// (the transition that carried it away has settled), <c>ScaffoldRootProxy.DestroyContent</c>
+    /// (a root's page is destroyed a few cycles AFTER that synchronization, so nothing earlier
+    /// would catch it) and scaffold teardown. Safe to call at any of them, in any order, twice:
+    /// a page that came back to life was already un-retired by <see cref="ReconcilePages"/>, and
+    /// the guard below re-checks it.
+    /// </remarks>
+    internal void FlushRetiredPages()
+    {
+        if (_retiredPageHosts.Count == 0)
+        {
+            return;
+        }
+
+        var flushed = _retiredPageHosts.ToArray();
+        _retiredPageHosts.Clear();
+
+        foreach (var host in flushed)
+        {
+            var page = host.Page;
+
+            if (_pageHosts.ContainsKey(page))
+            {
+                continue;
+            }
+
+            Presenter?.ReleasePage(page);
+            host.Dispose();
+
+            // The page's drawer overrides leave the resolution stack with it; release the
+            // attached content so the page model is not retained through it.
+            CleanupPageFlyoutContent(page);
+            RemoveLogicalChild(page);
+
+            // ...and the page's handler goes with it. Leaving the logical tree does not tear the
+            // platform side down: the page keeps a connected handler, so its view stays mounted
+            // in the native hierarchy — visible to anything that reads it (accessibility,
+            // automation) as a second, parentless copy of a page the app has left behind.
+            // A page that came back to life never reaches here (the guard above skips it), so
+            // this only ever disconnects what is genuinely gone.
+            DisconnectHandlerHelper.DisconnectHandlers(page);
+        }
+    }
+
+    /// <summary>The page's host, or null when the page is not in a stack of this scaffold.</summary>
+    internal ScaffoldPageHost? GetPageHost(Page page) => _pageHosts.GetValueOrDefault(page);
+
+    /// <summary>
+    /// Settles which bars are in the element tree once a transition has finished: the CURRENT
+    /// page's, and only it.
+    /// </summary>
+    /// <remarks>
+    /// Every live page owns a bar, but the tree reflects PRESENTED chrome — the rule that keeps
+    /// automation ids unique and lets tooling read "what is on screen". During a transition two
+    /// bars are legitimately attached (both are on screen, each showing its own page); this
+    /// re-establishes the single-bar steady state afterwards. A covered page's bar re-attaches
+    /// when its container syncs on the way back in.
+    /// </remarks>
+    internal void SettleNavBarAttachments()
+    {
+        foreach (var host in _pageHosts.Values)
+        {
+            host.SetNavBarAttached(ReferenceEquals(host.Page, CurrentPage) && host.IsNavBarVisible);
+        }
+    }
 
     /// <summary>
     /// Gets the observable soft-keyboard state (<see cref="ScaffoldKeyboardState.IsVisible"/>,
@@ -1244,19 +1536,33 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     internal ScaffoldSystemBars SystemBars => field ??= new ScaffoldSystemBars(this);
 
     /// <summary>
-    /// Resolves the ambient <see cref="ScaffoldNavBarContext"/> from any element hosted in a
-    /// scaffold (walks the logical parents) — the code-behind counterpart of
+    /// Resolves the <see cref="ScaffoldNavBarContext"/> of the page the given element belongs to
+    /// (walks the logical parents) — the code-behind counterpart of
     /// <see cref="NavBarBindingExtension"/>, e.g. to observe
     /// <see cref="ScaffoldNavBarContext.ScrollOffset"/> for scroll-driven chrome.
-    /// Null while the element is not attached to a scaffold's tree yet.
+    /// Bar content (a hosted title view included) resolves through the bar it is mounted in,
+    /// page content through its page; an element in a scaffold but in no page falls back to the
+    /// current page's context. Null while the element is not attached to a scaffold's tree yet.
     /// </summary>
     public static ScaffoldNavBarContext? FindNavBarContext(Element? element)
     {
+        Page? page = null;
+
         while (element is not null)
         {
-            if (element is Scaffold scaffold)
+            switch (element)
             {
-                return scaffold.NavBarContext;
+                case ScaffoldNavBarHost barHost:
+                    return barHost.Context;
+
+                // The scaffold IS a page: never mistake it for a hosted one.
+                case Scaffold scaffold:
+                    return (page is not null ? scaffold.GetPageHost(page)?.Context : null) ?? scaffold.NavBarContext;
+
+                case Page hostedPage:
+                    page ??= hostedPage;
+
+                    break;
             }
 
             element = element.Parent;
@@ -1266,14 +1572,15 @@ public partial class Scaffold : Page, IPageContainer<Page>, IDisposable
     }
 
     /// <summary>
-    /// Resolves the nav bar view for the given page: page attachment → current area attachment
-    /// → the scaffold's own value (defaulting to the built-in <see cref="ScaffoldNavBarView"/>).
-    /// The resolved view is attached to this scaffold's element tree on mount.
+    /// Resolves the nav bar template for the given page: page attachment → current area
+    /// attachment → the scaffold's own value (defaulting to the built-in
+    /// <see cref="ScaffoldNavBarView"/>). Null means the page shows no bar at all.
+    /// Each page realizes its OWN view from the resolved template.
     /// </summary>
-    internal View? ResolveNavBarView(Page currentPage)
-        => GetNavBarView(currentPage)
-           ?? (CurrentArea is { } area ? GetNavBarView(area) : null)
-           ?? GetNavBarView(this);
+    internal DataTemplate? ResolveNavBarTemplate(Page currentPage)
+        => GetNavBarTemplate(currentPage)
+           ?? (CurrentArea is { } area ? GetNavBarTemplate(area) : null)
+           ?? GetNavBarTemplate(this);
 
     /// <summary>Gets the tab bar visibility policy attached to a page.</summary>
     public static ScaffoldTabBarVisibility GetTabBarVisibility(BindableObject bindable) => (ScaffoldTabBarVisibility)bindable.GetValue(TabBarVisibilityProperty);

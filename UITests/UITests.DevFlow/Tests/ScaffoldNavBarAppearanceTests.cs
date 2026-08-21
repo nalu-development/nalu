@@ -22,26 +22,33 @@ public class ScaffoldNavBarAppearanceTests(NaluApp app) : BaseUiTest(app), IAsyn
     private Task WaitDisplayedAsync(string automationId)
         => App.WaitForBoundsAsync(automationId, b => b.Y > 0);
 
-    /// <summary>The strip surface opacity ("NavBarSurface" is the appearance target).</summary>
-    private async Task<double> GetSurfaceOpacityAsync()
+    /// <summary>
+    /// The strip surface opacity ("NavBarSurface" is the appearance target), or null while no
+    /// surface is in the tree.
+    /// </summary>
+    /// <remarks>
+    /// Absence is a legitimate transient, not a failure: each page owns its bar, so a transition
+    /// re-points which surface is attached and there is a moment with none. Callers poll.
+    /// </remarks>
+    private async Task<double?> GetSurfaceOpacityAsync()
     {
         // The agent serializes numbers with the DEVICE locale (e.g. "0,25" on an Italian
         // simulator): normalize the decimal separator before an invariant parse.
         var raw = await App.GetPropertyAsync("NavBarSurface", "Opacity");
 
-        return double.Parse(raw!.Replace(',', '.'), CultureInfo.InvariantCulture);
+        return raw is null ? null : double.Parse(raw.Replace(',', '.'), CultureInfo.InvariantCulture);
     }
 
     private async Task WaitForSurfaceOpacityAsync(double expected)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-        double last;
+        double? last;
 
         do
         {
             last = await GetSurfaceOpacityAsync();
 
-            if (Math.Abs(last - expected) < 0.01)
+            if (last is { } value && Math.Abs(value - expected) < 0.01)
             {
                 return;
             }
@@ -50,7 +57,8 @@ public class ScaffoldNavBarAppearanceTests(NaluApp app) : BaseUiTest(app), IAsyn
         }
         while (DateTime.UtcNow < deadline);
 
-        last.Should().BeApproximately(expected, 0.01, "the strip surface must reflect the effective appearance opacity");
+        last.Should().NotBeNull("a surface must be attached once the transition settled");
+        last!.Value.Should().BeApproximately(expected, 0.01, "the strip surface must reflect the effective appearance opacity");
     }
 
     [Fact]

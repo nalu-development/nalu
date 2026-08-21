@@ -118,6 +118,10 @@ public class NavigationRestoreTests
         public bool HasOverlay => false;
 
         public bool IsOverlayPresented(ScaffoldOverlayRequest request) => false;
+
+        public void ReleasePage(Page page)
+        {
+        }
     }
 
     /// <summary>One "process": DI + engine + scaffold + restore service sharing the given store.</summary>

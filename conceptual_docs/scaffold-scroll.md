@@ -43,7 +43,13 @@ Effects interpolate inside a **window** of scroll offsets. Declare the page-wide
 
 ```xml
 <ContentPage nalu:Scaffold.ScrollRampStart="100"
-             nalu:Scaffold.ScrollRampEnd="200">
+             nalu:Scaffold.ScrollRampEnd="200"
+             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollValue FromLight=Transparent,
+                                                                   ToLight={StaticResource BackgroundLight},
+                                                                   ToDark={StaticResource BackgroundDark}}"
+             nalu:Scaffold.NavBarForeground="{nalu:ThemeScrollValue FromLight=White,
+                                                                    ToLight={StaticResource TextPrimaryLight},
+                                                                    ToDark={StaticResource TextPrimaryDark}}">
 ```
 
 Every `ScrollValue` on the page rides this ramp unless it overrides it with its own
@@ -67,19 +73,19 @@ Background="{nalu:ThemeScrollValue FromLight=Transparent,
 | `Extrapolate` | `Clamp` (default: hold endpoints outside the window) or `Extend` (keep going linearly). |
 | `Easing` | Shapes the ramp interior. |
 
-They work on any element inside the scaffold's tree **and** on
-[`ScaffoldNavBarAppearance`](scaffold-navbar.md) properties, and must target a bindable
-property directly (styles/setters are not supported). In code-behind, bind the ambient values
-with the `NavBarBindings` utility — string path or fully typed:
+They work on any element inside the scaffold's tree — a page carrying the attached
+[nav bar appearance properties](scaffold-navbar.md) included — and must target a bindable
+property directly (styles/setters are not supported). In code-behind, bind the values with the
+`NavBarBindings` utility, passing the element the binding is applied to — that is what the page
+is resolved from, so the binding reads *that element's own page*:
 
 ```csharp
-offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create("ScrollOffset", stringFormat: "{0:F0}"));
-
-// Typed and compiled (trimming/AOT-safe):
 offsetLabel.SetBinding(Label.TextProperty,
-    static (Scaffold s) => s.NavBarContext.ScrollOffset,
-    source: NavBarBindings.ScaffoldAncestor);
+    NavBarBindings.Create(offsetLabel, "ScrollOffset", stringFormat: "{0:F0}"));
 ```
+
+Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
+paths are evaluated by reflection.
 
 ## Recipe: parallax header
 
@@ -123,17 +129,13 @@ The full-bleed header pattern, combining the channel with
 <ContentPage nalu:Scaffold.NavBarOverlapsContent="True"
              nalu:Scaffold.ScrollTracker="{x:Reference DetailScroll}"
              nalu:Scaffold.ScrollRampStart="100"
-             nalu:Scaffold.ScrollRampEnd="200">
-
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance
-            Background="{nalu:ThemeScrollValue FromLight=Transparent,
-                                               ToLight={StaticResource BackgroundLight},
-                                               ToDark={StaticResource BackgroundDark}}"
-            Foreground="{nalu:ThemeScrollValue FromLight=White,
-                                               ToLight={StaticResource TextPrimaryLight},
-                                               ToDark={StaticResource TextPrimaryDark}}" />
-    </nalu:Scaffold.NavBarAppearance>
+             nalu:Scaffold.ScrollRampEnd="200"
+             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollValue FromLight=Transparent,
+                                                                   ToLight={StaticResource BackgroundLight},
+                                                                   ToDark={StaticResource BackgroundDark}}"
+             nalu:Scaffold.NavBarForeground="{nalu:ThemeScrollValue FromLight=White,
+                                                                    ToLight={StaticResource TextPrimaryLight},
+                                                                    ToDark={StaticResource TextPrimaryDark}}">
 
     <nalu:Scaffold.TitleView>
         <Label Text="Weather" Opacity="{nalu:ScrollValue From=0, To=1}" />

@@ -1,8 +1,26 @@
 # Scaffold Nav Bar
 
 The nav bar is a plain MAUI view strip: same layout, same styling, same behavior on iOS and
-Android. The default bar is mounted out of the box — set `Scaffold.NavBarView` only to
-restyle-by-instance, replace it with a custom view, or remove it with `{x:Null}`.
+Android. It belongs to the **page**, not to the scaffold: every page realizes its own bar and
+that bar travels with it through every motion the scaffold performs — push and pop slides,
+custom transition specs, shared elements, the interactive edge pop, Android predictive back.
+During a transition two bars are on screen, each showing its own page's state.
+
+The default bar is mounted out of the box. Set `Scaffold.NavBarTemplate` only to replace it
+with a custom bar, or clear it with `{x:Null}` on the scaffold to remove the bar entirely:
+
+```xml
+<nalu:Scaffold.NavBarTemplate>
+    <DataTemplate>
+        <nalu:ScaffoldNavBarView />
+    </DataTemplate>
+</nalu:Scaffold.NavBarTemplate>
+```
+
+It is a **template**, not a view, precisely because the bar belongs to the page: a single view
+instance cannot be in two places at once, and MAUI would re-parent it to whichever page mounted
+it last, blanking the other page's bar. Resolution is unchanged — page → current area →
+scaffold, most specific wins.
 
 The default bar composes three columns: leading (start-drawer button, back button), center
 (title, or the page's `TitleView` in its place), trailing (end-drawer button, close button).
@@ -24,45 +42,71 @@ the page:
 ```
 
 The `TitleView`'s `BindingContext` is the **page model** — bind your own state directly. To
-read nav-bar ambient state (foreground color, scroll offset) use the `NavBarBinding` markup
-extension, which binds against the scaffold's `ScaffoldNavBarContext`:
+read nav-bar state (foreground color, scroll offset) use the `NavBarBinding` markup extension.
+It binds against the `ScaffoldNavBarContext` of the page the target element belongs to — page
+content through its page, bar content (a hosted title view included) through the bar it is
+mounted in — so during a transition each of the two live pages reads its OWN state:
 
 ```xml
 <Label Text="{nalu:NavBarBinding Path=Title}"
        TextColor="{nalu:NavBarBinding Path=Foreground}" />
 ```
 
-In code-behind, the `NavBarBindings` utility is the counterpart — `NavBarBindings.Create("Title")`
-for a string path, or fully typed:
-`SetBinding(Label.TextProperty, static (Scaffold s) => s.NavBarContext.Title, source: NavBarBindings.ScaffoldAncestor)`.
+In code-behind, the `NavBarBindings` utility is the counterpart. Pass the element the binding
+is applied to — it is what the page is resolved from:
+`label.SetBinding(Label.TextProperty, NavBarBindings.Create(label, "Title"))`.
+
+Paths naming a `ScaffoldNavBarContext` property compile to a typed binding (no reflection, so
+they survive trimming); deeper paths such as `PageBindingContext.SaveCommand` are
+evaluated by reflection. `{nalu:NavBarBinding}` is not supported inside a `Style` setter: one
+binding instance serves every styled element, so there is no single target to resolve a page
+from.
+
+`Scaffold.NavBarContext` remains available and means "what the bar shows now" — the CURRENT
+page's context. Prefer the per-page resolution above; the scaffold-level one is only correct
+while a single page is on screen.
 
 ## Appearance — a per-property merge chain
 
-`ScaffoldNavBarAppearance` styles the bar *surface* (never the mounted bar view's own
-properties). Attach it at scaffold, area, or page level; **each property resolves
-independently** through page → area → scaffold — a page-level appearance is a delta, not a
-replacement:
+Five attached properties style the bar *surface* — never the mounted bar view's own properties.
+Set them on a page, an area or the scaffold; **each resolves independently** through page → area
+→ scaffold, so a page-level value is a delta, not a replacement:
 
 ```xml
-<!-- Scaffold-wide surface -->
-<nalu:Scaffold.NavBarAppearance>
-    <nalu:ScaffoldNavBarAppearance Foreground="{StaticResource Accent}"
-                                   TitleForeground="{AppThemeBinding Light={StaticResource TextPrimaryLight},
-                                                                     Dark={StaticResource TextPrimaryDark}}">
-        <nalu:ScaffoldNavBarAppearance.Background>
+<!-- Scaffold-wide surface, typically in your Styles.xaml.
+     ApplyToDerivedTypes is REQUIRED: your AppScaffold derives from Scaffold, and MAUI matches
+     implicit styles on the exact type — without it this style never reaches your scaffold. -->
+<Style TargetType="nalu:Scaffold" ApplyToDerivedTypes="True">
+    <Setter Property="nalu:Scaffold.NavBarForeground" Value="{StaticResource Accent}" />
+    <Setter Property="nalu:Scaffold.NavBarTitleForeground"
+            Value="{AppThemeBinding Light={StaticResource TextPrimaryLight},
+                                    Dark={StaticResource TextPrimaryDark}}" />
+    <Setter Property="nalu:Scaffold.NavBarBackground">
+        <Setter.Value>
             <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight},
                                                      Dark={StaticResource BackgroundDark}}" />
-        </nalu:ScaffoldNavBarAppearance.Background>
-    </nalu:ScaffoldNavBarAppearance>
-</nalu:Scaffold.NavBarAppearance>
+        </Setter.Value>
+    </Setter>
+</Style>
 ```
+
+They are attached properties on real elements, so they bind, resolve `StaticResource` and
+`AppThemeBinding`, and animate from scroll with no machinery of their own — and a `Style` setter
+gives every element its own value rather than sharing one object.
+
+> [!WARNING]
+> An implicit style targeting `nalu:Scaffold` needs `ApplyToDerivedTypes="True"`. A XAML
+> `AppScaffold` *derives* from `Scaffold`, and MAUI matches implicit styles on the exact type, so
+> without it the style is silently skipped and the bar keeps the built-in defaults — including
+> through theme changes, which is what the symptom usually looks like: page content follows the
+> theme (its `ContentPage` style has `ApplyToDerivedTypes`), the bar never does.
 
 | Property | Effect |
 |----------|--------|
-| `Background` | The strip surface brush. |
-| `Foreground` | Flows to the default primitives (chevron, flyout/close icons — and the title unless `TitleForeground` is set) via the context. |
-| `TitleForeground` | Title-only color (`ScaffoldNavBarTitle`). Resolved level by level with `Foreground`: the first appearance (page → area → scaffold) that sets either wins, its `TitleForeground` beating its `Foreground`. So the scaffold can give buttons and title different colors, and a page still recolors the whole bar with `Foreground` alone (or the two apart by setting both). |
-| `Opacity` | Whole-surface opacity. |
+| `NavBarBackground` | The strip surface brush. |
+| `NavBarForeground` | Flows to the default primitives (chevron, flyout/close icons — and the title unless `NavBarTitleForeground` is set) via the context. |
+| `NavBarTitleForeground` | Title-only color (`ScaffoldNavBarTitle`). Resolved level by level with `NavBarForeground`: the first level (page → area → scaffold) that sets either wins, its title color first. So the scaffold can give buttons and title different colors, and a page still recolors the whole bar with `NavBarForeground` alone. |
+| `NavBarOpacity` | Whole-surface opacity. |
 | `OffsetY` | Vertical offset (hide-on-scroll effects). |
 
 `{AppThemeBinding}` / `{DynamicResource}` on these properties — and inside the `Background` brush —
@@ -107,16 +151,7 @@ live scroll offset with the `ScrollValue` / `ThemeScrollValue` markup extensions
              nalu:Scaffold.ScrollRampEnd="200">
 
     <!-- The bar materializes as you scroll: transparent over the header photo,
-         then the themed background, theme-aware on both ends. -->
-    <nalu:Scaffold.NavBarAppearance>
-        <nalu:ScaffoldNavBarAppearance
-            Background="{nalu:ThemeScrollValue FromLight=Transparent,
-                                               ToLight={StaticResource BackgroundLight},
-                                               ToDark={StaticResource BackgroundDark}}"
-            Foreground="{nalu:ThemeScrollValue FromLight=White,
-                                               ToLight={StaticResource TextPrimaryLight},
-                                               ToDark={StaticResource TextPrimaryDark}}" />
-    </nalu:Scaffold.NavBarAppearance>
+         then the themed background, theme-aware on both ends. Declared on the page itself. -->
 
     <!-- The title fades in on the same page-level ramp. -->
     <nalu:Scaffold.TitleView>

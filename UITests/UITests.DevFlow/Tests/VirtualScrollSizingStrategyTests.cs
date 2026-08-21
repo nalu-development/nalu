@@ -70,7 +70,7 @@ public class VirtualScrollSizingStrategyTests(NaluApp app) : BaseUiTest(app), IA
             await App.TapAsync("SizingAddItemButton");
         }
 
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
         (await App.GetBoundsAsync("SizingScroll")).Height.Should().BeApproximately(_cap, _tolerance);
     }
 
@@ -98,7 +98,7 @@ public class VirtualScrollSizingStrategyTests(NaluApp app) : BaseUiTest(app), IA
         // Android reports nothing (0), iOS keeps reporting the size it was last given. Both are
         // "not content-driven", which is the whole contract of Fill.
         await App.TapAsync("SizingManyItemsButton");
-        await Task.Delay(500);
+        await Task.Delay(500, TestContext.Current.CancellationToken);
 
         (await App.GetBoundsAsync("SizingScroll")).Height.Should().BeLessThan(3 * _itemExtent);
     }

@@ -1,0 +1,423 @@
+using Android.Content;
+using Android.Runtime;
+using Android.Views;
+using Android.Widget;
+using AndroidX.Core.View;
+using Microsoft.Maui.Platform;
+using Nalu.Internals;
+using AView = Android.Views.View;
+using Insets = AndroidX.Core.Graphics.Insets;
+
+namespace Nalu;
+
+/// <summary>
+/// The platform realization of one <see cref="ScaffoldPageHost"/>: the page's view and the
+/// page's OWN nav bar strip, SIBLINGS inside a container the scaffold owns. The frame is the
+/// page fragment's view, so every motion the presenter plays — push/pop slides, custom specs,
+/// shared elements, the predictive-back peek — moves the bar with its page for free.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Inset ownership is the reason the two are siblings rather than nested. The page's top inset
+/// is DERIVED from the strip, so the strip must never receive it: the frame dispatches the
+/// insets it was handed to the strip unchanged (the bar consumes the real status inset itself
+/// through its own SafeAreaEdges) and dispatches a top-rewritten copy to the page view alone.
+/// Nested — the strip inside the page's inset path — that is a feedback loop: strip height
+/// becomes the page's top inset, the bar consumes it and grows, which grows the strip, which
+/// grows the inset. It compounds every pass and the bar eats the screen.
+/// </para>
+/// <para>
+/// This is the same split iOS gets from <c>AdditionalSafeAreaInsets</c> on the page's view
+/// controller: one writer for the page's extra top inset, and chrome that is never a descendant
+/// of what it insets.
+/// </para>
+/// <para>
+/// It is a MANAGED view subclass sitting in the page-host chain, which the presenter otherwise
+/// avoids because a managed Java peer defers the GC-bridge release of popped pages past the
+/// leak detector's patience. <see cref="Release"/> therefore drops every managed reference and
+/// unregisters the listener rather than trusting the bridge — the Android twin of the iOS
+/// container leak. <c>ScaffoldNavigationTests</c> asserts <c>Leaked:0</c> after every test.
+/// </para>
+/// </remarks>
+// ReSharper disable once RedundantNameQualifier — inside a View subclass the bare name binds to the nested Android.Views.View.IOnApplyWindowInsetsListener
+internal sealed class ScaffoldPageFrame : FrameLayout, AndroidX.Core.View.IOnApplyWindowInsetsListener
+{
+    private static readonly int _systemBarsInsetsType = WindowInsetsCompat.Type.SystemBars();
+
+    /// <summary>Same slide length as every other piece of scaffold chrome.</summary>
+    private const int _chromeDurationMs = 250;
+
+    private ScaffoldPageHost? _host;
+    private ScaffoldNavBarStripLayout? _strip;
+    private AView? _pageView;
+    private WindowInsetsCompat? _lastInsets;
+    private int _appliedTopInsetPx = -1;
+    private bool _navBarPresented;
+
+    /// <summary>Where the bar is HEADED — <see cref="_navBarPresented"/> is what the page is padded for.</summary>
+    private bool _navBarTarget;
+    private int _lastStripHeightPx;
+    private Android.Animation.ObjectAnimator? _stripAnimator;
+
+    public ScaffoldPageFrame(IntPtr javaReference, JniHandleOwnership transfer)
+        : base(javaReference, transfer)
+    {
+    }
+
+    public ScaffoldPageFrame(Context context, ScaffoldPageHost host)
+        : base(context)
+    {
+        _host = host;
+
+        // What the page's PREVIOUS frame measured, so this one insets correctly from its first
+        // dispatch rather than a layout pass later (see ScaffoldPageHost.LastNavBarHeightPx).
+        _lastStripHeightPx = host.LastNavBarHeightPx;
+        LayoutParameters = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent);
+        SetClipChildren(false);
+        ViewCompat.SetOnApplyWindowInsetsListener(this, this);
+    }
+
+    /// <summary>This page's nav bar strip, when it shows one.</summary>
+    public ScaffoldNavBarStripLayout? NavStrip => _strip;
+
+    /// <summary>Mounts the page's platform view (below the bar) — called once, at creation.</summary>
+    public void SetPageView(AView pageView)
+    {
+        _pageView = pageView;
+
+        pageView.LayoutParameters = new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MatchParent,
+            ViewGroup.LayoutParams.MatchParent);
+
+        AddView(pageView);
+    }
+
+    /// <summary>
+    /// Mounts (or drops) this page's bar from the resolved template. The strip is added ABOVE the
+    /// page view: the bar always draws over page content, and an overlapping page simply gets no
+    /// top inset.
+    /// </summary>
+    public void SyncNavBar(IMauiContext mauiContext, bool animated = false)
+    {
+        if (_host is not { } host)
+        {
+            return;
+        }
+
+        var visible = host.IsNavBarVisible;
+
+        // A page that shows no bar never gets a strip: nothing to measure wrongly, nothing to
+        // flash during a transition.
+        if (!visible && _strip is null)
+        {
+            host.SetNavBarAttached(false);
+
+            return;
+        }
+
+        if (host.EnsureNavBarHost() is not { } barHost)
+        {
+            ReleaseStrip();
+            host.SetNavBarAttached(false);
+
+            return;
+        }
+
+        if (_strip is null)
+        {
+            var strip = new ScaffoldNavBarStripLayout(Context!)
+            {
+                LayoutParameters = new LayoutParams(
+                    ViewGroup.LayoutParams.MatchParent,
+                    ViewGroup.LayoutParams.WrapContent)
+                {
+                    Gravity = GravityFlags.Top
+                }
+            };
+
+            strip.SetBar(barHost.ToPlatform(mauiContext));
+            _strip = strip;
+            AddView(strip);
+        }
+
+        SetNavBarPresented(visible, animated);
+        host.SetNavBarAttached(visible);
+
+        // The tree shows the INCOMING page's bar from the moment it mounts, and every other
+        // page's leaves it. Their strips keep rendering — they live in their own frames — but
+        // automation ids stay unique and tooling reads the page being navigated TO rather than
+        // whichever bar happens to be enumerated first.
+        host.Scaffold.SettleNavBarAttachments();
+
+        RequestLayout();
+    }
+
+    /// <summary>
+    /// Drives this page's bar between shown and hidden. A SAME-PAGE toggle slides it out through
+    /// the top edge (and back in from there), the way the tab bar strip slides through the
+    /// bottom one — a bar that only blinks out of existence reads as a glitch, not a change.
+    /// Interruptible: a toggle mid-flight retargets from where the strip currently sits.
+    /// </summary>
+    /// <remarks>
+    /// The page's inset follows the TARGET state, not the strip's current offset (see
+    /// <see cref="_navBarPresented"/> in <see cref="TopInsetPx"/>): the content reflows once, at
+    /// the start, and the bar travels over it. Re-dispatching insets per animation frame would
+    /// re-pad the page — and everything MAUI lays out inside it — sixty times a second.
+    /// A bar whose height nobody has measured yet cannot slide by it, so the first sync of a
+    /// page (and any hidden-at-mount bar) still snaps: there is nothing to travel.
+    /// </remarks>
+    private void SetNavBarPresented(bool presented, bool animated)
+    {
+        if (_strip is not { } strip)
+        {
+            return;
+        }
+
+        if (strip.Height > 0)
+        {
+            _lastStripHeightPx = strip.Height;
+
+            if (_host is { } heightOwner)
+            {
+                heightOwner.LastNavBarHeightPx = strip.Height;
+            }
+        }
+
+        var travel = _lastStripHeightPx;
+        var wasPresented = _navBarPresented;
+        _navBarTarget = presented;
+
+        // The inset SHRINKS only once the bar has travelled, and GROWS before it arrives: either
+        // way the page reflows while the strip is off the screen rather than under the reader's
+        // eye. It also keeps the relayout out of the animation's way — publishing it as the
+        // slide starts blocked the UI thread for ~150ms a time and the 250ms flight rendered
+        // three frames.
+        if (presented)
+        {
+            _navBarPresented = true;
+        }
+
+        // Dropped BEFORE the cancel: Cancel() raises AnimationEnd, and an end handler that still
+        // recognised itself as current would settle the strip for a flight that was superseded.
+        var superseded = _stripAnimator;
+        _stripAnimator = null;
+        superseded?.Cancel();
+
+        if (!animated || travel <= 0 || wasPresented == presented)
+        {
+            // Hidden at rest is GONE, never a translation by a height nobody has measured yet.
+            _navBarPresented = presented;
+            strip.TranslationY = 0;
+            strip.Visibility = presented ? ViewStates.Visible : ViewStates.Gone;
+
+            return;
+        }
+
+        // On screen for the whole flight, whichever way it is going.
+        strip.Visibility = ViewStates.Visible;
+
+        if (presented && strip.TranslationY == 0)
+        {
+            strip.TranslationY = -travel;
+        }
+
+        var animator = Android.Animation.ObjectAnimator.OfFloat(strip, "translationY", strip.TranslationY, presented ? 0f : -travel)!;
+        animator.SetDuration(_chromeDurationMs);
+
+        animator.AnimationEnd += (_, _) =>
+        {
+            // Only the flight that is still the current one may settle anything: a toggle
+            // mid-flight cancels this animator, and cancelling raises this very event.
+            if (!ReferenceEquals(_stripAnimator, animator))
+            {
+                return;
+            }
+
+            _stripAnimator = null;
+
+            // A bar that has finished travelling out is HIDDEN, not merely parked offscreen.
+            // A translated-but-visible strip is the MoRootPage bug: the page it belongs to gets
+            // pushed with a slide-up spec, the whole frame travels, and a bar that is only
+            // transformed rides back into view on the way.
+            if (_navBarTarget || _strip is not { } settled)
+            {
+                return;
+            }
+
+            settled.Visibility = ViewStates.Gone;
+            settled.TranslationY = 0;
+
+            // ...and only now does the page grow into the space the bar has left.
+            _navBarPresented = false;
+            RequestLayout();
+        };
+
+        _stripAnimator = animator;
+        animator.Start();
+    }
+
+    /// <summary>
+    /// Splits the insets: the strip gets them UNCHANGED, the page view gets the top rewritten to
+    /// this page's chrome footprint. Consumed, because the children are dispatched by hand — the
+    /// default subtree dispatch would hand both the same values and close the loop.
+    /// </summary>
+    WindowInsetsCompat? AndroidX.Core.View.IOnApplyWindowInsetsListener.OnApplyWindowInsets(AView? view, WindowInsetsCompat? insets)
+    {
+        if (insets is null)
+        {
+            return insets;
+        }
+
+        _lastInsets = insets;
+        DispatchInsets();
+
+        return WindowInsetsCompat.Consumed;
+    }
+
+    private void DispatchInsets()
+    {
+        if (_lastInsets is not { } insets)
+        {
+            return;
+        }
+
+        if (_strip is not null)
+        {
+            // Unchanged: the bar consumes the system inset itself, and its height must never
+            // depend on the inset derived FROM its height.
+            ViewCompat.DispatchApplyWindowInsets(_strip, insets);
+        }
+
+        if (_pageView is not null)
+        {
+            ViewCompat.DispatchApplyWindowInsets(_pageView, RewriteForPage(insets));
+        }
+    }
+
+    /// <summary>
+    /// The page's top inset: its own bar's footprint, which already spans the system inset it
+    /// extends under. Zero contribution when the page overlaps its bar or shows none — the raw
+    /// system top then reaches the page untouched.
+    /// </summary>
+    private WindowInsetsCompat RewriteForPage(WindowInsetsCompat insets)
+    {
+        var footprint = TopInsetPx;
+
+        if (footprint <= 0)
+        {
+            return insets;
+        }
+
+        var systemBars = insets.GetInsets(_systemBarsInsetsType) ?? throw new InvalidOperationException("SystemBars insets are null.");
+
+        using var builder = new WindowInsetsCompat.Builder(insets);
+
+        return builder
+               .SetInsets(_systemBarsInsetsType, Insets.Of(systemBars.Left, footprint, systemBars.Right, systemBars.Bottom)!)!
+               .Build()
+               ?? insets;
+    }
+
+    /// <summary>This page's chrome footprint in px, once its strip has been laid out.</summary>
+    private int TopInsetPx
+        => _host?.WantsNavBarInset == true && _navBarPresented && _strip is { } strip
+            ? strip.Height > 0 ? strip.Height : _lastStripHeightPx
+            : 0;
+
+    protected override void OnLayout(bool changed, int left, int top, int right, int bottom)
+    {
+        base.OnLayout(changed, left, top, right, bottom);
+
+        // Remembered for the NEXT frame this page gets: a covered page is torn down and rebuilt,
+        // and the rebuild must know the footprint before it can measure it.
+        if (_strip is { Height: > 0 } measured)
+        {
+            _lastStripHeightPx = measured.Height;
+
+            if (_host is { } host)
+            {
+                host.LastNavBarHeightPx = measured.Height;
+            }
+        }
+
+        // The strip's height is only known after it has been laid out, so the page's inset is
+        // published from here — and only when it actually changed, or every pass would
+        // re-dispatch. The strip's own insets do not depend on it, so this settles in one turn.
+        var footprint = TopInsetPx;
+
+        if (footprint != _appliedTopInsetPx)
+        {
+            _appliedTopInsetPx = footprint;
+
+            if (_pageView is not null && _lastInsets is not null)
+            {
+                ViewCompat.DispatchApplyWindowInsets(_pageView, RewriteForPage(_lastInsets));
+
+                // ...and ask for a real pass too: MAUI computes a hosted view's safe-area padding
+                // in its OWN listener, which a hand-rolled dispatch to one child does not run.
+                ViewCompat.RequestApplyInsets(_pageView);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Hands the page's view back, still alive: the predictive-back peek builds a throwaway
+    /// frame around a page that the commit then re-parents into its real fragment frame.
+    /// </summary>
+    public void ReleasePageView()
+    {
+        if (_pageView is { } pageView)
+        {
+            RemoveView(pageView);
+            _pageView = null;
+        }
+    }
+
+    /// <summary>
+    /// A frame insets the page view it HOSTS, and only that one. The page's platform view
+    /// outlives any single frame — the predictive-back peek builds one around it and the commit
+    /// re-parents it into the fragment's real frame — and re-parenting is a plain
+    /// <c>removeView</c> on this side. Without letting go here, the emptied frame keeps
+    /// answering window dispatches by rewriting insets onto a view another frame now owns: two
+    /// writers, and the page's top padding becomes whichever one the traversal happens to reach
+    /// last. That is a page whose content sits under its nav bar on one device and not on
+    /// another.
+    /// </summary>
+    public override void OnViewRemoved(AView? child)
+    {
+        base.OnViewRemoved(child);
+
+        if (child is not null && ReferenceEquals(child, _pageView))
+        {
+            _pageView = null;
+        }
+    }
+
+    private void ReleaseStrip()
+    {
+        if (_strip is not { } strip)
+        {
+            return;
+        }
+
+        strip.SetBar(null);
+        RemoveView(strip);
+        _strip = null;
+    }
+
+    /// <summary>
+    /// Drops everything this frame holds. Explicit, not left to the GC bridge: a managed Java
+    /// peer in the page-host chain outlives its Dispose, and its managed fields would pin the
+    /// page host — and through it the page and its model.
+    /// </summary>
+    public void Release()
+    {
+        ViewCompat.SetOnApplyWindowInsetsListener(this, null);
+        _stripAnimator?.Cancel();
+        _stripAnimator = null;
+        ReleaseStrip();
+        _pageView = null;
+        _lastInsets = null;
+        _host = null;
+    }
+}

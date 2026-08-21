@@ -4,7 +4,7 @@ namespace Nalu;
 
 /// <summary>
 /// The default Nalu navigation bar component, created automatically as the
-/// <see cref="Scaffold.NavBarViewProperty"/> default at the scaffold level. Slots, in order:
+/// <see cref="Scaffold.NavBarTemplateProperty"/> default at the scaffold level. Slots, in order:
 /// start-drawer button, back button, title (or the page's
 /// <see cref="Scaffold.TitleViewProperty"/> content), end-drawer button, close button — all
 /// driven by the <see cref="ScaffoldNavBarContext"/> binding context. Style it or replace it
@@ -15,8 +15,8 @@ namespace Nalu;
 /// The component spans the whole top strip and opts into the safe area itself, so its content
 /// sits below the status inset while the bar contributes its footprint to the page.
 /// The strip BACKGROUND is not the bar's concern: it belongs to the chrome and is driven by the
-/// effective <see cref="ScaffoldNavBarAppearance"/> (attached via
-/// <see cref="Scaffold.NavBarAppearanceProperty"/>) — the same is true for any custom bar.
+/// effective the attached nav bar appearance properties (attached via
+/// <c>Scaffold.NavBarBackground</c>) — the same is true for any custom bar.
 /// </para>
 /// <para>
 /// It owns ONLY the strip metrics (height, padding, spacing). Title and button appearance

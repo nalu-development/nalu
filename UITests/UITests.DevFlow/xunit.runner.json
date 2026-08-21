@@ -1,0 +1,11 @@
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+  "parallelizeAssembly": false,
+  "parallelizeTestCollections": false,
+  "maxParallelThreads": 1,
+  "methodDisplay": "method",
+
+  "// diagnostics": "A UI test is slow when the DEVICE is slow, so speed is a symptom worth seeing while the run happens rather than an hour later. longRunningTestSeconds reports a test still running after 45s WITHOUT failing it — deliberately not a timeout: on a loaded machine a hard limit turns slow-but-correct runs into red, which is the noise this suite already fights. 45s sits above the legitimate worst case (the restore scenarios kill and relaunch the app), so anything reported is genuinely anomalous.",
+  "diagnosticMessages": true,
+  "longRunningTestSeconds": 45
+}

@@ -110,7 +110,7 @@ public class AppearanceHomePage : ContentPage
         // Resolved title color (hex): the theme-change tests read the scaffold-level
         // AppThemeBinding through it.
         var titleForegroundProbe = new Label { AutomationId = "AppearanceHomeTitleForeground", FontSize = 11 };
-        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
+        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(titleForegroundProbe, nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
 
         Content = new VerticalStackLayout
         {
@@ -143,16 +143,10 @@ public class AppearanceOverlapPage : ContentPage
 
         Scaffold.SetNavBarOverlapsContent(this, true);
 
-        Scaffold.SetNavBarAppearance(
-            this,
-            new ScaffoldNavBarAppearance
-            {
-                Background = new SolidColorBrush(Colors.Transparent),
-                Foreground = Colors.White,
-                // Title-only channel: buttons follow Foreground (white), the title goes gold.
-                TitleForeground = Colors.Gold
-            }
-        );
+        Scaffold.SetNavBarBackground(this, new SolidColorBrush(Colors.Transparent));
+        Scaffold.SetNavBarForeground(this, Colors.White);
+        // Title-only channel: buttons follow the foreground (white), the title goes gold.
+        Scaffold.SetNavBarTitleForeground(this, Colors.Gold);
 
         var header = new BoxView { Color = Colors.DarkSlateBlue, HeightRequest = 220, VerticalOptions = LayoutOptions.Start };
 
@@ -167,9 +161,9 @@ public class AppearanceOverlapPage : ContentPage
 
         // Probes of the resolved context colors (hex), so tests can assert the two channels apart.
         var foregroundProbe = new Label { AutomationId = "AppearanceOverlapForeground", FontSize = 11 };
-        foregroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.Foreground), converter: new ColorHexConverter()));
+        foregroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(foregroundProbe, nameof(ScaffoldNavBarContext.Foreground), converter: new ColorHexConverter()));
         var titleForegroundProbe = new Label { AutomationId = "AppearanceOverlapTitleForeground", FontSize = 11 };
-        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
+        titleForegroundProbe.SetBinding(Label.TextProperty, NavBarBindings.Create(titleForegroundProbe, nameof(ScaffoldNavBarContext.TitleForeground), converter: new ColorHexConverter()));
 
         var body = new VerticalStackLayout
         {
@@ -212,13 +206,8 @@ public class AppearanceStyledPage : ContentPage
         BindingContext = model;
         Title = "Styled Title";
 
-        var appearance = new ScaffoldNavBarAppearance
-        {
-            Opacity = 0.5,
-            Foreground = Colors.Red
-        };
-
-        Scaffold.SetNavBarAppearance(this, appearance);
+        Scaffold.SetNavBarOpacity(this, 0.5);
+        Scaffold.SetNavBarForeground(this, Colors.Red);
 
         var titleView = new Label
         {
@@ -231,9 +220,10 @@ public class AppearanceStyledPage : ContentPage
         Scaffold.SetTitleView(this, titleView);
         model.DisposedCallback = () => LeakTracker.ExpectCollected(titleView);
 
-        // Live mutation: the appearance object is observable — the strip reacts per property.
+        // Live mutation: the attached value is a bindable property — the strip reacts to the
+        // page's PropertyChanged, per property.
         var mutateButton = new Button { Text = "Dim bar", AutomationId = "MutateAppearance", FontSize = 11 };
-        mutateButton.Clicked += (_, _) => appearance.Opacity = 0.25;
+        mutateButton.Clicked += (_, _) => Scaffold.SetNavBarOpacity(this, 0.25);
 
         Content = new VerticalStackLayout
         {
@@ -292,7 +282,7 @@ public class AppearanceScrollPage : ContentPage
             FontAttributes = FontAttributes.Bold,
             VerticalTextAlignment = TextAlignment.Center
         };
-        offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(nameof(ScaffoldNavBarContext.ScrollOffset), stringFormat: "{0:F0}"));
+        offsetLabel.SetBinding(Label.TextProperty, NavBarBindings.Create(offsetLabel, nameof(ScaffoldNavBarContext.ScrollOffset), stringFormat: "{0:F0}"));
         Scaffold.SetTitleView(this, offsetLabel);
 
         // Diagnostic granularity: tracking the island members separately tells WHICH link leaks
@@ -329,9 +319,8 @@ public class NavBarAppearanceScaffold : Scaffold
         var surface = new SolidColorBrush();
         surface.SetAppThemeColor(SolidColorBrush.ColorProperty, Colors.LightSteelBlue, Colors.DarkSlateBlue);
 
-        var appearance = new ScaffoldNavBarAppearance { Background = surface };
-        appearance.SetAppThemeColor(ScaffoldNavBarAppearance.TitleForegroundProperty, Colors.Black, Colors.White);
-        SetNavBarAppearance(this, appearance);
+        SetNavBarBackground(this, surface);
+        this.SetAppThemeColor(NavBarTitleForegroundProperty, Colors.Black, Colors.White);
     }
 }
 

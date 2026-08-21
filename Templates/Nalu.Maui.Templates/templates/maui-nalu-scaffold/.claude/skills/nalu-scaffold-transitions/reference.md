@@ -114,13 +114,13 @@ Resolution order (implemented by the scaffold for the PUSHED page):
 | Old | Scaffold |
 |-----|----------|
 | `Shell` / `NaluShell` subclass, `TabBar`/`Tab`/`ShellContent` | `nalu:Scaffold` + `ScaffoldTabBar` + `ScaffoldRoot PageType="{x:Type ...}"` (skill `nalu-scaffold-structure`) |
-| `NavigationPage` wrapper, `NavigationPage.HasNavigationBar/HasBackButton/TitleView` etc. | Not used; pages are bare `ContentPage`s. Nav bar is drawn by the Scaffold: `nalu:Scaffold.IsNavBarVisible`, `nalu:Scaffold.TitleView`, `nalu:Scaffold.NavBarAppearance` |
+| `NavigationPage` wrapper, `NavigationPage.HasNavigationBar/HasBackButton/TitleView` etc. | Not used; pages are bare `ContentPage`s. Nav bar is drawn by the Scaffold: `nalu:Scaffold.IsNavBarVisible`, `nalu:Scaffold.TitleView`, the `nalu:Scaffold.NavBar*` appearance properties |
 | `Shell.NavBarIsVisible` | `nalu:Scaffold.IsNavBarVisible` |
 | `Shell.TitleView` | `nalu:Scaffold.TitleView` (BindingContext is the PAGE MODEL) |
 | `Shell.TabBarIsVisible` | `nalu:Scaffold.TabBarVisibility` (`Visible` default / `Auto` / `Hidden`) |
 | `Shell.PresentationMode="ModalAnimated"` / modal routes | `nalu:Scaffold.PageMode="Modal"` or `"DismissableModal"` |
-| `Shell.BackgroundColor`, `Shell.ForegroundColor`, `Shell.TitleColor`… | `ScaffoldNavBarAppearance` (page → area → scaffold merge) |
-| `Shell.BackButtonBehavior` | Default nav bar back button + `ILeavingGuard`; custom bar via `Scaffold.NavBarView` |
+| `Shell.BackgroundColor`, `Shell.ForegroundColor`, `Shell.TitleColor`… | `Scaffold.NavBarBackground` / `NavBarForeground` / `NavBarTitleForeground` (page → area → scaffold merge) |
+| `Shell.BackButtonBehavior` | Default nav bar back button + `ILeavingGuard`; custom bar via `Scaffold.NavBarTemplate` |
 | Shell flyout | `Scaffold.FlyoutStart`/`FlyoutEnd` + `ScaffoldFlyoutMenuView` |
 | Native/Fragment page animations | `nalu:Scaffold.PageTransition` + `nalu:Scaffold.TransitionName` |
 | `Shell.Current`, `GoToAsync("route?x=1")`, query-string routes | `INavigationService` + typed intents (skill `nalu-navigation`) |

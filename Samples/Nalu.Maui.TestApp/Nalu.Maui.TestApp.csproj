@@ -68,7 +68,7 @@
         <!-- DevFlow agent: gives AI agents and UI tests eyes/hands inside the running app.
              Referenced unconditionally (NuGet restore is configuration-independent),
              but only activated in DEBUG builds via MauiProgram. -->
-        <PackageReference Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26358.3" />
+        <PackageReference Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26368.2" />
     </ItemGroup>
 
     <ItemGroup>

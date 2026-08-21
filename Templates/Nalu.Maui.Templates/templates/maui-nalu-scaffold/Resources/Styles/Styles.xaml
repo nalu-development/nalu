@@ -65,12 +65,26 @@
 
     <!-- Scaffold chrome. Every styling property of the default components carries a real
          default value, so plain implicit styles override it. The nav bar STRIP surface
-         (background/opacity/offset) is not a component property: it is the scaffold-level
-         ScaffoldNavBarAppearance set in AppScaffold.xaml (pages override per property).
+         (background/opacity/offset) is not a component property: it is the attached nav bar
+         appearance below (pages override per property).
          Title/icon COLOR is deliberately NOT styled here: an explicit TextColor/IconColor would
-         win over the appearance colors and pin them, so a page setting its own NavBarAppearance
+         win over the appearance colors and pin them, so a page setting its own NavBarForeground
          (photo headers, scroll-driven recolor) could no longer recolor the bar. The scaffold-level
-         appearance in AppScaffold.xaml (Foreground = buttons, TitleForeground = title) is the source. -->
+         values below (NavBarForeground = buttons, NavBarTitleForeground = title) are the source. -->
+
+    <!-- App-wide nav bar surface. Attached properties on a real element, so a Style setter gives
+         every scaffold its own VALUE — nothing is shared — and any page overrides one property
+         at a time while the rest keep inheriting these. -->
+    <Style TargetType="nalu:Scaffold" ApplyToDerivedTypes="True">
+        <Setter Property="nalu:Scaffold.NavBarForeground" Value="{StaticResource Accent}" />
+        <Setter Property="nalu:Scaffold.NavBarTitleForeground"
+                Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
+        <Setter Property="nalu:Scaffold.NavBarBackground">
+            <Setter.Value>
+                <SolidColorBrush Color="{AppThemeBinding Light={StaticResource BackgroundLight}, Dark={StaticResource BackgroundDark}}" />
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <Style TargetType="nalu:ScaffoldNavBarTitle">
         <Setter Property="FontFamily" Value="SemiBold" />

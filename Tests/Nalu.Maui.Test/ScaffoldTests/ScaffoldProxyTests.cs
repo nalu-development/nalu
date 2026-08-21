@@ -90,6 +90,10 @@ public class ScaffoldProxyTests
         public bool HasOverlay => false;
 
         public bool IsOverlayPresented(ScaffoldOverlayRequest request) => false;
+
+        public void ReleasePage(Page page)
+        {
+        }
     }
 
     private readonly ServiceProvider _serviceProvider;
@@ -162,6 +166,43 @@ public class ScaffoldProxyTests
         // Initial display is the handler's synchronization; no navigation commit happened.
         _presenter.Syncs.Should().BeEmpty();
         _scaffold.Proxy!.Location.Should().Be("//area0/HomePage");
+    }
+
+    [Fact(DisplayName = "Scaffold.NavBarContext forwards to the CURRENT page's own context")]
+    public async Task ScaffoldNavBarContextForwardsToTheCurrentPage()
+    {
+        await _scaffold.InitializeAsync(_serviceProvider);
+
+        var homePage = _tabBar.Roots[0].NavigationStack.RootPage!;
+        var homeContext = _scaffold.NavBarContext;
+        homeContext.Should().BeSameAs(_scaffold.GetPageHost(homePage)!.Context);
+
+        var forwarderChanges = 0;
+        _scaffold.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(Scaffold.NavBarContext))
+            {
+                forwarderChanges++;
+            }
+        };
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>());
+
+        var detailPage = _scaffold.CurrentPage!;
+        detailPage.Should().NotBeSameAs(homePage);
+
+        _scaffold.NavBarContext.Should().BeSameAs(_scaffold.GetPageHost(detailPage)!.Context);
+        _scaffold.NavBarContext.Should().NotBeSameAs(homeContext, "each page owns its context");
+        forwarderChanges.Should().BeGreaterThan(0, "bindings routed through the forwarder must re-evaluate");
+
+        // The covered page keeps its own host and context while it stays in the stack.
+        _scaffold.GetPageHost(homePage).Should().NotBeNull();
+        _scaffold.GetPageHost(homePage)!.Context.Should().BeSameAs(homeContext);
+
+        await _navigationService.GoToAsync(Navigation.Relative().Pop());
+
+        _scaffold.NavBarContext.Should().BeSameAs(homeContext, "the revealed page's context is restored, not rebuilt");
+        _scaffold.GetPageHost(detailPage).Should().BeNull("a popped page's host is disposed");
     }
 
     [Fact(DisplayName = "Scaffold, when initialized with InitialRootPageType, selects that root")]

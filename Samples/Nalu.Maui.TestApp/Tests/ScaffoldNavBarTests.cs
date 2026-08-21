@@ -192,7 +192,7 @@ public class NavBarCustomPage : ContentPage
             1
         );
 
-        Scaffold.SetNavBarView(this, customBar);
+        Scaffold.SetNavBarTemplate(this, new DataTemplate(() => customBar));
 
         Content = NavBarPageFactory.BuildContent(
             "NavBarPageCustom",
@@ -224,7 +224,7 @@ public class NavBarEdgeToEdgePage : ContentPage
             AutomationId = "EdgeToEdgeNavBarMarker"
         };
 
-        Scaffold.SetNavBarView(this, customBar);
+        Scaffold.SetNavBarTemplate(this, new DataTemplate(() => customBar));
 
         Content = NavBarPageFactory.BuildContent(
             "NavBarPageEdgeToEdge",

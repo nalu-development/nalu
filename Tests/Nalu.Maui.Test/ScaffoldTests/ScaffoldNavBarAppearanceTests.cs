@@ -1,126 +1,144 @@
 namespace Nalu.Maui.Test.ScaffoldTests;
 
 /// <summary>
-/// The per-property appearance merge (§5.2 revision): each
-/// <see cref="ScaffoldNavBarAppearance"/> property resolves independently through the
-/// page → area → scaffold chain via UNSET detection — a page-level appearance is a delta,
-/// not a replacement.
+/// The nav bar appearance resolution: each attached property resolves INDEPENDENTLY through
+/// page → current area → scaffold by UNSET detection, so a page-level value is a delta, not a
+/// replacement. The title color is the one exception — it resolves level by level.
 /// </summary>
 public class ScaffoldNavBarAppearanceTests
 {
-    private static T Resolve<T>(
-        BindableProperty property,
-        ScaffoldNavBarAppearance? page,
-        ScaffoldNavBarAppearance? area,
-        ScaffoldNavBarAppearance? scaffold,
-        T fallback
-    ) => ScaffoldNavBarAppearance.Resolve(property, page, area, scaffold, fallback);
-
-    [Fact(DisplayName = "Resolve, given no appearance in the chain, returns the fallback")]
-    public void ResolveGivenNoAppearanceReturnsFallback()
+    private static (Scaffold Scaffold, ScaffoldArea Area, ContentPage Page) Build()
     {
-        Resolve<Color?>(ScaffoldNavBarAppearance.ForegroundProperty, null, null, null, null).Should().BeNull();
-        Resolve(ScaffoldNavBarAppearance.OpacityProperty, null, null, null, 1.0).Should().Be(1.0);
-    }
-
-    [Fact(DisplayName = "Resolve, given appearances with unset properties, returns the fallback")]
-    public void ResolveGivenUnsetPropertiesReturnsFallback()
-    {
-        var page = new ScaffoldNavBarAppearance();
-        var scaffold = new ScaffoldNavBarAppearance();
-
-        Resolve<Brush?>(ScaffoldNavBarAppearance.BackgroundProperty, page, null, scaffold, null).Should().BeNull();
-        Resolve(ScaffoldNavBarAppearance.OffsetYProperty, page, null, scaffold, 0.0).Should().Be(0.0);
-    }
-
-    [Fact(DisplayName = "Resolve, given a page-level value, beats area and scaffold values")]
-    public void ResolveGivenPageValueBeatsOuterLevels()
-    {
-        var page = new ScaffoldNavBarAppearance { Opacity = 0.25 };
-        var area = new ScaffoldNavBarAppearance { Opacity = 0.5 };
-        var scaffold = new ScaffoldNavBarAppearance { Opacity = 0.75 };
-
-        Resolve(ScaffoldNavBarAppearance.OpacityProperty, page, area, scaffold, 1.0).Should().Be(0.25);
-    }
-
-    [Fact(DisplayName = "Resolve, given a page-level delta, resolves unset properties from outer levels per property")]
-    public void ResolveGivenPageDeltaMergesPerProperty()
-    {
-        var scaffoldBackground = new SolidColorBrush(Colors.White);
-        var page = new ScaffoldNavBarAppearance { Opacity = 0.5 };
-        var area = new ScaffoldNavBarAppearance { Foreground = Colors.Red };
-        var scaffold = new ScaffoldNavBarAppearance { Background = scaffoldBackground, Foreground = Colors.Black };
-
-        Resolve(ScaffoldNavBarAppearance.OpacityProperty, page, area, scaffold, 1.0).Should().Be(0.5);
-        Resolve<Color?>(ScaffoldNavBarAppearance.ForegroundProperty, page, area, scaffold, null).Should().Be(Colors.Red);
-        Resolve<Brush?>(ScaffoldNavBarAppearance.BackgroundProperty, page, area, scaffold, null).Should().BeSameAs(scaffoldBackground);
-    }
-
-    [Fact(DisplayName = "Resolve, given a value explicitly set to the property default, still wins over outer levels")]
-    public void ResolveGivenExplicitDefaultValueWins()
-    {
-        // Unset detection, not value comparison: opacity 1.0 IS the bindable default, but an
-        // explicit assignment must shadow the scaffold-level 0.5.
-        var page = new ScaffoldNavBarAppearance { Opacity = 1.0 };
-        var scaffold = new ScaffoldNavBarAppearance { Opacity = 0.5 };
-
-        Resolve(ScaffoldNavBarAppearance.OpacityProperty, page, null, scaffold, 1.0).Should().Be(1.0);
-    }
-
-    [Fact(DisplayName = "Resolve, given a cleared property, falls back to outer levels again")]
-    public void ResolveGivenClearedPropertyFallsBack()
-    {
-        var page = new ScaffoldNavBarAppearance { Foreground = Colors.White };
-        var scaffold = new ScaffoldNavBarAppearance { Foreground = Colors.Black };
-
-        Resolve<Color?>(ScaffoldNavBarAppearance.ForegroundProperty, page, null, scaffold, null).Should().Be(Colors.White);
-
-        page.ClearValue(ScaffoldNavBarAppearance.ForegroundProperty);
-
-        Resolve<Color?>(ScaffoldNavBarAppearance.ForegroundProperty, page, null, scaffold, null).Should().Be(Colors.Black);
-    }
-
-    [Fact(DisplayName = "GetNavBarAppearanceChain resolves page, current area and scaffold attachments")]
-    public void ChainResolvesAttachments()
-    {
-        var scaffold = new Scaffold();
         var area = new ScaffoldArea();
+        var scaffold = new Scaffold();
         scaffold.Areas.Add(area);
         scaffold.CurrentArea = area;
 
-        var page = new ContentPage();
-        var pageAppearance = new ScaffoldNavBarAppearance();
-        var areaAppearance = new ScaffoldNavBarAppearance();
-        var scaffoldAppearance = new ScaffoldNavBarAppearance();
-
-        Scaffold.SetNavBarAppearance(page, pageAppearance);
-        Scaffold.SetNavBarAppearance(area, areaAppearance);
-        Scaffold.SetNavBarAppearance(scaffold, scaffoldAppearance);
-
-        var chain = scaffold.GetNavBarAppearanceChain(page);
-
-        chain.Page.Should().BeSameAs(pageAppearance);
-        chain.Area.Should().BeSameAs(areaAppearance);
-        chain.Scaffold.Should().BeSameAs(scaffoldAppearance);
+        return (scaffold, area, new ContentPage());
     }
 
-    [Fact(DisplayName = "An attached appearance inherits the element's binding context")]
-    public void AttachedAppearanceInheritsBindingContext()
+    [Fact(DisplayName = "With nothing set, resolution yields the property's declared default")]
+    public void ResolveGivenNothingSetYieldsTheDefault()
     {
-        var page = new ContentPage();
-        var appearance = new ScaffoldNavBarAppearance();
+        var (scaffold, _, page) = Build();
 
-        Scaffold.SetNavBarAppearance(page, appearance);
-        appearance.BindingContext.Should().BeNull();
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(1.0);
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOffsetYProperty).Should().Be(0.0);
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarForegroundProperty).Should().BeNull();
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarBackgroundProperty).Should().BeOfType<SolidColorBrush>();
+    }
 
-        var model = new object();
-        page.BindingContext = model;
-        appearance.BindingContext.Should().BeSameAs(model);
+    [Fact(DisplayName = "A page value beats the area's, which beats the scaffold's")]
+    public void ResolveIsMostSpecificWins()
+    {
+        var (scaffold, area, page) = Build();
 
-        // Attaching to an element that already has a context propagates immediately.
-        var otherPage = new ContentPage { BindingContext = model };
-        var otherAppearance = new ScaffoldNavBarAppearance();
-        Scaffold.SetNavBarAppearance(otherPage, otherAppearance);
-        otherAppearance.BindingContext.Should().BeSameAs(model);
+        Scaffold.SetNavBarOpacity(scaffold, 0.75);
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(0.75);
+
+        Scaffold.SetNavBarOpacity(area, 0.5);
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(0.5);
+
+        Scaffold.SetNavBarOpacity(page, 0.25);
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(0.25);
+    }
+
+    [Fact(DisplayName = "Each property resolves independently: a page value is a delta, not a replacement")]
+    public void ResolveIsPerProperty()
+    {
+        var (scaffold, area, page) = Build();
+        var scaffoldBackground = new SolidColorBrush(Colors.White);
+
+        Scaffold.SetNavBarBackground(scaffold, scaffoldBackground);
+        Scaffold.SetNavBarForeground(scaffold, Colors.Black);
+        Scaffold.SetNavBarForeground(area, Colors.Red);
+        Scaffold.SetNavBarOpacity(page, 0.5);
+
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(0.5, "the page set it");
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarForegroundProperty).Should().Be(Colors.Red, "the area is the most specific level that set it");
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarBackgroundProperty).Should().BeSameAs(scaffoldBackground, "nothing nearer set it");
+    }
+
+    [Fact(DisplayName = "A value set explicitly TO the default still shadows outer levels")]
+    public void ResolveUsesUnsetDetectionNotValueComparison()
+    {
+        var (scaffold, _, page) = Build();
+
+        // 1.0 IS the declared default, but an explicit assignment must beat the scaffold's 0.5 —
+        // which is why resolution asks IsSet rather than comparing values.
+        Scaffold.SetNavBarOpacity(scaffold, 0.5);
+        Scaffold.SetNavBarOpacity(page, 1.0);
+
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(1.0);
+    }
+
+    [Fact(DisplayName = "A style-applied value counts as set, so it beats outer levels")]
+    public void ResolveTreatsStyleValuesAsSet()
+    {
+        var (scaffold, _, page) = Build();
+
+        Scaffold.SetNavBarOpacity(scaffold, 0.5);
+
+        page.Style = new Style(typeof(ContentPage))
+        {
+            Setters = { new Setter { Property = Scaffold.NavBarOpacityProperty, Value = 0.25 } }
+        };
+
+        scaffold.ResolveNavBarValue(page, Scaffold.NavBarOpacityProperty).Should().Be(0.25);
+    }
+
+    /// <summary>
+    /// The shape every real app has: <c>AppScaffold</c> derives from <see cref="Scaffold"/>, and
+    /// the app-wide chrome arrives as an IMPLICIT style. MAUI matches implicit styles on the
+    /// EXACT type, so such a style never reaches the app's scaffold unless it opts in — and the
+    /// bar silently keeps the library defaults, immune to everything the style says, theme
+    /// changes included. Nothing else here catches that: the other tests assign values (or a
+    /// style) to the instance directly, which always applies.
+    /// </summary>
+    [Fact(DisplayName = "An implicit style reaches a DERIVED scaffold only with ApplyToDerivedTypes")]
+    public void ImplicitStyleReachesADerivedScaffoldOnlyWhenItOptsIn()
+    {
+        static double ResolveThroughImplicitStyle(bool applyToDerivedTypes)
+        {
+            var scaffold = new DerivedScaffold();
+            scaffold.Areas.Add(new ScaffoldArea());
+
+            scaffold.Resources = new ResourceDictionary
+            {
+                new Style(typeof(Scaffold))
+                {
+                    ApplyToDerivedTypes = applyToDerivedTypes,
+                    Setters = { new Setter { Property = Scaffold.NavBarOpacityProperty, Value = 0.25 } }
+                }
+            };
+
+            return (double) scaffold.ResolveNavBarValue(new ContentPage(), Scaffold.NavBarOpacityProperty)!;
+        }
+
+        ResolveThroughImplicitStyle(false).Should().Be(1.0, "an exact-type implicit style skips the subclass, leaving the declared default");
+        ResolveThroughImplicitStyle(true).Should().Be(0.25, "ApplyToDerivedTypes is what carries app-wide chrome onto the app's own scaffold");
+    }
+
+    private sealed class DerivedScaffold : Scaffold;
+
+    [Fact(DisplayName = "The title color takes the first level that set EITHER title or foreground")]
+    public void ResolveTitleForegroundIsLevelByLevel()
+    {
+        var (scaffold, area, page) = Build();
+
+        scaffold.ResolveNavBarTitleForeground(page).Should().BeNull("nothing set anywhere");
+
+        Scaffold.SetNavBarTitleForeground(scaffold, Colors.Blue);
+        scaffold.ResolveNavBarTitleForeground(page).Should().Be(Colors.Blue);
+
+        // The area sets only a foreground: it still decides the title, and the scaffold's title
+        // color does NOT leak past it — that is what "level by level" buys over per-property.
+        Scaffold.SetNavBarForeground(area, Colors.Red);
+        scaffold.ResolveNavBarTitleForeground(page).Should().Be(Colors.Red);
+
+        // At the same level, the title channel wins over the general one.
+        Scaffold.SetNavBarForeground(page, Colors.Green);
+        Scaffold.SetNavBarTitleForeground(page, Colors.Gold);
+        scaffold.ResolveNavBarTitleForeground(page).Should().Be(Colors.Gold);
     }
 }

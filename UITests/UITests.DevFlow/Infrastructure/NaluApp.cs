@@ -90,6 +90,11 @@ public sealed class NaluApp : IAsyncLifetime
                             _client = client;
                         }
 
+                        // Reaching AN agent is not reaching OURS, and a suite pointed at the wrong
+                        // app fails three hundred times instead of once.
+                        await EnsureAgentBelongsToTestAppAsync().ConfigureAwait(false);
+                        await WaitForAppForegroundAsync().ConfigureAwait(false);
+
                         return;
                     }
                 }
@@ -146,6 +151,35 @@ public sealed class NaluApp : IAsyncLifetime
 
         return platform.Contains("ios", StringComparison.OrdinalIgnoreCase)
                || platform.Contains("catalyst", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>TEMPORARY diagnostic: every element carrying an automation id, with its path.</summary>
+    public async Task<string> DiagnoseAsync(string automationId)
+    {
+        var tree = await _client.GetTreeAsync().ConfigureAwait(false);
+        var lines = new List<string>();
+
+        void Walk(IEnumerable<ElementInfo> elements, string path)
+        {
+            foreach (var element in elements)
+            {
+                var here = $"{path}/{element.Type}";
+
+                if (element.AutomationId == automationId)
+                {
+                    lines.Add($"  {here} [id={element.Id} x={element.WindowBounds?.X} w={element.WindowBounds?.Width} y={element.WindowBounds?.Y} h={element.WindowBounds?.Height} vis={element.IsVisible}]");
+                }
+
+                if (element.Children is { } children)
+                {
+                    Walk(children, here);
+                }
+            }
+        }
+
+        Walk(tree, string.Empty);
+
+        return string.Join("\n", lines);
     }
 
     /// <summary>Finds a single element by AutomationId, or null when not present.</summary>
@@ -1197,6 +1231,136 @@ public sealed class NaluApp : IAsyncLifetime
     /// re-established on the same platform's port pair (base / +1000 broker fallback), so the
     /// discovery can never latch onto another platform's app mid-restart.
     /// </summary>
+    /// <summary>
+    /// Fails when the agent we reached belongs to a DIFFERENT app.
+    /// </summary>
+    /// <remarks>
+    /// Any agent-enabled app answers on the platform port, and the port is claimed by whoever
+    /// starts first: the DailyHelper took 9223 twice in one session and the suite then drove IT,
+    /// every test failing on its own 10s waits — three hundred vague failures and the better part
+    /// of an hour for one wrong app. One clear failure here costs seconds.
+    /// Tolerant by design: when the agent will not say who it is, the run continues.
+    /// </remarks>
+    private async Task EnsureAgentBelongsToTestAppAsync()
+    {
+        var appId = await ReadAgentAppIdAsync().ConfigureAwait(false);
+
+        if (appId is null || appId.Contains(_testAppId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"The DevFlow agent at {_client.BaseUrl} belongs to '{appId}', not the TestApp ('{_testAppId}'). "
+            + "Another agent-enabled app holds the port (the DailyHelper is the usual culprit) — force-stop or "
+            + "uninstall it, relaunch the TestApp, and check the agent's 'HTTP server started' log line carries "
+            + "the TestApp's pid before re-running.");
+    }
+
+    /// <summary>The app id the agent reports, or null when this preview does not report one.</summary>
+    private async Task<string?> ReadAgentAppIdAsync()
+    {
+        try
+        {
+            var status = await _client.GetStatusAsync().ConfigureAwait(false);
+
+            return status is null ? null : FindAppId(status, depth: 0);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads the app id out of the status STRUCTURALLY rather than through a pinned property path:
+    /// the agent is an experimental preview whose status shape moves between builds, and this file
+    /// exists to absorb exactly that churn.
+    /// </summary>
+    private static string? FindAppId(object status, int depth)
+    {
+        if (depth > 2)
+        {
+            return null;
+        }
+
+        foreach (var property in status.GetType().GetProperties())
+        {
+            if (property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            object? value;
+
+            try
+            {
+                value = property.GetValue(status);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            switch (value)
+            {
+                case string text when property.Name is "PackageId" or "BundleId" or "ApplicationId" or "AppId":
+                    return text;
+
+                case not null and not string when property.Name is "App" or "Application":
+                    return FindAppId(value, depth + 1);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Waits until the app is not merely CONNECTED but actually showing something.
+    /// </summary>
+    /// <remarks>
+    /// The agent answers while the app is still starting: after a kill-and-relaunch it accepts a
+    /// status call before any page is laid out, and taps sent into that gap land nowhere at all.
+    /// The restore scenarios relaunch the app for a living and were the flakiest class in the
+    /// suite — spinning through a convergence budget against a window that had not drawn yet.
+    /// "Showing something" is the honest signal: at least one element with real window bounds.
+    /// </remarks>
+    public async Task WaitForAppForegroundAsync(TimeSpan? timeout = null)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
+
+        while (true)
+        {
+            try
+            {
+                var tree = await _client.GetTreeAsync().ConfigureAwait(false);
+
+                if (HasRenderedElement(tree))
+                {
+                    return;
+                }
+            }
+            catch (Exception) when (stopwatch.Elapsed < effectiveTimeout)
+            {
+                // Still coming up: the agent may refuse a tree while the window is being created.
+            }
+
+            if (stopwatch.Elapsed >= effectiveTimeout)
+            {
+                throw new TimeoutException(
+                    $"The app was reachable but never drew anything within {effectiveTimeout.TotalSeconds:0.#}s "
+                    + "— it is running without a presented window (still starting, or in the background).");
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+    }
+
+    private static bool HasRenderedElement(IEnumerable<ElementInfo> elements)
+        => elements.Any(element => (element.WindowBounds ?? element.Bounds) is { Height: > 0, Width: > 0 }
+                                   || (element.Children is { } children && HasRenderedElement(children)));
+
     public async Task RestartAppAsync()
     {
         var platform = await GetPlatformAsync().ConfigureAwait(false);
@@ -1220,6 +1384,9 @@ public sealed class NaluApp : IAsyncLifetime
         }
 
         await ReconnectSamePlatformAsync().ConfigureAwait(false);
+
+        // Reconnected is not ready: the caller's next tap must land on a window that exists.
+        await WaitForAppForegroundAsync().ConfigureAwait(false);
     }
 
     private static async Task RunSimctlAsync(params string[] arguments)
@@ -1297,26 +1464,55 @@ public sealed class NaluApp : IAsyncLifetime
     /// Brings the app back to the test-selection page.
     /// Uses the "ResetButton" overlay added by the TestApp to every test page.
     /// </summary>
+    /// <remarks>
+    /// Retried, because a test hands the app over mid-flight more often than not: an async
+    /// navigation the test did not wait for can still be settling, and while it is, the page it
+    /// is leaving is a second live copy of everything the reset looks for — same automation ids,
+    /// same "Exit" text, and a tap on the departing copy does nothing at all. A second attempt a
+    /// moment later finds only the page that stayed. A reset that gave up after one silent tap
+    /// failed the test that had already passed, and every test after it until the app drifted
+    /// back on its own.
+    /// </remarks>
     public async Task ResetAsync()
     {
-        // Already on the main page?
-        if (await FindElementAsync("TestName").ConfigureAwait(false) is not null)
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            return;
+            // Already on the main page?
+            if (await FindElementAsync("TestName").ConfigureAwait(false) is not null)
+            {
+                return;
+            }
+
+            await TryResetOnceAsync().ConfigureAwait(false);
+
+            if (await WaitForElementOrDefaultAsync("TestName", TimeSpan.FromSeconds(4)).ConfigureAwait(false) is not null)
+            {
+                return;
+            }
         }
 
+        // Nothing worked: fail with the tree, which says what the app is actually showing.
+        await WaitForElementAsync("TestName", TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+    }
+
+    /// <summary>One reset attempt: the decorated overlay, the Shell-style "Exit" button, or back.</summary>
+    private async Task TryResetOnceAsync()
+    {
         var resetButton = await WaitForElementOrDefaultAsync("ResetButton", TimeSpan.FromSeconds(2)).ConfigureAwait(false);
 
         if (resetButton is null)
         {
-            // Shell-based test pages (e.g. "Navigation Tests") have no decorated ResetButton:
-            // they expose an app-reset button with text "Exit" on every page instead.
-            var exitButton = (await _client.QueryAsync(text: "Exit").ConfigureAwait(false)).FirstOrDefault(e => e.IsVisible);
+            // Scaffold- and Shell-based test pages have no decorated ResetButton: they expose an
+            // app-reset button with text "Exit" on every page instead.
+            var exitButtons = (await _client.QueryAsync(text: "Exit").ConfigureAwait(false))
+                              .Where(e => e.IsVisible)
+                              .ToList();
 
-            if (exitButton is not null)
+            if (exitButtons.Count > 0)
             {
-                await _client.TapAsync(exitButton.Id).ConfigureAwait(false);
-                await WaitForElementAsync("TestName").ConfigureAwait(false);
+                // LAST, not first: when a departing page overlaps the arriving one, the tree
+                // still carries both and the arriving page is the later of the two.
+                await _client.TapAsync(exitButtons[^1].Id).ConfigureAwait(false);
 
                 return;
             }
@@ -1330,8 +1526,6 @@ public sealed class NaluApp : IAsyncLifetime
         {
             await _client.TapAsync(resetButton.Id).ConfigureAwait(false);
         }
-
-        await WaitForElementAsync("TestName").ConfigureAwait(false);
     }
 
     /// <summary>Resets the app and opens the test page registered with the given [TestPage] name.</summary>

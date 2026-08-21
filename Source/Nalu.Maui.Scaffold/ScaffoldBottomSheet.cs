@@ -234,6 +234,7 @@ public sealed class ScaffoldBottomSheetView : Border
     private readonly View _contentView;
     private readonly Grid _contentHost;
     private double[] _detentOffsets = [0];
+    private readonly GestureVelocitySampler _dragVelocity = new();
     private double _sheetHeight;
     private Func<Task>? _dismissAsync;
 
@@ -507,9 +508,13 @@ public sealed class ScaffoldBottomSheetView : Border
     {
         var previous = TranslationY;
         TranslationY = Math.Clamp(previous + deltaY, 0, _sheetHeight);
+        _dragVelocity.Add(TranslationY);
 
         return TranslationY - previous;
     }
+
+    /// <summary>Starts measuring the drag's speed — the platform gestures call it when they claim one.</summary>
+    internal void BeginDrag() => _dragVelocity.Begin(TranslationY);
 
     /// <inheritdoc cref="DragBy"/>
     internal Task SettleFromGestureAsync() => SettleAsync();
@@ -529,22 +534,85 @@ public sealed class ScaffoldBottomSheetView : Border
     internal Task ExitAsync() => this.TranslateToAsync(0, _sheetHeight, _animationDuration, Easing.CubicIn);
 
 
-    /// <summary>Snaps to the nearest detent — or dismisses when pulled far enough below the smallest one.</summary>
+    /// <summary>
+    /// Snaps to the detent the drag was HEADING for — or dismisses when it was heading below the
+    /// smallest one.
+    /// </summary>
+    /// <remarks>
+    /// The nearest detent to where the sheet was RELEASED is the wrong question: it makes every
+    /// change of detent a journey past the midpoint, and a quick swipe — the way people actually
+    /// dismiss a sheet or pull one open — do nothing at all. So the nearest detent is taken from
+    /// the projected position instead (<see cref="GestureSettling.Project"/>), which leaves a slow
+    /// drag behaving exactly as before because its projection is where it already is.
+    /// A FLICK moves exactly ONE detent in its own direction whatever the distance: down to the
+    /// next smaller one (or to dismissal, when there is none below and the sheet may close), up to
+    /// the next larger. One step, because skipping detents on a fast flick makes the gesture
+    /// unpredictable — the same rule the platforms' own sheets follow.
+    /// TranslationY grows DOWNWARD: a positive velocity is a swipe down, and _detentOffsets is
+    /// ordered largest-detent-first, so "the next detent down" is the next entry along.
+    /// </remarks>
     private async Task SettleAsync()
     {
         var position = TranslationY;
-        var smallestDetentOffset = _detentOffsets[^1];
+        var velocity = _dragVelocity.Velocity;
+        _dragVelocity.Reset();
 
-        if (_presentation.AllowPullDownToClose
-            && position > smallestDetentOffset + _dismissThreshold
-            && _dismissAsync is { } dismissAsync)
+        var smallestDetentOffset = _detentOffsets[^1];
+        var flick = GestureSettling.FlickDirection(velocity);
+        var projected = GestureSettling.Project(position, velocity);
+        var canDismiss = _presentation.AllowPullDownToClose && _dismissAsync is not null;
+
+        double target;
+
+        if (flick != 0)
         {
-            await dismissAsync();
+            var current = NearestDetentIndex(position);
+            var step = flick > 0 ? 1 : -1;
+            var next = current + step;
+
+            if (next >= _detentOffsets.Length)
+            {
+                // Flicked down with nothing smaller left: that is the dismiss gesture.
+                if (canDismiss)
+                {
+                    await _dismissAsync!();
+
+                    return;
+                }
+
+                next = _detentOffsets.Length - 1;
+            }
+
+            target = _detentOffsets[Math.Max(0, next)];
+        }
+        else if (canDismiss && projected > smallestDetentOffset + _dismissThreshold)
+        {
+            await _dismissAsync!();
 
             return;
         }
+        else
+        {
+            target = _detentOffsets.MinBy(offset => Math.Abs(offset - projected));
+        }
 
-        var target = _detentOffsets.MinBy(offset => Math.Abs(offset - position));
-        await this.TranslateToAsync(0, target, _animationDuration, Easing.CubicOut);
+        var duration = GestureSettling.SettleDuration(target - position, velocity, _animationDuration);
+        await this.TranslateToAsync(0, target, duration, Easing.CubicOut);
+    }
+
+    /// <summary>The detent this position is closest to, as an index into <see cref="_detentOffsets"/>.</summary>
+    private int NearestDetentIndex(double position)
+    {
+        var index = 0;
+
+        for (var i = 1; i < _detentOffsets.Length; i++)
+        {
+            if (Math.Abs(_detentOffsets[i] - position) < Math.Abs(_detentOffsets[index] - position))
+            {
+                index = i;
+            }
+        }
+
+        return index;
     }
 }

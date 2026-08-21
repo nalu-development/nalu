@@ -147,17 +147,39 @@ internal sealed class ScaffoldPageFragment : Fragment
         // re-mounted that page — the page's view is SHARED between the two fragments, so the
         // stale removal would rip the live page out of its new host and leave it detached for
         // good. Removing an emptied host instead is harmless.
-        var host = new Android.Widget.FrameLayout(RequireContext())
-                   {
-                       LayoutParameters = new ViewGroup.LayoutParams(
-                           ViewGroup.LayoutParams.MatchParent,
-                           ViewGroup.LayoutParams.MatchParent)
-                   };
+        // The host is the page's FRAME: the page view and the page's own nav bar strip as
+        // siblings (see ScaffoldPageFrame). Being the fragment's view is what makes the bar
+        // travel with the page — the presenter's animators move this.
+        var host = page.GetScaffoldOrDefault()?.GetPageHost(page) is { } pageHost
+            ? new ScaffoldPageFrame(RequireContext(), pageHost)
+            : null;
 
-        host.AddView(platformView);
+        if (host is null)
+        {
+            // No host means the page is not in a stack of this scaffold: nothing to frame.
+            var bare = new Android.Widget.FrameLayout(RequireContext())
+                       {
+                           LayoutParameters = new ViewGroup.LayoutParams(
+                               ViewGroup.LayoutParams.MatchParent,
+                               ViewGroup.LayoutParams.MatchParent)
+                       };
+
+            bare.AddView(platformView);
+
+            return bare;
+        }
+
+        host.SetPageView(platformView);
+        host.SyncNavBar(_mauiContext);
+        _frame = host;
 
         return host;
     }
+
+    /// <summary>This page's frame, once its view exists — the presenter drives its bar through it.</summary>
+    public ScaffoldPageFrame? Frame => _frame;
+
+    private ScaffoldPageFrame? _frame;
 
     /// <summary>
     /// Invoked with the page's platform view as soon as it exists, BEFORE its first layout pass:
@@ -192,6 +214,11 @@ internal sealed class ScaffoldPageFragment : Fragment
     public override void OnDestroy()
     {
         base.OnDestroy();
+
+        // Explicit: a managed view subclass in the page-host chain outlives its Dispose, and its
+        // fields would pin the page host, the page and the page model.
+        _frame?.Release();
+        _frame = null;
         _presented.TrySetResult();
     }
 

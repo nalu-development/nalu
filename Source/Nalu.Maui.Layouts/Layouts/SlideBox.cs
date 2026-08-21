@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using Microsoft.Maui.Layouts;
+using Nalu.Internals;
 
 namespace Nalu;
 
@@ -157,6 +158,7 @@ public class SlideBox : Layout
 #endif
     private double _dragOffset;
     private bool _dragging;
+    private readonly GestureVelocitySampler _dragVelocity = new();
 
     /// <summary>Initializes a new instance of the <see cref="SlideBox" /> class.</summary>
     public SlideBox()
@@ -467,7 +469,8 @@ public class SlideBox : Layout
     /// <param name="animated">Whether to animate towards the rest positions.</param>
     /// <param name="keepDrag">Whether the active drag offset applies on top of the rest positions.</param>
     /// <param name="direction">Travel direction hint: entering views start one page towards it.</param>
-    private void Present(bool animated, bool keepDrag = false, int direction = 0)
+    /// <param name="duration">Overrides <see cref="TransitionDuration" /> — a settling drag lands at the speed it was released with.</param>
+    private void Present(bool animated, bool keepDrag = false, int direction = 0, uint? duration = null)
     {
         if (Items.Count == 0 || PageSize <= 0)
         {
@@ -598,7 +601,7 @@ public class SlideBox : Layout
             animation.Commit(
                 this,
                 _transitionAnimationName,
-                length: TransitionDuration,
+                length: duration ?? TransitionDuration,
                 easing: TransitionEasing,
                 finished: (_, canceled) =>
                 {
@@ -665,6 +668,7 @@ public class SlideBox : Layout
         this.AbortAnimation(_transitionAnimationName);
         _dragging = true;
         _dragOffset = 0;
+        _dragVelocity.Begin(0);
     }
 
     /// <summary>
@@ -686,14 +690,26 @@ public class SlideBox : Layout
         total = Math.Clamp(total, -limit, limit);
 
         _dragOffset = hasTarget ? total : total * 0.25;
+        _dragVelocity.Add(_dragOffset);
 
         Present(animated: false, keepDrag: true);
     }
 
     /// <summary>
-    /// Settles the drag: commits the slide change when the gesture completed past a third of a
-    /// page towards an enabled neighbor, otherwise animates back to rest.
+    /// Settles the drag: commits the slide change when the gesture was HEADING past a third of a
+    /// page towards an enabled neighbour, otherwise animates back to rest.
     /// </summary>
+    /// <remarks>
+    /// Heading, not standing: the decision is taken on where the drag would coast to
+    /// (<see cref="GestureSettling.Project"/>), so a quick swipe lands the next slide without
+    /// having to drag a third of the way there — while a slow drag, whose velocity is nil,
+    /// projects onto itself and behaves exactly as it always did.
+    /// A FLICK commits on its own, whatever the distance: a short sharp swipe is an unambiguous
+    /// instruction, and springing back reads as the gesture having been ignored. Flicking BACK
+    /// returns to rest however far the content had travelled — the finger's last word wins.
+    /// The gesture only ever runs between the current slide and ONE neighbour, the one the drag
+    /// revealed, so a flick backwards means "never mind", not "take the other neighbour".
+    /// </remarks>
     internal void EndDrag(bool canceled)
     {
         if (!_dragging)
@@ -702,6 +718,8 @@ public class SlideBox : Layout
         }
 
         var offset = _dragOffset;
+        var velocity = _dragVelocity.Velocity;
+        _dragVelocity.Reset();
         _dragging = false;
         _dragOffset = 0;
 
@@ -709,9 +727,20 @@ public class SlideBox : Layout
         var logicalDirection = IsRtl ? -direction : direction;
         var target = FindEnabled(SelectedIndex, logicalDirection);
 
+        // Signed like the offset: the sign that means "further towards the revealed neighbour".
+        var towardsNeighbour = offset < 0 ? -1 : 1;
+        var flick = GestureSettling.FlickDirection(velocity);
+        var projected = GestureSettling.Project(offset, velocity);
+
         var commit = !canceled
                      && target >= 0
-                     && Math.Abs(offset) > PageSize / 3;
+                     && flick != -towardsNeighbour
+                     && (flick == towardsNeighbour
+                         || (Math.Sign(projected) == towardsNeighbour && Math.Abs(projected) > PageSize / 3));
+
+        // The landing keeps the speed the finger left behind rather than restarting from still.
+        var remaining = commit ? PageSize - Math.Abs(offset) : Math.Abs(offset);
+        var duration = GestureSettling.SettleDuration(remaining, velocity, TransitionDuration);
 
         if (commit)
         {
@@ -720,12 +749,12 @@ public class SlideBox : Layout
 
             if (SelectedIndex != target)
             {
-                Present(animated: true);
+                Present(animated: true, duration: duration);
             }
         }
         else
         {
-            Present(animated: true);
+            Present(animated: true, duration: duration);
         }
     }
 
