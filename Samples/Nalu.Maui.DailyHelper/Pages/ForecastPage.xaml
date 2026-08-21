@@ -11,13 +11,16 @@
              x:Name="Self"
              nalu:Scaffold.FlyoutEndMode="Auto"
              nalu:Scaffold.ScrollTracker="{x:Reference Scroll}"
-             nalu:Scaffold.NavBarBackground="{nalu:ThemeScrollDirectionValue DeactivatedLight={StaticResource BackgroundLight},
-                                                                             ActivatedLight={StaticResource NavBarFadeLight},
-                                                                             DeactivatedDark={StaticResource BackgroundDark},
-                                                                             ActivatedDark={StaticResource NavBarFadeDark},
-                                                                             ActivateThreshold=48,
-                                                                             DeactivateThreshold=16,
-                                                                             Easing={x:Static Easing.SinInOut}}"
+             nalu:Scaffold.NavBarOpacity="{nalu:ScrollDirectionValue Deactivated=1,
+                                                                     Activated=0,
+                                                                     ActivateThreshold=48,
+                                                                     DeactivateThreshold=16,
+                                                                     Easing={x:Static Easing.SinInOut}}"
+             nalu:Scaffold.NavBarOffsetY="{nalu:ScrollDirectionValue Deactivated=0,
+                                                                     Activated=-48,
+                                                                     ActivateThreshold=48,
+                                                                     DeactivateThreshold=16,
+                                                                     Easing={x:Static Easing.SinInOut}}"
              Title="Forecast">
 
     <!-- Per-page END flyout, explicitly enabled via FlyoutEndMode (§5.5): the nav bar shows
@@ -62,18 +65,21 @@
          title view fades out and goes input-transparent (a bool target: it flips at the
          transition midpoint), while the bar background (declared above) crossfades from the
          solid surface to a solid-at-top → transparent-at-bottom gradient. -->
+    <nalu:Scaffold.NavBarTemplate>
+        <DataTemplate>
+            <nalu:ScaffoldNavBarView InputTransparent="{nalu:ScrollDirectionValue Deactivated=False,
+                                                                                  Activated=True,
+                                                                                  ActivateThreshold=48,
+                                                                                  DeactivateThreshold=16}"/>
+        </DataTemplate>
+    </nalu:Scaffold.NavBarTemplate>
     <nalu:Scaffold.TitleView>
-        <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center"
-              Opacity="{nalu:ScrollDirectionValue Deactivated=1,
-                                                  Activated=0,
-                                                  ActivateThreshold=48,
-                                                  DeactivateThreshold=16,
-                                                  Easing={x:Static Easing.SinInOut}}"
-              InputTransparent="{nalu:ScrollDirectionValue Deactivated=False,
-                                                           Activated=True,
-                                                           ActivateThreshold=48,
-                                                           DeactivateThreshold=16}">
-            <Label Text="Forecast" FontFamily="SemiBold" FontSize="20" VerticalOptions="Center"/>
+        <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
+            <Label Text="Forecast"
+                   FontFamily="SemiBold"
+                   FontSize="20"
+                   VerticalOptions="Center"
+                   TextColor="{nalu:NavBarBinding ForegroundColor}"/>
             <Border Grid.Column="1"
                     StrokeThickness="0"
                     StrokeShape="RoundRectangle 14"
@@ -89,6 +95,7 @@
     </nalu:Scaffold.TitleView>
 
     <vs:VirtualScroll x:Name="Scroll"
+                      FadingEdgeLength="80"
                       ItemsSource="{Binding DaysAdapter}"
                       IsRefreshEnabled="True"
                       RefreshCommand="{Binding RefreshCommand}"
