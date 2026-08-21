@@ -14,6 +14,18 @@ namespace Nalu.Maui.UITests.Infrastructure;
 /// Driver-agnostic equivalent of the DevFlow <c>BoundsInfo</c> so geometry-based tests
 /// don't take a dependency on the experimental Driver API surface.
 /// </remarks>
+/// <summary>
+/// One view in the chain the app would hit at a point, innermost first — what a touch there
+/// would actually reach.
+/// </summary>
+public sealed record HitElement(string? AutomationId, string? Type, string? FullType)
+{
+    /// <summary>Whether this is a piece of scaffold chrome (a bar, a strip, one of their parts).</summary>
+    public bool IsScaffoldChrome
+        => (FullType ?? Type ?? string.Empty).Contains("ScaffoldNavBar", StringComparison.Ordinal)
+           || (FullType ?? Type ?? string.Empty).Contains("ScaffoldTabBar", StringComparison.Ordinal);
+}
+
 public sealed record ElementBounds(double X, double Y, double Width, double Height)
 {
     public double Right => X + Width;
@@ -180,6 +192,43 @@ public sealed class NaluApp : IAsyncLifetime
         Walk(tree, string.Empty);
 
         return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// What the app would hit at a WINDOW point — the direct question behind "can you tap through
+    /// this?", asked without side effects.
+    /// </summary>
+    public async Task<IReadOnlyList<HitElement>> HitTestAsync(double x, double y)
+    {
+        // ROUNDED on purpose. The Driver formats these numbers with the CURRENT CULTURE, so on an
+        // Italian machine 205.71 leaves as "2057142791748047" — the decimal separator vanishes,
+        // the agent hits nothing, and the call answers "empty" rather than "malformed". Integers
+        // are the one form that survives every culture, and a whole point is precise enough for a
+        // question about which view owns a region.
+        var json = await _client.HitTestAsync(Math.Round(x), Math.Round(y)).ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        using var document = JsonDocument.Parse(json);
+
+        if (!document.RootElement.TryGetProperty("elements", out var elements) || elements.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return elements
+               .EnumerateArray()
+               .Select(element => new HitElement(
+                   ReadString(element, "automationId"),
+                   ReadString(element, "type"),
+                   ReadString(element, "fullType")))
+               .ToList();
+
+        static string? ReadString(JsonElement element, string name)
+            => element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     }
 
     /// <summary>Finds a single element by AutomationId, or null when not present.</summary>
@@ -497,6 +546,19 @@ public sealed class NaluApp : IAsyncLifetime
         var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
 
         await RunAdbAsync($"shell input tap {(int)(bounds.CenterX * scale)} {(int)(bounds.CenterY * scale)}").ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A REAL tap at a window point (adb <c>input tap</c>): the only way to ask whether a touch
+    /// LANDS somewhere, because the agent's own taps are in-process — they invoke an element's
+    /// handlers directly and never consult hit-testing, so they cannot tell a transparent strip
+    /// from one that swallows everything under it.
+    /// </summary>
+    public async Task AndroidRealTapAtPointAsync(double xDp, double yDp)
+    {
+        var scale = await GetAndroidDisplayScaleAsync().ConfigureAwait(false);
+
+        await RunAdbAsync($"shell input tap {(int) (xDp * scale)} {(int) (yDp * scale)}").ConfigureAwait(false);
     }
 
     /// <summary>
