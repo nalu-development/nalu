@@ -7,6 +7,7 @@ namespace Nalu.Internals;
 internal enum ScrollValueKind
 {
     Double,
+    Bool,
     Color,
     Brush
 }
@@ -38,6 +39,10 @@ internal static class ScrollValueMath
         => kind switch
         {
             ScrollValueKind.Double => Lerp(ToDouble(from), ToDouble(to), t),
+
+            // Bool targets (IsVisible, InputTransparent…) interpolate as 0..1 and flip at the
+            // midpoint — halfway through an animated transition, not at its edges.
+            ScrollValueKind.Bool => Lerp(ToDouble(from), ToDouble(to), t) >= 0.5,
             ScrollValueKind.Color => LerpColor(ToColor(from), ToColor(to), t),
             _ => brushInterpolator.Materialize(from, to, t)
         };
@@ -46,8 +51,12 @@ internal static class ScrollValueMath
         => value switch
         {
             double d => d,
+            bool b => b ? 1 : 0,
+
+            // XAML hands markup-extension values as strings: "True"/"False" endpoints land here.
+            string text when bool.TryParse(text, out var parsed) => parsed ? 1 : 0,
             IConvertible convertible => convertible.ToDouble(CultureInfo.InvariantCulture),
-            _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a number.")
+            _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a number (or bool).")
         };
 
     public static Color ToColor(object? value)
@@ -68,6 +77,11 @@ internal static class ScrollValueMath
         if (targetType == typeof(double) || targetType == typeof(float) || targetType == typeof(int))
         {
             return ScrollValueKind.Double;
+        }
+
+        if (targetType == typeof(bool))
+        {
+            return ScrollValueKind.Bool;
         }
 
         if (targetType == typeof(Color))

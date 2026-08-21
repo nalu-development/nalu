@@ -102,12 +102,38 @@ public class ScrollValueTests
         Convert(converter, 100).Should().Be(1.0);
     }
 
-    [Fact(DisplayName = "KindFor maps numeric, Color and Brush targets and rejects others")]
+    [Fact(DisplayName = "KindFor maps numeric, bool, Color and Brush targets and rejects others")]
     public void KindForMapsTargetTypes()
     {
         ScrollValueMath.KindFor(typeof(double)).Should().Be(ScrollValueKind.Double);
+        ScrollValueMath.KindFor(typeof(bool)).Should().Be(ScrollValueKind.Bool);
         ScrollValueMath.KindFor(typeof(Color)).Should().Be(ScrollValueKind.Color);
         ScrollValueMath.KindFor(typeof(Brush)).Should().Be(ScrollValueKind.Brush);
         ScrollValueMath.KindFor(typeof(string)).Should().BeNull();
+    }
+
+    [Fact(DisplayName = "Bool targets flip at the ramp midpoint; XAML string endpoints parse")]
+    public void BoolTargetsFlipAtTheRampMidpoint()
+    {
+        // Markup-extension endpoint values arrive as strings from XAML: "False"/"True".
+        var converter = new ScrollInterpolationConverter { Kind = ScrollValueKind.Bool, RampStart = 0, RampEnd = 100, FromLight = "False", ToLight = "True" };
+
+        Convert(converter, 0).Should().Be(false);
+        Convert(converter, 49).Should().Be(false);
+        Convert(converter, 50).Should().Be(true);
+        Convert(converter, 100).Should().Be(true);
+    }
+
+    [Fact(DisplayName = "Bool interpolation is a 0..1 lerp thresholded at 0.5")]
+    public void BoolInterpolationThresholdsAtHalf()
+    {
+        var brushInterpolator = new ScrollValueBrushInterpolator();
+
+        ScrollValueMath.Interpolate(ScrollValueKind.Bool, false, true, 0.49, brushInterpolator).Should().Be(false);
+        ScrollValueMath.Interpolate(ScrollValueKind.Bool, false, true, 0.5, brushInterpolator).Should().Be(true);
+
+        // Reversed endpoints lerp 1 → 0: past the midpoint the value drops below 0.5.
+        ScrollValueMath.Interpolate(ScrollValueKind.Bool, true, false, 0.4, brushInterpolator).Should().Be(true);
+        ScrollValueMath.Interpolate(ScrollValueKind.Bool, true, false, 0.6, brushInterpolator).Should().Be(false);
     }
 }

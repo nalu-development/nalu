@@ -18,7 +18,7 @@ properties themselves → skill `nalu-scaffold-structure`.
 |-----|---------|-------|
 | `nalu:Scaffold.ScrollTracker="{x:Reference X}"` (page) | Connect the page's scrollable | `ScrollView`, `CollectionView`, `VirtualScroll`, or any view whose platform tree has a native scroll container ≤ 3 levels deep. One per page. |
 | `nalu:Scaffold.ScrollRampStart` / `ScrollRampEnd` (page → area → scaffold) | Page-wide ramp, default 0 / 100 | Every `ScrollValue` without its own `RampStart/RampEnd` rides it. |
-| `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, `Color`, or `Brush` — solid or gradient (types must match the target). |
+| `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, bool, `Color`, or `Brush` — solid or gradient (types must match the target; bools flip at t ≥ 0.5). |
 | `{nalu:ThemeScrollValue FromLight, ToLight, FromDark?, ToDark?, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Theme-aware endpoints | Dark values fall back to the light ones; theme change re-evaluates immediately. |
 | `{nalu:ScrollDirectionValue Deactivated, Activated, ActivateThreshold?, DeactivateThreshold?, ActivateDuration?, DeactivateDuration?, Easing?, DeactivateBelow?}` | Scroll DIRECTION → two-state value | Down `ActivateThreshold` dp (default 100) latches activated, up `DeactivateThreshold` dp (defaults to activate) latches back; each flip ANIMATES between the endpoints over `ActivateDuration`/`DeactivateDuration` ms (default 250, 0 snaps, `Easing` = time curve). Starts deactivated; ignores the ramp. |
 | `{nalu:ThemeScrollDirectionValue DeactivatedLight, ActivatedLight, DeactivatedDark?, ActivatedDark?, …}` | Theme-aware direction endpoints | Same knobs; dark values fall back to the light ones. |
@@ -109,7 +109,7 @@ reading on, back in after 24dp of scrolling up, animated over 250ms):
 - The extensions must target a **bindable property directly** on an element — not inside a `Style`
   setter, not on plain CLR properties. Works on any element in the scaffold's tree (page content, `TitleView`,
   custom nav/tab bars) — a page carrying the attached nav bar appearance properties included.
-- Endpoint types must match the target: numeric ↔ `double`/`int` properties, `Color` ↔ `Color`,
+- Endpoint types must match the target: numeric ↔ `double`/`int` properties, bool ↔ `bool` (flips at the transition midpoint — pairs with a fading Opacity for InputTransparent/IsVisible), `Color` ↔ `Color`,
   `Brush` ↔ `Brush`. `From=Transparent, To={StaticResource X}` on a `Brush` property works
   (color literals convert to solid brushes).
 - `Brush` endpoints may be gradients (`LinearGradientBrush`/`RadialGradientBrush`): solid ↔ gradient

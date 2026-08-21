@@ -180,6 +180,18 @@ public class ScrollDirectionValueTests
         ((Color)Convert(converter, 0, AppTheme.Dark)!).Should().Be(Colors.White);
     }
 
+    [Fact(DisplayName = "Bool targets step with the latched state (XAML string endpoints parse)")]
+    public void BoolTargetsStepWithTheState()
+    {
+        // InputTransparent="{nalu:ScrollDirectionValue Deactivated=False, Activated=True}":
+        // the endpoint values reach the converter as the strings XAML hands over.
+        var converter = CreateConverter(activateThreshold: 100, deactivateThreshold: 50, kind: ScrollValueKind.Bool, deactivated: "False", activated: "True");
+
+        Scroll(converter, 0, 60).Should().Be(false);
+        Scroll(converter, 120).Should().Be(true);
+        Scroll(converter, 60).Should().Be(false);
+    }
+
     [Fact(DisplayName = "Brush targets accept color endpoints and produce a solid brush")]
     public void BrushTargetsProduceSolidBrush()
     {

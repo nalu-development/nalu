@@ -69,7 +69,7 @@ Background="{nalu:ThemeScrollValue FromLight=Transparent,
 
 | Parameter | Purpose |
 |-----------|---------|
-| `From` / `To` | Endpoint values (numeric, `Color`, or a `Brush` — solid or gradient). |
+| `From` / `To` | Endpoint values (numeric, bool, `Color`, or a `Brush` — solid or gradient); bool targets flip at t ≥ 0.5. |
 | `FromLight/ToLight/FromDark/ToDark` | Theme-aware endpoints (`ThemeScrollValue`); dark values fall back to the light ones, and a theme change re-evaluates immediately. |
 | `RampStart` / `RampEnd` | Per-value ramp override (defaults to the page-level ramp). |
 | `Extrapolate` | `Clamp` (default: hold endpoints outside the window) or `Extend` (keep going linearly). |
@@ -123,7 +123,7 @@ TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80,
 
 | Parameter | Purpose |
 |-----------|---------|
-| `Deactivated` / `Activated` | Endpoint values (numeric, `Color`, or a `Brush` — solid or gradient); the state starts deactivated. |
+| `Deactivated` / `Activated` | Endpoint values (numeric, bool, `Color`, or a `Brush` — solid or gradient); bool targets (IsVisible, InputTransparent…) flip at the transition midpoint. The state starts deactivated. |
 | `DeactivatedLight/ActivatedLight/DeactivatedDark/ActivatedDark` | Theme-aware endpoints (`ThemeScrollDirectionValue`); dark values fall back to the light ones. |
 | `ActivateThreshold` | Downward travel (dp) that latches activated (default 100). Travel accumulates only while the scroll keeps moving down — any upward movement restarts the count; `0` latches on the first downward frame. |
 | `DeactivateThreshold` | Upward travel that latches back (defaults to `ActivateThreshold`). |

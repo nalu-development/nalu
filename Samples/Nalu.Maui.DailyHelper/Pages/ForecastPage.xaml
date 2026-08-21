@@ -58,9 +58,10 @@
     </nalu:Scaffold.FlyoutEnd>
 
     <!-- Custom title view: title plus a "Now" chip scrolling the list to the current hour.
-         Reading mode (48dp of scrolling down, 24dp back up — or the top — to undo): the title
-         fades out and the bar background (declared above) crossfades from the solid surface to
-         a solid-at-top → transparent-at-bottom gradient; the Now chip stays. -->
+         Reading mode (48dp of scrolling down; 16dp back up — or the top — to undo): the whole
+         title view fades out and goes input-transparent (a bool target: it flips at the
+         transition midpoint), while the bar background (declared above) crossfades from the
+         solid surface to a solid-at-top → transparent-at-bottom gradient. -->
     <nalu:Scaffold.TitleView>
         <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center"
               Opacity="{nalu:ScrollDirectionValue Deactivated=1,

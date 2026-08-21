@@ -66,7 +66,7 @@ public abstract class ScrollDirectionValueExtensionBase : IMarkupExtension<Bindi
 
         var kind = ScrollValueMath.KindFor(targetProperty.ReturnType)
             ?? throw new InvalidOperationException(
-                $"{GetType().Name} cannot target '{targetProperty.PropertyName}' ({targetProperty.ReturnType.Name}): only numeric, Color and Brush properties are supported.");
+                $"{GetType().Name} cannot target '{targetProperty.PropertyName}' ({targetProperty.ReturnType.Name}): only numeric, bool, Color and Brush properties are supported.");
 
         if (provideValueTarget.TargetObject is not Element target)
         {
@@ -127,7 +127,7 @@ public abstract class ScrollDirectionValueExtensionBase : IMarkupExtension<Bindi
 /// <see cref="ScrollDirectionValueExtensionBase.DeactivateThreshold"/> dp animates it back —
 /// wherever in the content that happens (unlike <see cref="ScrollValueExtension"/>, which maps the
 /// absolute offset). Starts deactivated, and the top of the content always restores deactivated.
-/// Works on numeric, <see cref="Color"/> and <see cref="Brush"/> properties (solid or gradient endpoints), on any element
+/// Works on numeric, bool, <see cref="Color"/> and <see cref="Brush"/> properties (solid or gradient brush endpoints; bools flip at the transition midpoint), on any element
 /// inside the scaffold's tree:
 /// <c>TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80, ActivateThreshold=48, DeactivateThreshold=24}"</c>.
 /// Must be applied directly on the target's bindable property — Style setters are not supported.
