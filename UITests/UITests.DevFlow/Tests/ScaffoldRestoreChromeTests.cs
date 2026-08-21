@@ -35,7 +35,11 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         // (the Exit path disposes the harness scaffold, turning restore off for other suites).
         try
         {
-            await ConvergeToHomeAsync();
+            // Best-effort: this is hygiene for the NEXT run, and InitializeAsync converges
+            // strictly before any scenario starts. A tired emulator that needs longer than the
+            // budget must not fail the test whose assertions already passed — it fails the next
+            // one's setup instead, where a genuine inability to converge belongs.
+            await ConvergeToHomeAsync(mustConverge: false);
             await Task.Delay(_snapshotSettle);
         }
         finally
@@ -76,9 +80,12 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
     /// appeared, the settle re-check found it gone.
     /// A replay's suppression window also ignores taps outright, so the tap itself is retried.
     /// </summary>
-    private async Task ConvergeToHomeAsync()
+    private async Task ConvergeToHomeAsync(bool mustConverge = true)
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        // Generous, because these scenarios KILL and relaunch the app: a cold start plus the
+        // replay that follows it can take most of this on a loaded emulator, and the budget only
+        // exists to end with a good error rather than to police the app's speed.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(45);
 
         while (DateTime.UtcNow < deadline)
         {
@@ -101,8 +108,17 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
             }
         }
 
-        // Out of budget: fail with the bounds, which say what the app settled on instead.
-        await App.WaitForSettledDisplayAsync("RestoreHomePage");
+        if (!mustConverge)
+        {
+            return;
+        }
+
+        // Out of budget. The bounds alone say "not displayed", which is the one thing already
+        // known — so say what the app IS showing instead, and where each harness page sits.
+        var tree = await App.DiagnoseAsync("RestoreHomePage");
+        var others = string.Join("\n", await Task.WhenAll(_pageNames.Select(async name => $"  Restore{name}Page: {await App.DiagnoseAsync($"Restore{name}Page")}")));
+
+        Assert.Fail($"Never converged to the home root.\nRestoreHomePage:\n{tree}\nAll harness pages:\n{others}");
     }
 
     [Fact]
