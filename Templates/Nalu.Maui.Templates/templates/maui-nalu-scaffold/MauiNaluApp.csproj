@@ -11,8 +11,9 @@
 
         <!-- Pin a recent MAUI patch: without this the workload's bundled default applies
              (e.g. 10.0.20), which still carries Android chrome rendering bugs fixed in later
-             patches (stale tab bar pills under the shadowed bar). -->
-        <MauiVersion>10.0.90</MauiVersion>
+             patches (stale tab bar pills under the shadowed bar). Nalu's own floor is 10.0.90;
+             this pin sits above it, on what the repo's sample apps run. -->
+        <MauiVersion>10.0.100</MauiVersion>
         <SingleProject>true</SingleProject>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>

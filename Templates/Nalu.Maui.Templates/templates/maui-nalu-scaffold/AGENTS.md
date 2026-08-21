@@ -42,7 +42,8 @@ Nalu APIs from Shell/NavigationPage habits.
 - New tab = new `ScaffoldRoot` in `AppScaffold.xaml`.
 - Overlays (dialogs, sheets) = scaffold popups/bottom sheets, not `DisplayAlert`-style platform
   modals when custom UI is needed.
-- Keep MAUI floor at `MauiVersion` in the csproj (scaffold needs ≥ 10.0.90); iOS 15+ / Android API 30+.
+- Keep MAUI at the `MauiVersion` pin in the csproj (10.0.100; the scaffold's own floor is 10.0.90) — do not
+  drop below it: the workload default still has Android chrome rendering bugs. iOS 15+ / Android API 30+.
 
 ## Build & run
 

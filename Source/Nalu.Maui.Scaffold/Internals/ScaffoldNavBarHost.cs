@@ -76,7 +76,9 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         // NavBarOffsetY moves that bar INSIDE this host. So a bar offset out of the way leaves
         // this host still covering the band — and on UIKit, where the deepest view whose bounds
         // contain a point wins whether it drew anything or not, that band stayed dead to touch.
-        // Cascade OFF: the bar and everything in it keeps taking its own touches.
+        // Verified by deletion: without this the vacated band is dead to touch on iOS, while
+        // Android passes either way (its strip is transparent glass regardless) — one declaration
+        // covers both. Cascade OFF: the bar and everything in it keeps taking its own touches.
         InputTransparent = true;
         CascadeInputTransparent = false;
 

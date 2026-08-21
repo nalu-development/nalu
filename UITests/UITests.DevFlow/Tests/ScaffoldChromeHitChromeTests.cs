@@ -69,10 +69,19 @@ public class ScaffoldChromeHitChromeTests(NaluApp app) : BaseUiTest(app), IAsync
         (await PageReceivesTapAtAsync(windowWidth - 3, pill.CenterY))
             .Should().BeTrue("both margins belong to the page, not to the chrome");
 
-        // The control: the pill must still consume its own touches, or the tab bar would be
-        // unusable — and a strip that passed EVERYTHING through would satisfy the two above.
+        // The controls. The item's centre is the easy one — it is interactive, so it would absorb
+        // even if every surface around it leaked.
         (await PageReceivesTapAtAsync(pill.CenterX, pill.CenterY))
-            .Should().BeFalse("the pill takes its own touches");
+            .Should().BeFalse("a tab item takes its own touches");
+
+        // Just OUTSIDE the item and still on the pill: bar surface with nothing interactive under
+        // it, which is where a drawn bar quietly leaks. Only the items absorbed here once, so a
+        // tap 2dp from one operated the page behind the bar.
+        (await PageReceivesTapAtAsync(pill.X - 2, pill.CenterY))
+            .Should().BeFalse("the pill's own padding is drawn bar, not a hole");
+
+        (await PageReceivesTapAtAsync(pill.CenterX, pill.Y - 2))
+            .Should().BeFalse("above the item is still the pill");
     }
 
     [Fact(DisplayName = "A nav bar takes touches on its surface and gives the band back when offset")]

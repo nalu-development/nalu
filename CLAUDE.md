@@ -60,7 +60,9 @@ activated in DEBUG builds in `MauiProgram.cs`, per-platform ports: Android **922
 ## General conventions
 
 - `LangVersion=preview`, nullable enabled, warnings as errors in `Source/` (relaxed in Samples/UITests).
-- Library MAUI floor versions stay LOW on purpose (`MauiVersion9`/`MauiVersion10` in root `Directory.Build.props`) —
-  do not bump them for consumers; apps/tests may use newer MAUI patch versions.
+- Library MAUI floor versions live in root `Directory.Build.props`: `MauiVersion9` (9.0.80) and a single
+  `MauiVersion10` (10.0.90) shared by EVERY net10 library — per-project floors only bought a lower number
+  in exchange for NU1605 downgrade errors when two Nalu packages met in one app. Do not bump them casually
+  for consumers; apps/tests use `MauiVersion` in `Samples/Directory.Build.props` (10.0.100).
 - Unit tests: `dotnet test Tests/Nalu.Maui.Test` (or `dotnet cake --target=Test`).
 - Docs are built with docfx from `conceptual_docs/`.

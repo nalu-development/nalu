@@ -8,10 +8,11 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <MauiVersion9>9.0.80</MauiVersion9>
-    <MauiVersion10>10.0.10</MauiVersion10>
-    <!-- Scaffold floor: higher on purpose (net10 safe-area/keyboard machinery it builds on: SafeAreaEdges,
-         MauiView safe-area overrides, per-view inset listeners). Keep in sync with what the TestApp runs. -->
-    <MauiVersion10Scaffold>10.0.90</MauiVersion10Scaffold>
+    <!-- ONE net10 floor for every library. It is 10.0.90 because Scaffold needs that much
+         (SafeAreaEdges, MauiView safe-area overrides, per-view inset listeners) and Controls'
+         SkiaSharp needs >= 10.0.20; a per-project floor bought the others a lower number at the
+         cost of NU1605 downgrade errors whenever two of them met in one app. -->
+    <MauiVersion10>10.0.90</MauiVersion10>
     <AllTargetFrameworks>net9.0;net9.0-android;net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0;net10.0-android;net10.0-ios26.0;net10.0-maccatalyst</AllTargetFrameworks>
     <AllTargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(AllTargetFrameworks);net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0</AllTargetFrameworks>
   </PropertyGroup>

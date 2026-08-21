@@ -56,6 +56,8 @@
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0"/>
         <PackageReference Include="OpenMeteo.dotnet" Version="2.0.0" />
+        <PackageReference Include="SkiaSharp" Version="4.151.1" />
+        <PackageReference Include="Svg.Skia" Version="5.2.1" />
         <!-- DevFlow agent: gives AI agents eyes/hands inside the running app (DEBUG only, see MauiProgram). -->
         <PackageReference Include="Microsoft.Maui.DevFlow.Agent" Version="0.1.0-preview.12.26368.2" />
     </ItemGroup>

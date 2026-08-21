@@ -37,7 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion10Scaffold)"/>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion10)"/>
   </ItemGroup>
 
   <ItemGroup>

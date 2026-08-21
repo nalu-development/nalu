@@ -236,7 +236,14 @@ public sealed class ScaffoldTabBarView : Grid
             StrokeThickness = 0,
             HorizontalOptions = LayoutOptions.Center,
             VerticalOptions = LayoutOptions.End,
-            Content = _items
+            Content = _items,
+
+            // The pill is DRAWN, so the pill takes the touch — the same rule the nav bar's surface
+            // follows, and load-bearing on Android for the same reason: a MAUI layout consumes
+            // nothing there by default, so its own BarPadding leaked to the page. Only the items
+            // absorbed, which hid it: 2dp outside an item is still bar, and a tap there operated
+            // the content behind the bar. The items keep their touches, being children.
+            GestureRecognizers = { new TapGestureRecognizer() }
         };
 
         // The BAR owns the bottom system inset (the strip is exactly the bar's measured
