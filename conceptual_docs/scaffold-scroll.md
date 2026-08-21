@@ -144,9 +144,11 @@ Notes:
   `ScaffoldTabBarView.LabelOpacity`, `BarBackground`) sits under no page, so it follows the
   channel of the **currently presented page** — pages without a tracker read a resting offset
   and keep the deactivated look.
-- The Daily Helper's Forecast page is the worked example, on the NAV bar: while reading on,
-  the title fades out and the page's `NavBarBackground` crossfades from the solid surface to a
-  solid-at-top → transparent-at-bottom gradient; scrolling back (or the top) restores both.
+- The [nav bar appearance channels](scaffold-navbar.md) are natural targets: the Daily
+  Helper's Forecast page is the worked example — while reading on, the whole bar slides up and
+  fades away (`NavBarOpacity` 1→0 plus `NavBarOffsetY` 0→-48 on the page) and a per-page
+  `NavBarTemplate` flips the bar `InputTransparent` mid-transition so touches pass through it;
+  scrolling back (or the top) brings the bar home.
 
 ## Recipe: parallax header
 

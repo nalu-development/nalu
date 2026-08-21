@@ -60,11 +60,11 @@
         </Border>
     </nalu:Scaffold.FlyoutEnd>
 
-    <!-- Custom title view: title plus a "Now" chip scrolling the list to the current hour.
-         Reading mode (48dp of scrolling down; 16dp back up — or the top — to undo): the whole
-         title view fades out and goes input-transparent (a bool target: it flips at the
-         transition midpoint), while the bar background (declared above) crossfades from the
-         solid surface to a solid-at-top → transparent-at-bottom gradient. -->
+    <!-- Reading mode (48dp of scrolling down; 16dp back up — or the top — to undo): the WHOLE
+         nav bar slides up and fades away through the NavBarOpacity/NavBarOffsetY attached
+         properties above, and this per-page bar template lets touches pass through the hidden
+         bar (a bool target: it flips at the transition midpoint). The list's FadingEdgeLength
+         takes over the soft top edge the bar used to paint. -->
     <nalu:Scaffold.NavBarTemplate>
         <DataTemplate>
             <nalu:ScaffoldNavBarView InputTransparent="{nalu:ScrollDirectionValue Deactivated=False,
