@@ -16,7 +16,7 @@
                                                                              DeactivatedDark={StaticResource BackgroundDark},
                                                                              ActivatedDark={StaticResource NavBarFadeDark},
                                                                              ActivateThreshold=48,
-                                                                             DeactivateThreshold=24,
+                                                                             DeactivateThreshold=16,
                                                                              Easing={x:Static Easing.SinInOut}}"
              Title="Forecast">
 
@@ -62,13 +62,17 @@
          fades out and the bar background (declared above) crossfades from the solid surface to
          a solid-at-top → transparent-at-bottom gradient; the Now chip stays. -->
     <nalu:Scaffold.TitleView>
-        <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center">
-            <Label Text="Forecast" FontFamily="SemiBold" FontSize="20" VerticalOptions="Center"
-                   Opacity="{nalu:ScrollDirectionValue Deactivated=1,
-                                                       Activated=0,
-                                                       ActivateThreshold=48,
-                                                       DeactivateThreshold=24,
-                                                       Easing={x:Static Easing.SinInOut}}" />
+        <Grid ColumnDefinitions="*,Auto" VerticalOptions="Center"
+              Opacity="{nalu:ScrollDirectionValue Deactivated=1,
+                                                  Activated=0,
+                                                  ActivateThreshold=48,
+                                                  DeactivateThreshold=16,
+                                                  Easing={x:Static Easing.SinInOut}}"
+              InputTransparent="{nalu:ScrollDirectionValue Deactivated=False,
+                                                           Activated=True,
+                                                           ActivateThreshold=48,
+                                                           DeactivateThreshold=16}">
+            <Label Text="Forecast" FontFamily="SemiBold" FontSize="20" VerticalOptions="Center"/>
             <Border Grid.Column="1"
                     StrokeThickness="0"
                     StrokeShape="RoundRectangle 14"
