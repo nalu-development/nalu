@@ -22,7 +22,7 @@ attached properties `nalu:Scaffold.*` on the `ContentPage`; most resolve page �
 | `Scaffold` `InitialRootPageType`, `InitialIntent` | Startup root (default: first root of first area) | Plain properties, not bindable. |
 | `Scaffold` `CurrentArea`, `CurrentPage`, `Areas` | Read-only state | Observable; `Areas`/`Roots` mutable at runtime. |
 | `nalu:Scaffold.TabBarVisibility` (page) | `Visible` (default) / `Auto` (hidden on pushed pages) / `Hidden` | Animated slide with the page transition. |
-| `ScaffoldTabBarView` | Default pill bar; implicit-style it | `ItemWidth` 76, `OverflowIcon`/`OverflowTitle` ("More"), `BarBackground`, `BarCornerRadius`, `BarMargin`, `BarPadding`, `BarShadow`; attached `ScaffoldTabBarView.BadgeText` on a `ScaffoldRoot`. |
+| `ScaffoldTabBarView` | Default pill bar; implicit-style it | `ItemWidth` 68, `OverflowIcon`/`OverflowTitle` ("More"), `BarBackground`, `BarCornerRadius`, `BarMargin`, `BarPadding`, `BarShadow`; attached `ScaffoldTabBarView.BadgeText` on a `ScaffoldRoot`. |
 | `ScaffoldTabBarItemView`, `ScaffoldTabBarOverflowView` | Item / overflow-panel styling | See reference.md tables. |
 | `nalu:Scaffold.FlyoutStart` / `FlyoutEnd` (View) + `FlyoutStartMode` / `FlyoutEndMode` | Drawers; page → area → scaffold | Mode `Disabled` (default) / `Auto` (roots only) / `Flyout`. Content alone does nothing. |
 | `ScaffoldFlyoutMenuView` | Ready-made menu of areas/roots | Set `IsTabBarDisplayed="True"` to list tab-bar roots (else empty in a tab-only app). |
