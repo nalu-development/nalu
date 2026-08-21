@@ -110,6 +110,30 @@ public class ScaffoldScrollDirectionTests(NaluApp app) : BaseUiTest(app), IAsync
     }
 
     [Fact]
+    public async Task GradientBackgroundRepaintsThroughTheReusedBrushInstance()
+    {
+        // Deactivated: a solid LightGray (the gradient plan paints every stop gray).
+        var bounds = await App.GetBoundsAsync("ScrollDirGradient");
+        await App.WaitForPixelColorAsync("ScrollDirGradient", 6, 10, IsLightGray, TimeSpan.FromSeconds(5));
+        await App.WaitForPixelColorAsync("ScrollDirGradient", bounds.Width - 6, 10, IsLightGray, TimeSpan.FromSeconds(5));
+
+        // Activation mutates the SAME brush instance in place: the native background must
+        // repaint into the red → blue gradient (the risky half of the reuse mechanism).
+        await App.TapAsync("ScrollDirDown120");
+        await WaitForOffsetAtLeastAsync(120);
+
+        await App.WaitForPixelColorAsync("ScrollDirGradient", 6, 10, c => c.R > 160 && c.B < 96, TimeSpan.FromSeconds(5));
+        await App.WaitForPixelColorAsync("ScrollDirGradient", bounds.Width - 6, 10, c => c.B > 160 && c.R < 96, TimeSpan.FromSeconds(5));
+
+        // And back to the flat gray on deactivation.
+        await App.TapAsync("ScrollDirUp60");
+        await App.WaitForPixelColorAsync("ScrollDirGradient", 6, 10, IsLightGray, TimeSpan.FromSeconds(5));
+
+        static bool IsLightGray((byte R, byte G, byte B) c)
+            => Math.Abs(c.R - 211) < 20 && Math.Abs(c.G - 211) < 20 && Math.Abs(c.B - 211) < 20;
+    }
+
+    [Fact]
     public async Task TheContentTopRestoresEvenAnUnreachableDeactivateThreshold()
     {
         await App.TapAsync("ScrollDirDown120");

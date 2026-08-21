@@ -50,6 +50,7 @@ internal sealed class ScrollDirectionInterpolationConverter : IMultiValueConvert
     /// <summary>Gets the latched state (starts deactivated).</summary>
     public bool Activated { get; private set; }
 
+    private readonly ScrollValueBrushInterpolator _brushInterpolator = new();
     private double _lastOffset;
     private bool _tracking;
 
@@ -113,7 +114,7 @@ internal sealed class ScrollDirectionInterpolationConverter : IMultiValueConvert
         var deactivated = dark ? DeactivatedDark ?? DeactivatedLight : DeactivatedLight;
         var activated = dark ? ActivatedDark ?? ActivatedLight : ActivatedLight;
 
-        return ScrollValueMath.Interpolate(Kind, deactivated, activated, t);
+        return ScrollValueMath.Interpolate(Kind, deactivated, activated, t, _brushInterpolator);
     }
 
     public object?[]? ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)

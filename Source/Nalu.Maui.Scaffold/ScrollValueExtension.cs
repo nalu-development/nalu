@@ -65,7 +65,7 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 
         var kind = ScrollValueMath.KindFor(targetProperty.ReturnType)
             ?? throw new InvalidOperationException(
-                $"{GetType().Name} cannot target '{targetProperty.PropertyName}' ({targetProperty.ReturnType.Name}): only numeric, Color and solid Brush properties are supported.");
+                $"{GetType().Name} cannot target '{targetProperty.PropertyName}' ({targetProperty.ReturnType.Name}): only numeric, Color and Brush properties are supported.");
 
         var (fromLight, toLight, fromDark, toDark) = GetEndpoints();
 
@@ -113,7 +113,7 @@ public abstract class ScrollValueExtensionBase : IMarkupExtension<BindingBase>
 /// crosses the [<see cref="ScrollValueExtensionBase.RampStart"/>,
 /// <see cref="ScrollValueExtensionBase.RampEnd"/>] window (defaulting to the page-level
 /// <see cref="Scaffold.ScrollRampStartProperty"/>/<see cref="Scaffold.ScrollRampEndProperty"/> ramp).
-/// Works on numeric, <see cref="Color"/> and solid <see cref="Brush"/> properties, on any
+/// Works on numeric, <see cref="Color"/> and <see cref="Brush"/> properties (solid or gradient endpoints), on any
 /// element inside the scaffold's tree:
 /// <c>Opacity="{nalu:ScrollValue From=0, To=1}"</c>. Must be applied directly on the target's
 /// bindable property — Style setters are not supported. For theme-dependent endpoints use

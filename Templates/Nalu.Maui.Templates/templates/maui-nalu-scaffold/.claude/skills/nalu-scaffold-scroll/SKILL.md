@@ -8,7 +8,7 @@ Package `Nalu.Maui.Scaffold`, namespace `Nalu`, XAML `xmlns:nalu="https://nalu-d
 Mental model — three parts: a **tracker** (page-attached property naming the page's scrollable) publishes
 the live vertical offset into the ambient `ScaffoldNavBarContext`; a **ramp** (`ScrollRampStart`→`ScrollRampEnd`,
 page-wide default) is the offset window over which effects interpolate; the **`{nalu:ScrollValue}`** /
-**`{nalu:ThemeScrollValue}`** markup extensions bind any numeric, `Color` or solid-`Brush` bindable property —
+**`{nalu:ThemeScrollValue}`** markup extensions bind any numeric, `Color` or `Brush` bindable property —
 on page content OR nav bar chrome — to that offset. No code, no scroll handlers. Nav bar / appearance
 properties themselves → skill `nalu-scaffold-structure`.
 
@@ -18,7 +18,7 @@ properties themselves → skill `nalu-scaffold-structure`.
 |-----|---------|-------|
 | `nalu:Scaffold.ScrollTracker="{x:Reference X}"` (page) | Connect the page's scrollable | `ScrollView`, `CollectionView`, `VirtualScroll`, or any view whose platform tree has a native scroll container ≤ 3 levels deep. One per page. |
 | `nalu:Scaffold.ScrollRampStart` / `ScrollRampEnd` (page → area → scaffold) | Page-wide ramp, default 0 / 100 | Every `ScrollValue` without its own `RampStart/RampEnd` rides it. |
-| `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, `Color`, or solid `Brush` (types must match the target). |
+| `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, `Color`, or `Brush` — solid or gradient (types must match the target). |
 | `{nalu:ThemeScrollValue FromLight, ToLight, FromDark?, ToDark?, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Theme-aware endpoints | Dark values fall back to the light ones; theme change re-evaluates immediately. |
 | `{nalu:ScrollDirectionValue Deactivated, Activated, ActivateThreshold?, DeactivateThreshold?, ActivateDuration?, DeactivateDuration?, Easing?, DeactivateBelow?}` | Scroll DIRECTION → two-state value | Down `ActivateThreshold` dp (default 100) latches activated, up `DeactivateThreshold` dp (defaults to activate) latches back; each flip ANIMATES between the endpoints over `ActivateDuration`/`DeactivateDuration` ms (default 250, 0 snaps, `Easing` = time curve). Starts deactivated; ignores the ramp. |
 | `{nalu:ThemeScrollDirectionValue DeactivatedLight, ActivatedLight, DeactivatedDark?, ActivatedDark?, …}` | Theme-aware direction endpoints | Same knobs; dark values fall back to the light ones. |
@@ -110,8 +110,14 @@ reading on, back in after 24dp of scrolling up, animated over 250ms):
   setter, not on plain CLR properties. Works on any element in the scaffold's tree (page content, `TitleView`,
   custom nav/tab bars) — a page carrying the attached nav bar appearance properties included.
 - Endpoint types must match the target: numeric ↔ `double`/`int` properties, `Color` ↔ `Color`,
-  `Brush` ↔ `Brush` (solid only). `From=Transparent, To={StaticResource X}` on a `Brush` property works
+  `Brush` ↔ `Brush`. `From=Transparent, To={StaticResource X}` on a `Brush` property works
   (color literals convert to solid brushes).
+- `Brush` endpoints may be gradients (`LinearGradientBrush`/`RadialGradientBrush`): solid ↔ gradient
+  expands the solid over the gradient's stops; gradient ↔ gradient pairs stops on the UNION of both
+  sides' offsets (different counts/positions fine) and lerps geometry too — but both sides must be
+  the same gradient type (linear ↔ radial throws). Gradients on a `Color` target throw. The output
+  is ONE brush instance per binding mutated in place (repaints via MAUI brush-change tracking);
+  per-frame gradient scrubs rebuild the native shader — prefer short ramps, or a direction value.
 - No tracker on the page → offset is 0 → every value sits at `From` (chrome looks like the "top" state).
   Only ONE tracker per page; each page has its own channel — navigating away and back rebinds it.
 - Nested/wrapped scrollables: the native scroll container is searched at most 3 levels below the tracked

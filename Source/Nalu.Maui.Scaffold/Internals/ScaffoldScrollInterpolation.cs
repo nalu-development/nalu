@@ -34,12 +34,12 @@ internal static class ScrollValueMath
         );
     }
 
-    public static object Interpolate(ScrollValueKind kind, object? from, object? to, double t)
+    public static object Interpolate(ScrollValueKind kind, object? from, object? to, double t, ScrollValueBrushInterpolator brushInterpolator)
         => kind switch
         {
             ScrollValueKind.Double => Lerp(ToDouble(from), ToDouble(to), t),
             ScrollValueKind.Color => LerpColor(ToColor(from), ToColor(to), t),
-            _ => new SolidColorBrush(LerpColor(ToColor(from), ToColor(to), t))
+            _ => brushInterpolator.Materialize(from, to, t)
         };
 
     public static double ToDouble(object? value)
@@ -57,6 +57,8 @@ internal static class ScrollValueMath
             SolidColorBrush brush => brush.Color,
             string text when Color.TryParse(text, out var parsed) => parsed,
             null => Colors.Transparent,
+            GradientBrush => throw new InvalidOperationException(
+                "ScrollValue gradient endpoints require a Brush-typed target property (e.g. Background) — a Color property cannot hold a gradient."),
             _ => throw new InvalidOperationException($"ScrollValue endpoint '{value}' is not a color (or solid brush).")
         };
 
@@ -103,6 +105,8 @@ internal sealed class ScrollInterpolationConverter : IMultiValueConverter
 
     public Easing? Easing { get; init; }
 
+    private readonly ScrollValueBrushInterpolator _brushInterpolator = new();
+
     public object? Convert(object?[]? values, Type targetType, object? parameter, CultureInfo culture)
     {
         var offset = ScrollValueMath.ValueOrDefault(values, 0, 0.0);
@@ -128,7 +132,7 @@ internal sealed class ScrollInterpolationConverter : IMultiValueConverter
             t = Easing.Ease(t);
         }
 
-        return ScrollValueMath.Interpolate(Kind, from, to, t);
+        return ScrollValueMath.Interpolate(Kind, from, to, t, _brushInterpolator);
     }
 
     public object?[]? ConvertBack(object? value, Type[] targetTypes, object? parameter, CultureInfo culture)

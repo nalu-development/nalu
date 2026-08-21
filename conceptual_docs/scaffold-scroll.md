@@ -1,7 +1,7 @@
 # Scaffold Scroll-Driven Effects
 
 The Scaffold has a built-in **scroll channel**: one page-attached property connects a
-scrollable to the scaffold, and from that moment any numeric, `Color`, or solid-`Brush`
+scrollable to the scaffold, and from that moment any numeric, `Color`, or `Brush`
 property — on chrome *or* page content — can be driven from the live scroll offset with
 plain markup. Materializing nav bars, fading titles, and parallax headers all ride the same
 three concepts: a **tracker**, a **ramp**, and the **`ScrollValue`** extensions — plus the
@@ -69,7 +69,7 @@ Background="{nalu:ThemeScrollValue FromLight=Transparent,
 
 | Parameter | Purpose |
 |-----------|---------|
-| `From` / `To` | Endpoint values (numeric, `Color`, or a solid `Brush`). |
+| `From` / `To` | Endpoint values (numeric, `Color`, or a `Brush` — solid or gradient). |
 | `FromLight/ToLight/FromDark/ToDark` | Theme-aware endpoints (`ThemeScrollValue`); dark values fall back to the light ones, and a theme change re-evaluates immediately. |
 | `RampStart` / `RampEnd` | Per-value ramp override (defaults to the page-level ramp). |
 | `Extrapolate` | `Clamp` (default: hold endpoints outside the window) or `Extend` (keep going linearly). |
@@ -89,6 +89,22 @@ offsetLabel.SetBinding(Label.TextProperty,
 Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
 paths are evaluated by reflection.
 
+### Gradient endpoints
+
+`Brush` endpoints may be **gradients** (`LinearGradientBrush`/`RadialGradientBrush`), not just
+solids — in `ScrollValue` and `ScrollDirectionValue` alike:
+
+- **Solid ↔ gradient** works: the solid side expands over the gradient's stops.
+- **Gradient ↔ gradient** works with *different* stop counts and positions: both sides are
+  sampled at the union of their stop offsets and lerped stop by stop; geometry
+  (`StartPoint`/`EndPoint`, or `Center`/`Radius`) lerps too. Both sides must be the same
+  gradient type — linear ↔ radial cannot interpolate.
+- The value emits **one brush instance per binding, mutated in place** each evaluation — the
+  target repaints through MAUI's brush-content change tracking (the same channel
+  `AppThemeBinding` on a brush color uses), so scrolling allocates nothing.
+- Gradients rebuild the native shader on every change: fine for direction-value transitions
+  (a few hundred ms), measurable on a per-frame `ScrollValue` scrub — prefer short ramps there.
+
 ## 4. `ScrollDirectionValue` and `ThemeScrollDirectionValue`
 
 Where `ScrollValue` maps the absolute offset, **`ScrollDirectionValue`** watches the scroll
@@ -107,7 +123,7 @@ TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80,
 
 | Parameter | Purpose |
 |-----------|---------|
-| `Deactivated` / `Activated` | Endpoint values (numeric, `Color`, or a solid `Brush`); the state starts deactivated. |
+| `Deactivated` / `Activated` | Endpoint values (numeric, `Color`, or a `Brush` — solid or gradient); the state starts deactivated. |
 | `DeactivatedLight/ActivatedLight/DeactivatedDark/ActivatedDark` | Theme-aware endpoints (`ThemeScrollDirectionValue`); dark values fall back to the light ones. |
 | `ActivateThreshold` | Downward travel (dp) that latches activated (default 100). Travel accumulates only while the scroll keeps moving down — any upward movement restarts the count; `0` latches on the first downward frame. |
 | `DeactivateThreshold` | Upward travel that latches back (defaults to `ActivateThreshold`). |

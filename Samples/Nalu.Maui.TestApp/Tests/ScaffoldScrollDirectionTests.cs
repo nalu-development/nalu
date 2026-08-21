@@ -69,6 +69,27 @@ public class ScrollDirectionPage : ContentPage
             new ScrollDirectionValueExtension { Deactivated = 1.0, Activated = 0.2, ActivateThreshold = 100, DeactivateThreshold = 100_000, ActivateDuration = 0 }
         );
 
+        // Solid ↔ gradient background, duration 0: pixel checks verify the reused-and-mutated
+        // brush instance actually repaints natively on activation.
+        var gradientTarget = new Grid { AutomationId = "ScrollDirGradient", HeightRequest = 20 };
+
+        ScrollDirectionFactory.Apply(
+            gradientTarget,
+            BackgroundProperty,
+            new ScrollDirectionValueExtension
+            {
+                Deactivated = new SolidColorBrush(Colors.LightGray),
+                Activated = new LinearGradientBrush(
+                    [new GradientStop(Colors.Red, 0f), new GradientStop(Colors.Blue, 1f)],
+                    new Point(0, 0),
+                    new Point(1, 0)
+                ),
+                ActivateThreshold = 100,
+                DeactivateThreshold = 50,
+                ActivateDuration = 0
+            }
+        );
+
         // The classic chrome: a bottom bar sliding out of view over 150ms when activated.
         var bar = new Grid { AutomationId = "ScrollDirBar", HeightRequest = 56, BackgroundColor = Colors.DarkSlateBlue, VerticalOptions = LayoutOptions.End };
 
@@ -102,6 +123,7 @@ public class ScrollDirectionPage : ContentPage
                 offsetProbe,
                 snapTarget,
                 stickyTarget,
+                gradientTarget,
                 Move("Down 120", "ScrollDirDown120", y => y + 120),
                 Move("Down 40", "ScrollDirDown40", y => y + 40),
                 Move("Up 60", "ScrollDirUp60", y => y - 60),
