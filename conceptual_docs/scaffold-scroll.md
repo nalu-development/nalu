@@ -143,8 +143,10 @@ Notes:
 - Scaffold-level chrome works too: a value bound on the **tab bar** (e.g.
   `ScaffoldTabBarView.LabelOpacity`, `BarBackground`) sits under no page, so it follows the
   channel of the **currently presented page** — pages without a tracker read a resting offset
-  and keep the deactivated look. The Daily Helper's Forecast tab is the worked example: labels
-  fade out and the pill background fades to a bottom-transparent gradient while reading on.
+  and keep the deactivated look.
+- The Daily Helper's Forecast page is the worked example, on the NAV bar: while reading on,
+  the title fades out and the page's `NavBarBackground` crossfades from the solid surface to a
+  solid-at-top → transparent-at-bottom gradient; scrolling back (or the top) restores both.
 
 ## Recipe: parallax header
 

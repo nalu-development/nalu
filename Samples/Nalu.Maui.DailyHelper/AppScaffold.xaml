@@ -9,26 +9,6 @@
          navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->
 
     <nalu:ScaffoldTabBar>
-        <!-- Reading-mode chrome, driven by the scroll DIRECTION of whichever page is presented:
-             48dp of scrolling down fades the labels out and the pill background from the solid
-             card color (top edge) to transparent; 24dp back up (or reaching the top) restores
-             both. Only the Forecast page declares a ScrollTracker today — the other tabs read a
-             resting offset and keep the solid look. -->
-        <nalu:ScaffoldTabBar.TabBarView>
-            <nalu:ScaffoldTabBarView LabelOpacity="{nalu:ScrollDirectionValue Deactivated=1,
-                                                                              Activated=0,
-                                                                              ActivateThreshold=48,
-                                                                              DeactivateThreshold=24,
-                                                                              Easing={x:Static Easing.SinInOut}}"
-                                     BarBackground="{nalu:ThemeScrollDirectionValue DeactivatedLight={StaticResource CardLight},
-                                                                                    ActivatedLight={StaticResource TabBarFadeLight},
-                                                                                    DeactivatedDark={StaticResource CardDark},
-                                                                                    ActivatedDark={StaticResource TabBarFadeDark},
-                                                                                    ActivateThreshold=48,
-                                                                                    DeactivateThreshold=24,
-                                                                                    Easing={x:Static Easing.SinInOut}}" />
-        </nalu:ScaffoldTabBar.TabBarView>
-
         <nalu:ScaffoldRoot Title="Today" PageType="{x:Type pages:TodayPage}">
             <nalu:ScaffoldRoot.Icon>
                 <FontImageSource FontFamily="Material" Glyph="&#xe8df;" Color="{StaticResource TabIcon}" Size="24" />
