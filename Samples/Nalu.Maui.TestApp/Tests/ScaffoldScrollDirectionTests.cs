@@ -69,8 +69,8 @@ public class ScrollDirectionPage : ContentPage
             new ScrollDirectionValueExtension { Deactivated = 1.0, Activated = 0.2, ActivateThreshold = 100, DeactivateThreshold = 100_000, ActivateDuration = 0 }
         );
 
-        // Solid ↔ gradient background, duration 0: pixel checks verify the reused-and-mutated
-        // brush instance actually repaints natively on activation.
+        // Solid ↔ gradient background, duration 0: pixel checks verify the interpolated brush
+        // actually repaints natively on activation.
         var gradientTarget = new Grid { AutomationId = "ScrollDirGradient", HeightRequest = 20 };
 
         ScrollDirectionFactory.Apply(

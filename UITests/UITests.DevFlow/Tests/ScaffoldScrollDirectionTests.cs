@@ -110,15 +110,15 @@ public class ScaffoldScrollDirectionTests(NaluApp app) : BaseUiTest(app), IAsync
     }
 
     [Fact]
-    public async Task GradientBackgroundRepaintsThroughTheReusedBrushInstance()
+    public async Task GradientBackgroundRepaintsOnActivation()
     {
         // Deactivated: a solid LightGray (the gradient plan paints every stop gray).
         var bounds = await App.GetBoundsAsync("ScrollDirGradient");
         await App.WaitForPixelColorAsync("ScrollDirGradient", 6, 10, IsLightGray, TimeSpan.FromSeconds(5));
         await App.WaitForPixelColorAsync("ScrollDirGradient", bounds.Width - 6, 10, IsLightGray, TimeSpan.FromSeconds(5));
 
-        // Activation mutates the SAME brush instance in place: the native background must
-        // repaint into the red → blue gradient (the risky half of the reuse mechanism).
+        // Activation swaps in the interpolated brush: the native background must repaint
+        // into the red → blue gradient.
         await App.TapAsync("ScrollDirDown120");
         await WaitForOffsetAtLeastAsync(120);
 

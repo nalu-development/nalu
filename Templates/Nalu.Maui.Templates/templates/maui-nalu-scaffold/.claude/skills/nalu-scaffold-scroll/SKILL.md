@@ -115,9 +115,9 @@ reading on, back in after 24dp of scrolling up, animated over 250ms):
 - `Brush` endpoints may be gradients (`LinearGradientBrush`/`RadialGradientBrush`): solid ↔ gradient
   expands the solid over the gradient's stops; gradient ↔ gradient pairs stops on the UNION of both
   sides' offsets (different counts/positions fine) and lerps geometry too — but both sides must be
-  the same gradient type (linear ↔ radial throws). Gradients on a `Color` target throw. The output
-  is ONE brush instance per binding mutated in place (repaints via MAUI brush-change tracking);
-  per-frame gradient scrubs rebuild the native shader — prefer short ramps, or a direction value.
+  the same gradient type (linear ↔ radial throws). Gradients on a `Color` target throw. Each
+  evaluation emits a fresh brush instance; per-frame gradient scrubs rebuild the native shader —
+  prefer short ramps, or a direction value.
 - No tracker on the page → offset is 0 → every value sits at `From` (chrome looks like the "top" state).
   Only ONE tracker per page; each page has its own channel — navigating away and back rebinds it.
 - Nested/wrapped scrollables: the native scroll container is searched at most 3 levels below the tracked

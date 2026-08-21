@@ -6,8 +6,8 @@ namespace Nalu.Maui.Test.ScaffoldTests;
 /// <summary>
 /// The Brush leg of the scroll-value interpolations (<see cref="ScrollValueBrushInterpolator"/>):
 /// solid ↔ solid, solid ↔ gradient and gradient ↔ gradient lerps (stop-offset union, geometry),
-/// the reused-and-mutated single output instance with its fresh-instances escape hatch, and the
-/// wiring through both value converters.
+/// the fresh-instance-per-evaluation default with the experimental single-mutated-instance
+/// opt-in, and the wiring through both value converters.
 /// </summary>
 public class ScrollValueBrushTests
 {
@@ -20,8 +20,8 @@ public class ScrollValueBrushTests
     private static object? Convert(ScrollInterpolationConverter converter, double offset, AppTheme theme = AppTheme.Light)
         => converter.Convert([offset, 0.0, 100.0, theme], typeof(object), null, CultureInfo.InvariantCulture);
 
-    [Fact(DisplayName = "A solid pair reuses ONE output instance, mutated in place")]
-    public void SolidPairReusesOneInstance()
+    [Fact(DisplayName = "The default emits a FRESH instance per evaluation")]
+    public void DefaultEmitsFreshInstances()
     {
         var converter = new ScrollInterpolationConverter { Kind = ScrollValueKind.Brush, FromLight = Colors.Black, ToLight = Colors.White };
 
@@ -29,23 +29,33 @@ public class ScrollValueBrushTests
         first.Color.Should().Be(Colors.Black);
 
         var mid = (SolidColorBrush)Convert(converter, 50)!;
+        mid.Should().NotBeSameAs(first);
+        mid.Color.Red.Should().BeApproximately(0.5f, 0.01f);
+
+        // The earlier instance is untouched — nothing mutates behind the target's back.
+        first.Color.Should().Be(Colors.Black);
+        ((SolidColorBrush)Convert(converter, 100)!).Color.Should().Be(Colors.White);
+    }
+
+    [Fact(DisplayName = "The experimental opt-in reuses ONE output instance, mutated in place")]
+    public void OptInReuseMutatesOneInstance()
+    {
+        var interpolator = new ScrollValueBrushInterpolator { ReuseOverride = true };
+
+        var first = (SolidColorBrush)interpolator.Materialize(Colors.Black, Colors.White, 0);
+        first.Color.Should().Be(Colors.Black);
+
+        var mid = (SolidColorBrush)interpolator.Materialize(Colors.Black, Colors.White, 0.5);
         mid.Should().BeSameAs(first);
         mid.Color.Red.Should().BeApproximately(0.5f, 0.01f);
 
-        ((SolidColorBrush)Convert(converter, 100)!).Should().BeSameAs(first);
-        first.Color.Should().Be(Colors.White);
-    }
+        var gradient = Linear(new Point(0, 0), new Point(1, 0), (Colors.Red, 0f), (Colors.Blue, 1f));
+        var atStart = (LinearGradientBrush)interpolator.Materialize(Colors.LightGray, gradient, 0);
+        var atEnd = (LinearGradientBrush)interpolator.Materialize(Colors.LightGray, gradient, 1);
 
-    [Fact(DisplayName = "The escape hatch emits a fresh instance per evaluation")]
-    public void EscapeHatchEmitsFreshInstances()
-    {
-        var interpolator = new ScrollValueBrushInterpolator { ReuseOverride = false };
-
-        var first = interpolator.Materialize(Colors.Black, Colors.White, 0);
-        var second = interpolator.Materialize(Colors.Black, Colors.White, 0.5);
-
-        second.Should().NotBeSameAs(first);
-        ((SolidColorBrush)second).Color.Red.Should().BeApproximately(0.5f, 0.01f);
+        atEnd.Should().BeSameAs(atStart);
+        atEnd.GradientStops[0].Color.Should().Be(Colors.Red);
+        atEnd.GradientStops[1].Color.Should().Be(Colors.Blue);
     }
 
     [Fact(DisplayName = "Solid ↔ gradient: the solid side expands over the gradient's stops")]
@@ -59,7 +69,6 @@ public class ScrollValueBrushTests
         atStart.GradientStops.Should().OnlyContain(s => s.Color.Equals(Colors.Red));
 
         var atEnd = (LinearGradientBrush)interpolator.Materialize(Colors.Red, gradient, 1);
-        atEnd.Should().BeSameAs(atStart);
         atEnd.GradientStops[0].Color.Should().Be(Colors.Black);
         atEnd.GradientStops[1].Color.Should().Be(Colors.White);
         atEnd.StartPoint.Should().Be(new Point(0, 0));
@@ -154,7 +163,7 @@ public class ScrollValueBrushTests
         Convert(converter, 0).Should().BeOfType<SolidColorBrush>();
     }
 
-    [Fact(DisplayName = "ScrollDirectionValue steps a solid ↔ gradient background through one instance")]
+    [Fact(DisplayName = "ScrollDirectionValue steps a solid ↔ gradient background")]
     public void DirectionValueLerpsGradients()
     {
         var animator = new ScrollDirectionAnimator();
@@ -177,7 +186,6 @@ public class ScrollValueBrushTests
         resting.GradientStops.Should().OnlyContain(s => s.Color.Equals(Colors.LightGray));
 
         var activated = (LinearGradientBrush)DirectionConvert(150)!;
-        activated.Should().BeSameAs(resting);
         activated.GradientStops[0].Color.Should().Be(Colors.Red);
         activated.GradientStops[1].Color.Should().Be(Colors.Blue);
 

@@ -8,18 +8,19 @@ namespace Nalu.Internals;
 /// <remarks>
 /// The endpoint pair is normalized ONCE into a plan (the union of both sides' stop offsets, each
 /// side's color sampled at every union offset, per-side geometry): per evaluation only the lerp
-/// runs. By default the SAME output brush instance is reused and mutated in place — the target
-/// repaints through MAUI's brush-content change tracking (the mechanism AppThemeBinding on
-/// SolidColorBrush.Color relies on) — so a scroll frame allocates nothing.
+/// runs. By default every evaluation emits a FRESH brush instance — the plain MAUI binding
+/// behavior, safe on any Brush-typed target.
 /// </remarks>
 internal sealed class ScrollValueBrushInterpolator
 {
     /// <summary>
-    /// The escape hatch: set to false to emit a FRESH brush instance per evaluation (the plain
-    /// MAUI binding behavior) instead of mutating one reused instance in place. Flip it if a
-    /// Brush-typed target does not track brush-content changes and misses repaints.
+    /// EXPERIMENTAL opt-in: set to true to reuse ONE output brush instance per binding, mutated
+    /// in place — zero allocations per scroll frame, but the target must track brush-content
+    /// changes to repaint (Background/Stroke/Fill do; custom Brush properties may not), and each
+    /// gradient-stop set raises its own invalidation. Default false: a fresh instance per
+    /// evaluation, the safe behavior.
     /// </summary>
-    public static bool ReuseInstancesByDefault { get; set; } = true;
+    public static bool ReuseInstancesByDefault { get; set; }
 
     /// <summary>Per-instance override of <see cref="ReuseInstancesByDefault"/> (tests; null = follow the default).</summary>
     public bool? ReuseOverride { get; init; }

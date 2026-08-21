@@ -99,9 +99,9 @@ solids — in `ScrollValue` and `ScrollDirectionValue` alike:
   sampled at the union of their stop offsets and lerped stop by stop; geometry
   (`StartPoint`/`EndPoint`, or `Center`/`Radius`) lerps too. Both sides must be the same
   gradient type — linear ↔ radial cannot interpolate.
-- The value emits **one brush instance per binding, mutated in place** each evaluation — the
-  target repaints through MAUI's brush-content change tracking (the same channel
-  `AppThemeBinding` on a brush color uses), so scrolling allocates nothing.
+- Each evaluation emits a **fresh brush instance** (the plain MAUI binding behavior — safe on
+  any Brush-typed target). The endpoint pair is still normalized only once per binding, so a
+  scroll frame runs just the lerp.
 - Gradients rebuild the native shader on every change: fine for direction-value transitions
   (a few hundred ms), measurable on a per-frame `ScrollValue` scrub — prefer short ramps there.
 
