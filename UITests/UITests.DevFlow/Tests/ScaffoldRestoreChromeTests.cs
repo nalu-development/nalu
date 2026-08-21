@@ -68,24 +68,40 @@ public class ScaffoldRestoreChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLi
         throw new TimeoutException("No restore harness page became displayed.");
     }
 
+    /// <summary>
+    /// Brings the harness to its baseline — home root, empty stack — and does not return until it
+    /// STAYS there. Arriving is not converging: this suite persists a snapshot and replays it on
+    /// open, so a replay still in flight navigates away from a Home the convergence just reached,
+    /// a few hundred milliseconds later. Every flake in this class was that: the tap landed, Home
+    /// appeared, the settle re-check found it gone.
+    /// A replay's suppression window also ignores taps outright, so the tap itself is retried.
+    /// </summary>
     private async Task ConvergeToHomeAsync()
     {
-        var displayed = await WaitForAnyRestorePageAsync();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
 
-        if (displayed != "Home")
+        while (DateTime.UtcNow < deadline)
         {
-            // A replay may still be in flight (its suppression window ignores taps): retry
-            // until the convergence navigation actually lands.
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            var displayed = await WaitForAnyRestorePageAsync();
 
-            while (DateTime.UtcNow < deadline && displayed != "Home")
+            if (displayed != "Home")
             {
                 await App.TapAsync($"RestoreGoHomeRoot{displayed}Button");
                 await Task.Delay(350);
-                displayed = await WaitForAnyRestorePageAsync();
+
+                continue;
+            }
+
+            // Home, and still Home once anything already in flight would have landed.
+            await Task.Delay(400);
+
+            if (await IsDisplayedAsync("RestoreHomePage"))
+            {
+                return;
             }
         }
 
+        // Out of budget: fail with the bounds, which say what the app settled on instead.
         await App.WaitForSettledDisplayAsync("RestoreHomePage");
     }
 
