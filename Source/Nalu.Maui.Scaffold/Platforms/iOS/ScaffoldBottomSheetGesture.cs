@@ -56,6 +56,7 @@ internal sealed class ScaffoldBottomSheetGesture
                 _startY = _recognizer.LocationInView(null).Y;
                 _lastY = _startY;
                 _claimed = false;
+                _sheet.BeginDrag();
                 _scrollView = FindScrollViewAt(e.Location);
 
                 // A touch CATCHING a scroll that is at (or bouncing around) its top claims

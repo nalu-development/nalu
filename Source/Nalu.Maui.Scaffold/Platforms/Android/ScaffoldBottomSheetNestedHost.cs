@@ -93,6 +93,7 @@ internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScroll
                 _downY = ev.RawY;
                 _lastSelfY = ev.RawY;
                 _draggingSelf = false;
+                _sheet.BeginDrag();
 
                 return true;
 
@@ -128,13 +129,13 @@ internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScroll
 
     public void OnNestedScrollAccepted(AView? child, AView? target, Android.Views.ScrollAxis axes, int type)
     {
-        Console.WriteLine($"[SHEET] nestedAccepted type={type}");
         _helper.OnNestedScrollAccepted(child!, target!, (int) axes, type);
 
         if (type == ViewCompat.TypeTouch)
         {
             _sheetMoved = false;
             _nestedActive = true;
+            _sheet.BeginDrag();
         }
     }
 
