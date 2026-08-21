@@ -172,11 +172,38 @@ bar becomes opaque, status-bar icons flip to contrast with it.
 
 ## Custom nav bars
 
-Replace the bar per scaffold, area, or page with `Scaffold.NavBarView`. Custom bars bind the
+Replace the bar per scaffold, area, or page with `Scaffold.NavBarTemplate`. Custom bars bind the
 `ScaffoldNavBarContext` — `Title`, `Foreground`, `TitleForeground`, `CanNavigateBack`, `BackCommand`,
 `ScrollOffset`, `IsScrolledUnder`, `IsModal`/`IsCloseButtonVisible`, flyout-button visibility
 and commands — and can reuse the public primitives. The bar view owns its top safe-area
 behavior (the default bar consumes the status-bar inset itself).
+
+### iPadOS 26: the system windowing controls
+
+On iPadOS 26 every app is a resizable window, and while it IS a window the system draws its
+windowing controls — the "traffic lights" — over the window's top-leading corner, on top of
+whatever the app draws there. For a scaffold that is the nav bar's leading buttons and the start
+of its title.
+
+The scaffold moves the bar's content clear of them automatically: a windowed iPad scene gets a
+leading safe-area inset on the BAR's subtree only, so the bar's background still spans the full
+strip and the page underneath does not move. A bar that consumes the container safe area — the
+default bar does, and a custom bar should already for the status bar — picks it up with no code:
+
+```xml
+<Grid SafeAreaEdges="Container">   <!-- content clears the status bar AND the window controls -->
+```
+
+Two consequences worth knowing:
+
+- **Full-screen windows get no inset.** There the controls are transient (they appear near the
+  corner and hide again), and reserving the band permanently would cost every full-screen iPad app
+  its leading bar space for something usually absent.
+- **The controls' geometry is a measured constant**, because no API reports it: UIKit publishes no
+  leading inset for them, they are hosted outside the app's window, and iOS 26's
+  `UISceneWindowingControlStyle` selects a style, never a frame. The scaffold applies it
+  geometrically — a bar that does not actually reach under the controls (a sheet, a bar starting
+  below them) is left alone.
 
 ### Touches: what you draw is what you take
 
