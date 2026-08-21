@@ -162,7 +162,7 @@ public sealed class NaluApp : IAsyncLifetime
 
                 if (element.AutomationId == automationId)
                 {
-                    lines.Add($"  {here} [id={element.Id} y={element.WindowBounds?.Y} h={element.WindowBounds?.Height}]");
+                    lines.Add($"  {here} [id={element.Id} x={element.WindowBounds?.X} w={element.WindowBounds?.Width} y={element.WindowBounds?.Y} h={element.WindowBounds?.Height} vis={element.IsVisible}]");
                 }
 
                 if (element.Children is { } children)
