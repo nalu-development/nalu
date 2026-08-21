@@ -141,9 +141,9 @@ Notes:
 - Recycler-backed trackers are fully reliable: the state machine runs on scroll *deltas*, the
   one thing they report exactly.
 - Scaffold-level chrome works too: a value bound on the **tab bar** (e.g.
-  `ScaffoldTabBarView.LabelOpacity`, `BarBackground`) sits under no page, so it follows the
-  channel of the **currently presented page** — pages without a tracker read a resting offset
-  and keep the deactivated look.
+  `ScaffoldTabBarView.BarBackground`) sits under no page, so it follows the channel of the
+  **currently presented page** — pages without a tracker read a resting offset and keep the
+  deactivated look.
 - The [nav bar appearance channels](scaffold-navbar.md) are natural targets: the Daily
   Helper's Forecast page is the worked example — while reading on, the whole bar slides up and
   fades away (`NavBarOpacity` 1→0 plus `NavBarOffsetY` 0→-48 on the page) and a per-page

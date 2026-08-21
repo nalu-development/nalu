@@ -390,21 +390,4 @@ public class ScaffoldProxyTests
         await _navigationService.GoToAsync(Navigation.Relative().Pop());
         chrome.Text.Should().Be("Home", "popping restores the previous page's context");
     }
-
-    [Fact(DisplayName = "Tab bar LabelOpacity forwards to the bar item labels, new items included")]
-    public async Task LabelOpacityForwardsToTheItemLabels()
-    {
-        await _scaffold.InitializeAsync(_serviceProvider);
-        var barView = (ScaffoldTabBarView)_tabBar.GetOrCreateBarView();
-
-        barView.ItemViews.Should().NotBeEmpty();
-        barView.ItemViews.Should().OnlyContain(item => item.TitleLabel!.Opacity == 1.0);
-
-        barView.LabelOpacity = 0.25;
-        barView.ItemViews.Should().OnlyContain(item => item.TitleLabel!.Opacity == 0.25);
-
-        // Items rebuilt after the fact (a roots change) come up seeded with the current value.
-        _tabBar.Roots.Add(new ScaffoldRoot { PageType = typeof(SettingsPage) });
-        barView.ItemViews.Should().OnlyContain(item => item.TitleLabel!.Opacity == 0.25);
-    }
 }

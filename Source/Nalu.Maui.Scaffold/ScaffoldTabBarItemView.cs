@@ -364,11 +364,6 @@ public sealed class ScaffoldTabBarItemView : Grid
         }
     }
 
-    /// <summary>Applies the bar-level <see cref="ScaffoldTabBarView.LabelOpacity"/> (bar items only, not overflow rows).</summary>
-    internal void SetLabelOpacity(double value) => _label?.Opacity = value;
-
-    internal Label? TitleLabel => _label;
-
     internal void SetSelectedState(bool selected)
     {
         if (_selected != selected)

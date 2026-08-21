@@ -92,27 +92,6 @@ public sealed class ScaffoldTabBarView : Grid
             propertyChanged: static view => (_, value) => view._pill?.Shadow = value
         );
 
-    /// <summary>Bindable property for <see cref="LabelOpacity"/>.</summary>
-    public static readonly BindableProperty LabelOpacityProperty =
-        GenericBindableProperty<ScaffoldTabBarView>.Create(
-            nameof(LabelOpacity),
-            1.0,
-            propertyChanged: static view => (_, value) => view._items?.ApplyLabelOpacity(value)
-        );
-
-    /// <summary>
-    /// Gets or sets the opacity of the bar items' labels (the "More" item included; overflow
-    /// panel rows are unaffected). Being a plain bindable property on the bar element, it is a
-    /// natural target for scroll effects — e.g.
-    /// <c>LabelOpacity="{nalu:ScrollDirectionValue Deactivated=1, Activated=0}"</c> collapses
-    /// the bar to icons while reading on.
-    /// </summary>
-    public double LabelOpacity
-    {
-        get => (double)GetValue(LabelOpacityProperty);
-        set => SetValue(LabelOpacityProperty, value);
-    }
-
     /// <summary>Gets or sets the background brush of the floating bar pill.</summary>
     public Brush? BarBackground
     {
@@ -225,7 +204,6 @@ public sealed class ScaffoldTabBarView : Grid
     /// <summary>Roots currently living in the overflow panel (recomputed by the items layout on measure).</summary>
     internal IReadOnlyList<ScaffoldRoot> OverflowRoots => _items.OverflowRoots;
 
-    internal IEnumerable<ScaffoldTabBarItemView> ItemViews => _items.ItemViews;
 
     /// <summary>Raised when the overflow set changes (an open panel must close or refresh).</summary>
     internal event Action? OverflowRootsChanged;

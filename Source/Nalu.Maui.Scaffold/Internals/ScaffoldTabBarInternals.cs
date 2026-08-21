@@ -60,17 +60,7 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
         // The More item stays LAST in child order: ArrangeChildren walks children in order and
         // hands the in-plan ones consecutive slots.
         Add(_moreItem);
-        ApplyLabelOpacity(_owner.LabelOpacity);
         InvalidateMeasure();
-    }
-
-    /// <summary>Forwards the bar-level <see cref="ScaffoldTabBarView.LabelOpacity"/> to the BAR items (overflow rows keep theirs).</summary>
-    internal void ApplyLabelOpacity(double value)
-    {
-        foreach (var item in ItemViews)
-        {
-            item.SetLabelOpacity(value);
-        }
     }
 
     /// <summary>Replaces the More item — its content (drawn ••• glyph vs. user icon) is fixed at construction.</summary>
@@ -83,7 +73,6 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
 
         _moreItem = new ScaffoldTabBarItemView(_owner, root: null);
         _moreItem.SetSelectedState(_overflowRoots.Any(static root => root.IsSelected));
-        _moreItem.SetLabelOpacity(_owner.LabelOpacity);
         Add(_moreItem);
         InvalidateMeasure();
     }
