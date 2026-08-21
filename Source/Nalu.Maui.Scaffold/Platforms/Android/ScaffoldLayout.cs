@@ -3,6 +3,7 @@ using Android.Runtime;
 using Android.Views;
 using Android.Widget;
 using AndroidX.Core.View;
+using Microsoft.Maui.Platform;
 using AView = Android.Views.View;
 
 namespace Nalu;
@@ -290,8 +291,45 @@ public sealed class ScaffoldLayout : FrameLayout
             {
                 layout._imeAnimating = false;
                 layout.UpdateImeInset(ViewCompat.GetRootWindowInsets(layout));
+                layout.RevealFocusedInputAfterResize();
             }
         }
+    }
+
+    /// <summary>
+    /// Re-asks the platform to reveal the focused input once the keyboard has SETTLED, in Resize
+    /// mode only.
+    /// </summary>
+    /// <remarks>
+    /// Resize leans on the platform: a scroll container reveals the focused child itself. It does
+    /// so ONCE though, when focus arrives — and on Android that is before the IME insets have
+    /// finished arriving, because MAUI's window listener gates dispatches for the length of the
+    /// keyboard animation. The container therefore reveals against its pre-resize height and
+    /// stops short: measured on the harness, a focused entry settled 19dp BELOW the keyboard's
+    /// top edge and stayed there. Nothing else asks again — the caret follower deliberately
+    /// leaves Resize to the platform, and no layout pass re-runs a reveal.
+    /// Posted, because the container has to know its new size before it can work out how far to
+    /// scroll, and requesting a rect that is already visible does nothing.
+    /// </remarks>
+    private void RevealFocusedInputAfterResize()
+    {
+        if (ImeBottomInsetPx <= 0
+            || OverlayOwnsKeyboard?.Invoke() == true
+            || PageKeyboardMode?.Invoke() != ScaffoldKeyboardMode.Resize
+            || Context?.GetActivity()?.CurrentFocus is not { } focus)
+        {
+            return;
+        }
+
+        Post(() =>
+            {
+                // Focus may have moved on (or gone) between the post and the run.
+                if (ImeBottomInsetPx > 0 && ReferenceEquals(Context?.GetActivity()?.CurrentFocus, focus))
+                {
+                    ScaffoldFocusedInput.RequestCaretOnScreen(focus);
+                }
+            }
+        );
     }
 
     /// <summary>

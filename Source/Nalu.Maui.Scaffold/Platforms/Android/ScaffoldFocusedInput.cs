@@ -46,6 +46,34 @@ internal static class ScaffoldFocusedInput
         return location[1] + CaretBottomPx(focus);
     }
 
+    /// <summary>
+    /// Asks the focused input's ancestors to scroll its CARET LINE into view — the platform's own
+    /// reveal path (<c>requestRectangleOnScreen</c>), aimed at the line rather than the whole
+    /// input, because an auto-sizing editor can be taller than the room above the keyboard and
+    /// revealing all of it would push the caret back off screen.
+    /// A no-op when the rect is already visible, so it is safe to ask again.
+    /// </summary>
+    public static void RequestCaretOnScreen(AView focus)
+    {
+        var caretBottom = CaretBottomPx(focus);
+        var lineTop = Math.Max(0, caretBottom - CaretLineHeightPx(focus));
+
+        focus.RequestRectangleOnScreen(new Android.Graphics.Rect(0, lineTop, focus.Width, caretBottom), true);
+    }
+
+    /// <summary>The height of the caret's line — a whole single-line input, one line of a multi-line one.</summary>
+    private static int CaretLineHeightPx(AView focus)
+    {
+        if (focus is Android.Widget.TextView { Layout: { } layout } textView && textView.LineCount > 1)
+        {
+            var line = layout.GetLineForOffset(Math.Max(0, textView.SelectionEnd));
+
+            return Math.Max(1, layout.GetLineBottom(line) - layout.GetLineTop(line));
+        }
+
+        return focus.Height;
+    }
+
     /// <summary>The bottom (px, relative to the view's top) of the line holding the selection end — the view's height when that cannot be resolved.</summary>
     private static int CaretBottomPx(AView focus)
     {
