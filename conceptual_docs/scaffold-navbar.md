@@ -177,3 +177,37 @@ Replace the bar per scaffold, area, or page with `Scaffold.NavBarView`. Custom b
 `ScrollOffset`, `IsScrolledUnder`, `IsModal`/`IsCloseButtonVisible`, flyout-button visibility
 and commands — and can reuse the public primitives. The bar view owns its top safe-area
 behavior (the default bar consumes the status-bar inset itself).
+
+### Touches: what you draw is what you take
+
+A bar lives in a strip that spans the FULL width, whatever the bar itself paints. Everything in
+that strip you do not draw belongs to the page underneath, and must let touches through — a
+floating pill with empty margins, a bar moved out of the band by `NavBarOffsetY`, the space beside
+a short title. A strip that swallows those is an invisible dead zone, and nothing on screen
+explains it to the person tapping.
+
+Two rules keep a custom bar honest, and they mirror how the built-in chrome is built:
+
+- **Whatever you DRAW should take its own touches.** A MAUI view carrying a gesture recognizer
+  consumes them on both platforms, and the behavior travels with the view — a bar translated out of
+  the way stops claiming the space it no longer occupies, with no platform code deciding where the
+  bar "really" is. The default bar's surface carries an empty `TapGestureRecognizer` for exactly
+  this: without it, a tap on a visible bar reaches the page behind it, which with
+  `NavBarOverlapsContent` means operating content the user cannot see.
+- **Whatever merely POSITIONS should be `InputTransparent`,** with `CascadeInputTransparent="False"`
+  so your content keeps its own touches. Layouts that fill the strip to centre something — the tab
+  bar's own grid is the clearest case — otherwise take every touch inside their bounds on iOS,
+  padding included, while on Android they let everything fall through. Declaring it makes both
+  platforms behave the same way.
+
+```xml
+<!-- a custom bar: the painted surface absorbs, the wrapper does not -->
+<Grid InputTransparent="True" CascadeInputTransparent="False">
+    <Border BackgroundColor="{StaticResource BarSurface}">
+        <Border.GestureRecognizers>
+            <TapGestureRecognizer />
+        </Border.GestureRecognizers>
+        <!-- title, buttons… -->
+    </Border>
+</Grid>
+```

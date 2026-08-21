@@ -72,10 +72,27 @@ internal sealed class ScaffoldNavBarHost : Grid, IDisposable
         // net10 off-screen first-traversal padding heuristic.
         SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None);
 
+        // The host FILLS its strip and draws nothing: the bar it carries is what you see, and
+        // NavBarOffsetY moves that bar INSIDE this host. So a bar offset out of the way leaves
+        // this host still covering the band — and on UIKit, where the deepest view whose bounds
+        // contain a point wins whether it drew anything or not, that band stayed dead to touch.
+        // Cascade OFF: the bar and everything in it keeps taking its own touches.
+        InputTransparent = true;
+        CascadeInputTransparent = false;
+
         _content = new Grid
         {
             AutomationId = "NavBarSurface",
-            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None)
+            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None),
+
+            // The SURFACE is what you can see of the bar, so the surface is what takes the touch.
+            // A recognizer that does nothing is the whole mechanism: a MAUI view carrying one
+            // consumes touches on both platforms, and it travels with the view — a bar moved out
+            // of the band by NavBarOffsetY stops claiming the space it no longer occupies, with
+            // no platform code deciding where the bar "really" is.
+            // Without it Android leaked every touch its children did not take through to the page
+            // underneath, so a tap on a visible bar could operate content hidden behind it.
+            GestureRecognizers = { new TapGestureRecognizer() }
         };
 
         Add(_content);

@@ -68,7 +68,6 @@ internal sealed class ScaffoldBottomSheetNestedHost : FrameLayout, INestedScroll
                 break;
 
             case Android.Views.MotionEventActions.Move when !_nestedActive && !_draggingSelf && Math.Abs(ev.RawY - _downY) > _touchSlop:
-                Console.WriteLine("[SHEET] intercept-steal");
                 _draggingSelf = true;
                 _lastSelfY = ev.RawY;
 

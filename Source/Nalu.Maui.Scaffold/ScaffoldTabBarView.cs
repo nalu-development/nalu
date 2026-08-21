@@ -213,6 +213,18 @@ public sealed class ScaffoldTabBarView : Grid
     {
         BackgroundColor = Colors.Transparent;
 
+        // This view spans the full width; the PILL is all you can see of it. Everything either
+        // side must fall through to the page — a strip that eats those touches is a dead zone
+        // nothing on screen explains.
+        // It has to be declared on the LAYOUTS that merely position, because the platforms
+        // disagree by default: Android's strip is transparent glass and only a child that handles
+        // the touch keeps it, while UIKit hands the touch to the deepest view whose bounds contain
+        // it, drawn or not — and that is this grid, or the inset host inside it.
+        // Cascade OFF: with it on, the pill would go transparent to input as well and the bar
+        // would stop working altogether.
+        InputTransparent = true;
+        CascadeInputTransparent = false;
+
         // A star-row root Grid FILLS bounded measure constraints (the bar would measure
         // full-screen inside the platform strip) — the single row must be Auto.
         RowDefinitions.Add(new RowDefinition(GridLength.Auto));
@@ -244,7 +256,12 @@ public sealed class ScaffoldTabBarView : Grid
         _insetHost = new Grid
         {
             RowDefinitions = { new RowDefinition(GridLength.Auto) },
-            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None, SafeAreaRegions.None, SafeAreaRegions.None, SafeAreaRegions.Container)
+            SafeAreaEdges = new SafeAreaEdges(SafeAreaRegions.None, SafeAreaRegions.None, SafeAreaRegions.None, SafeAreaRegions.Container),
+
+            // Fills the bar exactly as its parent does, and is just as invisible: without this it
+            // becomes the deepest view under the pill's margins and swallows them on its own.
+            InputTransparent = true,
+            CascadeInputTransparent = false
         };
 
         _insetHost.Add(_pill);
