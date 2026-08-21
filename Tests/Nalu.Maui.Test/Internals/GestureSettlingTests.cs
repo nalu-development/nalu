@@ -55,47 +55,67 @@ public class GestureSettlingTests
 /// </summary>
 public class GestureVelocitySamplerTests
 {
+    /// <summary>
+    /// A clock the test moves by hand. The sampler's whole job is dividing distance by time, and
+    /// driving it with real delays measures the machine instead: the same assertions passed here
+    /// in ~110ms and failed on a CI runner that stretched them to 376ms.
+    /// </summary>
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private long _timestamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => _timestamp;
+
+        public void Advance(TimeSpan by) => _timestamp += by.Ticks;
+    }
+
     [Fact(DisplayName = "A gesture that never moved has no velocity")]
     public void AStillGestureHasNoVelocity()
     {
-        var sampler = new GestureVelocitySampler();
+        var time = new ManualTimeProvider();
+        var sampler = new GestureVelocitySampler(time);
         sampler.Begin(0);
+        time.Advance(TimeSpan.FromMilliseconds(20));
         sampler.Add(0);
 
         sampler.Velocity.Should().Be(0);
     }
 
     [Fact(DisplayName = "Velocity is signed like the positions and survives a still final sample")]
-    public async Task VelocityIsMeasuredOverAWindow()
+    public void VelocityIsMeasuredOverAWindow()
     {
-        var sampler = new GestureVelocitySampler();
+        var time = new ManualTimeProvider();
+        var sampler = new GestureVelocitySampler(time);
         sampler.Begin(0);
 
-        // Move steadily for a while...
+        // Moving steadily: 20 units every 20ms is 1000 units per second.
         for (var i = 1; i <= 5; i++)
         {
-            await Task.Delay(20, TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromMilliseconds(20));
             sampler.Add(-i * 20.0);
         }
 
         // ...then the last event a lifting finger reports: no movement at all. Measured over the
         // last two samples this would read as zero and a real flick would be missed.
-        await Task.Delay(5, TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromMilliseconds(5));
         sampler.Add(-100.0);
 
         sampler.Velocity.Should().BeLessThan(-200, "the drag was travelling towards negative positions, fast");
     }
 
     [Fact(DisplayName = "A gesture that stopped before the release is not a flick")]
-    public async Task AStoppedGestureHasNoVelocity()
+    public void AStoppedGestureHasNoVelocity()
     {
-        var sampler = new GestureVelocitySampler();
+        var time = new ManualTimeProvider();
+        var sampler = new GestureVelocitySampler(time);
         sampler.Begin(0);
 
-        // A fast swipe...
+        // A fast swipe: 40 units every 10ms is 4000 units per second.
         for (var i = 1; i <= 5; i++)
         {
-            await Task.Delay(10, TestContext.Current.CancellationToken);
+            time.Advance(TimeSpan.FromMilliseconds(10));
             sampler.Add(-i * 40.0);
         }
 
@@ -103,7 +123,7 @@ public class GestureVelocitySamplerTests
 
         // ...and then the finger stops, still down, having changed its mind. Nothing is reported
         // while it rests, so only the clock can tell the difference.
-        await Task.Delay(250, TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromMilliseconds(250));
 
         sampler.Velocity.Should().Be(0, "a gesture that has stopped must not settle as a flick");
     }
@@ -111,8 +131,10 @@ public class GestureVelocitySamplerTests
     [Fact(DisplayName = "A reset gesture reports no velocity until it starts again")]
     public void ResetForgetsTheGesture()
     {
-        var sampler = new GestureVelocitySampler();
+        var time = new ManualTimeProvider();
+        var sampler = new GestureVelocitySampler(time);
         sampler.Begin(0);
+        time.Advance(TimeSpan.FromMilliseconds(10));
         sampler.Add(-50);
         sampler.Reset();
 

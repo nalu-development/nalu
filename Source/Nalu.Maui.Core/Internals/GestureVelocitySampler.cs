@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace Nalu.Internals;
 
 /// <summary>
@@ -20,46 +18,54 @@ namespace Nalu.Internals;
 /// gesture ended, not how it started.
 /// </para>
 /// </remarks>
-internal sealed class GestureVelocitySampler
+/// <param name="timeProvider">
+/// The clock. Injectable so the settling MATHS can be tested without depending on the machine's
+/// scheduling: driving it with real delays makes a unit test fail on a loaded CI runner, where a
+/// 20ms sleep is not 20ms, and the reading it produces is the runner's mood rather than the code's
+/// behaviour.
+/// </param>
+internal sealed class GestureVelocitySampler(TimeProvider? timeProvider = null)
 {
     /// <summary>How far back a release looks. Long enough to survive one stalled frame, short enough to stay "now".</summary>
     private static readonly TimeSpan _window = TimeSpan.FromMilliseconds(100);
 
-    private readonly Stopwatch _clock = new();
-    private (TimeSpan Time, double Position) _oldest;
-    private (TimeSpan Time, double Position) _newest;
-    private bool _hasOldest;
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
+    private readonly (TimeSpan Time, double Position)[] _samples = new (TimeSpan, double)[16];
+    private long _origin;
+    private int _count;
+    private int _next;
 
     /// <summary>Starts a fresh gesture at <paramref name="position"/>.</summary>
     public void Begin(double position)
     {
-        _clock.Restart();
-        _newest = (TimeSpan.Zero, position);
-        _oldest = _newest;
-        _hasOldest = true;
+        _origin = _time.GetTimestamp();
+        _count = 0;
+        _next = 0;
+        Push(TimeSpan.Zero, position);
     }
 
     /// <summary>Records where the gesture is now (same units the caller settles in).</summary>
     public void Add(double position)
     {
-        if (!_hasOldest)
+        if (_count == 0)
         {
             Begin(position);
 
             return;
         }
 
-        var now = _clock.Elapsed;
+        Push(_time.GetElapsedTime(_origin), position);
+    }
 
-        // The previous newest becomes the baseline once the current one falls out of the window,
-        // which keeps exactly one sample of history older than it — the shortest span that can
-        // still measure a flick whose last event barely moved.
-        if (now - _oldest.Time > _window)
+    private void Push(TimeSpan time, double position)
+    {
+        _samples[_next] = (time, position);
+        _next = (_next + 1) % _samples.Length;
+
+        if (_count < _samples.Length)
         {
-            _oldest = _newest;
+            _count++;
         }
-
-        _newest = (now, position);
     }
 
     /// <summary>
@@ -67,42 +73,59 @@ internal sealed class GestureVelocitySampler
     /// never moved, or when it has STOPPED.
     /// </summary>
     /// <remarks>
-    /// Measured against NOW rather than against the last sample, because a finger that stops
-    /// reports nothing at all: swipe fast, hold, release — with the last two samples this reads as
-    /// the swipe, and a settled gesture would commit as if it had been flicked. Someone who
-    /// changes their mind usually pauses first, and a pause must not be read as intent.
-    /// Including the still time in the denominator decays the reading as the pause grows; past a
-    /// whole window of stillness it is simply zero.
+    /// Measured from the OLDEST sample still inside the window to the latest, over the time since
+    /// that oldest one — against NOW rather than against the last sample, because a finger that
+    /// stops reports nothing at all: swipe fast, hold, release, and a reading taken between the
+    /// last two samples would still be the swipe. Someone who changes their mind usually pauses
+    /// first, and a pause must not be read as intent.
+    /// Several samples are kept because two are not enough: a lifting finger's final event
+    /// usually reports no movement, and with a single sample of history the window can roll
+    /// forward until both readings sit at the same position — a genuine flick then measures as
+    /// perfectly still, which is the opposite of the truth.
     /// </remarks>
     public double Velocity
     {
         get
         {
-            if (!_hasOldest)
+            if (_count < 2)
             {
                 return 0;
             }
 
-            var now = _clock.Elapsed;
+            var now = _time.GetElapsedTime(_origin);
+            var newest = _samples[(_next - 1 + _samples.Length) % _samples.Length];
 
-            if (now - _newest.Time > _window)
+            if (now - newest.Time > _window)
             {
                 return 0;
             }
 
-            var elapsed = (now - _oldest.Time).TotalSeconds;
+            var oldest = newest;
 
-            return elapsed > 0.001 ? (_newest.Position - _oldest.Position) / elapsed : 0;
+            for (var i = 1; i < _count; i++)
+            {
+                var candidate = _samples[(_next - 1 - i + (2 * _samples.Length)) % _samples.Length];
+
+                if (now - candidate.Time > _window)
+                {
+                    break;
+                }
+
+                oldest = candidate;
+            }
+
+            var elapsed = (now - oldest.Time).TotalSeconds;
+
+            return elapsed > 0.001 ? (newest.Position - oldest.Position) / elapsed : 0;
         }
     }
 
     /// <summary>Forgets the gesture; <see cref="Velocity"/> reads zero until the next <see cref="Begin"/>.</summary>
     public void Reset()
     {
-        _clock.Reset();
-        _hasOldest = false;
-        _oldest = default;
-        _newest = default;
+        _origin = 0;
+        _count = 0;
+        _next = 0;
     }
 }
 
