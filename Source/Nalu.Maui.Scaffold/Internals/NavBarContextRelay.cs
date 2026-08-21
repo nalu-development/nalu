@@ -36,6 +36,8 @@ internal sealed class NavBarContextRelay : INotifyPropertyChanged
     private readonly List<Element> _chain = [];
     private Element? _target;
     private ScaffoldNavBarHost? _observedBarHost;
+    private Scaffold? _observedScaffold;
+    private Page? _observedScaffoldPage;
 
     /// <summary>The resolved context, or null while the target is not yet in a scaffold's tree.</summary>
     public ScaffoldNavBarContext? Context
@@ -95,8 +97,14 @@ internal sealed class NavBarContextRelay : INotifyPropertyChanged
 
                 // The scaffold IS a page: it must never be mistaken for a hosted one.
                 case Scaffold scaffold:
-                    Context = (page is not null ? scaffold.GetPageHost(page)?.Context : null)
-                              ?? scaffold.NavBarContext;
+                    // Chrome outside any page (tab bar, scaffold-level overlays) falls back to
+                    // the CURRENT page's context — and must keep following it across
+                    // navigations, which arrive as PropertyChanged(NavBarContext), not as an
+                    // ancestry change.
+                    _observedScaffold = scaffold;
+                    _observedScaffoldPage = page;
+                    scaffold.PropertyChanged += OnScaffoldPropertyChanged;
+                    Context = ResolveScaffoldContext(scaffold, page);
 
                     return;
 
@@ -111,7 +119,18 @@ internal sealed class NavBarContextRelay : INotifyPropertyChanged
         Context = null;
     }
 
+    private static ScaffoldNavBarContext ResolveScaffoldContext(Scaffold scaffold, Page? page)
+        => (page is not null ? scaffold.GetPageHost(page)?.Context : null) ?? scaffold.NavBarContext;
+
     private void OnAncestryChanged(object? sender, EventArgs e) => Resolve();
+
+    private void OnScaffoldPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Scaffold.NavBarContext) && sender is Scaffold scaffold)
+        {
+            Context = ResolveScaffoldContext(scaffold, _observedScaffoldPage);
+        }
+    }
 
     private void OnBarHostPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -134,6 +153,13 @@ internal sealed class NavBarContextRelay : INotifyPropertyChanged
         {
             _observedBarHost.PropertyChanged -= OnBarHostPropertyChanged;
             _observedBarHost = null;
+        }
+
+        if (_observedScaffold is not null)
+        {
+            _observedScaffold.PropertyChanged -= OnScaffoldPropertyChanged;
+            _observedScaffold = null;
+            _observedScaffoldPage = null;
         }
     }
 }

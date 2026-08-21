@@ -1,10 +1,12 @@
 # Scaffold Scroll-Driven Effects
 
 The Scaffold has a built-in **scroll channel**: one page-attached property connects a
-scrollable to the scaffold, and from that moment any numeric, `Color`, or solid-`Brush`
+scrollable to the scaffold, and from that moment any numeric, `Color`, or `Brush`
 property — on chrome *or* page content — can be driven from the live scroll offset with
 plain markup. Materializing nav bars, fading titles, and parallax headers all ride the same
-three concepts: a **tracker**, a **ramp**, and the **`ScrollValue`** extensions.
+three concepts: a **tracker**, a **ramp**, and the **`ScrollValue`** extensions — plus the
+direction-driven **`ScrollDirectionValue`** for chrome that hides as you read on and returns
+the moment you scroll back.
 
 <img src="assets/images/scaffold-scroll-chrome.gif" width="340" alt="Nav bar materializing and title fading in as the page scrolls, photo parallaxing behind" />
 
@@ -67,7 +69,7 @@ Background="{nalu:ThemeScrollValue FromLight=Transparent,
 
 | Parameter | Purpose |
 |-----------|---------|
-| `From` / `To` | Endpoint values (numeric, `Color`, or a solid `Brush`). |
+| `From` / `To` | Endpoint values (numeric, bool, `Color`, or a `Brush` — solid or gradient); bool targets flip at t ≥ 0.5. |
 | `FromLight/ToLight/FromDark/ToDark` | Theme-aware endpoints (`ThemeScrollValue`); dark values fall back to the light ones, and a theme change re-evaluates immediately. |
 | `RampStart` / `RampEnd` | Per-value ramp override (defaults to the page-level ramp). |
 | `Extrapolate` | `Clamp` (default: hold endpoints outside the window) or `Extend` (keep going linearly). |
@@ -86,6 +88,67 @@ offsetLabel.SetBinding(Label.TextProperty,
 
 Single-segment paths compile to a typed binding (no reflection, trimming/AOT-safe); deeper
 paths are evaluated by reflection.
+
+### Gradient endpoints
+
+`Brush` endpoints may be **gradients** (`LinearGradientBrush`/`RadialGradientBrush`), not just
+solids — in `ScrollValue` and `ScrollDirectionValue` alike:
+
+- **Solid ↔ gradient** works: the solid side expands over the gradient's stops.
+- **Gradient ↔ gradient** works with *different* stop counts and positions: both sides are
+  sampled at the union of their stop offsets and lerped stop by stop; geometry
+  (`StartPoint`/`EndPoint`, or `Center`/`Radius`) lerps too. Both sides must be the same
+  gradient type — linear ↔ radial cannot interpolate.
+- Each evaluation emits a **fresh brush instance** (the plain MAUI binding behavior — safe on
+  any Brush-typed target). The endpoint pair is still normalized only once per binding, so a
+  scroll frame runs just the lerp.
+- Gradients rebuild the native shader on every change: fine for direction-value transitions
+  (a few hundred ms), measurable on a per-frame `ScrollValue` scrub — prefer short ramps there.
+
+## 4. `ScrollDirectionValue` and `ThemeScrollDirectionValue`
+
+Where `ScrollValue` maps the absolute offset, **`ScrollDirectionValue`** watches the scroll
+**direction**: scrolling *down* by `ActivateThreshold` dp latches an **activated** state,
+scrolling back *up* by `DeactivateThreshold` dp latches back to **deactivated** (the initial
+state) — wherever in the content that movement happens. Each flip animates the target between
+the two endpoint values over a real duration, so the effect reads as a mode change, not a
+scrub — the classic "toolbar slips away as you read on, returns the moment you scroll back":
+
+```xml
+<!-- The bottom action bar slides out after 48dp of reading on, back in after 24dp upward. -->
+TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80,
+                                         ActivateThreshold=48, DeactivateThreshold=24,
+                                         ActivateDuration=250, Easing={x:Static Easing.SinInOut}}"
+```
+
+| Parameter | Purpose |
+|-----------|---------|
+| `Deactivated` / `Activated` | Endpoint values (numeric, bool, `Color`, or a `Brush` — solid or gradient); bool targets (IsVisible, InputTransparent…) flip at the transition midpoint. The state starts deactivated. |
+| `DeactivatedLight/ActivatedLight/DeactivatedDark/ActivatedDark` | Theme-aware endpoints (`ThemeScrollDirectionValue`); dark values fall back to the light ones. |
+| `ActivateThreshold` | Downward travel (dp) that latches activated (default 100). Travel accumulates only while the scroll keeps moving down — any upward movement restarts the count; `0` latches on the first downward frame. |
+| `DeactivateThreshold` | Upward travel that latches back (defaults to `ActivateThreshold`). |
+| `ActivateDuration` / `DeactivateDuration` | Transition lengths in milliseconds (default 250; `DeactivateDuration` defaults to `ActivateDuration`; `0` snaps). An interrupted transition reverses from where it is, at the same perceived speed. |
+| `Easing` | Time curve of the transitions (default linear). |
+| `DeactivateBelow` | Offset at or below which deactivated is always restored (default 0 — the content top). |
+
+Notes:
+
+- The content **top always restores deactivated**, even after a fast fling — resting at the
+  top never leaves the mode stuck on. Top over-scroll (the iOS bounce) feeds no travel.
+- The bottom bounce *does* rebound upward: keep `DeactivateThreshold` above the typical
+  rebound if the mode must survive hitting the end of the content.
+- The ramp plays no part here — direction values ignore `ScrollRampStart`/`ScrollRampEnd`.
+- Recycler-backed trackers are fully reliable: the state machine runs on scroll *deltas*, the
+  one thing they report exactly.
+- Scaffold-level chrome works too: a value bound on the **tab bar** (e.g.
+  `ScaffoldTabBarView.BarBackground`) sits under no page, so it follows the channel of the
+  **currently presented page** — pages without a tracker read a resting offset and keep the
+  deactivated look.
+- The [nav bar appearance channels](scaffold-navbar.md) are natural targets: the Daily
+  Helper's Forecast page is the worked example — while reading on, the whole bar slides up and
+  fades away (`NavBarOpacity` 1→0 plus `NavBarOffsetY` 0→-48 on the page) and a per-page
+  `NavBarTemplate` flips the bar `InputTransparent` mid-transition so touches pass through it;
+  scrolling back (or the top) brings the bar home.
 
 ## Recipe: parallax header
 

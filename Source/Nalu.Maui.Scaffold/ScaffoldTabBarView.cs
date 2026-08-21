@@ -204,6 +204,7 @@ public sealed class ScaffoldTabBarView : Grid
     /// <summary>Roots currently living in the overflow panel (recomputed by the items layout on measure).</summary>
     internal IReadOnlyList<ScaffoldRoot> OverflowRoots => _items.OverflowRoots;
 
+
     /// <summary>Raised when the overflow set changes (an open panel must close or refresh).</summary>
     internal event Action? OverflowRootsChanged;
 

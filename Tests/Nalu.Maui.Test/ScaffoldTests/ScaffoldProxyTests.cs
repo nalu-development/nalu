@@ -104,6 +104,10 @@ public class ScaffoldProxyTests
 
     public ScaffoldProxyTests()
     {
+        // Typed bindings dispatch cross-thread property changes: the chrome-binding tests
+        // update bound labels from context changes and need a dispatcher to exist.
+        DispatcherProvider.SetCurrent(new DispatcherProviderStub());
+
         var services = new ServiceCollection();
         services.AddScoped<INavigationServiceProviderInternal, NavigationServiceProvider>();
         services.AddScoped<INavigationServiceProvider>(sp => sp.GetRequiredService<INavigationServiceProviderInternal>());
@@ -361,5 +365,29 @@ public class ScaffoldProxyTests
 
         homeRoot.NavigationStack.RootPage.Should().BeNull();
         homeRoot.NavigationStack.PushedPages.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Chrome outside any page (the tab bar) follows the PRESENTED page's context")]
+    public async Task ChromeOutsideAnyPageFollowsThePresentedPage()
+    {
+        await _scaffold.InitializeAsync(_serviceProvider);
+
+        // The default tab bar view: a logical child of the ScaffoldTabBar area — inside the
+        // scaffold's tree but under NO page, exactly like a scroll-driven binding on it (the
+        // hide-on-scroll tab bar chrome).
+        var barView = (ScaffoldTabBarView)_tabBar.GetOrCreateBarView();
+        var chrome = new Label();
+        barView.Add(chrome);
+        chrome.SetBinding(Label.TextProperty, NavBarBindings.Create(chrome, nameof(ScaffoldNavBarContext.Title)));
+
+        _tabBar.Roots[0].NavigationStack.RootPage!.Title = "Home";
+        chrome.Text.Should().Be("Home");
+
+        await _navigationService.GoToAsync(Navigation.Relative().Push<IDetailPageModel>());
+        _scaffold.CurrentPage!.Title = "Detail";
+        chrome.Text.Should().Be("Detail", "a navigation re-points the scaffold-level context with NO ancestry change — the relay must follow it");
+
+        await _navigationService.GoToAsync(Navigation.Relative().Pop());
+        chrome.Text.Should().Be("Home", "popping restores the previous page's context");
     }
 }

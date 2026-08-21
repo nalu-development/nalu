@@ -1,6 +1,6 @@
 ---
 name: nalu-scaffold-scroll
-description: Nalu.Maui.Scaffold scroll-driven effects — Scaffold.ScrollTracker + ramp, {nalu:ScrollValue}/{nalu:ThemeScrollValue} bindings for parallax headers, materializing nav bars, fading titles; load when a value must follow the page scroll offset.
+description: Nalu.Maui.Scaffold scroll-driven effects — Scaffold.ScrollTracker + ramp, {nalu:ScrollValue}/{nalu:ThemeScrollValue} bindings for parallax headers, materializing nav bars, fading titles, and {nalu:ScrollDirectionValue} for hide-on-scroll-down/show-on-scroll-up chrome; load when a value must follow the page scroll offset or direction.
 ---
 # Scaffold scroll-driven effects (ScrollValue / parallax)
 
@@ -8,7 +8,7 @@ Package `Nalu.Maui.Scaffold`, namespace `Nalu`, XAML `xmlns:nalu="https://nalu-d
 Mental model — three parts: a **tracker** (page-attached property naming the page's scrollable) publishes
 the live vertical offset into the ambient `ScaffoldNavBarContext`; a **ramp** (`ScrollRampStart`→`ScrollRampEnd`,
 page-wide default) is the offset window over which effects interpolate; the **`{nalu:ScrollValue}`** /
-**`{nalu:ThemeScrollValue}`** markup extensions bind any numeric, `Color` or solid-`Brush` bindable property —
+**`{nalu:ThemeScrollValue}`** markup extensions bind any numeric, `Color` or `Brush` bindable property —
 on page content OR nav bar chrome — to that offset. No code, no scroll handlers. Nav bar / appearance
 properties themselves → skill `nalu-scaffold-structure`.
 
@@ -18,8 +18,10 @@ properties themselves → skill `nalu-scaffold-structure`.
 |-----|---------|-------|
 | `nalu:Scaffold.ScrollTracker="{x:Reference X}"` (page) | Connect the page's scrollable | `ScrollView`, `CollectionView`, `VirtualScroll`, or any view whose platform tree has a native scroll container ≤ 3 levels deep. One per page. |
 | `nalu:Scaffold.ScrollRampStart` / `ScrollRampEnd` (page → area → scaffold) | Page-wide ramp, default 0 / 100 | Every `ScrollValue` without its own `RampStart/RampEnd` rides it. |
-| `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, `Color`, or solid `Brush` (types must match the target). |
+| `{nalu:ScrollValue From, To, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Offset → value | `From`/`To`: numeric, bool, `Color`, or `Brush` — solid or gradient (types must match the target; bools flip at t ≥ 0.5). |
 | `{nalu:ThemeScrollValue FromLight, ToLight, FromDark?, ToDark?, RampStart?, RampEnd?, Extrapolate?, Easing?}` | Theme-aware endpoints | Dark values fall back to the light ones; theme change re-evaluates immediately. |
+| `{nalu:ScrollDirectionValue Deactivated, Activated, ActivateThreshold?, DeactivateThreshold?, ActivateDuration?, DeactivateDuration?, Easing?, DeactivateBelow?}` | Scroll DIRECTION → two-state value | Down `ActivateThreshold` dp (default 100) latches activated, up `DeactivateThreshold` dp (defaults to activate) latches back; each flip ANIMATES between the endpoints over `ActivateDuration`/`DeactivateDuration` ms (default 250, 0 snaps, `Easing` = time curve). Starts deactivated; ignores the ramp. |
+| `{nalu:ThemeScrollDirectionValue DeactivatedLight, ActivatedLight, DeactivatedDark?, ActivatedDark?, …}` | Theme-aware direction endpoints | Same knobs; dark values fall back to the light ones. |
 | `Extrapolate` (`ScrollValueExtrapolation`) | `Clamp` (default: hold endpoints outside the ramp) / `Extend` (continue linearly) | `Extend` on numeric targets only; colors/brushes always clamp. |
 | `Easing` | Shapes the ramp interior | `Easing="{x:Static Easing.CubicOut}"`. |
 | `ScaffoldNavBarContext.ScrollOffset` / `IsScrolledUnder` | Raw channel values | `{nalu:NavBarBinding Path=ScrollOffset}` in XAML; `IsScrolledUnder` for threshold checks (e.g. a divider). |
@@ -90,14 +92,32 @@ Fade-out + drift of a hero element in normal content (template `HomePage.xaml`):
 Threshold-style effects: `IsVisible="{nalu:NavBarBinding Path=IsScrolledUnder}"` on a divider under a
 custom bar; or `Opacity="{nalu:ScrollValue RampStart=0, RampEnd=1, From=0, To=1}"` for a hard switch.
 
+Hide-on-scroll chrome (direction, not position — a bottom action bar that slides out after 48dp of
+reading on, back in after 24dp of scrolling up, animated over 250ms):
+
+```xml
+<Grid VerticalOptions="End"
+      TranslationY="{nalu:ScrollDirectionValue Deactivated=0, Activated=80,
+                                               ActivateThreshold=48, DeactivateThreshold=24,
+                                               Easing={x:Static Easing.SinInOut}}">
+    <!-- bar content -->
+</Grid>
+```
+
 ## Rules & gotchas
 
 - The extensions must target a **bindable property directly** on an element — not inside a `Style`
   setter, not on plain CLR properties. Works on any element in the scaffold's tree (page content, `TitleView`,
   custom nav/tab bars) — a page carrying the attached nav bar appearance properties included.
-- Endpoint types must match the target: numeric ↔ `double`/`int` properties, `Color` ↔ `Color`,
-  `Brush` ↔ `Brush` (solid only). `From=Transparent, To={StaticResource X}` on a `Brush` property works
+- Endpoint types must match the target: numeric ↔ `double`/`int` properties, bool ↔ `bool` (flips at the transition midpoint — pairs with a fading Opacity for InputTransparent/IsVisible), `Color` ↔ `Color`,
+  `Brush` ↔ `Brush`. `From=Transparent, To={StaticResource X}` on a `Brush` property works
   (color literals convert to solid brushes).
+- `Brush` endpoints may be gradients (`LinearGradientBrush`/`RadialGradientBrush`): solid ↔ gradient
+  expands the solid over the gradient's stops; gradient ↔ gradient pairs stops on the UNION of both
+  sides' offsets (different counts/positions fine) and lerps geometry too — but both sides must be
+  the same gradient type (linear ↔ radial throws). Gradients on a `Color` target throw. Each
+  evaluation emits a fresh brush instance; per-frame gradient scrubs rebuild the native shader —
+  prefer short ramps, or a direction value.
 - No tracker on the page → offset is 0 → every value sits at `From` (chrome looks like the "top" state).
   Only ONE tracker per page; each page has its own channel — navigating away and back rebinds it.
 - Nested/wrapped scrollables: the native scroll container is searched at most 3 levels below the tracked
@@ -116,6 +136,10 @@ custom bar; or `Opacity="{nalu:ScrollValue RampStart=0, RampEnd=1, From=0, To=1}
   values ride it; give parallax values their own ramp so both can coexist on one page.
 - Materializing bar over a photo: also set `nalu:Scaffold.SystemBarStyle="LightContent"` for the white-chrome
   state; the scaffold flips status-bar icons automatically as the bar becomes opaque (→ `nalu-scaffold-structure`).
+- `ScrollDirectionValue`: starts deactivated; the content top always restores deactivated (even after a
+  fast fling), and top over-scroll feeds no travel — but the iOS BOTTOM bounce rebounds upward, so keep
+  `DeactivateThreshold` above the typical rebound if the mode must survive hitting the end. Ignores the
+  ramp entirely; delta-based, so recycler-backed trackers are fully reliable here.
 - Nothing to dispose: bindings live with the page. Do not add your own `Scrolled` handlers for the same job.
 
 ## See also
