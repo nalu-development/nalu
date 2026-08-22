@@ -32,31 +32,6 @@ public class ScaffoldNavBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (await App.WaitForElementAsync("NavBarFlyoutEndButton")).IsVisible.Should().BeFalse("no end flyout is configured");
     }
 
-    /// <summary>
-    /// The window-controls spacer costs NOTHING unless the app is a window on an iPad — which no
-    /// device this suite drives is: phones and Android have no such controls, and a full-screen
-    /// iPad shows them only transiently. A spacer that reserved space here would push every bar's
-    /// leading button right on every platform.
-    /// </summary>
-    [Fact(DisplayName = "The window-controls spacer reserves nothing on a full-screen window")]
-    public async Task WindowControlsSpacerReservesNothingOutsideAWindowedIPad()
-    {
-        await WaitDisplayedAsync("NavBarPageHome");
-
-        var (windowWidth, windowHeight) = await App.GetWindowSizeAsync();
-        var spacer = await App.WaitForElementAsync("NavBarWindowControlsSpacer");
-
-        spacer.IsVisible.Should().BeFalse(
-            "the app fills the screen ({0}x{1}), so no system window controls sit over its corner",
-            windowWidth,
-            windowHeight
-        );
-
-        var button = await App.WaitForStableBoundsAsync("NavBarFlyoutStartButton");
-
-        button.X.Should().BeLessThan(20, "the leading button keeps its usual bar padding, not a reserved band");
-    }
-
     [Fact]
     public async Task PushShowsBackButtonAndPopsThroughIt()
     {

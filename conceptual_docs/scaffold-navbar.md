@@ -185,42 +185,36 @@ window controls — the "traffic lights" — over the window's top-leading corne
 the app draws there. That corner belongs to the nav bar's leading buttons, and to the first entry
 of a start-edge drawer.
 
-`ScaffoldSystemWindowControlsSpacer` reserves exactly that footprint, and nothing anywhere else —
-it is zero-sized on Android, on iPhone, and on a full-screen iPad, so it can sit in a layout
-unconditionally:
+The scaffold clears them for you, through the platform's own safe-area mechanism and per surface:
+
+| surface | inset | why that edge |
+|---|---|---|
+| nav bar strip | **leading** | the bar is a band across the top; pushing its content right is all it needs |
+| left-edge drawer | **top** | a drawer runs the full height — insetting its leading edge would waste the panel's width all the way down for controls that only cover its corner |
+
+Each surface is its own view controller, so its inset reaches that surface alone: the page under a
+bar does not move, and an end-side drawer (which never reaches the controls) gets nothing. Content
+picks it up with no code as long as it consumes the container safe area — which the default bar,
+`ScaffoldFlyoutMenuView`, and any bar that already handles the status bar all do:
 
 ```xml
-<HorizontalStackLayout>
-    <nalu:ScaffoldSystemWindowControlsSpacer />   <!-- 62dp windowed on iPad, 0 everywhere else -->
-    <Button Text="Menu" />
-</HorizontalStackLayout>
-
-<VerticalStackLayout>
-    <nalu:ScaffoldSystemWindowControlsSpacer Orientation="Vertical" />   <!-- 65dp, pushes DOWN -->
-    <Label Text="Menu" />
-</VerticalStackLayout>
+<Grid SafeAreaEdges="Container">   <!-- clears the status bar AND the window controls -->
 ```
 
-`Orientation` picks the dimension: `Horizontal` (the default) moves content to the RIGHT of the
-controls, which is what a nav bar wants; `Vertical` moves it BELOW them, which is what a
-full-height start drawer wants — insetting a whole drawer from the left would waste the panel's
-width down its entire height for controls that only cover its corner.
-
-The built-in chrome already carries one: the default nav bar puts it before its leading buttons,
-and `ScaffoldFlyoutMenuView` puts one at the top of its content when it is the START drawer (an
-end drawer never reaches that corner and reserves nothing). **Custom bars and custom drawer
-content place their own** — that is what the component is public for.
+Content that deliberately opts OUT of safe areas to draw edge-to-edge stays under the controls —
+exactly as it already stays under the status bar.
 
 Two things worth knowing about the geometry:
 
-- **Full-screen windows reserve nothing.** There the controls are transient — they appear near
-  the corner and hide again — and holding the band open permanently for something usually absent
-  would cost every full-screen iPad app its leading space.
+- **Full-screen windows get no inset.** There the controls are transient — they appear near the
+  corner and hide again — and holding the band open permanently for something usually absent would
+  cost every full-screen iPad app its leading space.
 - **The footprint is a measured constant** (the controls occupy x 21..62, y 43..65 in window
   coordinates), because no API reports it: UIKit publishes no inset for them — a windowed scene
   reports a plain `L0 T32 R0 B20` while they are on screen, and they sit BELOW that top inset —
   they are hosted outside the app's window, so the app cannot find them in its own view tree, and
-  iOS 26's `UISceneWindowingControlStyle` selects a style, never a frame.
+  iOS 26's `UISceneWindowingControlStyle` selects a style, never a frame. What each surface applies
+  is the REMAINING distance: a drawer already inset 32pt by the status bar adds only the rest.
 
 ### Touches: what you draw is what you take
 

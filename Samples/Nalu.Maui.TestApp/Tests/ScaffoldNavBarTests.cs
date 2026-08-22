@@ -274,10 +274,6 @@ public class NavBarScaffold : Scaffold
             Spacing = 8,
             Children =
             {
-                // CUSTOM drawer content: the built-in ScaffoldFlyoutMenuView carries one of these
-                // itself, but content like this has to reserve the corner on its own — on a
-                // windowed iPad the system controls are drawn right over this label.
-                new ScaffoldSystemWindowControlsSpacer { Orientation = StackOrientation.Vertical, AutomationId = "GlobalNavFlyoutSpacer" },
                 new Label { Text = "Nav flyout", AutomationId = "GlobalNavFlyoutLabel", FontSize = 18, FontAttributes = FontAttributes.Bold },
                 closeButton,
                 stateLabel
