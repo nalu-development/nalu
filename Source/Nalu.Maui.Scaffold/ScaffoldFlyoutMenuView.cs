@@ -79,6 +79,9 @@ public class ScaffoldFlyoutMenuView : ScrollView
             propertyChanged: static menu => (_, _) => menu.RebuildItems()
         );
 
+    private readonly ScaffoldSystemWindowControlsSpacer _windowControlsSpacer =
+        new() { Orientation = StackOrientation.Vertical, AutomationId = "FlyoutWindowControlsSpacer" };
+
     private readonly VerticalStackLayout _container;
     private readonly VerticalStackLayout _menuStack;
     private readonly ObservableCollection<Element> _menuItems = [];
@@ -178,14 +181,39 @@ public class ScaffoldFlyoutMenuView : ScrollView
         AttachToScaffold(this.GetScaffoldOrDefault());
     }
 
+    /// <summary>
+    /// Reserves the window-controls corner only for the START drawer. On a windowed iPad the
+    /// system draws its controls over the window's top-leading corner — which a start drawer
+    /// occupies and an end drawer never does, so an end drawer must not push its content down
+    /// for controls that are nowhere near it.
+    /// </summary>
+    private void UpdateWindowControlsSpacer()
+    {
+        var isStartDrawer = _scaffold is { } scaffold
+                            && ReferenceEquals(scaffold.ResolveFlyoutContent(ScaffoldFlyoutSide.Start), this);
+        var present = _container.Children.Contains(_windowControlsSpacer);
+
+        if (isStartDrawer && !present)
+        {
+            _container.Children.Insert(0, _windowControlsSpacer);
+        }
+        else if (!isStartDrawer && present)
+        {
+            _container.Children.Remove(_windowControlsSpacer);
+        }
+    }
+
     private void AttachToScaffold(Scaffold? scaffold)
     {
         if (ReferenceEquals(_scaffold, scaffold))
         {
+            UpdateWindowControlsSpacer();
+
             return;
         }
 
         _scaffold = scaffold;
+        UpdateWindowControlsSpacer();
         RebuildItems();
     }
 

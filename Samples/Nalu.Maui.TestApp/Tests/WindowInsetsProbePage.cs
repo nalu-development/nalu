@@ -109,6 +109,7 @@ public class WindowInsetsProbePage : ContentPage
 #endif
     }
 
+#if IOS || MACCATALYST
     /// <summary>
     /// Every native view intersecting the window's top band, with its class and frame. If the
     /// system draws its windowing controls INSIDE our window, they appear here as a view we did
@@ -145,6 +146,8 @@ public class WindowInsetsProbePage : ContentPage
 
         return string.Join("\n", lines);
     }
+
+#endif
 
     private static Button MakeExitButton()
     {

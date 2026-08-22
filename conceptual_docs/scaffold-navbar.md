@@ -178,32 +178,49 @@ Replace the bar per scaffold, area, or page with `Scaffold.NavBarTemplate`. Cust
 and commands — and can reuse the public primitives. The bar view owns its top safe-area
 behavior (the default bar consumes the status-bar inset itself).
 
-### iPadOS 26: the system windowing controls
+### iPadOS 26: the system window controls
 
 On iPadOS 26 every app is a resizable window, and while it IS a window the system draws its
-windowing controls — the "traffic lights" — over the window's top-leading corner, on top of
-whatever the app draws there. For a scaffold that is the nav bar's leading buttons and the start
-of its title.
+window controls — the "traffic lights" — over the window's top-leading corner, on top of whatever
+the app draws there. That corner belongs to the nav bar's leading buttons, and to the first entry
+of a start-edge drawer.
 
-The scaffold moves the bar's content clear of them automatically: a windowed iPad scene gets a
-leading safe-area inset on the BAR's subtree only, so the bar's background still spans the full
-strip and the page underneath does not move. A bar that consumes the container safe area — the
-default bar does, and a custom bar should already for the status bar — picks it up with no code:
+`ScaffoldSystemWindowControlsSpacer` reserves exactly that footprint, and nothing anywhere else —
+it is zero-sized on Android, on iPhone, and on a full-screen iPad, so it can sit in a layout
+unconditionally:
 
 ```xml
-<Grid SafeAreaEdges="Container">   <!-- content clears the status bar AND the window controls -->
+<HorizontalStackLayout>
+    <nalu:ScaffoldSystemWindowControlsSpacer />   <!-- 62dp windowed on iPad, 0 everywhere else -->
+    <Button Text="Menu" />
+</HorizontalStackLayout>
+
+<VerticalStackLayout>
+    <nalu:ScaffoldSystemWindowControlsSpacer Orientation="Vertical" />   <!-- 65dp, pushes DOWN -->
+    <Label Text="Menu" />
+</VerticalStackLayout>
 ```
 
-Two consequences worth knowing:
+`Orientation` picks the dimension: `Horizontal` (the default) moves content to the RIGHT of the
+controls, which is what a nav bar wants; `Vertical` moves it BELOW them, which is what a
+full-height start drawer wants — insetting a whole drawer from the left would waste the panel's
+width down its entire height for controls that only cover its corner.
 
-- **Full-screen windows get no inset.** There the controls are transient (they appear near the
-  corner and hide again), and reserving the band permanently would cost every full-screen iPad app
-  its leading bar space for something usually absent.
-- **The controls' geometry is a measured constant**, because no API reports it: UIKit publishes no
-  leading inset for them, they are hosted outside the app's window, and iOS 26's
-  `UISceneWindowingControlStyle` selects a style, never a frame. The scaffold applies it
-  geometrically — a bar that does not actually reach under the controls (a sheet, a bar starting
-  below them) is left alone.
+The built-in chrome already carries one: the default nav bar puts it before its leading buttons,
+and `ScaffoldFlyoutMenuView` puts one at the top of its content when it is the START drawer (an
+end drawer never reaches that corner and reserves nothing). **Custom bars and custom drawer
+content place their own** — that is what the component is public for.
+
+Two things worth knowing about the geometry:
+
+- **Full-screen windows reserve nothing.** There the controls are transient — they appear near
+  the corner and hide again — and holding the band open permanently for something usually absent
+  would cost every full-screen iPad app its leading space.
+- **The footprint is a measured constant** (the controls occupy x 21..62, y 43..65 in window
+  coordinates), because no API reports it: UIKit publishes no inset for them — a windowed scene
+  reports a plain `L0 T32 R0 B20` while they are on screen, and they sit BELOW that top inset —
+  they are hosted outside the app's window, so the app cannot find them in its own view tree, and
+  iOS 26's `UISceneWindowingControlStyle` selects a style, never a frame.
 
 ### Touches: what you draw is what you take
 

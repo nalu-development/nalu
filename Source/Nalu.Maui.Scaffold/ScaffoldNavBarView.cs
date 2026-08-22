@@ -109,6 +109,10 @@ public sealed class ScaffoldNavBarView : Grid
                                  VerticalOptions = LayoutOptions.Center,
                                  Children =
                                  {
+                                     // Zero everywhere except a WINDOWED iPad, where the system
+                                     // draws its window controls over this exact corner and would
+                                     // otherwise cover the first button.
+                                     new ScaffoldSystemWindowControlsSpacer { AutomationId = "NavBarWindowControlsSpacer" },
                                      new ScaffoldFlyoutButton { Side = ScaffoldFlyoutSide.Start, AutomationId = "NavBarFlyoutStartButton" },
                                      new ScaffoldBackButton { AutomationId = "NavBarBackButton" }
                                  }
