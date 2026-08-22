@@ -32,7 +32,12 @@ public abstract class NavigationTestsBase(NaluApp app) : BaseUiTest(app), IAsync
     /// </summary>
     protected virtual string MultiPopLeakReport => "Leaked:2 NavEditorPageModel,NavDetailPageModel";
 
-    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+    /// <summary>
+    /// Starts every test from an EMPTY leak tracker, so the assertion in
+    /// <see cref="DisposeAsync"/> is about this test's own scenario. Without it a single leak
+    /// cascades into every following test and the failure count tracks ordering, not leaks.
+    /// </summary>
+    public async ValueTask InitializeAsync() => await App.ResetLeakTrackerAsync();
 
     /// <summary>
     /// Known-leak override: tests hitting a documented PLATFORM leak set this to the exact
@@ -52,13 +57,6 @@ public abstract class NavigationTestsBase(NaluApp app) : BaseUiTest(app), IAsync
         await App.ResetAsync();
         await App.TapAsync("CheckLeaksButton");
         await App.WaitForTextAsync("LeaksLabel", _expectedLeakReport, TimeSpan.FromSeconds(15));
-
-        if (_expectedLeakReport != "Leaked:0")
-        {
-            // Drop the asserted residue so subsequent scenarios start from a clean tracker.
-            await App.TapAsync("ForgiveLeaksButton");
-            await App.WaitForTextAsync("LeaksLabel", "forgiven");
-        }
     }
 
     private async Task OpenShellAsync()

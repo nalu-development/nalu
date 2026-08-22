@@ -674,6 +674,22 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>Waits until the element's text equals the expected value.</summary>
+    /// <summary>
+    /// Drops leak-tracker residue so the next scenario's check is about ITSELF alone.
+    /// </summary>
+    /// <remarks>
+    /// The tracker keeps survivors between checks, so one leaked object fails every test that
+    /// follows it — including tests that never touch the leaked type, which then report a leak
+    /// they had no part in. The failure count measures ORDERING rather than leaks (the same suite
+    /// reported 6 or 14 failures purely by discovery order). Any suite asserting on LeaksLabel
+    /// calls this FIRST, from a state where MainPage is up.
+    /// </remarks>
+    public async Task ResetLeakTrackerAsync()
+    {
+        await TapAsync("ForgiveLeaksButton");
+        await WaitForTextAsync("LeaksLabel", "forgiven");
+    }
+
     public async Task WaitForTextAsync(string automationId, string expectedText, TimeSpan? timeout = null)
     {
         var stopwatch = Stopwatch.StartNew();

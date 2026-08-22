@@ -15,7 +15,13 @@ public class ScaffoldNavBarAppearanceTests(NaluApp app) : BaseUiTest(app), IAsyn
 {
     private const string _pageName = "Scaffold NavBar Appearance Tests";
 
-    public async ValueTask InitializeAsync() => await App.OpenTestPageAsync(_pageName);
+    public async ValueTask InitializeAsync()
+    {
+        // ScrollObservationIsReleasedOnPop asserts "Leaked:0": it must not inherit another
+        // test's residue. Cleared here, while MainPage is still up.
+        await App.ResetLeakTrackerAsync();
+        await App.OpenTestPageAsync(_pageName);
+    }
 
     public async ValueTask DisposeAsync() => await App.ResetAsync();
 
