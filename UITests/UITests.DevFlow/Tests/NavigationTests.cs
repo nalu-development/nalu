@@ -306,7 +306,9 @@ public abstract class NavigationTestsBase(NaluApp app) : BaseUiTest(app), IAsync
         // up — the popped pages stay rooted even though Nalu disposed them correctly
         // (single-pop scenarios collect fine). Assert the exact residue so any change in
         // behavior (fix or worsening) is caught.
-        _expectedLeakReport = MultiPopLeakReport;
+        // ...on APPLE. The leak is in the iOS Shell renderer; Android's pop-to-root cleans up,
+        // so demanding the residue there fails a host that behaved correctly.
+        _expectedLeakReport = await App.IsAppleAsync() ? MultiPopLeakReport : "Leaked:0";
     }
 
     [Fact]
