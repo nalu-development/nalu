@@ -41,7 +41,9 @@ engine-owned selection.
 `ScaffoldTabBar` is an area whose roots render in the bottom tab bar. The default bar is a
 centered pill with icon+label items and **automatic overflow**: when items don't fit at the
 configured item width, the bar shows a "More" item opening a wrap-grid panel with the remaining
-roots (reusing the same item template).
+roots (reusing the same item template). Overflowed items leave the bar entirely — hidden, not
+merely moved out of sight — so a screen reader announces the tabs that are actually on the bar
+and nothing else.
 
 <img src="assets/images/scaffold-tabbar.gif" width="414" alt="The default tab bar pill switching between roots" />
 

@@ -123,6 +123,26 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
                 layout._owner.NotifyOverflowRootsChanged();
             }
 
+            // Out-of-plan items are HIDDEN, not merely moved: parking them offscreen keeps them
+            // in the accessibility tree, where a screen reader happily announces tabs the user
+            // cannot see or reach. Visibility keys off the plan, never off the item's own state —
+            // the plan is computed from each ROOT's IsVisible, so hiding the item view here
+            // cannot feed back into which items fit.
+            foreach (var item in layout._rootItems)
+            {
+                var inPlan = _plan.Contains(item);
+
+                if (item.IsVisible != inPlan)
+                {
+                    item.IsVisible = inPlan;
+                }
+            }
+
+            if (layout._moreItem is { } more && more.IsVisible != showMore)
+            {
+                more.IsVisible = showMore;
+            }
+
             double height = 0;
 
             foreach (var item in _plan)

@@ -50,9 +50,34 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         }
     }
 
+    /// <summary>
+    /// Skips when the bar is wide enough to fit every root. Overflow is a function of WIDTH: the
+    /// harness sizes its six roots to overflow a phone, and on an iPad they all fit — nothing is
+    /// overflowed, [More] does nothing, and a test asserting on the panel is testing a scenario
+    /// the device cannot produce. Reported as a skip rather than a failure, which would read as a
+    /// bug in the bar.
+    /// </summary>
+    /// <remarks>
+    /// The witness is an overflowed root being HIDDEN: where every root fits, none is overflowed
+    /// and each one — Echo included — is a visible bar item.
+    /// </remarks>
+    private async Task SkipUnlessOverflowingAsync()
+    {
+        var echo = await App.WaitForElementAsync("TabEcho");
+        var (windowWidth, _) = await App.GetWindowSizeAsync();
+
+        Assert.SkipWhen(
+            echo.IsVisible,
+            $"All six roots fit in a {windowWidth:0}dp-wide bar, so nothing overflows here "
+            + "(the harness is sized to overflow a phone)."
+        );
+    }
+
     [Fact]
     public async Task DefaultTemplateShowsFittingItemsAndMore()
     {
+        await SkipUnlessOverflowingAsync();
+
         await App.WaitForElementAsync("TabPageAlpha");
 
         (await App.WaitForElementAsync("TabAlpha")).IsVisible.Should().BeTrue();
@@ -61,9 +86,11 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (await App.WaitForElementAsync("TabDelta")).IsVisible.Should().BeTrue();
         (await App.WaitForElementAsync("TabMore")).IsVisible.Should().BeTrue();
 
-        // Echo and Foxtrot do not fit: they live in the overflow panel, not the bar.
-        var echoBounds = await App.GetBoundsAsync("TabEcho");
-        echoBounds.X.Should().BeLessThan(0, "overflowed items are parked offscreen");
+        // Echo and Foxtrot do not fit: they live in the overflow panel, not the bar — and are
+        // HIDDEN rather than parked offscreen, so a screen reader does not announce tabs that
+        // are not on the bar.
+        (await App.WaitForElementAsync("TabEcho")).IsVisible
+            .Should().BeFalse("overflowed items leave the bar entirely, accessibility included");
     }
 
     [Fact]
@@ -152,6 +179,8 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     [Fact]
     public async Task OverflowPanelOpensSelectsAndHighlights()
     {
+        await SkipUnlessOverflowingAsync();
+
         await App.WaitForElementAsync("TabPageAlpha");
 
         await App.TapAsync("TabMore");
@@ -168,6 +197,8 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     [Fact]
     public async Task OverflowPanelTogglesOnMoreTap()
     {
+        await SkipUnlessOverflowingAsync();
+
         await WaitDisplayedAsync("TabPageAlpha");
 
         await App.TapAsync("TabMore");
@@ -182,6 +213,8 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     [Fact]
     public async Task OverflowPanelDismissesOnBarSelection()
     {
+        await SkipUnlessOverflowingAsync();
+
         await App.WaitForElementAsync("TabPageAlpha");
 
         await App.TapAsync("TabMore");
