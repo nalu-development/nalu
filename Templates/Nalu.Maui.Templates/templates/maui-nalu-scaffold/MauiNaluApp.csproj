@@ -14,6 +14,13 @@
              patches (stale tab bar pills under the shadowed bar). Nalu's own floor is 10.0.90;
              this pin sits above it, on what the repo's sample apps run. -->
         <MauiVersion>10.0.100</MauiVersion>
+        <!--
+            DEBUG only: lets the day-to-day loop survive an Xcode/workload skew (a fresh workload
+            can require a newer Xcode than the machine has). Release still demands the Xcode the
+            iOS SDK asks for, which is what ships.
+         -->
+        <ValidateXcodeVersion Condition="'$(Configuration)' == 'Debug'">false</ValidateXcodeVersion>
+
         <SingleProject>true</SingleProject>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>

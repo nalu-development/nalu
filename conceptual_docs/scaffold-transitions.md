@@ -12,12 +12,12 @@ swipe, Android predictive back) deliberately do NOT replay custom specs: a horiz
 scrubs the standard slide so the page tracks the finger — the page's own spec plays on
 programmatic pushes and pops.
 
-Built-in specs: `Default` (plain slide), `SlideFromRight` (iOS-style with behind parallax),
-`SlideUpFade`, `ZoomFade`, `SlideFromBottom` (the modal default), `None`.
+Built-in specs: `Default` (the stock slide from the right, the page behind counter-sliding 35%
+out to the left), `SlideUpFade`, `ZoomFade`, `SlideFromBottom` (the modal default), `None`.
 
 ```xml
 <!-- Scaffold-wide -->
-<nalu:Scaffold nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+<nalu:Scaffold nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.Default}">
 
 <!-- Or per page (the spec belongs to the PUSHED page) -->
 <ContentPage nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideUpFade}">

@@ -34,7 +34,7 @@ Semantics:
   animators): every spec is seekable and reversible. Keep specs to these four channels — there is
   no hook for arbitrary per-frame code, custom easing, or per-view animation.
 - Records are immutable: derive variants with `with`, e.g.
-  `ScaffoldPageTransition.SlideFromRight with { DurationSeconds = 0.35 }`.
+  `ScaffoldPageTransition.Default with { DurationSeconds = 0.35 }`.
 - Interactive gestures never play custom specs (they scrub the standard slide). Design specs
   knowing the programmatic push/pop and gesture pop may look different.
 - Root switches use `ScaffoldPageTransition.Default` (adjacent roots) or a cross-fade (different
@@ -44,11 +44,10 @@ Built-in values for calibration:
 
 | Spec | Enter | Behind | Duration |
 |------|-------|--------|----------|
-| `Default` | `FractionX: 1` | identity | 0.25 |
-| `SlideFromRight` | `FractionX: 1` | `FractionX: -0.3, Opacity: 0.9` | 0.25 |
-| `SlideUpFade` | `FractionY: 0.03, Opacity: 0` | `Scale: 0.97, Opacity: 0.85` | 0.38 |
-| `ZoomFade` | `Scale: 0.85, Opacity: 0` | `Scale: 1.05, Opacity: 0.6` | 0.3 |
-| `SlideFromBottom` | `FractionY: 1` | `Scale: 0.97, Opacity: 0.9` | 0.3 |
+| `Default` | `FractionX: 1` | `FractionX: -0.35` | 0.25 |
+| `SlideUpFade` | `FractionY: 0.1, Opacity: 0` | `FractionY: -0.1, Opacity: 0.85` | 0.25 |
+| `ZoomFade` | `Scale: 0.85, Opacity: 0` | `Scale: 1.05, Opacity: 0.6` | 0.25 |
+| `SlideFromBottom` | `FractionY: 1` | `FractionY: -0.35` | 0.25 |
 | `None` | identity | identity | 0 |
 
 Declaring and using a custom spec:

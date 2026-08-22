@@ -16,11 +16,10 @@ fly between their geometries. Modals are ordinary stack pages with a different p
 | API | Purpose | Notes |
 |-----|---------|-------|
 | `nalu:Scaffold.PageTransition` (attached, `ScaffoldPageTransition?`) | Push/pop spec | On a page: that page's own spec. On the `Scaffold`: default for all pages. Resolution: page value → `SlideFromBottom` if page is modal → scaffold value → `Default`. |
-| `ScaffoldPageTransition.Default` | Slide in from right, behind page static | Fallback. |
-| `ScaffoldPageTransition.SlideFromRight` | iOS-style slide, behind page parallaxes (-0.3 X, opacity 0.9) | Template sets this scaffold-wide in `AppScaffold.xaml`. |
-| `ScaffoldPageTransition.SlideUpFade` | 3% slide-up + fade in; behind scales 0.97 and dims | 0.38 s. |
-| `ScaffoldPageTransition.ZoomFade` | Scale 0.85→1 + fade; behind grows 1.05 and dims | 0.3 s. |
-| `ScaffoldPageTransition.SlideFromBottom` | Slide up from bottom edge; behind recedes | 0.3 s. Automatic default for modal pages. |
+| `ScaffoldPageTransition.Default` | Slide in from right; the behind page counter-slides 35% out to the left | Fallback, and what the template sets scaffold-wide in `AppScaffold.xaml`. |
+| `ScaffoldPageTransition.SlideUpFade` | 10% slide-up + fade in; behind slides up 10% and dims to 0.85 | 0.25 s. |
+| `ScaffoldPageTransition.ZoomFade` | Scale 0.85→1 + fade; behind grows to 1.05 and dims to 0.6 | 0.25 s. |
+| `ScaffoldPageTransition.SlideFromBottom` | Slide up from the bottom edge; the behind page counter-slides 35% up | 0.25 s. Automatic default for modal pages. |
 | `ScaffoldPageTransition.None` | Instant swap | Duration 0. |
 | `new ScaffoldPageTransition(Enter, Behind, DurationSeconds = 0.25)` | Custom spec (record) | See reference.md. |
 | `ScaffoldTransitionMotion(FractionX, FractionY, Scale, Opacity)` | One page's motion | Fractions of page size; `Scale`/`Opacity` default 1. |
@@ -34,7 +33,7 @@ Scaffold-wide default (template's `AppScaffold.xaml`):
 
 ```xml
 <nalu:Scaffold xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
-               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.Default}">
 ```
 
 Per-page override — the spec belongs to the page being PUSHED (it enters and leaves with it):

@@ -4,7 +4,7 @@
                xmlns:nalu="https://nalu-development.github.com/nalu/scaffold"
                xmlns:pages="clr-namespace:MauiNaluApp.Pages"
                x:Class="MauiNaluApp.AppScaffold"
-               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.SlideFromRight}">
+               nalu:Scaffold.PageTransition="{x:Static nalu:ScaffoldPageTransition.Default}">
 
     <!-- The whole application structure: one tab bar, two roots, each hosting its own
          navigation stack. Pages are plain ContentPages resolved through Nalu navigation. -->
