@@ -183,8 +183,8 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
     /// The already-covered path is the set CHANGING (a wider window takes items back), which the
     /// bar reports and the panel closes on. This is the other one: a shape change that leaves the
     /// partition alone still has to close it, or the panel survives at the old window's geometry.
-    /// Landscape here keeps at least one root overflowed, so the panel would have something to
-    /// show and no reason to close by the existing path.
+    /// The panel must close on the rotation itself, not merely because its contents changed:
+    /// landscape fits every root, so a panel left open would have nothing to show.
     /// </remarks>
     [Fact]
     public async Task RotatingClosesTheOverflowPanel()
@@ -196,9 +196,12 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
 
         await App.WaitForElementGoneAsync("TabBarOverflowPanel");
 
-        // …and the bar is left usable: the panel can be opened again in the new orientation
-        // (a close that tore down more than the panel would show up here).
-        (await App.WaitForElementAsync("TabMore")).IsVisible.Should().BeTrue();
+        // …and the bar is left usable (a close that tore down more than the panel shows up here).
+        // The witness is a ROOT item, not [More]: landscape is wide enough to fit every root, so
+        // there is nothing to overflow and no [More] to find — which is exactly what the sibling
+        // RotatingRepartitionsTheTabBarOverflow asserts from the other side.
+        (await App.WaitForElementAsync("TabOne")).IsVisible.Should().BeTrue("the bar still shows its items");
+        (await App.GetBoundsAsync("TabOne")).X.Should().BeGreaterThanOrEqualTo(0, "and they are laid out in it");
 
         await App.SetOrientationAsync(landscape: false);
     }

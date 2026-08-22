@@ -686,6 +686,12 @@ public sealed class NaluApp : IAsyncLifetime
     /// </remarks>
     public async Task ResetLeakTrackerAsync()
     {
+        // The tracker's controls live on MainPage, and a test does NOT start there: the previous
+        // class may have left its own page open (its teardown resets, but nothing guarantees the
+        // order, and a class that never resets leaves whatever it was showing). Getting back
+        // first is what makes this callable from any InitializeAsync; ResetAsync no-ops when the
+        // app is already home.
+        await ResetAsync();
         await TapAsync("ForgiveLeaksButton");
         await WaitForTextAsync("LeaksLabel", "forgiven");
     }
