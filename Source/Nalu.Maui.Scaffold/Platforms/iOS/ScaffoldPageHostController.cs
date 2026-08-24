@@ -32,6 +32,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
     private ScaffoldPageHost? _host;
     private readonly IMauiContext _mauiContext;
     private ScaffoldNavBarStrip? _navStrip;
+    private ScaffoldNavBarStripController? _navStripController;
     private nfloat _externalBottomInset;
     private bool _navBarPresented;
     private int _navBarAnimating;
@@ -105,8 +106,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
 
         if (barHost is null)
         {
-            _navStrip?.RemoveFromSuperview();
-            _navStrip = null;
+            DetachNavStrip();
             _navBarPresented = false;
             Host.SetNavBarAttached(false);
             View?.SetNeedsLayout();
@@ -120,7 +120,15 @@ internal sealed class ScaffoldPageHostController : UIViewController
             // page and its bar, and the bar always draws over the page.
             var strip = new ScaffoldNavBarStrip(barHost.ToPlatform(_mauiContext));
             _navStrip = strip;
-            View!.AddSubview(strip);
+
+            // A controller owns the strip so the BAR can carry a leading safe-area inset of its
+            // own, clearing the iPadOS 26 window controls without moving the page — which is this
+            // container's other child controller.
+            var stripController = new ScaffoldNavBarStripController(strip);
+            _navStripController = stripController;
+            AddChildViewController(stripController);
+            View!.AddSubview(stripController.View!);
+            stripController.DidMoveToParentViewController(this);
 
             // A page enters with its bar already at rest: the bar travels WITH the page, so it
             // must not also slide in on its own.
@@ -239,10 +247,30 @@ internal sealed class ScaffoldPageHostController : UIViewController
             ? ScaffoldChromeBar.FootprintAboveInset(strip.BarHeight, View?.SafeAreaInsets.Top ?? 0)
             : 0;
 
+    /// <summary>
+    /// What the WINDOW CONTROLS still demand of the page itself. A bar tall enough already holds
+    /// the page below them and this is smaller than its contribution; a bar that is hidden — or
+    /// overlapped by the page — leaves the page reaching the window's top-leading corner on its
+    /// own, with the controls drawn over its content. Whichever is larger wins, so the page never
+    /// moves for controls a bar is already clearing.
+    /// </summary>
+    private nfloat WindowControlsTopContribution
+        => PageController.ViewIfLoaded is { } pageView
+            ? ScaffoldWindowControls.TopInsetFor(pageView, View?.SafeAreaInsets.Top ?? 0)
+            : 0;
+
     /// <summary>Writes the page's composite additional safe area — the ONE place that does.</summary>
     public void ApplyPageInsets()
     {
-        var insets = new UIEdgeInsets(TopInsetContribution, 0, _externalBottomInset, 0);
+        var top = TopInsetContribution;
+        var windowControls = WindowControlsTopContribution;
+
+        if (windowControls > top)
+        {
+            top = windowControls;
+        }
+
+        var insets = new UIEdgeInsets(top, 0, _externalBottomInset, 0);
 
         // Only on change: writing AdditionalSafeAreaInsets re-dirties the page subtree even when
         // the value is identical, and this runs on every layout pass.
@@ -288,7 +316,11 @@ internal sealed class ScaffoldPageHostController : UIViewController
 
         if (_navStrip is { } strip)
         {
-            if (strip.NeedsMeasure || changed)
+            // Where this strip sits in the window, and whether the window is one, are both layout
+            // facts — so they are read here. A change re-dirties the bar, re-measured in this pass.
+            var insetChanged = _navStripController?.UpdateWindowControlsInset() ?? false;
+
+            if (strip.NeedsMeasure || changed || insetChanged)
             {
                 strip.Measure(bounds.Width);
             }
@@ -314,6 +346,24 @@ internal sealed class ScaffoldPageHostController : UIViewController
         ApplyPageInsets();
     }
 
+    /// <summary>Unmounts the strip and its controller from containment (both go away together).</summary>
+    private void DetachNavStrip()
+    {
+        if (_navStripController is { } controller)
+        {
+            controller.WillMoveToParentViewController(null);
+            controller.View?.RemoveFromSuperview();
+            controller.RemoveFromParentViewController();
+            _navStripController = null;
+        }
+        else
+        {
+            _navStrip?.RemoveFromSuperview();
+        }
+
+        _navStrip = null;
+    }
+
     private CGRect _lastBounds;
     private nfloat _lastSafeTop = -1;
 
@@ -323,8 +373,7 @@ internal sealed class ScaffoldPageHostController : UIViewController
         PageController.WillMoveToParentViewController(null);
         PageController.View?.RemoveFromSuperview();
         PageController.RemoveFromParentViewController();
-        _navStrip?.RemoveFromSuperview();
-        _navStrip = null;
+        DetachNavStrip();
 
         // Drop the managed reference chain — host -> page -> page model — and do NOT rely on
         // Dispose to do it. This is a managed UIViewController subclass: disposing it does not

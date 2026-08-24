@@ -178,6 +178,44 @@ Replace the bar per scaffold, area, or page with `Scaffold.NavBarTemplate`. Cust
 and commands — and can reuse the public primitives. The bar view owns its top safe-area
 behavior (the default bar consumes the status-bar inset itself).
 
+### iPadOS 26: the system window controls
+
+On iPadOS 26 every app is a resizable window, and while it IS a window the system draws its
+window controls — the "traffic lights" — over the window's top-leading corner, on top of whatever
+the app draws there. That corner belongs to the nav bar's leading buttons, and to the first entry
+of a start-edge drawer.
+
+The scaffold clears them for you, through the platform's own safe-area mechanism and per surface:
+
+| surface | inset | why that edge |
+|---|---|---|
+| nav bar strip | **leading** | the bar is a band across the top; pushing its content right is all it needs |
+| left-edge drawer | **top** | a drawer runs the full height — insetting its leading edge would waste the panel's width all the way down for controls that only cover its corner |
+
+Each surface is its own view controller, so its inset reaches that surface alone: the page under a
+bar does not move, and an end-side drawer (which never reaches the controls) gets nothing. Content
+picks it up with no code as long as it consumes the container safe area — which the default bar,
+`ScaffoldFlyoutMenuView`, and any bar that already handles the status bar all do:
+
+```xml
+<Grid SafeAreaEdges="Container">   <!-- clears the status bar AND the window controls -->
+```
+
+Content that deliberately opts OUT of safe areas to draw edge-to-edge stays under the controls —
+exactly as it already stays under the status bar.
+
+Two things worth knowing about the geometry:
+
+- **Full-screen windows get no inset.** There the controls are transient — they appear near the
+  corner and hide again — and holding the band open permanently for something usually absent would
+  cost every full-screen iPad app its leading space.
+- **The footprint is a measured constant** (the controls occupy x 21..62, y 43..65 in window
+  coordinates), because no API reports it: UIKit publishes no inset for them — a windowed scene
+  reports a plain `L0 T32 R0 B20` while they are on screen, and they sit BELOW that top inset —
+  they are hosted outside the app's window, so the app cannot find them in its own view tree, and
+  iOS 26's `UISceneWindowingControlStyle` selects a style, never a frame. What each surface applies
+  is the REMAINING distance: a drawer already inset 32pt by the status bar adds only the rest.
+
 ### Touches: what you draw is what you take
 
 A bar lives in a strip that spans the FULL width, whatever the bar itself paints. Everything in
