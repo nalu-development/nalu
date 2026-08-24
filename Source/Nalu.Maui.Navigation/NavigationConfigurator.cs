@@ -100,6 +100,22 @@ public class NavigationConfigurator : INavigationConfiguration
     }
 
     /// <summary>
+    /// Registers <typeparamref name="TFactory" /> as the <see cref="IComponentPageFactory" />
+    /// rendering component-based pages (non-<see cref="Page" /> types registered via
+    /// <see cref="AddPage{TPage}()" />) into native pages. Called by component adapter packages
+    /// (e.g. <c>Nalu.Maui.Navigation.MauiReactor</c>'s <c>UseMauiReactorComponents()</c>) —
+    /// call this directly only when plugging in a custom component framework.
+    /// </summary>
+    /// <typeparam name="TFactory">The factory implementation, registered as a singleton.</typeparam>
+    public NavigationConfigurator UseComponentPageFactory<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TFactory>()
+        where TFactory : class, IComponentPageFactory
+    {
+        _services.AddSingleton<IComponentPageFactory, TFactory>();
+
+        return this;
+    }
+
+    /// <summary>
     /// Registers <typeparamref name="TPage" /> as a directly navigable destination WITHOUT a
     /// page model: navigate to it with <c>Navigation.Relative().Push&lt;TPage&gt;()</c>
     /// (or use it as a root page type). Two flavors share this registration style:
