@@ -782,16 +782,16 @@ internal sealed class NavigationRestoreService : INavigationRestore, IDisposable
                 .ToList();
 
     /// <summary>
-    /// Every page type registered with the navigation engine: model-mapped pages
-    /// (<c>Mapping</c> values) AND view-only registrations (which never enter the mapping —
-    /// it is keyed by page-model type).
+    /// Every destination type registered with the navigation engine: model-mapped pages
+    /// (<c>Mapping</c> values) AND view-only/component registrations (which never enter the
+    /// mapping — it is keyed by page-model type).
     /// </summary>
     private IEnumerable<Type> GetRegisteredPageTypes()
     {
         var configuration = NavigationService.Configuration;
 
         return configuration is NavigationConfigurator configurator
-            ? configuration.Mapping.Values.Concat(configurator.ViewOnlyPages)
+            ? configuration.Mapping.Values.Concat(configurator.ViewOnlyPages).Concat(configurator.ComponentPages)
             : configuration.Mapping.Values;
     }
 

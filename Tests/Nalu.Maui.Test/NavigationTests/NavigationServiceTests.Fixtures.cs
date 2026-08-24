@@ -292,6 +292,8 @@ public partial class NavigationServiceTests
         serviceCollection.AddScoped<Page10Model>();
         serviceCollection.AddScoped<Page10>();
 
+        ConfigureComponentPages(serviceCollection);
+
         serviceCollection.AddSingleton<INavigationService, NavigationService>();
         _serviceLocator.Value = _serviceProvider = serviceCollection.BuildServiceProvider();
         _navigationService = (NavigationService) _serviceProvider.GetRequiredService<INavigationService>();

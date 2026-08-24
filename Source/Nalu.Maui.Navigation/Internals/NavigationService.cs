@@ -252,13 +252,36 @@ internal class NavigationService : INavigationService, IDisposable
             navigationServiceProvider.SetParent(parentNavigationServiceProvider);
         }
 
-        var page = (Page) serviceScope.ServiceProvider.GetRequiredService(pageType);
+        Page page;
+        PageNavigationContext pageContext;
+
+        if (typeof(Page).IsAssignableFrom(pageType))
+        {
+            page = (Page) serviceScope.ServiceProvider.GetRequiredService(pageType);
+            pageContext = new PageNavigationContext(serviceScope);
+        }
+        else
+        {
+            // Component-based destination (AddPage<TComponent>): the component is resolved from
+            // the page's own scope (constructor injection works) and rendered into a native page
+            // by the adapter-provided factory. The handle owns the mounted tree and is the
+            // page's lifecycle target — see NavigationHelper.GetLifecycleTarget.
+            var componentPageFactory = serviceScope.ServiceProvider.GetService<IComponentPageFactory>()
+                                       ?? throw new InvalidOperationException(
+                                           $"{pageType.FullName} is registered as a component-based page, but no {nameof(IComponentPageFactory)} is available: "
+                                           + "register a component adapter (e.g. Nalu.Maui.Navigation.MauiReactor), or register a Page-derived type instead."
+                                       );
+
+            var component = serviceScope.ServiceProvider.GetRequiredService(pageType);
+            var componentHandle = componentPageFactory.CreatePage(component);
+            page = componentHandle.Page;
+            pageContext = new PageNavigationContext(serviceScope) { ComponentHandle = componentHandle };
+        }
+
         navigationServiceProvider.SetContextPage(page);
 
         var isRoot = parentPage is null;
         ConfigureBackButtonBehavior(page, isRoot);
-
-        var pageContext = new PageNavigationContext(serviceScope);
 
         PageNavigationContext.Set(page, pageContext);
 

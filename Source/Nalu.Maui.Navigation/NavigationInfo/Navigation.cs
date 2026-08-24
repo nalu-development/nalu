@@ -37,10 +37,9 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
     [TypeConverter(typeof(TypeTypeConverter))]
     public static void SetPageType(BindableObject bindable, Type? value)
     {
-        if (value?.IsSubclassOf(typeof(Page)) != true)
-        {
-            throw new InvalidOperationException("PageType must be a type that inherits from Page.");
-        }
+        // Any registered destination is acceptable here: a page, a page model, or a component
+        // type. Resolution (and the precise error) happens when the content page is created.
+        ArgumentNullException.ThrowIfNull(value);
 
         bindable.SetValue(PageTypeProperty, value);
     }
@@ -274,9 +273,9 @@ public abstract class Navigation : BindableObject, IList<INavigationSegment>, IN
             throw new InvalidOperationException("ShellPage can only be attached to ShellContent");
         }
 
-        if (newvalue is not Type type || !typeof(INotifyPropertyChanged).IsAssignableFrom(type))
+        if (newvalue is not Type type)
         {
-            throw new InvalidOperationException("ShellPage must be a type that implements INotifyPropertyChanged");
+            throw new InvalidOperationException("PageType must be a page, page model, or component type registered with Nalu navigation.");
         }
 
         if (shellContent.Route.StartsWith("D_FAULT_", StringComparison.Ordinal))
