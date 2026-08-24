@@ -66,3 +66,26 @@ activated in DEBUG builds in `MauiProgram.cs`, per-platform ports: Android **922
   for consumers; apps/tests use `MauiVersion` in `Samples/Directory.Build.props` (10.0.100).
 - Unit tests: `dotnet test Tests/Nalu.Maui.Test` (or `dotnet cake --target=Test`).
 - Docs are built with docfx from `conceptual_docs/`.
+
+## Building on Linux / agent containers (no Apple workloads)
+
+Apple workloads don't exist on Linux, so multi-TFM restore fails out of the box. Every hardcoded
+TFM list is overridable; single-target everything to plain net10.0 with:
+
+```
+dotnet test Tests/Nalu.Maui.Test -p:AllTargetFrameworks=net10.0 -p:ScaffoldTargetFrameworks=net10.0 \
+  -p:NaluMauiReactorTargetFrameworks=net10.0
+dotnet build Samples/Nalu.Maui.TestApp -f net10.0 [same -p overrides] -p:TestAppTargetFrameworks=net10.0
+```
+
+The TestApp additionally needs `dotnet workload install maui-tizen android` (nuget.org serves the
+packs). This compiles and runs the whole unit suite — including the headless MauiReactor adapter
+tests — but NOT the DevFlow UI tests, which need a real app on a device/simulator.
+
+## MauiReactor component pages
+
+`Nalu.Maui.Navigation.MauiReactor` renders MauiReactor components into Nalu-navigable pages
+(`UseMauiReactorComponents()` + `AddPage<TComponent>()`; the component is the lifecycle target).
+Components are NOT auto-registered by the source-generated `AddPages()` — register them manually.
+Harness: "Scaffold Reactor Tests" page (`Samples/Nalu.Maui.TestApp/Tests/ScaffoldReactorTests.cs`),
+UI suite `UITests/UITests.DevFlow/Tests/ScaffoldReactorChromeTests.cs`.
