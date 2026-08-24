@@ -206,6 +206,11 @@ exactly as it already stays under the status bar.
 
 Two things worth knowing about the geometry:
 
+- **Apps that opt out of the iOS 26 design get no inset.** `UIDesignRequiresCompatibility` in the
+  Info.plist puts the app in the compatibility window chrome, where the system reserves a band at
+  the top of the window (safe area top 32 instead of 10, measured on iPadOS 26.2 and 26.5) and
+  draws the controls INSIDE it — they never reach the app's content, so insetting would only open
+  a gap.
 - **Full-screen windows get no inset.** There the controls are transient — they appear near the
   corner and hide again — and holding the band open permanently for something usually absent would
   cost every full-screen iPad app its leading space.

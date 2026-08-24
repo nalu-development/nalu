@@ -1,4 +1,5 @@
 using CoreGraphics;
+using Foundation;
 using UIKit;
 
 namespace Nalu;
@@ -31,14 +32,31 @@ internal static class ScaffoldWindowControls
     private static readonly CGRect _inWindow = new(21, 43, 41, 22);
 
     /// <summary>
-    /// Whether the controls are permanently on screen: only for a WINDOWED iPad scene. A
-    /// full-screen app gets them transiently instead — they appear near the corner and hide again
-    /// — and holding a band open forever for something usually absent would cost every
-    /// full-screen iPad app that space.
+    /// Whether the app opted OUT of the iOS 26 design (<c>UIDesignRequiresCompatibility</c> in its
+    /// Info.plist). Such an app gets the compatibility window chrome instead: the system reserves
+    /// a band at the top of the window — measured on iPadOS 26.5, safe area top 32 rather than 10
+    /// — and draws the controls INSIDE it, so they never reach the app's content and insetting
+    /// for them would only open a gap where nothing is drawn.
+    /// </summary>
+    private static readonly bool _designCompatibility =
+        NSBundle.MainBundle.ObjectForInfoDictionary("UIDesignRequiresCompatibility") is NSNumber flag && flag.BoolValue;
+
+    /// <summary>
+    /// Whether the controls are permanently on screen and over the app's own content: only for a
+    /// WINDOWED iPad scene, in an app that did not opt out of the iOS 26 design. A full-screen app
+    /// gets them transiently instead — they appear near the corner and hide again — and holding a
+    /// band open forever for something usually absent would cost every full-screen iPad app that
+    /// space.
     /// </summary>
     private static bool IsActive(UIView view)
     {
+        // iPadOS 26 is where windowing (and these controls) begins, and only on iPad.
         if (!OperatingSystem.IsIOSVersionAtLeast(26) || UIDevice.CurrentDevice.UserInterfaceIdiom != UIUserInterfaceIdiom.Pad)
+        {
+            return false;
+        }
+
+        if (_designCompatibility)
         {
             return false;
         }

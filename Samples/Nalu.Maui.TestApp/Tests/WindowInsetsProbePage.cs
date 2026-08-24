@@ -102,6 +102,8 @@ public class WindowInsetsProbePage : ContentPage
                + $"rootView.safeArea L{rv.Left:0.#} T{rv.Top:0.#} R{rv.Right:0.#} B{rv.Bottom:0.#}\n"
                + $"rootVC.additional L{add.Left:0.#} T{add.Top:0.#} R{add.Right:0.#} B{add.Bottom:0.#}\n"
                + $"sizeClass         H:{window.TraitCollection.HorizontalSizeClass} V:{window.TraitCollection.VerticalSizeClass}\n"
+               + $"sysMinMargins     L{root?.SystemMinimumLayoutMargins.Leading ?? 0:0.#} T{root?.SystemMinimumLayoutMargins.Top ?? 0:0.#}\n"
+               + $"rootView.margins  L{root?.View?.DirectionalLayoutMargins.Leading ?? 0:0.#} T{root?.View?.LayoutMargins.Top ?? 0:0.#}\n"
                + "--- window subtree, top 220pt ---\n"
                + DescribeTopOfWindow(window);
 #else
