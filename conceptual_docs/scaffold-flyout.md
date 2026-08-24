@@ -87,9 +87,3 @@ The default nav bar shows drawer buttons automatically; tune with
 - Navigation closes any open drawer first.
 - While the drawer covers the status-bar area, the
   [system bar icons](scaffold-systembars.md) contrast with the drawer surface.
-- On a **windowed iPad** (iPadOS 26) the system draws its window controls over the window's
-  top-leading corner, which a LEFT drawer occupies. The scaffold gives that drawer a top
-  safe-area inset so its first entry clears them — content picks it up by consuming the container
-  safe area, as `ScaffoldFlyoutMenuView` does. An end-side drawer never reaches that corner and is
-  left alone. See [the nav bar's account](scaffold-navbar.md#ipados-26-the-system-window-controls)
-  for why the footprint is a measured constant.

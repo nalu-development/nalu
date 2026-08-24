@@ -94,9 +94,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         public required UIView ScrimPlatform { get; init; }
         public required UIView ContentPlatform { get; set; }
         public double FlyoutOffscreenTranslation { get; init; }
-
-        /// <summary>Set for a LEFT-edge flyout: the controller carrying its window-controls inset.</summary>
-        public ScaffoldFlyoutPanelController? PanelController { get; init; }
         public bool Closing { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
@@ -1229,7 +1226,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         double flyoutOffscreen = 0;
         UIView panel;
-        ScaffoldFlyoutPanelController? flyoutPanelController = null;
 
         switch (request.Kind)
         {
@@ -1240,21 +1236,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // translation, applied after the arrange.
                 panel = request.Content.ToPlatform(mauiContext);
                 flyoutOffscreen = LayoutFlyout(request, container);
-
-                // Only the panel on the physical LEFT can meet the iPadOS 26 window controls, so
-                // only that one is given a controller to carry a top inset for them.
-                if (IsFlyoutOnLeft(request.FlyoutSide))
-                {
-                    flyoutPanelController = new ScaffoldFlyoutPanelController(panel);
-                    controller.AddChildViewController(flyoutPanelController);
-                    container.AddSubview(flyoutPanelController.View!);
-                    flyoutPanelController.DidMoveToParentViewController(controller);
-                    flyoutPanelController.UpdateWindowControlsInset();
-                }
-                else
-                {
-                    container.AddSubview(panel);
-                }
+                container.AddSubview(panel);
 
                 // The flyout covers the status-bar region: its surface drives the icon style
                 // while open (UIKit fades the flip alongside the slide).
@@ -1302,8 +1284,7 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
             ScrimView = scrimView,
             ScrimPlatform = scrim,
             ContentPlatform = panel,
-            FlyoutOffscreenTranslation = flyoutOffscreen,
-            PanelController = flyoutPanelController
+            FlyoutOffscreenTranslation = flyoutOffscreen
         };
 
         _overlays.Add(entry);
@@ -1569,7 +1550,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
                 case { Kind: ScaffoldOverlayKind.Flyout }:
                     LayoutFlyout(entry.Request, container);
-                    entry.PanelController?.UpdateWindowControlsInset();
 
                     break;
 
@@ -1715,20 +1695,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // exit animation: detaching the content's logical child earlier freezes its exit
         // transforms — the sheet/popup would sit still and vanish at the end.
         request.Cleanup?.Invoke();
-
-        if (entry.PanelController is { } panelController)
-        {
-            panelController.WillMoveToParentViewController(null);
-            panelController.View?.RemoveFromSuperview();
-            panelController.RemoveFromParentViewController();
-
-            // A flyout's content view OUTLIVES its presentation (the same MAUI view is mounted
-            // again on the next open), and leaving the controller as its view controller makes
-            // the next open throw UIViewControllerHierarchyInconsistency — UIKit allows a view
-            // exactly one controller, and dropping the controller from containment does not
-            // clear that association. Releasing the view here does.
-            panelController.ReleaseView();
-        }
 
         entry.ContentPlatform.RemoveFromSuperview();
         entry.ScrimPlatform.RemoveFromSuperview();
