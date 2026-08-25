@@ -4,8 +4,44 @@ using MauiControls = Microsoft.Maui.Controls;
 
 namespace Nalu.Maui.Test.NavigationTests;
 
+/// <summary>
+/// Validates the DOCUMENTED MauiReactor bridge (conceptual_docs/navigation-mauireactor.md):
+/// Nalu ships no adapter package — apps paste this IComponentPageFactory. The copy below must
+/// stay in sync with the docs and with the TestApp's MauiReactorComponentPageFactory.
+/// </summary>
 public class MauiReactorAdapterTests
 {
+    private sealed class MauiReactorComponentPageFactory : IComponentPageFactory
+    {
+        public IComponentPageHandle CreatePage(object component)
+        {
+            if (component is not VisualNode visualNode)
+            {
+                throw new InvalidOperationException($"{component.GetType().FullName} must derive from MauiReactor.Component to be used as a component-based page.");
+            }
+
+            var host = new TemplateHost(visualNode);
+
+            if (host.NativeElement is not MauiControls.Page page)
+            {
+                host.Stop();
+
+                throw new InvalidOperationException($"{component.GetType().FullName} must render a Page-derived root (e.g. ContentPage) to be used as a navigation page.");
+            }
+
+            return new Handle(host, page, component);
+        }
+
+        private sealed class Handle(TemplateHost host, MauiControls.Page page, object component) : IComponentPageHandle
+        {
+            public MauiControls.Page Page => page;
+
+            public object LifecycleTarget => component;
+
+            public void Dispose() => host.Stop();
+        }
+    }
+
     private class CounterState
     {
         public int Count { get; set; }

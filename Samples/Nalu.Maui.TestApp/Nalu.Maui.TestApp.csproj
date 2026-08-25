@@ -73,6 +73,9 @@
         <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
+        <!-- MauiReactor: used by the "Scaffold Reactor Tests" harness together with the
+             app-side MauiReactorComponentPageFactory (Nalu ships no adapter package). -->
+        <PackageReference Include="Reactor.Maui" Version="4.0.18" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0"/>
         <!-- DevFlow agent: gives AI agents and UI tests eyes/hands inside the running app.
              Referenced unconditionally (NuGet restore is configuration-independent),
@@ -85,7 +88,6 @@
       <ProjectReference Include="..\..\Source\Nalu.Maui.Controls\Nalu.Maui.Controls.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
-      <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation.MauiReactor\Nalu.Maui.Navigation.MauiReactor.csproj" />
       <!-- Analyzer references: NuGet consumers get these automatically from the packages; project references must attach them explicitly. -->
       <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation.SourceGenerators\Nalu.Maui.Navigation.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Scaffold.SourceGenerators\Nalu.Maui.Scaffold.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />

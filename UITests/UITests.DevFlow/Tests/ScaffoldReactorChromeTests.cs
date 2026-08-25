@@ -7,7 +7,7 @@ namespace Nalu.Maui.UITests.Tests;
 /// <summary>
 /// Covers COMPONENT-BASED navigation (MauiReactor, no pages, no page models) against the
 /// "Scaffold Reactor Tests" harness: components registered with <c>AddPage&lt;TComponent&gt;()</c>
-/// are rendered into native pages by the Nalu.Maui.Navigation.MauiReactor adapter and are the
+/// are rendered into native pages by the app's <c>IComponentPageFactory</c> bridge and are the
 /// lifecycle targets themselves — entering/appearing/disappearing counters re-rendered from
 /// component STATE, typed intents, a component-level <c>ILeavingGuard</c> honored on every leave
 /// path, and tab-stack preservation.

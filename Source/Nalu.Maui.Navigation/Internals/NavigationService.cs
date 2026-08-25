@@ -269,7 +269,7 @@ internal class NavigationService : INavigationService, IDisposable
             var componentPageFactory = serviceScope.ServiceProvider.GetService<IComponentPageFactory>()
                                        ?? throw new InvalidOperationException(
                                            $"{pageType.FullName} is registered as a component-based page, but no {nameof(IComponentPageFactory)} is available: "
-                                           + "register a component adapter (e.g. Nalu.Maui.Navigation.MauiReactor), or register a Page-derived type instead."
+                                           + "register a component page factory via UseComponentPageFactory<TFactory>() (see the MauiReactor guide in the docs), or register a Page-derived type instead."
                                        );
 
             var component = serviceScope.ServiceProvider.GetRequiredService(pageType);

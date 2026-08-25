@@ -23,8 +23,8 @@ pages and passing parameters — with a **fluent, type-safe API** instead of str
 `Relative` and `Absolute` navigation, guards, and typed intents. It runs on MAUI `Shell`,
 `NaluShell`, or the [Scaffold](scaffold.md). MVVM is optional: the same engine drives
 [view-only pages](navigation-view-only.md) and **MVU component pages** —
-[MauiReactor](navigation-mauireactor.md) out of the box, other component frameworks through
-the same extension point.
+[MauiReactor](navigation-mauireactor.md) via a small documented bridge, other component
+frameworks through the same `IComponentPageFactory` extension point.
 
 ```csharp
 // Push the page registered with the DetailPageModel

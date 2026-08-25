@@ -3,8 +3,9 @@ namespace Nalu;
 /// <summary>
 /// Bridges component-based UI frameworks (MauiReactor, Comet, …) into Nalu navigation:
 /// turns a component instance into the native <see cref="Page" /> it renders.
-/// Register an implementation (usually via an adapter package) to enable
-/// <see cref="NavigationConfigurator.AddPage{TPage}" /> with non-<see cref="Page" /> types.
+/// Register an implementation via <c>UseComponentPageFactory&lt;TFactory&gt;()</c> to enable
+/// <see cref="NavigationConfigurator.AddPage{TPage}" /> with non-<see cref="Page" /> types —
+/// the MauiReactor guide in the conceptual docs carries a ready-to-paste implementation.
 /// </summary>
 /// <remarks>
 /// The factory runs inside the page's own navigation DI scope: the component instance is

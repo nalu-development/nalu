@@ -7,24 +7,61 @@ guards, lifecycle events, intents, tab-stack preservation and (under the
 [Scaffold](scaffold.md)) gesture-driven back all work identically to the MVVM and
 [view-only](navigation-view-only.md) modes.
 
-The bridge ships as a separate package, **`Nalu.Maui.Navigation.MauiReactor`**, built on
-MauiReactor's public `TemplateHost` integration primitive. The seam it plugs into
-(`IComponentPageFactory`) is framework-agnostic — adapters for other component frameworks can
-implement the same two-member contract.
+Nalu deliberately ships **no MauiReactor package**: the bridge is a small class you paste into
+your app, built on MauiReactor's public `TemplateHost` integration primitive. The seam it
+plugs into (`IComponentPageFactory`) is framework-agnostic — the same two-member contract
+bridges other component frameworks too.
 
 ## Quick Start
 
-### 1. Install and enable
+### 1. Paste the bridge and enable it
 
-Add `Nalu.Maui.Navigation.MauiReactor` (it brings `Reactor.Maui` with it), then:
+With `Reactor.Maui` installed, add this class to your app (this exact code is exercised by
+Nalu's test suite):
+
+```csharp
+using MauiReactor;
+using MauiPage = Microsoft.Maui.Controls.Page;
+
+internal sealed class MauiReactorComponentPageFactory : IComponentPageFactory
+{
+    public IComponentPageHandle CreatePage(object component)
+    {
+        if (component is not VisualNode visualNode)
+        {
+            throw new InvalidOperationException($"{component.GetType().FullName} must derive from MauiReactor.Component to be used as a component-based page.");
+        }
+
+        var host = new TemplateHost(visualNode);
+
+        if (host.NativeElement is not MauiPage page)
+        {
+            host.Stop();
+
+            throw new InvalidOperationException($"{component.GetType().FullName} must render a Page-derived root (e.g. ContentPage) to be used as a navigation page.");
+        }
+
+        return new Handle(host, page, component);
+    }
+
+    private sealed class Handle(TemplateHost host, MauiPage page, object component) : IComponentPageHandle
+    {
+        public MauiPage Page => page;
+        public object LifecycleTarget => component;
+        public void Dispose() => host.Stop();
+    }
+}
+```
+
+Then register it — one line on each builder:
 
 ```csharp
 builder
     .UseMauiApp<App>()
     .UseNaluNavigation<App>(nav => nav
-        .AddPages()                  // source-generated, includes opted-in components (below)
-        .UseMauiReactorComponents()) // the MauiReactor page factory
-    .UseMauiReactor()                // MauiReactor's own init (Component.Services etc.)
+        .AddPages() // source-generated, includes opted-in components (below)
+        .UseComponentPageFactory<MauiReactorComponentPageFactory>())
+    .UseMauiReactor() // MauiReactor's own init (Component.Services etc.)
     .UseNaluScaffold();
 ```
 
@@ -61,8 +98,7 @@ registered), while on `ContentPage`s it keeps its usual opt-out role
 overload as view-only pages:
 
 ```csharp
-nav.UseMauiReactorComponents()
-   .AddPage<CounterPage>()
+nav.AddPage<CounterPage>()
    .AddPage<DetailPage>();
 ```
 
@@ -141,7 +177,7 @@ attached properties with concrete values from `Render()`; re-renders update them
 ## How it works
 
 - **Creation**: on navigation, Nalu resolves the component from the page's fresh DI scope and
-  hands it to the adapter, which mounts it through MauiReactor's `TemplateHost`. The `Page`
+  hands it to your registered factory, which mounts it through MauiReactor's `TemplateHost`. The `Page`
   the component renders becomes the navigation page — pushed, transitioned and tracked like
   any other.
 - **Re-renders**: `SetState` updates flow into that **same page instance**; the navigation
@@ -159,7 +195,9 @@ attached properties with concrete values from `Render()`; re-renders update them
   hosts. State-driven re-renders and regular .NET hot reload of method bodies are unaffected.
 - **Mixing modes** works per destination type: MVVM pages, view-only pages and component
   pages coexist on the same stack.
-- **Other component frameworks**: implement `IComponentPageFactory` (turn a component
-  instance into an `IComponentPageHandle` exposing the rendered `Page` and the lifecycle
-  target) and register it via `nav.UseComponentPageFactory<TFactory>()` — the engine takes
-  care of everything else.
+- **Other component frameworks** (Comet, BlazorBindings.Maui, …): implement
+  `IComponentPageFactory` the same way — turn a component instance into an
+  `IComponentPageHandle` exposing the rendered `Page` and the lifecycle target — and register
+  it via `nav.UseComponentPageFactory<TFactory>()`; the engine takes care of everything else.
+  Note the contract is synchronous (the page is pushed immediately): an async-rendering
+  framework should materialize into a shell page it fills.

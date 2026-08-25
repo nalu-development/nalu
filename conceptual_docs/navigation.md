@@ -67,7 +67,7 @@ intent id collisions.
 - `.AddPage<MainPageModel, MainPage>()` - Manual registration ✅ **AOT-compatible**
 - `.AddPage<IMainPageModel, MainPageModel, MainPage>()` - With interface (better for testing) ✅ **AOT-compatible**
 - `.AddPage<MainPage>()` - **View-only** registration: no page model, lifecycle interfaces go directly on the page ✅ **AOT-compatible** — see [View-Only Navigation](navigation-view-only.md)
-- `.AddPage<MyComponent>()` - **Component-based** registration (e.g. a MauiReactor component rendered through an adapter's `IComponentPageFactory`) ✅ **AOT-compatible** — see [MauiReactor Component Pages](navigation-mauireactor.md)
+- `.AddPage<MyComponent>()` - **Component-based** registration (e.g. a MauiReactor component rendered through your registered `IComponentPageFactory`) ✅ **AOT-compatible** — see [MauiReactor Component Pages](navigation-mauireactor.md)
 
 The generator also registers **component-based pages**: a non-`Page` class (e.g. a MauiReactor
 component) decorated with `[AutoNavigationPage]` is emitted as a model-less `AddPage<T>()` —

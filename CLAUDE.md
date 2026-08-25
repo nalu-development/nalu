@@ -73,8 +73,7 @@ Apple workloads don't exist on Linux, so multi-TFM restore fails out of the box.
 TFM list is overridable; single-target everything to plain net10.0 with:
 
 ```
-dotnet test Tests/Nalu.Maui.Test -p:AllTargetFrameworks=net10.0 -p:ScaffoldTargetFrameworks=net10.0 \
-  -p:NaluMauiReactorTargetFrameworks=net10.0
+dotnet test Tests/Nalu.Maui.Test -p:AllTargetFrameworks=net10.0 -p:ScaffoldTargetFrameworks=net10.0
 dotnet build Samples/Nalu.Maui.TestApp -f net10.0 [same -p overrides] -p:TestAppTargetFrameworks=net10.0
 ```
 
@@ -84,8 +83,11 @@ tests — but NOT the DevFlow UI tests, which need a real app on a device/simula
 
 ## MauiReactor component pages
 
-`Nalu.Maui.Navigation.MauiReactor` renders MauiReactor components into Nalu-navigable pages
-(`UseMauiReactorComponents()` + `AddPage<TComponent>()`; the component is the lifecycle target).
+Nalu ships NO MauiReactor package: the bridge is an app-side `IComponentPageFactory`
+(canonical copy: `Samples/Nalu.Maui.TestApp/MauiReactorComponentPageFactory.cs`, registered
+with `UseComponentPageFactory<T>()`; keep it in sync with conceptual_docs/navigation-mauireactor.md
+and the copy in `Tests/Nalu.Maui.Test/NavigationTests/MauiReactorAdapterTests.cs`).
+Components register via `AddPage<TComponent>()`; the component is the lifecycle target.
 Page-rendering components opt into the source-generated `AddPages()` by decorating with
 `[AutoNavigationPage]` (on non-Page classes the attribute is an opt-IN, on ContentPages it stays
 the opt-OUT via `Enabled = false`); undecorated components are never auto-registered.

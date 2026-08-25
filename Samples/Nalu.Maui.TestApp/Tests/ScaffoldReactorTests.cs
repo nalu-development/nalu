@@ -7,8 +7,9 @@ namespace Nalu.Maui.TestApp.Tests;
 // Component-based navigation harness (MauiReactor): NO pages, NO page models — MauiReactor
 // components registered with AddPage<TComponent>() are the navigation destinations AND the
 // lifecycle targets (IEnteringAware/IAppearingAware/ILeavingGuard/typed intents implemented
-// directly on the component). The native page is produced by the Nalu.Maui.Navigation.MauiReactor
-// adapter (TemplateHost) and Nalu drives it like any other page: DI scope, lifecycle, disposal.
+// directly on the component). The native page is produced by the app-side
+// MauiReactorComponentPageFactory (TemplateHost) and Nalu drives it like any other page:
+// DI scope, lifecycle, disposal.
 // Components are created by the engine through DI (constructor-injected INavigationService).
 // Registration is source-generated: [AutoNavigationPage] on a non-Page class is the OPT-IN that
 // makes the generated AddPages() emit the model-less AddPage<TComponent>() for it.

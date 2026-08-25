@@ -10,9 +10,8 @@ namespace Nalu;
 /// </item>
 /// <item>
 /// On any other class — an opt-IN marker: the class is registered as a component-based page
-/// (model-less <c>AddPage&lt;TComponent&gt;()</c>, rendered through the
-/// <see cref="IComponentPageFactory"/> of an adapter such as
-/// <c>Nalu.Maui.Navigation.MauiReactor</c>). Decorate only components whose <c>Render()</c>
+/// (model-less <c>AddPage&lt;TComponent&gt;()</c>, rendered through the registered
+/// <see cref="IComponentPageFactory"/>). Decorate only components whose <c>Render()</c>
 /// produces a Page-rooted tree — plain view components are not navigation destinations, and
 /// page-ness cannot be inferred statically. Typed intents implemented by the component feed
 /// the generated <c>AddIntents()</c> like any page's.

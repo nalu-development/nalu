@@ -102,9 +102,9 @@ public class NavigationConfigurator : INavigationConfiguration
     /// <summary>
     /// Registers <typeparamref name="TFactory" /> as the <see cref="IComponentPageFactory" />
     /// rendering component-based pages (non-<see cref="Page" /> types registered via
-    /// <see cref="AddPage{TPage}()" />) into native pages. Called by component adapter packages
-    /// (e.g. <c>Nalu.Maui.Navigation.MauiReactor</c>'s <c>UseMauiReactorComponents()</c>) —
-    /// call this directly only when plugging in a custom component framework.
+    /// <see cref="AddPage{TPage}()" />) into native pages. The factory is a small app-side
+    /// class bridging a component UI framework (MauiReactor, Comet, …) — see the MauiReactor
+    /// guide in the conceptual docs for a ready-to-paste implementation.
     /// </summary>
     /// <typeparam name="TFactory">The factory implementation, registered as a singleton.</typeparam>
     public NavigationConfigurator UseComponentPageFactory<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TFactory>()
@@ -129,8 +129,8 @@ public class NavigationConfigurator : INavigationConfiguration
     /// </item>
     /// <item>
     /// <b>Component page</b> (any other class, e.g. a MauiReactor <c>Component</c>): the native
-    /// page is produced at navigation time by the registered <see cref="IComponentPageFactory" />
-    /// (provided by an adapter package), and the component is the navigation lifecycle target —
+    /// page is produced at navigation time by the registered <see cref="IComponentPageFactory" />,
+    /// and the component is the navigation lifecycle target —
     /// implement the lifecycle interfaces directly on the component.
     /// </item>
     /// </list>
