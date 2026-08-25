@@ -67,8 +67,15 @@ intent id collisions.
 - `.AddPage<MainPageModel, MainPage>()` - Manual registration ✅ **AOT-compatible**
 - `.AddPage<IMainPageModel, MainPageModel, MainPage>()` - With interface (better for testing) ✅ **AOT-compatible**
 - `.AddPage<MainPage>()` - **View-only** registration: no page model, lifecycle interfaces go directly on the page ✅ **AOT-compatible** — see [View-Only Navigation](navigation-view-only.md)
+- `.AddPage<MyComponent>()` - **Component-based** registration (e.g. a MauiReactor component rendered through your registered `IComponentPageFactory`) ✅ **AOT-compatible** — see [MauiReactor Component Pages](navigation-mauireactor.md)
+
+The generator also registers **component-based pages**: a non-`Page` class (e.g. a MauiReactor
+component) decorated with `[AutoNavigationPage]` is emitted as a model-less `AddPage<T>()` —
+on non-`Page` classes the attribute is an opt-IN, on `ContentPage`s it stays the opt-OUT.
 
 > **Without MVVM?** You can use Nalu without ViewModels — register pages with `AddPage<TPage>()` and use page types in navigation; lifecycle interfaces, guards and intents go directly on the page. See [View-Only Navigation](navigation-view-only.md).
+
+> **MVU?** MauiReactor stateful components can be Nalu pages too — lifecycle, guards and intents implemented directly on the component. See [MauiReactor Component Pages](navigation-mauireactor.md).
 
 ### 3. Create your Page and ViewModel
 
@@ -509,6 +516,7 @@ Each tab maintains its own navigation stack independently.
 
 - 📘 [Navigation Lifecycle](navigation-lifecycle.md) - Deep dive into lifecycle events and timing
 - 📘 [Navigation Intents](navigation-intents.md) - Passing data and returning results
+- 📘 [MauiReactor Component Pages](navigation-mauireactor.md) - MVU components as first-class navigation destinations
 - 📘 [Advanced Navigation](navigation-advanced.md) - Guards, behaviors, scoped services, and leak detection
 - 📘 [State Restoration](navigation-restore.md) - Land exactly where you were after an app restart
 - 📘 [Custom Tab Bar](navigation-tabbar.md) - Customizable tab bar for iOS/Android/MacCatalyst (works with standard Shell too)

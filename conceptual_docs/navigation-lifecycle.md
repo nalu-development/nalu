@@ -21,15 +21,17 @@ Understanding when lifecycle events fire relative to navigation animations is cr
 
 Each page has exactly **one lifecycle target** — events are never dispatched to two objects:
 
-- An **explicitly assigned `BindingContext`** (your page model) is the target and wins
+- On a **component-based page** ([MauiReactor Component Pages](navigation-mauireactor.md))
+  the component is the target, unconditionally.
+- Otherwise an **explicitly assigned `BindingContext`** (your page model) is the target and wins
   *entirely* — page-implemented lifecycle interfaces are ignored while a page model is set.
 - Without one, **the page itself** is the target: implement the interfaces directly on the
   page ([View-Only Navigation](navigation-view-only.md)).
 - An **inherited** binding context (MAUI parent propagation from Shell/Scaffold) never counts
   as a target — only explicit assignment does.
 
-The examples below implement the interfaces on page models; in view-only mode the same
-contracts apply to the page itself.
+The examples below implement the interfaces on page models; in view-only and component modes
+the same contracts apply to the page or component itself.
 
 ## Event Timing Sequence
 

@@ -14,19 +14,22 @@ internal sealed record IntentSpec(string Fqn, string ShortName, string? Explicit
 /// <summary>A page-model type referenced by a page constructor.</summary>
 internal sealed record ModelRef(string Fqn, bool IsInterface, bool ImplementsInpc, EquatableArray<IntentSpec> Intents);
 
-/// <summary>A discovered ContentPage subclass eligible for automatic registration.</summary>
-/// <param name="PageFqn">Fully-qualified (global::) page type name.</param>
+/// <summary>A discovered navigation destination eligible for automatic registration.</summary>
+/// <param name="PageFqn">Fully-qualified (global::) page (or component) type name.</param>
 /// <param name="PageName">Short name, input to the naming-convention fallback.</param>
 /// <param name="CtorModel">Model inferred from the constructor (BindingContext assignment, else single INPC parameter).</param>
 /// <param name="AmbiguousCtorModels">BindingContext is assigned from more than one constructor parameter type.</param>
-/// <param name="PageIntents">Intents implemented by the page itself (view-only pages are their own lifecycle target).</param>
+/// <param name="PageIntents">Intents implemented by the page/component itself (both are their own lifecycle target).</param>
+/// <param name="IsComponent">A non-Page class opted in via [AutoNavigationPage] (e.g. a MauiReactor
+/// component): registered with the model-less AddPage&lt;T&gt;() overload, no model inference.</param>
 internal sealed record PageCandidate(
     string PageFqn,
     string PageName,
     ModelRef? CtorModel,
     bool AmbiguousCtorModels,
     EquatableArray<IntentSpec> PageIntents,
-    LocationInfo Location
+    LocationInfo Location,
+    bool IsComponent = false
 );
 
 /// <summary>

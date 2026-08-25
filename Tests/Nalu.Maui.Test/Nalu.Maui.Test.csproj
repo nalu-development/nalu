@@ -37,5 +37,7 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+      <!-- Validates the documented MauiReactor IComponentPageFactory bridge headlessly. -->
+      <PackageReference Include="Reactor.Maui" Version="4.0.18" />
     </ItemGroup>
 </Project>

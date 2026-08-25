@@ -9,21 +9,32 @@ internal static partial class NavigationHelper
     /// <summary>
     /// Resolves the page's lifecycle target: the ONE object receiving navigation lifecycle
     /// callbacks (<see cref="IEnteringAware"/>, <see cref="IAppearingAware"/>,
-    /// <see cref="ILeavingGuard"/>, intent methods…). An EXPLICITLY assigned
-    /// <see cref="BindableObject.BindingContext"/> (the page model) wins entirely — when both
-    /// the page and its binding context implement lifecycle interfaces, only the binding
-    /// context is called. Without one, the page itself is the target (view-only pages
+    /// <see cref="ILeavingGuard"/>, intent methods…). For component-based pages the component
+    /// (via <see cref="IComponentPageHandle.LifecycleTarget"/>) wins UNCONDITIONALLY — the
+    /// page's <c>BindingContext</c> is irrelevant there (Nalu never assigns it, and a
+    /// component's own render output must not hijack the lifecycle). Otherwise an EXPLICITLY
+    /// assigned <see cref="BindableObject.BindingContext"/> (the page model) wins entirely —
+    /// when both the page and its binding context implement lifecycle interfaces, only the
+    /// binding context is called. Without one, the page itself is the target (view-only pages
     /// implement the interfaces directly). An INHERITED binding context (MAUI parent
     /// propagation — hosted pages inherit from their Shell/Scaffold) is stored outside the
     /// property store and never counts: it is application state, not the page's model.
     /// </summary>
     /// <remarks>
-    /// O(1), allocation-free (a property-context lookup). Deliberately NOT cached: the
+    /// O(1), allocation-free (property-context lookups). Deliberately NOT cached: the
     /// binding context may legally be assigned after creation (e.g. inside
-    /// <c>OnEnteringAsync</c>), which must flip the target on the next dispatch.
+    /// <c>OnEnteringAsync</c>), and a component handle may redirect its target (hot reload) —
+    /// both must flip the target on the next dispatch.
     /// </remarks>
     public static object GetLifecycleTarget(Page page)
-        => page.IsSet(BindableObject.BindingContextProperty) ? page.BindingContext ?? page : page;
+    {
+        if (PageNavigationContext.TryGet(page)?.ComponentHandle is { } componentHandle)
+        {
+            return componentHandle.LifecycleTarget;
+        }
+
+        return page.IsSet(BindableObject.BindingContextProperty) ? page.BindingContext ?? page : page;
+    }
 
     private static readonly AsyncLocal<Page?> _lifecyclePage = new();
 
@@ -287,7 +298,9 @@ internal static partial class NavigationHelper
     {
         ArgumentNullException.ThrowIfNull(segmentType);
 
-        if (segmentType.IsSubclassOf(typeof(Page)))
+        // Registered component types are their own destination identity: the native page is
+        // produced at creation time by the IComponentPageFactory (see NavigationService.CreatePage).
+        if (segmentType.IsSubclassOf(typeof(Page)) || IsComponentPageType(segmentType, configuration))
         {
             return segmentType;
         }
@@ -299,6 +312,9 @@ internal static partial class NavigationHelper
 
         throw new InvalidOperationException($"Cannot find page type for segment type {segmentType.FullName}.");
     }
+
+    public static bool IsComponentPageType(Type type, INavigationConfiguration configuration)
+        => configuration is NavigationConfigurator configurator && configurator.ComponentPages.Contains(type);
 
     [GeneratedRegex("^(Nalu\\.IEnteringAware<.+>\\.|^)OnEnteringAsync$")]
     private static partial Regex OnEnteringAsyncRegex();

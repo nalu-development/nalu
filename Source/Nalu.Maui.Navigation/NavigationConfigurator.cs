@@ -16,6 +16,7 @@ public class NavigationConfigurator : INavigationConfiguration
     private readonly IServiceCollection _services;
     private readonly Dictionary<Type, Type> _mapping;
     private readonly HashSet<Type> _viewOnlyPages = [];
+    private readonly HashSet<Type> _componentPages = [];
 
     /// <summary>
     /// Pages registered WITHOUT a page model via <see cref="AddPage{TPage}()"/>: they never
@@ -24,6 +25,14 @@ public class NavigationConfigurator : INavigationConfiguration
     /// across every registration style.
     /// </summary>
     internal IReadOnlyCollection<Type> ViewOnlyPages => _viewOnlyPages;
+
+    /// <summary>
+    /// Component types registered via <see cref="AddPage{TPage}()"/> (non-<see cref="Page"/>
+    /// destinations rendered through an <see cref="IComponentPageFactory"/>). Like
+    /// <see cref="ViewOnlyPages"/> they never enter <see cref="Mapping"/>: the component type
+    /// IS the navigation segment identity.
+    /// </summary>
+    internal IReadOnlySet<Type> ComponentPages => _componentPages;
 
     /// <inheritdoc />
     public ImageSource? MenuImage { get; private set; }
@@ -91,20 +100,50 @@ public class NavigationConfigurator : INavigationConfiguration
     }
 
     /// <summary>
-    /// Registers <typeparamref name="TPage" /> as a directly navigable page WITHOUT a page model
-    /// (view-only mode): navigate to it with <c>Navigation.Relative().Push&lt;TPage&gt;()</c>
-    /// (or use it as a root page type). The page itself is the navigation lifecycle target —
-    /// implement <see cref="IEnteringAware" />, <see cref="ILeavingGuard" />, intent interfaces…
+    /// Registers <typeparamref name="TFactory" /> as the <see cref="IComponentPageFactory" />
+    /// rendering component-based pages (non-<see cref="Page" /> types registered via
+    /// <see cref="AddPage{TPage}()" />) into native pages. The factory is a small app-side
+    /// class bridging a component UI framework (MauiReactor, Comet, …) — see the MauiReactor
+    /// guide in the conceptual docs for a ready-to-paste implementation.
+    /// </summary>
+    /// <typeparam name="TFactory">The factory implementation, registered as a singleton.</typeparam>
+    public NavigationConfigurator UseComponentPageFactory<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TFactory>()
+        where TFactory : class, IComponentPageFactory
+    {
+        _services.AddSingleton<IComponentPageFactory, TFactory>();
+
+        return this;
+    }
+
+    /// <summary>
+    /// Registers <typeparamref name="TPage" /> as a directly navigable destination WITHOUT a
+    /// page model: navigate to it with <c>Navigation.Relative().Push&lt;TPage&gt;()</c>
+    /// (or use it as a root page type). Two flavors share this registration style:
+    /// <list type="bullet">
+    /// <item>
+    /// <b>View-only page</b> (<typeparamref name="TPage" /> derives from <see cref="Page" />):
+    /// the page itself is the navigation lifecycle target — implement
+    /// <see cref="IEnteringAware" />, <see cref="ILeavingGuard" />, intent interfaces…
     /// directly on the page. Assigning a <c>BindingContext</c> explicitly hands the lifecycle
     /// over to it entirely (the standard MVVM contract); an inherited binding context does not.
+    /// </item>
+    /// <item>
+    /// <b>Component page</b> (any other class, e.g. a MauiReactor <c>Component</c>): the native
+    /// page is produced at navigation time by the registered <see cref="IComponentPageFactory" />,
+    /// and the component is the navigation lifecycle target —
+    /// implement the lifecycle interfaces directly on the component.
+    /// </item>
+    /// </list>
     /// Adds <typeparamref name="TPage" /> as a scoped service (a fresh instance per navigation,
     /// created in the page's own scope — constructor-inject services freely).
     /// </summary>
-    /// <typeparam name="TPage">Type of the page.</typeparam>
+    /// <typeparam name="TPage">Type of the page or component.</typeparam>
     public NavigationConfigurator AddPage<[DynamicallyAccessedMembers(DynamicallyAccessedPageModelMembers)] TPage>()
-        where TPage : Page
+        where TPage : class
     {
-        if (_viewOnlyPages.Add(typeof(TPage)))
+        var registry = typeof(Page).IsAssignableFrom(typeof(TPage)) ? _viewOnlyPages : _componentPages;
+
+        if (registry.Add(typeof(TPage)))
         {
             _services.AddScoped<TPage>();
         }

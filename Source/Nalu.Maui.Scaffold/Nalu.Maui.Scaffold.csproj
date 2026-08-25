@@ -11,8 +11,10 @@
   </PropertyGroup>
 
   <PropertyGroup Label="Build">
-    <!-- Mobile-only Shell replacement (see scaffold-implementation-strategy.md): net10 for now, net11 soon. -->
-    <TargetFrameworks>net10.0;net10.0-android;net10.0-ios26.0</TargetFrameworks>
+    <!-- Mobile-only Shell replacement (see scaffold-implementation-strategy.md): net10 for now, net11 soon.
+         Overridable (-p:ScaffoldTargetFrameworks=net10.0) so agents/CI on hosts without mobile workloads can build/test. -->
+    <ScaffoldTargetFrameworks Condition="'$(ScaffoldTargetFrameworks)' == ''">net10.0;net10.0-android;net10.0-ios26.0</ScaffoldTargetFrameworks>
+    <TargetFrameworks>$(ScaffoldTargetFrameworks)</TargetFrameworks>
 
     <SingleProject>true</SingleProject>
     <OutputType>Library</OutputType>

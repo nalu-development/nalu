@@ -1,8 +1,12 @@
 using CommunityToolkit.Maui;
+using MauiReactor;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
 #if DEBUG
 using Microsoft.Extensions.Logging;
+#endif
+#if DEBUG && (ANDROID || IOS || MACCATALYST || WINDOWS)
+// The DevFlow agent package has no plain-net10.0 lib: platform heads only.
 using Microsoft.Maui.DevFlow.Agent;
 #endif
 
@@ -27,9 +31,17 @@ public static class MauiProgram
             // explicit AddPage<T>() calls.
             .UseNaluNavigation<App>(nav => nav
                                            .AddPages()
+                                           // MauiReactor component-based pages ("Scaffold Reactor Tests" harness):
+                                           // rendered by the app-side MauiReactorComponentPageFactory (the
+                                           // copy-paste bridge from the docs — Nalu ships no adapter package);
+                                           // the components themselves are picked up by the generated AddPages()
+                                           // via their [AutoNavigationPage] opt-in.
+                                           .UseComponentPageFactory<MauiReactorComponentPageFactory>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )
+            // MauiReactor runtime init (Component.Services etc.) for the component harness.
+            .UseMauiReactor()
             // Navigation-state snapshot & restore, exercised by the "Scaffold Restore
             // Tests" harness. DISABLED at launch: the harness scaffold toggles Enabled
             // around its own lifetime (ctor on / Dispose off), so other suites never
@@ -73,7 +85,9 @@ public static class MauiProgram
         builder.Logging.AddDebug();
         builder.Logging.AddSimpleConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
+#endif
 
+#if DEBUG && (ANDROID || IOS || MACCATALYST || WINDOWS)
         // DevFlow in-app agent: exposes visual tree, screenshots, interactions and logs
         // to the `maui devflow` CLI / MCP server and to the UITests.DevFlow test project.
         // Deterministic per-platform ports: the iOS simulator and Mac Catalyst bind the HOST

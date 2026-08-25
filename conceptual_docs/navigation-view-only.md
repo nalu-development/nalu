@@ -134,8 +134,8 @@ Two details worth knowing:
 ## Mixing modes
 
 Modes are **per page type** and mix freely in one app: register some pages with models
-(`AddPage<TPageModel, TPage>()`) and others without (`AddPage<TPage>()`); push either kind
-onto the same stack. A page type registered with a model can also be pushed by its page type
+(`AddPage<TPageModel, TPage>()`), others without (`AddPage<TPage>()`), and even
+[MauiReactor component pages](navigation-mauireactor.md); push any kind onto the same stack. A page type registered with a model can also be pushed by its page type
 (`Push<DetailPage>()` and `Push<DetailPageModel>()` resolve to the same destination).
 
 ## Building your own MVVM abstraction on top
