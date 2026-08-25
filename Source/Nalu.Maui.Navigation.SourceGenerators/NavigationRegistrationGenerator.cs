@@ -76,8 +76,22 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
             symbol.IsAbstract ||
             symbol.IsGenericType ||
             IsScaffoldSymbol(symbol) ||
-            !DerivesFromContentPage(symbol) ||
             IsAutoRegistrationDisabled(symbol))
+        {
+            return null;
+        }
+
+        var isPage = DerivesFromContentPage(symbol);
+
+        // Non-Page classes participate ONLY by explicit opt-in: [AutoNavigationPage] on e.g. a
+        // MauiReactor component marks it a component-based page destination. Whether a component
+        // renders a page-rooted tree is invisible statically (most components are view
+        // fragments), so the attribute is the signal — while for ContentPages the attribute
+        // stays what it always was: an opt-OUT via Enabled = false. Scaffold-derived types are
+        // the app shell, never destinations, attribute or not.
+        var isComponent = !isPage && HasAutoNavigationPageAttribute(symbol) && !DerivesFromScaffold(symbol);
+
+        if (!isPage && !isComponent)
         {
             return null;
         }
@@ -89,6 +103,21 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
         if (!IsCanonicalDeclaration(symbol, declaration, ct))
         {
             return null;
+        }
+
+        if (isComponent)
+        {
+            // No model inference: the component IS the lifecycle target, registered with the
+            // model-less AddPage<T>() overload (its intents still feed AddIntents()).
+            return new PageCandidate(
+                Fqn(symbol),
+                symbol.Name,
+                null,
+                false,
+                ExtractIntents(symbol),
+                LocationInfo.From(declaration),
+                IsComponent: true
+            );
         }
 
         var (ctorModel, ambiguous) = InferConstructorModel(symbol, ct);
@@ -384,6 +413,23 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
     private static bool IsScaffoldSymbol(INamedTypeSymbol type)
         => type is { Name: "Scaffold", ContainingNamespace: { Name: "Nalu", ContainingNamespace.IsGlobalNamespace: true } };
 
+    private static bool DerivesFromScaffold(INamedTypeSymbol type)
+    {
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (IsScaffoldSymbol(baseType))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasAutoNavigationPageAttribute(INamedTypeSymbol type)
+        => type.GetAttributes()
+               .Any(static a => a.AttributeClass is { } attributeClass && IsNaluType(attributeClass, "AutoNavigationPageAttribute"));
+
     private static bool IsAutoRegistrationDisabled(INamedTypeSymbol type)
         => type.GetAttributes()
                .Any(
@@ -499,6 +545,16 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
 
         foreach (var page in pageList)
         {
+            if (page.IsComponent)
+            {
+                // Component-based page ([AutoNavigationPage] opt-in): model-less registration,
+                // no inference, no view-only diagnostic — the component is its own model.
+                registrations.Add(new Registration(RegistrationKind.ViewOnly, page.PageFqn, null, null));
+                CollectIntents(page.PageIntents);
+
+                continue;
+            }
+
             if (page.AmbiguousCtorModels)
             {
                 context.ReportDiagnostic(Diagnostic.Create(Diagnostics.AmbiguousModel, page.Location.ToLocation(), page.PageName));
@@ -629,7 +685,9 @@ public sealed class NavigationRegistrationGenerator : IIncrementalGenerator
                 /// Registers every non-excluded <c>ContentPage</c> discovered in this assembly with its
                 /// inferred page model (constructor <c>BindingContext</c> assignment, single
                 /// <c>INotifyPropertyChanged</c> constructor parameter, or <c>MyPage -&gt; MyPageModel</c>
-                /// naming convention), falling back to a view-only registration.
+                /// naming convention), falling back to a view-only registration — plus every non-Page
+                /// class opted in with <c>[AutoNavigationPage]</c> (component-based pages, e.g.
+                /// MauiReactor components), registered model-less.
                 /// </summary>
                 public static global::Nalu.NavigationConfigurator AddPages(this global::Nalu.NavigationConfigurator navigation)
                 {

@@ -86,6 +86,8 @@ tests — but NOT the DevFlow UI tests, which need a real app on a device/simula
 
 `Nalu.Maui.Navigation.MauiReactor` renders MauiReactor components into Nalu-navigable pages
 (`UseMauiReactorComponents()` + `AddPage<TComponent>()`; the component is the lifecycle target).
-Components are NOT auto-registered by the source-generated `AddPages()` — register them manually.
+Page-rendering components opt into the source-generated `AddPages()` by decorating with
+`[AutoNavigationPage]` (on non-Page classes the attribute is an opt-IN, on ContentPages it stays
+the opt-OUT via `Enabled = false`); undecorated components are never auto-registered.
 Harness: "Scaffold Reactor Tests" page (`Samples/Nalu.Maui.TestApp/Tests/ScaffoldReactorTests.cs`),
 UI suite `UITests/UITests.DevFlow/Tests/ScaffoldReactorChromeTests.cs`.

@@ -32,13 +32,10 @@ public static class MauiProgram
             .UseNaluNavigation<App>(nav => nav
                                            .AddPages()
                                            // MauiReactor component-based pages ("Scaffold Reactor Tests" harness):
-                                           // components are NOT ContentPages, so the source generator skips them —
-                                           // registered manually, rendered by the MauiReactor adapter.
+                                           // rendered by the MauiReactor adapter; the components themselves are
+                                           // picked up by the generated AddPages() via their [AutoNavigationPage]
+                                           // opt-in (non-Page classes are never registered without it).
                                            .UseMauiReactorComponents()
-                                           .AddPage<Tests.ReactorOnePage>()
-                                           .AddPage<Tests.ReactorTwoPage>()
-                                           .AddPage<Tests.ReactorDetailPage>()
-                                           .AddPage<Tests.ReactorGuardPage>()
                                            .WithNavigationIntentBehavior(NavigationIntentBehavior.Fallthrough)
                                            .WithLeakDetectorState(NavigationLeakDetectorState.EnabledWithDebugger)
             )

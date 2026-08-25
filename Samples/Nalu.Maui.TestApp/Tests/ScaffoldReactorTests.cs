@@ -10,6 +10,8 @@ namespace Nalu.Maui.TestApp.Tests;
 // directly on the component). The native page is produced by the Nalu.Maui.Navigation.MauiReactor
 // adapter (TemplateHost) and Nalu drives it like any other page: DI scope, lifecycle, disposal.
 // Components are created by the engine through DI (constructor-injected INavigationService).
+// Registration is source-generated: [AutoNavigationPage] on a non-Page class is the OPT-IN that
+// makes the generated AddPages() emit the model-less AddPage<TComponent>() for it.
 
 public class ReactorLifecycleState
 {
@@ -23,6 +25,7 @@ public class ReactorLifecycleState
 /// SetState re-render into the same native page), a push-with-intent and a push-to-guard button.
 /// </summary>
 [UsedImplicitly]
+[AutoNavigationPage]
 public class ReactorOnePage(INavigationService navigationService) : Component<ReactorLifecycleState>, IEnteringAware, IAppearingAware, IDisappearingAware
 {
     public ValueTask OnEnteringAsync()
@@ -72,6 +75,7 @@ public class ReactorOnePage(INavigationService navigationService) : Component<Re
 
 /// <summary>Second component root: the tab-switch target for stack-preservation checks.</summary>
 [UsedImplicitly]
+[AutoNavigationPage]
 public class ReactorTwoPage : Component
 {
     public override VisualNode Render()
@@ -97,6 +101,7 @@ public class ReactorDetailState
 /// (<see cref="IEnteringAware{TIntent}" /> with no page model).
 /// </summary>
 [UsedImplicitly]
+[AutoNavigationPage]
 public class ReactorDetailPage(INavigationService navigationService) : Component<ReactorDetailState>, IEnteringAware<int>
 {
     public ValueTask OnEnteringAsync(int intent)
@@ -137,6 +142,7 @@ public class ReactorGuardState
 /// (pop button, system back, edge swipe) must consult the COMPONENT's guard. Starts in DENY mode.
 /// </summary>
 [UsedImplicitly]
+[AutoNavigationPage]
 public class ReactorGuardPage(INavigationService navigationService) : Component<ReactorGuardState>, ILeavingGuard
 {
     public ValueTask<bool> CanLeaveAsync()

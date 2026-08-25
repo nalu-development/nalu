@@ -659,6 +659,127 @@ public class NavigationRegistrationGeneratorTests
         result.GeneratedText.Should().NotContain("WeirdPage");
     }
 
+    [Fact(DisplayName = "Non-page class opted in with [AutoNavigationPage] registers as component page with its intents")]
+    public void DecoratedComponentRegistersModelLessWithIntents()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Nalu;
+
+            namespace MauiReactor
+            {
+                public abstract class Component;
+            }
+
+            namespace MyApp
+            {
+                public record DetailIntent(int Id);
+
+                [AutoNavigationPage]
+                public class CounterComponent : MauiReactor.Component, Nalu.IEnteringAware<DetailIntent>;
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.CounterComponent>();");
+        result.GeneratedText.Should().Contain("options.AddIntent<global::MyApp.DetailIntent>(\"DetailIntent\");");
+    }
+
+    [Fact(DisplayName = "Non-page class WITHOUT [AutoNavigationPage] is not registered")]
+    public void UndecoratedComponentIsIgnored()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            namespace MauiReactor
+            {
+                public abstract class Component;
+            }
+
+            namespace MyApp
+            {
+                public class PlainViewComponent : MauiReactor.Component;
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().NotContain("PlainViewComponent");
+    }
+
+    [Fact(DisplayName = "[AutoNavigationPage(Enabled = false)] excludes a component like it excludes a page")]
+    public void DisabledComponentIsIgnored()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Nalu;
+
+            namespace MauiReactor
+            {
+                public abstract class Component;
+            }
+
+            namespace MyApp
+            {
+                [AutoNavigationPage(Enabled = false)]
+                public class HandRegisteredComponent : MauiReactor.Component;
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().NotContain("HandRegisteredComponent");
+    }
+
+    [Fact(DisplayName = "[AutoNavigationPage] on a Scaffold-derived class is ignored: the shell is never a destination")]
+    public void DecoratedScaffoldIsIgnored()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Nalu;
+
+            namespace MyApp;
+
+            [AutoNavigationPage]
+            public class AppScaffold : Nalu.Scaffold;
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().NotContain("AppScaffold");
+    }
+
+    [Fact(DisplayName = "[AutoNavigationPage] on a ContentPage keeps the normal model inference")]
+    public void DecoratedPageKeepsModelInference()
+    {
+        var result = GeneratorTestHarness.Run(
+            """
+            using Microsoft.Maui.Controls;
+            using Nalu;
+            using System.ComponentModel;
+
+            namespace MyApp;
+
+            public class DetailViewModel : INotifyPropertyChanged
+            {
+                public event PropertyChangedEventHandler? PropertyChanged;
+            }
+
+            [AutoNavigationPage]
+            public class DetailPage : ContentPage
+            {
+                public DetailPage(DetailViewModel model)
+                {
+                    BindingContext = model;
+                }
+            }
+            """
+        );
+
+        result.OutputCompilationErrors.Should().BeEmpty();
+        result.GeneratedText.Should().Contain("navigation.AddPage<global::MyApp.DetailViewModel, global::MyApp.DetailPage>();");
+    }
+
     [Fact(DisplayName = "Without a Nalu reference nothing is generated")]
     public void NoNaluReferenceNoOutput()
     {
