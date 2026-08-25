@@ -21,7 +21,10 @@ nav bar · floating tab bar — every animation on this page comes from **Daily 
 The MVVM navigation service offers a straightforward and robust method for navigating between
 pages and passing parameters — with a **fluent, type-safe API** instead of strings, supporting
 `Relative` and `Absolute` navigation, guards, and typed intents. It runs on MAUI `Shell`,
-`NaluShell`, or the [Scaffold](scaffold.md).
+`NaluShell`, or the [Scaffold](scaffold.md). MVVM is optional: the same engine drives
+[view-only pages](navigation-view-only.md) and **MVU component pages** —
+[MauiReactor](navigation-mauireactor.md) out of the box, other component frameworks through
+the same extension point.
 
 ```csharp
 // Push the page registered with the DetailPageModel
