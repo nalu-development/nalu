@@ -205,12 +205,20 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// <inheritdoc />
     public override void DidBecomeInvalid(NSUrlSession session, NSError? error)
     {
-        Logger.LogDebug("DidBecomeInvalid");
-        _nsUrlSession = null;
-
-        if (error != null)
+        try
         {
-            Logger.LogError(new InvalidOperationException(FormatNSError(error)), "Exception in DidBecomeInvalid");
+            Logger.LogDebug("DidBecomeInvalid");
+            _nsUrlSession = null;
+
+            if (error != null)
+            {
+                Logger.LogError(new InvalidOperationException(FormatNSError(error)), "Exception in DidBecomeInvalid");
+            }
+        }
+        catch (Exception)
+        {
+            // A managed exception escaping an ObjC-registrar callback aborts the process (SIGABRT).
+            _nsUrlSession = null;
         }
     }
 
@@ -219,6 +227,22 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     {
         Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
 
+        // A managed exception escaping an ObjC-registrar callback aborts the process (SIGABRT),
+        // orphaning every queued background-session event — observed in the field on background
+        // launches where session callbacks arrive before the DI container is built.
+        try
+        {
+            ProcessTaskCompletion(task, error);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unhandled error in DidCompleteWithError for {TaskDescription}", task.TaskDescription);
+            FaultPendingRequest(task.TaskDescription, ex);
+        }
+    }
+
+    private void ProcessTaskCompletion(NSUrlSessionTask task, NSError? error)
+    {
         // Runs synchronously on the delegate queue: unlike DidFinishDownloading there is no
         // temp file at stake and the body is quick — handle bookkeeping plus TrySet*
         // completions, whose continuations run asynchronously by construction
@@ -344,19 +368,28 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     {
         Volatile.Write(ref _lastCompletedTaskTimestamp, Stopwatch.GetTimestamp());
 
-        // SECURE FIRST, PROCESS LATER. The system guarantees the downloaded file only while
-        // this callback executes, and the delegate queue is SERIAL: every millisecond spent
-        // here delays the callbacks queued behind this one, leaving THEIR temp files exposed
-        // to nsurlsessiond cleanup — observed in the field as "Downloaded file was removed by
-        // the system" after bursts of simultaneous completions. The callback therefore only
-        // renames the file into app-owned storage (microseconds) and defers everything else.
-        var stagedFilePath = SecureDownloadedFile(location);
-        var originalSourcePath = location.Path;
+        try
+        {
+            // SECURE FIRST, PROCESS LATER. The system guarantees the downloaded file only while
+            // this callback executes, and the delegate queue is SERIAL: every millisecond spent
+            // here delays the callbacks queued behind this one, leaving THEIR temp files exposed
+            // to nsurlsessiond cleanup — observed in the field as "Downloaded file was removed by
+            // the system" after bursts of simultaneous completions. The callback therefore only
+            // renames the file into app-owned storage (microseconds) and defers everything else.
+            var stagedFilePath = SecureDownloadedFile(location, out var stagingFailureReason);
+            var originalSourcePath = location.Path;
 
-        ProcessCallback(() => ProcessFinishedDownload(task, stagedFilePath, originalSourcePath));
+            ProcessCallback(task.TaskDescription, () => ProcessFinishedDownload(task, stagedFilePath, originalSourcePath, stagingFailureReason));
+        }
+        catch (Exception ex)
+        {
+            // A managed exception escaping an ObjC-registrar callback aborts the process (SIGABRT).
+            Logger.LogError(ex, "Unhandled error in DidFinishDownloading for {TaskDescription}", task.TaskDescription);
+            FaultPendingRequest(task.TaskDescription, ex);
+        }
     }
 
-    private void ProcessFinishedDownload(NSUrlSessionDownloadTask task, string? stagedFilePath, string? originalSourcePath)
+    private void ProcessFinishedDownload(NSUrlSessionDownloadTask task, string? stagedFilePath, string? originalSourcePath, string? stagingFailureReason)
     {
         if (string.IsNullOrWhiteSpace(task.TaskDescription))
         {
@@ -433,9 +466,11 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             }
             else
             {
-                // The system purged the download before it could be secured
-                // (e.g. nsurlsessiond cache cleanup).
-                throw new IOException($"Downloaded file was removed by the system before it could be processed. Source: {originalSourcePath}");
+                // SecureDownloadedFile could not claim the file: surface what NSFileManager
+                // actually reported instead of guessing. ENOENT means the system reclaimed it
+                // (cache purge, or re-delivery of an event whose file is long gone); EPERM
+                // points at data protection on a locked device.
+                throw new IOException($"Failed to secure downloaded file: {stagingFailureReason ?? "unknown reason"}. Source: {originalSourcePath}");
             }
 
             fileStream = new FileStream(targetResponseContentFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -510,6 +545,21 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     }
 
     /// <summary>
+    /// Faults the pending request for <paramref name="requestIdentifier" />, if any, so a
+    /// contained callback failure surfaces to the awaiting caller instead of leaking the handle.
+    /// </summary>
+    private void FaultPendingRequest(string? requestIdentifier, Exception exception)
+    {
+        if (string.IsNullOrWhiteSpace(requestIdentifier) || !_pendingRequests.TryGetValue(requestIdentifier, out var handle))
+        {
+            return;
+        }
+
+        handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Failed to process session callback", exception));
+        CompleteAndRemoveHandle(handle);
+    }
+
+    /// <summary>
     /// Runs download processing OFF the serial delegate queue, fire-and-forget. Keeping
     /// <see cref="DidFinishDownloading" /> near-instant is what lets burst completions all
     /// secure their temp files before the system reclaims them. Once a download is secured,
@@ -517,7 +567,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// are concurrent, and completion races are settled by TrySet* — so processing runs in
     /// parallel with no ordering requirements.
     /// </summary>
-    private void ProcessCallback(Action action)
+    private void ProcessCallback(string? requestIdentifier, Action action)
         => _ = Task.Run(() =>
             {
                 try
@@ -526,7 +576,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, "Unhandled error while processing a session callback");
+                    Logger.LogError(ex, "Unhandled error while processing a session callback for {RequestIdentifier}", requestIdentifier);
+                    FaultPendingRequest(requestIdentifier, ex);
                 }
                 finally
                 {
@@ -538,12 +589,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// Renames the system-provided download into app-owned storage. MUST be the first thing
     /// <see cref="DidFinishDownloading" /> does, synchronously: the file is guaranteed only
     /// while that callback executes, and a bare rename is what keeps the serial delegate queue
-    /// draining fast enough during completion bursts. Returns null when the file is already gone.
+    /// draining fast enough during completion bursts. Returns null when the move failed,
+    /// with <paramref name="failureReason" /> carrying the actual NSFileManager error.
     /// </summary>
-    private string? SecureDownloadedFile(NSUrl location)
+    private string? SecureDownloadedFile(NSUrl location, out string? failureReason)
     {
         if (string.IsNullOrEmpty(location.Path))
         {
+            failureReason = "the system provided no file path";
+
             return null;
         }
 
@@ -553,6 +607,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (fileManager.Move(location, stagedUrl, out var moveError))
         {
+            failureReason = null;
+
             return stagedFilePath;
         }
 
@@ -564,13 +620,14 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             && fileManager.CreateDirectory(tempDir, true, (NSDictionary?)null, out _)
             && fileManager.Move(location, stagedUrl, out moveError))
         {
+            failureReason = null;
+
             return stagedFilePath;
         }
 
-        Logger.LogWarning(
-            "Failed to stage downloaded file {Source}: {Error}",
-            location.Path,
-            moveError?.LocalizedDescription ?? "Unknown error");
+        // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+        failureReason = $"{FormatNSError(moveError)} (source file exists: {fileManager.FileExists(location.Path!)})";
+        Logger.LogError("Failed to stage downloaded file {Source}: {Reason}", location.Path, failureReason);
 
         return null;
     }
@@ -720,10 +777,21 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
     }
 
-    private static INSUrlBackgroundSessionLostMessageHandler? GetLostMessageHandler() =>
-        IPlatformApplication.Current?
-                            .Services
-                            .GetService<INSUrlBackgroundSessionLostMessageHandler>();
+    private static INSUrlBackgroundSessionLostMessageHandler? GetLostMessageHandler()
+    {
+        try
+        {
+            // IPlatformApplication.Current is assigned in the app-delegate constructor, but
+            // Services only after CreateMauiApp() returns: background launches deliver session
+            // events inside exactly that window, so Services can be null here.
+            return IPlatformApplication.Current?.Services?.GetService<INSUrlBackgroundSessionLostMessageHandler>();
+        }
+        catch (Exception)
+        {
+            // e.g. ObjectDisposedException while the container is being torn down.
+            return null;
+        }
+    }
 
     private static string GetRequestBodyPath(string requestIdentifier)
         => Path.Combine(Path.GetTempPath(), $"{requestIdentifier}.nsrequest");
@@ -848,7 +916,21 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         => LoggerFactory.Create(_ => { }).CreateLogger<MessageHandlerNSUrlSessionDownloadDelegate>();
 
     private static ILogger<MessageHandlerNSUrlSessionDownloadDelegate>? GetLoggerFromApplicationServiceProvider()
-        => IPlatformApplication.Current?.Services.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+    {
+        try
+        {
+            // IPlatformApplication.Current is assigned in the app-delegate constructor, but
+            // Services only after CreateMauiApp() returns: on a background launch session
+            // callbacks can arrive inside that window (observed in the field as a SIGABRT
+            // from an ArgumentNullException crossing the ObjC-registrar boundary).
+            return IPlatformApplication.Current?.Services?.GetService<ILogger<MessageHandlerNSUrlSessionDownloadDelegate>>();
+        }
+        catch (Exception)
+        {
+            // e.g. ObjectDisposedException while the container is being torn down.
+            return null;
+        }
+    }
 
     // Build an NSUrl from a managed Uri using NSUrlComponents and HttpUtility.ParseQueryString for accurate query parsing.
     private static NSUrl BuildNativeUrl(Uri uri)
