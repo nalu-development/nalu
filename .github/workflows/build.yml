@@ -1,5 +1,21 @@
 name: Build
 
+# Job topology:
+#
+#   test (linux, net10.0 only, no workloads)
+#     ├─→ build-android (linux · android + plain .NET · maui-android workload, gradle native)
+#     ├─→ build-apple   (macos · ios + maccatalyst    · maui-ios/maui-maccatalyst workloads)
+#     └─→ pack          (windows · ALL TFMs · full maui workload · nupkg + docs)
+#           └─→ push-github-packages / push-nuget / deploy-gh-pages
+#
+# Why pack still builds every TFM on Windows: a nupkg must contain all target frameworks in
+# one file, and Windows is the only OS that can build the net*-windows TFMs (managed
+# Android/iOS/MacCatalyst library code cross-compiles fine there — no Mac pairing needed for
+# class libraries). The linux/macos jobs validate each platform on its native toolchain and
+# are the future home of native processing (gradle-built .aar on linux, xcframework
+# compilation on macos): when that lands, they upload native artifacts and the pack job
+# downloads and embeds them instead of rebuilding them.
+
 on:
   push:
     branches:
@@ -11,8 +27,6 @@ on:
   workflow_dispatch:
 
 env:
-  # Disable the .NET logo in the console output.
-  # DOTNET_NOLOGO: true
   # Disable the .NET first time experience to skip caching NuGet packages and speed up the build.
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   # Disable sending .NET CLI telemetry to Microsoft.
@@ -21,12 +35,126 @@ env:
   MINVERBUILDMETADATA: build.${{github.run_number}}
 
 jobs:
-  build:
-    name: Build-${{matrix.os}}
-    runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        os: [windows-latest]
+  test:
+    name: "Unit Tests (Linux)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # MinVer needs the full history (warnings are errors in Source/)
+      - name: "Setup .NET SDK"
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      # Single-targeting every library to plain net10.0 means no Android/Apple workloads are
+      # needed at all — the whole unit suite compiles and runs on a bare Linux runner.
+      - name: "Test Nalu.Maui.Test"
+        run: dotnet test Tests/Nalu.Maui.Test --configuration Release -p:AllTargetFrameworks=net10.0 -p:ScaffoldTargetFrameworks=net10.0 --collect:"XPlat Code Coverage" --logger "trx;LogFileName=Nalu.Maui.Test.trx" --results-directory ./Artefacts
+      - name: "Test Nalu.Maui.Navigation.SourceGenerators.Test"
+        run: dotnet test Tests/Nalu.Maui.Navigation.SourceGenerators.Test --configuration Release --logger "trx;LogFileName=Nalu.Maui.Navigation.SourceGenerators.Test.trx" --results-directory ./Artefacts
+      - name: "Test Nalu.Maui.Scaffold.SourceGenerators.Test"
+        run: dotnet test Tests/Nalu.Maui.Scaffold.SourceGenerators.Test --configuration Release --logger "trx;LogFileName=Nalu.Maui.Scaffold.SourceGenerators.Test.trx" --results-directory ./Artefacts
+      - name: "Publish Test Results"
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: ./Artefacts
+
+  build-android:
+    name: "Build Android + .NET (Linux)"
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: configure_java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: "Setup .NET SDK"
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: "Ensure workloads"
+        run: dotnet workload install maui-android --version 10.0.103
+      - name: "Validate tooling"
+        run: |
+          java --version
+          dotnet --version
+          dotnet workload list
+      # The VirtualScroll native layer is built by Gradle (cold no-daemon JVM per TFM);
+      # caching the wrapper + dependency caches keeps it fast. Linux is where gradle
+      # behaves best — future native Android processing belongs in this job.
+      - name: "Cache Gradle"
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
+          restore-keys: |
+            ${{runner.os}}-gradle-
+      # Plain net TFMs are kept so the (net10.0) test/tooling projects in the solution
+      # filter can still resolve their library ProjectReferences.
+      - name: "Build"
+        run: |
+          mkdir -p Binlog
+          dotnet build Nalu.Pack.slnf --configuration Release -p:AllTargetFrameworks="net9.0;net9.0-android;net10.0;net10.0-android" -p:ScaffoldTargetFrameworks="net10.0;net10.0-android" -bl:Binlog/build.binlog
+      - name: "Publish Binlog"
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: binlog-android
+          path: "./Binlog"
+
+  build-apple:
+    name: "Build iOS + Mac Catalyst (macOS)"
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: "Setup .NET SDK"
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: "Ensure workloads"
+        run: dotnet workload install maui-ios maui-maccatalyst --version 10.0.103
+      - name: "Validate tooling"
+        run: |
+          dotnet --version
+          dotnet workload list
+      # net10.0 is kept so the (net10.0) test/tooling projects in the solution filter can
+      # still resolve their library ProjectReferences. Future xcframework compilation
+      # belongs in this job.
+      - name: "Build"
+        run: |
+          mkdir -p Binlog
+          dotnet build Nalu.Pack.slnf --configuration Release -p:AllTargetFrameworks="net10.0;net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst" -p:ScaffoldTargetFrameworks="net10.0;net10.0-ios26.0" -bl:Binlog/build.binlog
+      - name: "Publish Binlog"
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: binlog-apple
+          path: "./Binlog"
+
+  pack:
+    name: "Pack (Windows)"
+    needs: test
+    runs-on: windows-latest
     steps:
       - name: "Checkout"
         uses: actions/checkout@v7
@@ -76,9 +204,6 @@ jobs:
       - name: "Dotnet Cake Build"
         run: dotnet cake --target=Build
         shell: pwsh
-      - name: "Dotnet Cake Test"
-        run: dotnet cake --target=Test
-        shell: pwsh
       - name: "Dotnet Cake Pack"
         run: dotnet cake --target=Pack
         shell: pwsh
@@ -98,17 +223,18 @@ jobs:
       - name: "Publish Artefacts"
         uses: actions/upload-artifact@v7
         with:
-          name: ${{matrix.os}}
+          name: packages
           path: "./Artefacts"
       - name: "Publish Binlog"
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{matrix.os}}-binlog
+          name: binlog-windows
           path: "./Binlog"
 
   push-github-packages:
     name: "Push GitHub Packages"
-    needs: build
+    needs: [pack, build-android, build-apple]
     if: github.ref == 'refs/heads/main' || github.event_name == 'release'
     environment:
       name: "GitHub Packages"
@@ -120,7 +246,7 @@ jobs:
       - name: "Download Artefact"
         uses: actions/download-artifact@v8
         with:
-          name: "windows-latest"
+          name: "packages"
       - name: "Dotnet NuGet Add Source"
         run: dotnet nuget add source https://nuget.pkg.github.com/nalu-development/index.json --name GitHub --username albyrock87 --password ${{secrets.GITHUB_TOKEN}}
         shell: pwsh
@@ -130,7 +256,7 @@ jobs:
 
   push-nuget:
     name: "Push NuGet Packages"
-    needs: build
+    needs: [pack, build-android, build-apple]
     permissions:
       id-token: write  # enable GitHub OIDC token issuance for this job
     if: github.event_name == 'release'
@@ -147,7 +273,7 @@ jobs:
       - name: "Download Artefact"
         uses: actions/download-artifact@v8
         with:
-          name: "windows-latest"
+          name: "packages"
       - name: "Dotnet NuGet Push"
         run: |
           Get-ChildItem .\ -Filter *.nupkg |
@@ -157,8 +283,8 @@ jobs:
 
   deploy-gh-pages:
     name: Deploy GitHub Pages
-    needs: build
-    # The docs SITE is built on every run (see the build job — broken-docs guard), but
+    needs: pack
+    # The docs SITE is built on every run (see the pack job — broken-docs guard), but
     # PUBLISHING is a manual gate: the github-pages environment requires a reviewer, so this
     # job pauses at "Review deployments" until approved from the run page. Main-branch runs
     # only — approve the run whose docs should go live, reject (or cancel) the ones to skip.
