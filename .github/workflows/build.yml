@@ -20,8 +20,9 @@ name: Build
 # linux, xcframework compilation on macos — their outputs already flow to pack as artifacts.
 #
 # Overlap note: the source generators (netstandard2.0) build on every machine as project
-# references, and Scaffold builds plain net10.0 on windows too (its TargetFrameworks cannot
-# be empty); those duplicate outputs are identical, so extraction order doesn't matter.
+# references, and the windows slice also carries plain net10.0 (Scaffold has no windows TFM,
+# and its ProjectReferences must expose a net10.0-compatible target); those duplicate
+# outputs are identical, so extraction order doesn't matter.
 
 on:
   push:
@@ -196,14 +197,17 @@ jobs:
           dotnet --version
           dotnet workload list
       # Scaffold has no windows TFM; it builds plain net10.0 here only because
-      # TargetFrameworks cannot be empty (duplicate of the linux output, identical).
+      # TargetFrameworks cannot be empty — which drags plain net10.0 into the whole slice,
+      # since Scaffold's ProjectReferences (Core, Layouts, Navigation) must expose a TFM
+      # compatible with net10.0 or restore fails with NU1201. Those plain outputs duplicate
+      # the linux ones, identically.
       - name: "Build"
         shell: bash
         run: |
           mkdir -p Binlog
           # The inner quotes reach MSBuild so the semicolons stay inside the property value
           # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
       - name: "Collect binaries"
         shell: bash
         run: tar -czf bins-windows.tar.gz Source/*/bin/Release Templates/*/bin/Release
