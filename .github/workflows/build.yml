@@ -1,20 +1,27 @@
 name: Build
 
-# Job topology:
+# Job topology — each TFM is built exactly once, on its native OS, then packed together:
 #
 #   test (linux, net10.0 only, no workloads)
-#     ├─→ build-android (linux · android + plain .NET · maui-android workload, gradle native)
-#     ├─→ build-apple   (macos · ios + maccatalyst    · maui-ios/maui-maccatalyst workloads)
-#     └─→ pack          (windows · ALL TFMs · full maui workload · nupkg + docs)
-#           └─→ push-github-packages / push-nuget / deploy-gh-pages
+#     ├─→ build-android (linux · net9.0/net10.0 + android · maui-android workload, gradle native)
+#     ├─→ build-apple   (macos · ios + maccatalyst      · maui-ios/maui-maccatalyst workloads)
+#     └─→ build-windows (windows · net*-windows          · maui-windows workload)
+#           └─→ pack    (windows · downloads all bins, dotnet pack --no-build · nupkg + docs)
+#                 └─→ push-github-packages / push-nuget / deploy-gh-pages
 #
-# Why pack still builds every TFM on Windows: a nupkg must contain all target frameworks in
-# one file, and Windows is the only OS that can build the net*-windows TFMs (managed
-# Android/iOS/MacCatalyst library code cross-compiles fine there — no Mac pairing needed for
-# class libraries). The linux/macos jobs validate each platform on its native toolchain and
-# are the future home of native processing (gradle-built .aar on linux, xcframework
-# compilation on macos): when that lands, they upload native artifacts and the pack job
-# downloads and embeds them instead of rebuilding them.
+# Each build job tars its bin/Release outputs (paths relative to the repo root) and the pack
+# job extracts all three tarballs in place, restores Nalu.Libraries.slnf for evaluation only
+# (which is why it still installs the full maui workload — restoring every TFM needs the
+# manifests, even with nothing to compile), and packs with --no-build. Packing must happen on
+# one machine because a nupkg carries every TFM in a single file, and that machine must be
+# Windows because only Windows can evaluate the net*-windows targets. MinVer stamps identical
+# versions on every runner: same commit (fetch-depth: 0) and same MINVERBUILDMETADATA.
+# The platform jobs are also the future home of native processing: gradle-built .aar on
+# linux, xcframework compilation on macos — their outputs already flow to pack as artifacts.
+#
+# Overlap note: the source generators (netstandard2.0) build on every machine as project
+# references, and Scaffold builds plain net10.0 on windows too (its TargetFrameworks cannot
+# be empty); those duplicate outputs are identical, so extraction order doesn't matter.
 
 on:
   push:
@@ -103,14 +110,19 @@ jobs:
           key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
           restore-keys: |
             ${{runner.os}}-gradle-
-      # Plain net TFMs are kept so the (net10.0) test/tooling projects in the solution
-      # filter can still resolve their library ProjectReferences.
       - name: "Build"
         run: |
           mkdir -p Binlog
           # The inner quotes reach MSBuild so the semicolons stay inside the property value
           # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Pack.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net9.0-android;net10.0;net10.0-android"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-android"' -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net9.0-android;net10.0;net10.0-android"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-android"' -bl:Binlog/build.binlog
+      - name: "Collect binaries"
+        run: tar -czf bins-android.tar.gz Source/*/bin/Release Templates/*/bin/Release
+      - name: "Publish Binaries"
+        uses: actions/upload-artifact@v7
+        with:
+          name: bins-android
+          path: bins-android.tar.gz
       - name: "Publish Binlog"
         if: always()
         uses: actions/upload-artifact@v7
@@ -139,15 +151,20 @@ jobs:
         run: |
           dotnet --version
           dotnet workload list
-      # net10.0 is kept so the (net10.0) test/tooling projects in the solution filter can
-      # still resolve their library ProjectReferences. Future xcframework compilation
-      # belongs in this job.
+      # Future xcframework compilation belongs in this job.
       - name: "Build"
         run: |
           mkdir -p Binlog
           # The inner quotes reach MSBuild so the semicolons stay inside the property value
           # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Pack.slnf --configuration Release -p:AllTargetFrameworks='"net10.0;net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-ios26.0"' -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks='"net10.0-ios26.0"' -bl:Binlog/build.binlog
+      - name: "Collect binaries"
+        run: tar -czf bins-apple.tar.gz Source/*/bin/Release Templates/*/bin/Release
+      - name: "Publish Binaries"
+        uses: actions/upload-artifact@v7
+        with:
+          name: bins-apple
+          path: bins-apple.tar.gz
       - name: "Publish Binlog"
         if: always()
         uses: actions/upload-artifact@v7
@@ -155,9 +172,56 @@ jobs:
           name: binlog-apple
           path: "./Binlog"
 
+  build-windows:
+    name: "Build Windows (Windows)"
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: "Setup .NET SDK"
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: "Ensure workloads"
+        run: dotnet workload install maui-windows --version 10.0.103
+        shell: pwsh
+      - name: "Validate tooling"
+        shell: pwsh
+        run: |
+          dotnet --version
+          dotnet workload list
+      # Scaffold has no windows TFM; it builds plain net10.0 here only because
+      # TargetFrameworks cannot be empty (duplicate of the linux output, identical).
+      - name: "Build"
+        shell: bash
+        run: |
+          mkdir -p Binlog
+          # The inner quotes reach MSBuild so the semicolons stay inside the property value
+          # instead of being parsed as extra -p switches (MSB1006).
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
+      - name: "Collect binaries"
+        shell: bash
+        run: tar -czf bins-windows.tar.gz Source/*/bin/Release Templates/*/bin/Release
+      - name: "Publish Binaries"
+        uses: actions/upload-artifact@v7
+        with:
+          name: bins-windows
+          path: bins-windows.tar.gz
+      - name: "Publish Binlog"
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: binlog-windows
+          path: "./Binlog"
+
   pack:
     name: "Pack (Windows)"
-    needs: test
+    needs: [build-android, build-apple, build-windows]
     runs-on: windows-latest
     steps:
       - name: "Checkout"
@@ -165,48 +229,32 @@ jobs:
         with:
           lfs: true
           fetch-depth: 0
-      - name: configure_java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'temurin'
-          java-version: '17'
       - name: "Setup .NET SDK"
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             9.0.x
             10.0.x
+      # Full workload: restoring/evaluating every TFM needs all the manifests even though
+      # nothing is compiled here (pack is --no-build; docfx metadata compiles docs only).
       - name: "Ensure workloads" # https://github.com/actions/runner/issues/3578
         run: dotnet workload install maui --version 10.0.103
         shell: pwsh
-      - name: "Validate tooling"
-        shell: pwsh
-        run: |
-          java --version
-          echo $ENV:JAVA_HOME
-          dotnet --version
-          dotnet workload list
-      # The VirtualScroll native layer is built by Gradle, once per Android target framework, and
-      # the .NET Android SDK always invokes it with the no-daemon flag — every run starts a cold
-      # JVM that first has to unpack the wrapper distribution and re-resolve dependencies. Caching
-      # both takes that work off the critical path; on a cold Windows runner it is most of the
-      # budget Gradle's 30s daemon-connection window has to fit into, which is what fails the
-      # build with "Timeout waiting to connect to the Gradle daemon".
-      - name: "Cache Gradle"
-        uses: actions/cache@v6
+      - name: "Download platform binaries"
+        uses: actions/download-artifact@v8
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
-          restore-keys: |
-            ${{runner.os}}-gradle-
-
+          pattern: bins-*
+          merge-multiple: true
+      - name: "Extract platform binaries"
+        shell: bash
+        run: |
+          for f in bins-*.tar.gz; do tar -xzf "$f"; done
+          rm bins-*.tar.gz
       - name: "Dotnet Tool Restore"
         run: dotnet tool restore
         shell: pwsh
-      - name: "Dotnet Cake Build"
-        run: dotnet cake --target=Build
+      - name: "Dotnet Restore"
+        run: dotnet restore Nalu.Libraries.slnf
         shell: pwsh
       - name: "Dotnet Cake Pack"
         run: dotnet cake --target=Pack
@@ -233,12 +281,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: binlog-windows
+          name: binlog-pack
           path: "./Binlog"
 
   push-github-packages:
     name: "Push GitHub Packages"
-    needs: [pack, build-android, build-apple]
+    needs: pack
     if: github.ref == 'refs/heads/main' || github.event_name == 'release'
     environment:
       name: "GitHub Packages"
@@ -260,7 +308,7 @@ jobs:
 
   push-nuget:
     name: "Push NuGet Packages"
-    needs: [pack, build-android, build-apple]
+    needs: pack
     permissions:
       id-token: write  # enable GitHub OIDC token issuance for this job
     if: github.event_name == 'release'
