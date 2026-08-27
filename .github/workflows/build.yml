@@ -1,28 +1,38 @@
 name: Build
 
-# Job topology — each TFM is built exactly once, on its native OS, then packed together:
+# Job topology — each TFM is built and packed exactly once, on its native OS, and the
+# partial packages are merged at zip level on linux:
 #
 #   test (linux, net10.0 only, no workloads)
-#     ├─→ build-android (linux · net9.0/net10.0 + android · maui-android workload, gradle native)
-#     ├─→ build-apple   (macos · ios + maccatalyst      · maui-ios/maui-maccatalyst workloads)
-#     └─→ build-windows (windows · net*-windows          · maui-windows workload)
-#           └─→ pack    (windows · downloads all bins, dotnet pack --no-build · nupkg + docs)
+#     ├─→ docs          (linux · docfx pinned to net10.0, no workloads · site artifact)
+#     ├─→ build-android (linux · android TFMs               · maui-android, gradle native)
+#     ├─→ build-apple   (macos · ios + maccatalyst          · maui-ios/maui-maccatalyst)
+#     └─→ build-windows (windows · net9.0/net10.0 + windows · maui-windows)
+#           └─→ pack    (linux · merges partial nupkgs, no dotnet needed)
 #                 └─→ push-github-packages / push-nuget / deploy-gh-pages
 #
-# Each build job tars its bin/Release outputs (paths relative to the repo root) and the pack
-# job extracts all three tarballs in place, restores Nalu.Libraries.slnf for evaluation only
-# (which is why it still installs the full maui workload — restoring every TFM needs the
-# manifests, even with nothing to compile), and packs with --no-build. Packing must happen on
-# one machine because a nupkg carries every TFM in a single file, and that machine must be
-# Windows because only Windows can evaluate the net*-windows targets. MinVer stamps identical
-# versions on every runner: same commit (fetch-depth: 0) and same MINVERBUILDMETADATA.
-# The platform jobs are also the future home of native processing: gradle-built .aar on
-# linux, xcframework compilation on macos — their outputs already flow to pack as artifacts.
+# Each build job runs `dotnet pack --no-build` with the same TFM-slice properties as its
+# build, which is a fully supported single-machine pack — it only evaluates the TFMs of the
+# slice, so the slim per-platform workload is enough and no job installs the full `maui`
+# workload. The resulting partial nupkgs (lib/ folders and nuspec dependency groups for
+# just that slice) are unioned by .github/scripts/merge-nupkgs.py: payload files united,
+# nuspec dependency groups merged by targetFramework, id/version asserted equal across
+# partials. MinVer stamps identical versions on every runner: same commit (fetch-depth: 0)
+# and same MINVERBUILDMETADATA.
 #
-# Overlap note: the source generators (netstandard2.0) build on every machine as project
-# references, and the windows slice also carries plain net10.0 (Scaffold has no windows TFM,
-# and its ProjectReferences must expose a net10.0-compatible target); those duplicate
-# outputs are identical, so extraction order doesn't matter.
+# The TFM slices are disjoint (plain net9.0/net10.0 lives on windows, which needs net10.0
+# anyway so Scaffold's ProjectReferences resolve — NU1201 otherwise). Only the netstandard2.0
+# source generators (IsPackable=false, shipped inside Navigation/Scaffold as analyzers) and
+# the Templates package build on every machine as dependencies; their duplicated outputs are
+# equivalent by construction and the windows-first merge order ships the windows-built copy.
+#
+# The platform jobs are also the future home of native processing: gradle-built .aar on
+# linux, xcframework compilation on macos — their outputs already flow into their own
+# partial packages.
+#
+# docs is independent of packaging: docfx compiles the API surface from source, pinned to
+# net10.0 (see docfx.json properties), so it runs workload-free on linux in parallel with
+# the platform builds. Publishing still gates on both docs and pack.
 
 on:
   push:
@@ -72,14 +82,48 @@ jobs:
           name: test-results
           path: ./Artefacts
 
-  build-android:
-    name: "Build Android + .NET (Linux)"
+  docs:
+    name: "Docs (Linux)"
     needs: test
     runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
         uses: actions/checkout@v7
         with:
+          lfs: true # docfx site resources (Images/)
+          fetch-depth: 0
+      - name: "Setup .NET SDK"
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: "Dotnet Tool Restore"
+        run: dotnet tool restore
+      # docfx.json pins TargetFramework/AllTargetFrameworks/ScaffoldTargetFrameworks to
+      # net10.0, so the API metadata build needs no MAUI workloads; restore with the same
+      # properties so the assets docfx evaluates against exist.
+      - name: "Dotnet Restore"
+        run: dotnet restore Nalu.Libraries.slnf -p:AllTargetFrameworks=net10.0 -p:ScaffoldTargetFrameworks=net10.0
+      - name: Build Documentation Metadata
+        run: dotnet docfx metadata docfx.json
+      - name: Build Documentation
+        run: dotnet docfx build docfx.json
+      - name: Upload Documentation Site
+        uses: actions/upload-artifact@v7
+        with:
+          name: docfx-site
+          path: _site
+
+  build-android:
+    name: "Build Android (Linux)"
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v7
+        with:
+          lfs: true # packed Icon.png/README.md
           fetch-depth: 0
       - name: configure_java
         uses: actions/setup-java@v5
@@ -114,19 +158,19 @@ jobs:
       # -m:1 serializes the build: the two android TFMs each drive Gradle in the SAME
       # AndroidNative project directory, and concurrent single-use Gradle daemons race on
       # the daemon registry and build dir (XAGRDL0000 "daemon vm is shutting down").
+      # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
+      # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build"
         run: |
           mkdir -p Binlog
-          # The inner quotes reach MSBuild so the semicolons stay inside the property value
-          # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Libraries.slnf --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0;net9.0-android;net10.0;net10.0-android"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-android"' -bl:Binlog/build.binlog
-      - name: "Collect binaries"
-        run: tar -czf bins-android.tar.gz Source/*/bin/Release Templates/*/bin/Release
-      - name: "Publish Binaries"
+          dotnet build Nalu.Libraries.slnf --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build.binlog
+      - name: "Pack"
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+      - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
-          name: bins-android
-          path: bins-android.tar.gz
+          name: nupkgs-android
+          path: ./Artefacts
       - name: "Publish Binlog"
         if: always()
         uses: actions/upload-artifact@v7
@@ -142,6 +186,7 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v7
         with:
+          lfs: true # packed Icon.png/README.md
           fetch-depth: 0
       - name: "Setup .NET SDK"
         uses: actions/setup-dotnet@v6
@@ -156,19 +201,19 @@ jobs:
           dotnet --version
           dotnet workload list
       # Future xcframework compilation belongs in this job.
+      # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
+      # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build"
         run: |
           mkdir -p Binlog
-          # The inner quotes reach MSBuild so the semicolons stay inside the property value
-          # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks='"net10.0-ios26.0"' -bl:Binlog/build.binlog
-      - name: "Collect binaries"
-        run: tar -czf bins-apple.tar.gz Source/*/bin/Release Templates/*/bin/Release
-      - name: "Publish Binaries"
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -bl:Binlog/build.binlog
+      - name: "Pack"
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+      - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
-          name: bins-apple
-          path: bins-apple.tar.gz
+          name: nupkgs-apple
+          path: ./Artefacts
       - name: "Publish Binlog"
         if: always()
         uses: actions/upload-artifact@v7
@@ -177,13 +222,14 @@ jobs:
           path: "./Binlog"
 
   build-windows:
-    name: "Build Windows (Windows)"
+    name: "Build Windows + .NET (Windows)"
     needs: test
     runs-on: windows-latest
     steps:
       - name: "Checkout"
         uses: actions/checkout@v7
         with:
+          lfs: true # packed Icon.png/README.md
           fetch-depth: 0
       - name: "Setup .NET SDK"
         uses: actions/setup-dotnet@v6
@@ -199,26 +245,24 @@ jobs:
         run: |
           dotnet --version
           dotnet workload list
-      # Scaffold has no windows TFM; it builds plain net10.0 here only because
-      # TargetFrameworks cannot be empty — which drags plain net10.0 into the whole slice,
-      # since Scaffold's ProjectReferences (Core, Layouts, Navigation) must expose a TFM
-      # compatible with net10.0 or restore fails with NU1201. Those plain outputs duplicate
-      # the linux ones, identically.
+      # Plain net9.0/net10.0 live in this slice: windows needs net10.0 anyway so Scaffold's
+      # ProjectReferences resolve (Scaffold has no windows TFM), and keeping plain here makes
+      # the three slices disjoint.
+      # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
+      # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build"
         shell: bash
         run: |
           mkdir -p Binlog
-          # The inner quotes reach MSBuild so the semicolons stay inside the property value
-          # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
-      - name: "Collect binaries"
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
+      - name: "Pack"
         shell: bash
-        run: tar -czf bins-windows.tar.gz Source/*/bin/Release Templates/*/bin/Release
-      - name: "Publish Binaries"
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+      - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
-          name: bins-windows
-          path: bins-windows.tar.gz
+          name: nupkgs-windows
+          path: ./Artefacts
       - name: "Publish Binlog"
         if: always()
         uses: actions/upload-artifact@v7
@@ -227,73 +271,31 @@ jobs:
           path: "./Binlog"
 
   pack:
-    name: "Pack (Windows)"
+    name: "Merge Packages (Linux)"
     needs: [build-android, build-apple, build-windows]
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - name: "Checkout"
         uses: actions/checkout@v7
-        with:
-          lfs: true
-          fetch-depth: 0
-      - name: "Setup .NET SDK"
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: |
-            9.0.x
-            10.0.x
-      # Full workload: restoring/evaluating every TFM needs all the manifests even though
-      # nothing is compiled here (pack is --no-build; docfx metadata compiles docs only).
-      - name: "Ensure workloads" # https://github.com/actions/runner/issues/3578
-        run: dotnet workload install maui --version 10.0.103
-        shell: pwsh
-      - name: "Download platform binaries"
+      - name: "Download partial packages"
         uses: actions/download-artifact@v8
         with:
-          pattern: bins-*
-          merge-multiple: true
-      - name: "Extract platform binaries"
-        shell: bash
-        run: |
-          for f in bins-*.tar.gz; do tar -xzf "$f"; done
-          rm bins-*.tar.gz
-      - name: "Dotnet Tool Restore"
-        run: dotnet tool restore
-        shell: pwsh
-      - name: "Dotnet Restore"
-        run: dotnet restore Nalu.Libraries.slnf
-        shell: pwsh
-      - name: "Dotnet Cake Pack"
-        run: dotnet cake --target=Pack
-        shell: pwsh
-
-      - name: Build Documentation Metadata
-        run: dotnet docfx metadata docfx.json
-        shell: pwsh
-      - name: Build Documentation
-        run: dotnet docfx build docfx.json
-        shell: pwsh
-      - name: Upload Documentation Site
-        uses: actions/upload-artifact@v7
-        with:
-          name: docfx-site
-          path: _site
-
+          pattern: nupkgs-*
+          path: partials
+      # windows comes first: the merge is first-wins on duplicated files, so everything
+      # every machine builds (the source-generator analyzer dlls inside Navigation/Scaffold,
+      # the Templates package) ships from the windows build.
+      - name: "Merge partial packages"
+        run: python3 .github/scripts/merge-nupkgs.py Artefacts partials/nupkgs-windows partials/nupkgs-android partials/nupkgs-apple
       - name: "Publish Artefacts"
         uses: actions/upload-artifact@v7
         with:
           name: packages
           path: "./Artefacts"
-      - name: "Publish Binlog"
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: binlog-pack
-          path: "./Binlog"
 
   push-github-packages:
     name: "Push GitHub Packages"
-    needs: pack
+    needs: [pack, docs]
     if: github.ref == 'refs/heads/main' || github.event_name == 'release'
     environment:
       name: "GitHub Packages"
@@ -315,7 +317,7 @@ jobs:
 
   push-nuget:
     name: "Push NuGet Packages"
-    needs: pack
+    needs: [pack, docs]
     permissions:
       id-token: write  # enable GitHub OIDC token issuance for this job
     if: github.event_name == 'release'
@@ -342,8 +344,8 @@ jobs:
 
   deploy-gh-pages:
     name: Deploy GitHub Pages
-    needs: pack
-    # The docs SITE is built on every run (see the pack job — broken-docs guard), but
+    needs: [docs, pack]
+    # The docs SITE is built on every run (see the docs job — broken-docs guard), but
     # PUBLISHING is a manual gate: the github-pages environment requires a reviewer, so this
     # job pauses at "Review deployments" until approved from the run page. Main-branch runs
     # only — approve the run whose docs should go live, reject (or cancel) the ones to skip.
