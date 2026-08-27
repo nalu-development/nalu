@@ -24,7 +24,7 @@ name: Build
 # anyway so Scaffold's ProjectReferences resolve — NU1201 otherwise). The netstandard2.0
 # source generators (IsPackable=false, shipped inside Navigation/Scaffold as analyzers) and
 # the Templates package build on every machine as dependencies; their duplicated outputs are
-# equivalent by construction and the apple-first merge order ships the macos-built copy.
+# equivalent by construction and the windows-first merge order ships the windows-built copy.
 #
 # The platform jobs are also the future home of native processing: gradle-built .aar on
 # linux, xcframework compilation on macos — their outputs already flow into their own
@@ -208,8 +208,7 @@ jobs:
         run: |
           dotnet --version
           dotnet workload list
-      # The source-generator analyzer dlls and the Templates package ship from this job
-      # (apple-first merge order). Future xcframework compilation belongs in this job.
+      # Future xcframework compilation belongs in this job.
       # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
       # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build"
@@ -291,11 +290,11 @@ jobs:
         with:
           pattern: nupkgs-*
           path: partials
-      # apple comes first: the merge is first-wins on duplicated files, and the only
+      # windows comes first: the merge is first-wins on duplicated files, and the only
       # files built on more than one machine (the source-generator analyzer dlls inside
-      # Navigation/Scaffold, the Templates package) then ship from the macos build.
+      # Navigation/Scaffold, the Templates package) then ship from the windows build.
       - name: "Merge partial packages"
-        run: python3 .github/scripts/merge-nupkgs.py Artefacts partials/nupkgs-apple partials/nupkgs-windows partials/nupkgs-android
+        run: python3 .github/scripts/merge-nupkgs.py Artefacts partials/nupkgs-windows partials/nupkgs-apple partials/nupkgs-android
       - name: "Publish Artefacts"
         uses: actions/upload-artifact@v7
         with:
