@@ -6,8 +6,8 @@ name: Build
 #   test (linux, net10.0 only, no workloads)
 #     ├─→ docs          (linux · docfx pinned to net10.0, no workloads · site artifact)
 #     ├─→ build-android (linux · android TFMs               · maui-android, gradle native)
-#     ├─→ build-apple   (macos · ios + maccatalyst          · maui-ios/maui-maccatalyst)
-#     └─→ build-windows (windows · net9.0/net10.0 + windows · maui-windows)
+#     ├─→ build-apple   (macos · net9.0/net10.0 + ios + maccatalyst · maui-ios/maui-maccatalyst)
+#     └─→ build-windows (windows · windows TFMs (+net10.0, see below)  · maui-windows)
 #           └─→ pack    (linux · merges partial nupkgs, no dotnet needed)
 #                 └─→ push-github-packages / push-nuget / deploy-gh-pages
 #
@@ -20,11 +20,12 @@ name: Build
 # partials. MinVer stamps identical versions on every runner: same commit (fetch-depth: 0)
 # and same MINVERBUILDMETADATA.
 #
-# The TFM slices are disjoint (plain net9.0/net10.0 lives on windows, which needs net10.0
-# anyway so Scaffold's ProjectReferences resolve — NU1201 otherwise). Only the netstandard2.0
+# Plain net9.0/net10.0 build and ship from macos (the fastest runners); windows also
+# builds net10.0, but only so Scaffold's ProjectReferences resolve (Scaffold has no windows
+# TFM — NU1201 otherwise), and that duplicate is discarded at merge. The netstandard2.0
 # source generators (IsPackable=false, shipped inside Navigation/Scaffold as analyzers) and
-# the Templates package build on every machine as dependencies; their duplicated outputs are
-# equivalent by construction and the windows-first merge order ships the windows-built copy.
+# the Templates package build on every machine as dependencies; all duplicated outputs are
+# equivalent by construction and the apple-first merge order ships the macos-built copy.
 #
 # The platform jobs are also the future home of native processing: gradle-built .aar on
 # linux, xcframework compilation on macos — their outputs already flow into their own
@@ -202,15 +203,16 @@ jobs:
         run: |
           dotnet --version
           dotnet workload list
-      # Future xcframework compilation belongs in this job.
+      # Plain net9.0/net10.0 are built (and shipped) from here — the Apple-silicon
+      # runners compile them fastest. Future xcframework compilation belongs in this job.
       # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
       # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build"
         run: |
           mkdir -p Binlog
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-ios26.0"' -bl:Binlog/build.binlog
       - name: "Pack"
-        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-ios26.0"' -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
       - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
@@ -247,19 +249,19 @@ jobs:
         run: |
           dotnet --version
           dotnet workload list
-      # Plain net9.0/net10.0 live in this slice: windows needs net10.0 anyway so Scaffold's
-      # ProjectReferences resolve (Scaffold has no windows TFM), and keeping plain here makes
-      # the three slices disjoint.
+      # net10.0 is built here ONLY so Scaffold's ProjectReferences resolve (Scaffold has
+      # no windows TFM — NU1201 otherwise); the shipped plain TFMs come from the macos
+      # partial, which precedes this one in the merge order.
       # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
       # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build"
         shell: bash
         run: |
           mkdir -p Binlog
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
       - name: "Pack"
         shell: bash
-        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
       - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
@@ -284,11 +286,11 @@ jobs:
         with:
           pattern: nupkgs-*
           path: partials
-      # windows comes first: the merge is first-wins on duplicated files, so everything
-      # every machine builds (the source-generator analyzer dlls inside Navigation/Scaffold,
-      # the Templates package) ships from the windows build.
+      # apple comes first: the merge is first-wins on duplicated files, so everything
+      # more than one machine builds (plain net9.0/net10.0, the source-generator analyzer
+      # dlls inside Navigation/Scaffold, the Templates package) ships from the macos build.
       - name: "Merge partial packages"
-        run: python3 .github/scripts/merge-nupkgs.py Artefacts partials/nupkgs-windows partials/nupkgs-android partials/nupkgs-apple
+        run: python3 .github/scripts/merge-nupkgs.py Artefacts partials/nupkgs-apple partials/nupkgs-windows partials/nupkgs-android
       - name: "Publish Artefacts"
         uses: actions/upload-artifact@v7
         with:
