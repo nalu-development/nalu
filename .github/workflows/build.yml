@@ -111,12 +111,15 @@ jobs:
           key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
           restore-keys: |
             ${{runner.os}}-gradle-
+      # -m:1 serializes the build: the two android TFMs each drive Gradle in the SAME
+      # AndroidNative project directory, and concurrent single-use Gradle daemons race on
+      # the daemon registry and build dir (XAGRDL0000 "daemon vm is shutting down").
       - name: "Build"
         run: |
           mkdir -p Binlog
           # The inner quotes reach MSBuild so the semicolons stay inside the property value
           # instead of being parsed as extra -p switches (MSB1006).
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net9.0-android;net10.0;net10.0-android"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-android"' -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0;net9.0-android;net10.0;net10.0-android"' -p:ScaffoldTargetFrameworks='"net10.0;net10.0-android"' -bl:Binlog/build.binlog
       - name: "Collect binaries"
         run: tar -czf bins-android.tar.gz Source/*/bin/Release Templates/*/bin/Release
       - name: "Publish Binaries"
