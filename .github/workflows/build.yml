@@ -155,20 +155,23 @@ jobs:
           key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
           restore-keys: |
             ${{runner.os}}-gradle-
-      # Gradle semaphore: the two android TFMs each drive Gradle in the SAME AndroidNative
-      # project directory, and concurrent single-use Gradle daemons race on the daemon
-      # registry and build dir (XAGRDL0000 "daemon vm is shutting down"). Gradle only lives
-      # in VirtualScroll, so build it alone first on a single MSBuild node (-m:1) — the
-      # follow-up solution build finds it up-to-date, Gradle no-ops, and every other
-      # project builds fully parallel.
+      # Gradle semaphore, in two phases. Phase 1 builds every library except VirtualScroll
+      # fully parallel (Nalu.Libraries.Managed.slnf = Nalu.Libraries.slnf minus the
+      # gradle-native VirtualScroll), covering Core and the source generators as
+      # references.
       # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
       # property value instead of being parsed as extra -p switches (MSB1006).
-      - name: "Build VirtualScroll (serialized Gradle)"
+      - name: "Build libraries"
         run: |
           mkdir -p Binlog
-          dotnet build Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build-virtualscroll.binlog
-      - name: "Build"
-        run: dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.Managed.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build-libraries.binlog
+      # Phase 2 builds VirtualScroll alone on a single MSBuild node: its two android TFMs
+      # drive Gradle in the SAME AndroidNative project directory, and concurrent
+      # single-use Gradle daemons race on the daemon registry and build dir (XAGRDL0000
+      # "daemon vm is shutting down"). Core is already up-to-date from phase 1, so the
+      # serial tail is just VirtualScroll's two TFMs.
+      - name: "Build VirtualScroll (serialized Gradle)"
+        run: dotnet build Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build-virtualscroll.binlog
       # -m:1 stays here as cheap insurance: the android Gradle target still runs its
       # up-to-date check during pack (a no-op with fresh stamps) and would race again if
       # it ever decided to re-run; pack itself is only seconds.
@@ -353,11 +356,11 @@ jobs:
   deploy-gh-pages:
     name: Deploy GitHub Pages
     needs: [docs, pack]
-    # The docs SITE is built on every run (see the docs job — broken-docs guard), but
-    # PUBLISHING is a manual gate: the github-pages environment requires a reviewer, so this
-    # job pauses at "Review deployments" until approved from the run page. Main-branch runs
-    # only — approve the run whose docs should go live, reject (or cancel) the ones to skip.
-    if: github.ref == 'refs/heads/main'
+    # The docs SITE is built on every run (see the docs job — broken-docs guard), but it is
+    # PUBLISHED only when a release is published (the version tag), automatically —
+    # provided the github-pages environment has no required-reviewer protection rule
+    # (Settings → Environments → github-pages).
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: read
