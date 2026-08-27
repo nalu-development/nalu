@@ -164,8 +164,10 @@ jobs:
         run: |
           mkdir -p Binlog
           dotnet build Nalu.Libraries.slnf --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build.binlog
+      # -m:1 here too: the android Gradle target still runs its up-to-date check during
+      # pack and would race again if it ever re-ran (see the Build comment).
       - name: "Pack"
-        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
       - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
