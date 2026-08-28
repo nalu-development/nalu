@@ -62,6 +62,7 @@ public static class MauiProgram
             .UseNaluLayouts()
             .UseNaluControls()
             .UseNaluVirtualScroll()
+            .UseNaluLiveActivities(live => live.AddKind("demo", "Demo live activities"))
             .UseMauiCommunityToolkit()
             .ConfigureFonts(fonts =>
                 {

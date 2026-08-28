@@ -5,6 +5,7 @@
       "Source\\Nalu.Maui.Core\\Nalu.Maui.Core.csproj",
       "Source\\Nalu.Maui.Controls\\Nalu.Maui.Controls.csproj",
       "Source\\Nalu.Maui.Layouts\\Nalu.Maui.Layouts.csproj",
+      "Source\\Nalu.Maui.LiveActivities\\Nalu.Maui.LiveActivities.csproj",
       "Source\\Nalu.Maui.Navigation\\Nalu.Maui.Navigation.csproj",
       "Source\\Nalu.Maui.Navigation.SourceGenerators\\Nalu.Maui.Navigation.SourceGenerators.csproj",
       "Source\\Nalu.Maui.Scaffold\\Nalu.Maui.Scaffold.csproj",

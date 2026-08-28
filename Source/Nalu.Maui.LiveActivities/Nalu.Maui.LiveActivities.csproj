@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Label="Package">
+    <Product>Nalu.Maui.LiveActivities</Product>
+    <Description>Cross-platform live activities for .NET MAUI: one semantic content model rendered as an iOS Live Activity (ActivityKit + Dynamic Island) and an Android 16 Live Update (promoted ongoing notification with status-bar chip), degrading to a plain ongoing notification on older Android.</Description>
+    <PackageTags>MAUI;live-activity;live-updates;activitykit;dynamic-island;notifications</PackageTags>
+    <RootNamespace>Nalu</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Build">
+    <TargetFrameworks>$(AllTargetFrameworks)</TargetFrameworks>
+
+    <SingleProject>true</SingleProject>
+    <OutputType>Library</OutputType>
+
+    <!-- Runs bgen over AppleNative/ApiDefinition.cs (the ObjcBinding items below).
+         iOS TFMs only: Mac Catalyst carries no bindings (no Live Activities there). -->
+    <IsBindingProject Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">true</IsBindingProject>
+    <!-- Always ship the binding resources as <Assembly>.resources.zip: the uncompressed
+         .resources folder blows NuGet's path-length limit (NU5123). -->
+    <CompressBindingResourcePackage Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">true</CompressBindingResourcePackage>
+
+    <!-- iOS floor matches the other Nalu libraries; ActivityKit itself is gated at runtime
+         (iOS 16.2) — below that Support is Unavailable. -->
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">12.2</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ApiDefinition.cs is consumed by bgen (ObjcBindingApiDefinition below), never by
+         the normal compilation — keep it out of the default Compile globs on every TFM. -->
+    <Compile Remove="AppleNative/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Nalu.Maui.Test</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Nalu.Maui.TestApp</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DynamicProxyGenAssembly2</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Condition="$(TargetFramework.StartsWith('net9'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion9)"/>
+    <PackageReference Condition="$(TargetFramework.StartsWith('net10'))" Include="Microsoft.Maui.Controls" Version="$(MauiVersion10)"/>
+  </ItemGroup>
+
+  <!-- Native ActivityKit bridge (MAUI Core's XcodeProject pattern): the .NET build drives
+       xcodebuild (archive → xcframework) and the ObjcBinding items bind the Swift surface.
+       iOS only — Live Activities do not exist on Mac Catalyst. -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+    <XcodeProject Include="AppleNative\LiveActivitiesInterop\NaluLiveActivitiesInterop.xcodeproj">
+      <SchemeName>NaluLiveActivitiesInterop</SchemeName>
+    </XcodeProject>
+    <ObjcBindingApiDefinition Include="AppleNative\ApiDefinition.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
+  </ItemGroup>
+</Project>

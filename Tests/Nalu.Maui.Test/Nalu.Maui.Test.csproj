@@ -9,6 +9,7 @@
       <ProjectReference Include="..\..\Source\Nalu.Maui.Controls\Nalu.Maui.Controls.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Layouts\Nalu.Maui.Layouts.csproj" />
+      <ProjectReference Include="..\..\Source\Nalu.Maui.LiveActivities\Nalu.Maui.LiveActivities.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Navigation\Nalu.Maui.Navigation.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.Scaffold\Nalu.Maui.Scaffold.csproj" />
       <ProjectReference Include="..\..\Source\Nalu.Maui.VirtualScroll\Nalu.Maui.VirtualScroll.csproj" />
