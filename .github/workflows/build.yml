@@ -51,6 +51,11 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   # Set the build number in MinVer.
   MINVERBUILDMETADATA: build.${{github.run_number}}
+  # MSBuild binlogs are opt-in: set the repository variable CI_BINLOG to 'true'
+  # (Settings → Secrets and variables → Actions → Variables) to generate and upload them.
+  # Producing a binlog is itself expensive, so the default is fast builds with none.
+  # Normalized here to 'true' or empty so bash steps can use ${CI_BINLOG:+...}.
+  CI_BINLOG: ${{ vars.CI_BINLOG == 'true' && 'true' || '' }}
 
 jobs:
   test:
@@ -164,26 +169,26 @@ jobs:
       - name: "Build libraries"
         run: |
           mkdir -p Binlog
-          dotnet build Nalu.Libraries.Managed.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build-libraries.binlog
+          dotnet build Nalu.Libraries.Managed.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android ${CI_BINLOG:+-bl:Binlog/build-libraries.binlog}
       # Phase 2 builds VirtualScroll alone on a single MSBuild node: its two android TFMs
       # drive Gradle in the SAME AndroidNative project directory, and concurrent
       # single-use Gradle daemons race on the daemon registry and build dir (XAGRDL0000
       # "daemon vm is shutting down"). Core is already up-to-date from phase 1, so the
       # serial tail is just VirtualScroll's two TFMs.
       - name: "Build VirtualScroll (serialized Gradle)"
-        run: dotnet build Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -bl:Binlog/build-virtualscroll.binlog
+        run: dotnet build Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android ${CI_BINLOG:+-bl:Binlog/build-virtualscroll.binlog}
       # -m:1 stays here as cheap insurance: the android Gradle target still runs its
       # up-to-date check during pack (a no-op with fresh stamps) and would race again if
       # it ever decided to re-run; pack itself is only seconds.
       - name: "Pack"
-        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts ${CI_BINLOG:+-bl:Binlog/pack.binlog}
       - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
           name: nupkgs-android
           path: ./Artefacts
       - name: "Publish Binlog"
-        if: always()
+        if: always() && env.CI_BINLOG == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: binlog-android
@@ -217,16 +222,16 @@ jobs:
       - name: "Build"
         run: |
           mkdir -p Binlog
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 ${CI_BINLOG:+-bl:Binlog/build.binlog}
       - name: "Pack"
-        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0-ios18.0;net9.0-ios26.0;net9.0-maccatalyst;net10.0-ios26.0;net10.0-maccatalyst"' -p:ScaffoldTargetFrameworks=net10.0-ios26.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts ${CI_BINLOG:+-bl:Binlog/pack.binlog}
       - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
           name: nupkgs-apple
           path: ./Artefacts
       - name: "Publish Binlog"
-        if: always()
+        if: always() && env.CI_BINLOG == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: binlog-apple
@@ -265,17 +270,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p Binlog
-          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -bl:Binlog/build.binlog
+          dotnet build Nalu.Libraries.slnf --configuration Release -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 ${CI_BINLOG:+-bl:Binlog/build.binlog}
       - name: "Pack"
         shell: bash
-        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts -bl:Binlog/pack.binlog
+        run: dotnet pack Nalu.Libraries.slnf --configuration Release --no-build -p:AllTargetFrameworks='"net9.0;net10.0;net9.0-windows10.0.19041.0;net10.0-windows10.0.19041.0"' -p:ScaffoldTargetFrameworks=net10.0 -p:ContinuousIntegrationBuild=true -p:IncludeSymbols=true --output Artefacts ${CI_BINLOG:+-bl:Binlog/pack.binlog}
       - name: "Publish Packages"
         uses: actions/upload-artifact@v7
         with:
           name: nupkgs-windows
           path: ./Artefacts
       - name: "Publish Binlog"
-        if: always()
+        if: always() && env.CI_BINLOG == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: binlog-windows
