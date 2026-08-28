@@ -75,7 +75,7 @@ public sealed class NaluApp : IAsyncLifetime
     /// set DEVFLOW_PORT to target a specific one.
     /// </summary>
     private static int[] CandidatePorts()
-        => int.TryParse(Environment.GetEnvironmentVariable("DEVFLOW_PORT"), out var p) ? [p] : [9223, 9224, 9225, 10223, 10224, 10225];
+        => int.TryParse(Environment.GetEnvironmentVariable("DEVFLOW_PORT"), out var p) ? [p] : [9223, 9224, 9225, 9226, 10223, 10224, 10225, 10226];
 
     public async ValueTask InitializeAsync()
     {

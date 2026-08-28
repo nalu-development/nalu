@@ -102,6 +102,8 @@ public static class MauiProgram
             options.Port = 9224;
 #elif MACCATALYST
             options.Port = 9225;
+#elif WINDOWS
+            options.Port = 9226;
 #endif
         });
 #endif
