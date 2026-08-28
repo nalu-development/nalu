@@ -16,7 +16,9 @@
       ],
       "dest": "api",
       "properties": {
-        "TargetFramework": "net10.0"
+        "TargetFramework": "net10.0",
+        "AllTargetFrameworks": "net10.0",
+        "ScaffoldTargetFrameworks": "net10.0"
       }
     }
   ],

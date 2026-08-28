@@ -67,8 +67,10 @@ Task("Pack")
     .Description("Creates NuGet packages and outputs them to the artefacts directory.")
     .Does(() =>
     {
+        // Libraries-only filter: packing must not require the (unbuilt) test projects, so CI can
+        // pack --no-build from per-platform bin outputs built on other machines.
         DotNetPack(
-            "Nalu.Pack.slnf",
+            "Nalu.Libraries.slnf",
             new DotNetPackSettings()
             {
                 Configuration = configuration,
@@ -76,7 +78,7 @@ Task("Pack")
                 MSBuildSettings = new DotNetMSBuildSettings()
                 {
                     ContinuousIntegrationBuild = !BuildSystem.IsLocalBuild,
-                },
+                }.EnableBinaryLogger($"{binlogDirectory}/pack.binlog"),
                 NoBuild = true,
                 NoRestore = true,
                 OutputDirectory = artefactsDirectory,
