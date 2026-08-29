@@ -34,6 +34,17 @@ struct LiveContent: Codable {
     struct ProgressInfo: Codable {
         var value: Double?
         var indeterminate: Bool?
+        var segments: [SegmentInfo]?
+        var points: [PointInfo]?
+    }
+
+    struct SegmentInfo: Codable {
+        var weight: Double?
+        var color: String?
+    }
+
+    struct PointInfo: Codable {
+        var position: Double?
     }
 
     struct TimerInfo: Codable {
@@ -68,6 +79,12 @@ struct LiveContent: Codable {
     var url: URL? {
         deepLink.flatMap(URL.init(string:))
     }
+
+    /// Identity glyph for the card and the compact island: chipIcon is interpreted as an
+    /// SF Symbol name on iOS (on Android it is a drawable resource name).
+    var symbol: String? {
+        chipIcon
+    }
 }
 
 // MARK: - Widget
@@ -80,28 +97,11 @@ struct NaluLiveActivityWidget: Widget {
             let content = LiveContent.decode(context.state.payload)
 
             return DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) {
-                    if let title = content.title {
-                        Text(title)
-                            .font(.headline)
-                            .lineLimit(1)
-                    }
-                }
-                DynamicIslandExpandedRegion(.trailing) {
-                    TimerText(timer: content.timer)
-                        .font(.headline)
-                        .monospacedDigit()
-                        .foregroundStyle(content.accent)
-                }
+                // Everything lives in the full-width bottom region: the narrow
+                // leading/trailing slots truncate real-world titles immediately.
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let subtitle = content.subtitle {
-                            Text(subtitle)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        ProgressBar(content: content)
-                    }
+                    ContentCard(content: content)
+                        .padding(.top, 4)
                 }
             } compactLeading: {
                 CompactLabel(content: content)
@@ -119,64 +119,174 @@ struct NaluLiveActivityWidget: Widget {
 }
 
 // MARK: - Views
+//
+// One design language on both platforms: Android's promoted Live Update is a
+// system-templated card (identity + title/subtitle, time trailing, tinted segmented
+// ProgressStyle bar), so the iOS surfaces mirror that card with native polish —
+// rounded bold ticking timer, secondary styles that adapt to Lock Screen / island,
+// and a segmented capsule track that echoes Android 16's signature progress look.
 
 private struct LockScreenView: View {
     let content: LiveContent
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
+        ContentCard(content: content)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+            .activityBackgroundTint(nil)
+            .activitySystemActionForegroundColor(content.accent)
+            .widgetURL(content.url)
+    }
+}
+
+/// The shared full-width card: title owns the width (never truncated by the clock),
+/// the ticking timer sits large and trailing, the segmented track closes the card.
+private struct ContentCard: View {
+    let content: LiveContent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                if let symbol = content.symbol {
+                    Image(systemName: symbol)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(content.accent)
+                        .frame(width: 34, height: 34)
+                        .background(content.accent.opacity(0.16), in: Circle())
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
                     if let title = content.title {
                         Text(title)
                             .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
                     if let subtitle = content.subtitle {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
-                Spacer()
+                .layoutPriority(1)
+
+                Spacer(minLength: 8)
+
                 TimerText(timer: content.timer)
-                    .font(.title3.weight(.semibold))
+                    .font(.system(.title2, design: .rounded).weight(.bold))
                     .monospacedDigit()
+                    .multilineTextAlignment(.trailing)
                     .foregroundStyle(content.accent)
+                    .frame(maxWidth: 92, alignment: .trailing)
             }
-            ProgressBar(content: content)
+
+            ProgressTrack(content: content)
         }
-        .padding()
-        .activityBackgroundTint(nil)
-        .widgetURL(content.url)
     }
 }
 
-private struct ProgressBar: View {
+/// Android-16-style segmented progress: weighted capsule segments separated by small
+/// gaps, filled up to the current fraction, with milestone dots. Renders nothing when
+/// the content carries no progress.
+private struct ProgressTrack: View {
     let content: LiveContent
 
     var body: some View {
         if let progress = content.progress {
             if progress.indeterminate == true {
                 ProgressView()
+                    .progressViewStyle(.linear)
                     .tint(content.accent)
             } else if let value = progress.value {
-                ProgressView(value: min(max(value, 0), 1))
-                    .tint(content.accent)
+                SegmentedBar(
+                    value: min(max(value, 0), 1),
+                    segments: normalizedSegments,
+                    points: (content.progress?.points ?? []).compactMap { $0.position },
+                    accent: content.accent
+                )
+                .frame(height: 6)
+            }
+        }
+    }
+
+    /// (startFraction, endFraction, color) per segment; a single accent segment when none given.
+    private var normalizedSegments: [(Double, Double, Color)] {
+        guard let segments = content.progress?.segments, !segments.isEmpty else {
+            return [(0, 1, content.accent)]
+        }
+
+        let total = segments.reduce(0.0) { $0 + max($1.weight ?? 1, 0.0001) }
+        var start = 0.0
+
+        return segments.map { segment in
+            let end = start + max(segment.weight ?? 1, 0.0001) / total
+            defer { start = end }
+            return (start, end, Color(hex: segment.color) ?? content.accent)
+        }
+    }
+}
+
+private struct SegmentedBar: View {
+    let value: Double
+    let segments: [(Double, Double, Color)]
+    let points: [Double]
+    let accent: Color
+
+    private let gap = 3.0
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let height = geo.size.height
+
+            ZStack(alignment: .leading) {
+                ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
+                    let (start, end, color) = segment
+                    let x = start * width + (start > 0 ? gap / 2 : 0)
+                    let segmentWidth = max((end - start) * width - (start > 0 ? gap / 2 : 0) - (end < 1 ? gap / 2 : 0), 1)
+                    let fill = min(max((value - start) / (end - start), 0), 1)
+
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(color.opacity(0.22))
+
+                        if fill > 0 {
+                            Capsule()
+                                .fill(color)
+                                .frame(width: max(fill * segmentWidth, height))
+                        }
+                    }
+                    .frame(width: segmentWidth, height: height)
+                    .offset(x: x)
+                }
+
+                ForEach(Array(points.enumerated()), id: \.offset) { _, position in
+                    Circle()
+                        .fill(position <= value ? accent : Color.primary.opacity(0.25))
+                        .frame(width: height, height: height)
+                        .offset(x: min(max(position, 0), 1) * (width - height))
+                }
             }
         }
     }
 }
 
+/// The tiny always-visible identity — mirrors the Android status-bar chip
+/// (accent pill with the short text, falling back to a dot).
 private struct CompactLabel: View {
     let content: LiveContent
 
     var body: some View {
         if let chipText = content.chipText {
             Text(chipText)
-                .font(.caption2.weight(.semibold))
+                .font(.caption2.weight(.bold))
+                .monospacedDigit()
                 .foregroundStyle(content.accent)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(content.accent.opacity(0.18), in: Capsule())
         } else {
-            Image(systemName: "circle.fill")
+            Image(systemName: content.symbol ?? "circle.fill")
                 .imageScale(.small)
                 .foregroundStyle(content.accent)
         }
@@ -208,5 +318,18 @@ private struct TimerText: View {
         default:
             EmptyView()
         }
+    }
+}
+
+private extension Color {
+    init?(hex: String?) {
+        guard let hex, hex.hasPrefix("#"), hex.count == 7, let rgb = UInt32(hex.dropFirst(), radix: 16) else {
+            return nil
+        }
+        self.init(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
     }
 }
