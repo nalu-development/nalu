@@ -88,7 +88,7 @@ public class LiveActivityTests : ContentPage
             ChipText = "10%",
             AccentColor = "#4C7DF0",
             Progress = new LiveActivityProgress { Value = _progress },
-            Timer = LiveActivityTimer.CountDown(DateTimeOffset.UtcNow.AddMinutes(1)),
+            Timer = LiveActivityTimer.CountDown(DateTimeOffset.UtcNow.AddMinutes(5)),
             Actions =
             [
                 // v1: link-backed actions render as buttons and open the app at the link.

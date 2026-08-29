@@ -116,52 +116,31 @@ struct NaluLiveActivityWidget: Widget {
             let content = LiveContent.decode(context.state.payload)
 
             return DynamicIsland {
-                // The top row flanks the sensor housing (Android-card header shape):
-                // identity glyph leading, ticking timer trailing. Title/subtitle/track/
-                // actions get the full width below — long titles never truncate.
+                // The sensor-flanking corners carry SMALL metadata only (the grammar of
+                // Apple's own expanded views: RAIN / FEELS LIKE 36, flight number / airline
+                // logo). The big content — title, ticking timer, track, actions — is the
+                // full-width body below, flight-card style.
                 DynamicIslandExpandedRegion(.leading) {
                     if let symbol = content.symbol {
                         Image(systemName: symbol)
-                            .font(.title3.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(content.accent)
-                            .frame(width: 30, height: 30)
+                            .frame(width: 22, height: 22)
                             .background(content.accent.opacity(0.16), in: Circle())
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    // Scale down instead of truncating: overflow grows ("−1:02:03") and
-                    // an ellipsised clock is worse than a smaller one.
-                    TimerText(timer: content.timer)
-                        .font(.system(.headline, design: .rounded).weight(.bold))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 84, alignment: .trailing)
+                    if let chipText = content.chipText {
+                        Text(chipText)
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            if let title = content.title {
-                                Text(title)
-                                    .font(.headline)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.85)
-                            }
-                            if let subtitle = content.subtitle {
-                                Text(subtitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        ProgressTrack(content: content)
-
-                        ActionRow(content: content)
-                    }
-                    .padding(.top, 2)
-                    .padding(.bottom, 4)
+                    ContentCard(content: content, showsGlyph: false)
+                        .padding(.top, 2)
+                        .padding(.bottom, 4)
                 }
             } compactLeading: {
                 CompactLabel(content: content)
@@ -206,11 +185,12 @@ private struct LockScreenView: View {
 /// the ticking timer sits large and trailing, the segmented track closes the card.
 private struct ContentCard: View {
     let content: LiveContent
+    var showsGlyph = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
-                if let symbol = content.symbol {
+                if showsGlyph, let symbol = content.symbol {
                     Image(systemName: symbol)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(content.accent)
