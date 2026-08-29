@@ -1,0 +1,100 @@
+<!--
+  Nalu.Maui.LiveActivities — automatic iOS widget extension.
+
+  For iOS APP builds on macOS this wires up everything a Live Activity needs to render,
+  with zero files in the consumer's project:
+
+    1. injects NSSupportsLiveActivities into the compiled Info.plist (PartialAppManifest);
+    2. copies the bundled generic widget (SwiftUI rendering the shared content model)
+       into obj/ and builds it with xcodebuild for the right SDK slice, stamping
+       PRODUCT_BUNDLE_IDENTIFIER=$(ApplicationId).$(NaluLiveActivitiesWidgetBundleSuffix);
+    3. embeds the resulting .appex via AdditionalAppExtensions (the .NET iOS SDK copies
+       it into PlugIns/ and codesigns it with the app's identity).
+
+  Customization properties:
+    - NaluLiveActivitiesWidget           false to disable everything (default: true for Exe projects)
+    - NaluLiveActivitiesWidgetProject    path to a custom widget .xcodeproj (custom SwiftUI —
+                                         start by copying the bundled one; keep the attributes
+                                         struct name NaluLiveActivityAttributes)
+    - NaluLiveActivitiesWidgetTarget     xcodebuild target name (default: NaluLiveActivitiesWidget)
+    - NaluLiveActivitiesWidgetBundleSuffix  appex bundle id suffix (default: widget)
+    - NaluLiveActivitiesWidgetDisplayName   user-visible widget name (default: $(ApplicationTitle))
+
+  Device builds note: the appex is signed with the app's signing identity; store/device
+  distribution requires the usual per-bundle-id provisioning on the Apple developer portal.
+-->
+<Project>
+
+  <PropertyGroup>
+    <NaluLiveActivitiesWidget Condition="'$(NaluLiveActivitiesWidget)' == '' and '$(OutputType)' == 'Exe'">true</NaluLiveActivitiesWidget>
+    <NaluLiveActivitiesWidgetProject Condition="'$(NaluLiveActivitiesWidgetProject)' == ''">$(MSBuildThisFileDirectory)NaluLiveActivitiesWidget.xcodeproj</NaluLiveActivitiesWidgetProject>
+    <NaluLiveActivitiesWidgetTarget Condition="'$(NaluLiveActivitiesWidgetTarget)' == ''">NaluLiveActivitiesWidget</NaluLiveActivitiesWidgetTarget>
+    <NaluLiveActivitiesWidgetBundleSuffix Condition="'$(NaluLiveActivitiesWidgetBundleSuffix)' == ''">widget</NaluLiveActivitiesWidgetBundleSuffix>
+    <NaluLiveActivitiesWidgetDisplayName Condition="'$(NaluLiveActivitiesWidgetDisplayName)' == ''">$(ApplicationTitle)</NaluLiveActivitiesWidgetDisplayName>
+    <_NaluWidgetEnabled>false</_NaluWidgetEnabled>
+    <_NaluWidgetEnabled Condition="'$(NaluLiveActivitiesWidget)' == 'true' and $([MSBuild]::IsOSPlatform('osx'))">true</_NaluWidgetEnabled>
+  </PropertyGroup>
+
+  <!-- 1. NSSupportsLiveActivities: merged into the compiled app manifest, so the consumer
+       does not have to touch Platforms/iOS/Info.plist at all. -->
+  <Target Name="_NaluLiveActivitiesPartialManifest"
+          Condition="'$(_NaluWidgetEnabled)' == 'true'"
+          BeforeTargets="_CompileAppManifest;CompileAppManifest">
+    <PropertyGroup>
+      <_NaluPartialManifestPath>$(IntermediateOutputPath)NaluLiveActivitiesInfo.plist</_NaluPartialManifestPath>
+      <_NaluPartialManifestContent><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+</dict>
+</plist>]]></_NaluPartialManifestContent>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(_NaluPartialManifestPath)" Lines="$(_NaluPartialManifestContent)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+
+    <ItemGroup>
+      <PartialAppManifest Include="$(_NaluPartialManifestPath)" />
+      <FileWrites Include="$(_NaluPartialManifestPath)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- 2 + 3. Build the widget appex and hand it to the SDK for embedding + codesigning.
+       Everything is computed at target-execution time: RuntimeIdentifier is still empty
+       during evaluation, and a device appex embedded into a simulator app silently fails
+       pluginkit registration. -->
+  <Target Name="_NaluLiveActivitiesBuildWidget"
+          Condition="'$(_NaluWidgetEnabled)' == 'true'"
+          BeforeTargets="_ExtendAppExtensionReferences">
+    <PropertyGroup>
+      <_NaluWidgetSdk>iphoneos</_NaluWidgetSdk>
+      <_NaluWidgetSdk Condition="$(RuntimeIdentifier.StartsWith('iossimulator'))">iphonesimulator</_NaluWidgetSdk>
+      <_NaluWidgetRoot>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)naluwidget/'))</_NaluWidgetRoot>
+      <_NaluWidgetSrc>$([System.IO.Path]::GetDirectoryName('$(NaluLiveActivitiesWidgetProject)'))</_NaluWidgetSrc>
+      <_NaluWidgetProjName>$([System.IO.Path]::GetFileName('$(NaluLiveActivitiesWidgetProject)'))</_NaluWidgetProjName>
+    </PropertyGroup>
+
+    <!-- Build outside the package cache: xcodebuild must never write next to the nupkg
+         contents, and a local copy keeps custom projects' relative paths intact too. -->
+    <ItemGroup>
+      <_NaluWidgetSources Include="$(_NaluWidgetSrc)/**/*" Exclude="$(_NaluWidgetSrc)/**/xcuserdata/**" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_NaluWidgetSources)"
+          DestinationFiles="@(_NaluWidgetSources->'$(_NaluWidgetRoot)src/%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <Exec Command="xcodebuild -project &quot;$(_NaluWidgetRoot)src/$(_NaluWidgetProjName)&quot; -target &quot;$(NaluLiveActivitiesWidgetTarget)&quot; -configuration Release -sdk $(_NaluWidgetSdk) CODE_SIGNING_ALLOWED=NO &quot;PRODUCT_BUNDLE_IDENTIFIER=$(ApplicationId).$(NaluLiveActivitiesWidgetBundleSuffix)&quot; &quot;INFOPLIST_KEY_CFBundleDisplayName=$(NaluLiveActivitiesWidgetDisplayName)&quot; &quot;CONFIGURATION_BUILD_DIR=$(_NaluWidgetRoot)$(_NaluWidgetSdk)&quot; &quot;SYMROOT=$(_NaluWidgetRoot)sym&quot; &quot;OBJROOT=$(_NaluWidgetRoot)obj&quot; build"
+          StandardOutputImportance="low" />
+
+    <ItemGroup>
+      <AdditionalAppExtensions Include="$(_NaluWidgetRoot.TrimEnd('/'))">
+        <Name>$(NaluLiveActivitiesWidgetTarget)</Name>
+        <BuildOutput>$(_NaluWidgetSdk)</BuildOutput>
+      </AdditionalAppExtensions>
+      <FileWrites Include="$(_NaluWidgetRoot)**/*" />
+    </ItemGroup>
+  </Target>
+
+</Project>

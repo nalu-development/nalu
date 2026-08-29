@@ -77,4 +77,12 @@
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
   </ItemGroup>
+
+  <!-- buildTransitive payload: the generic widget extension (Xcode project + SwiftUI)
+       plus the targets that build and embed it into consuming iOS apps automatically
+       (see nuget/buildTransitive/widget/Nalu.Maui.LiveActivities.Widget.targets). -->
+  <ItemGroup>
+    <None Remove="nuget\**" />
+    <None Include="nuget\**" PackagePath="" Pack="true" />
+  </ItemGroup>
 </Project>

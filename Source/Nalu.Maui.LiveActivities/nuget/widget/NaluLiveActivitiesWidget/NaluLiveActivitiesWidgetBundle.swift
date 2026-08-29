@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct NaluTestWidgetBundle: WidgetBundle {
+struct NaluLiveActivitiesWidgetBundle: WidgetBundle {
     var body: some Widget {
         NaluLiveActivityWidget()
     }

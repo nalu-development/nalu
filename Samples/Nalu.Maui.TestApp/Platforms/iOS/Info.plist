@@ -35,7 +35,5 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Gathering weather information for the current location.</string>
     
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 </dict>
 </plist>
