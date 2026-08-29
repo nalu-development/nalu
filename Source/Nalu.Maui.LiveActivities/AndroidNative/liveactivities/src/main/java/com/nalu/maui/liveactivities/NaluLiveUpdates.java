@@ -6,7 +6,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
@@ -17,16 +16,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Native side of Nalu.Maui.LiveActivities: builds and posts the whole (promoted) ongoing
- * notification from the serialized cross-platform content payload in a single JNI call,
- * so per-update work never chatters across the managed/native boundary.
- *
- * The payload is the same camelCase JSON contract the iOS widget consumes; timestamps are
- * epoch milliseconds.
+ * notification in a single JNI call. The content arrives as typed arguments — flattened
+ * primitives, strings and primitive arrays — so nothing is parsed on the hot path; the
+ * serialized payload is carried along as an OPAQUE string only to be stored in the
+ * notification extras for rehydration after a process restart.
  */
 public final class NaluLiveUpdates {
 
@@ -35,11 +30,23 @@ public final class NaluLiveUpdates {
     private static final String EXTRA_PAYLOAD = "nalu.live.payload";
     private static final int PROGRESS_SCALE = 1000;
 
+    /** progressMode values. */
+    public static final int PROGRESS_NONE = 0;
+    public static final int PROGRESS_VALUE = 1;
+    public static final int PROGRESS_INDETERMINATE = 2;
+
+    /** timerMode values. */
+    public static final int TIMER_NONE = 0;
+    public static final int TIMER_COUNT_DOWN = 1;
+    public static final int TIMER_COUNT_UP = 2;
+    public static final int TIMER_PAUSED = 3;
+
     private NaluLiveUpdates() {
     }
 
     /**
-     * Ensures the channel exists, renders the payload and posts the notification.
+     * Ensures the channel exists, renders the content and posts the notification.
+     * Colors are ARGB ints with 0 meaning "not set" (real colors always carry alpha).
      * Returns false when notifications cannot be posted (no manager / pre-O device).
      */
     public static boolean post(
@@ -51,11 +58,28 @@ public final class NaluLiveUpdates {
         String channelId,
         String channelName,
         int smallIcon,
-        String payloadJson,
+        String title,
+        String subtitle,
+        String chipText,
+        int accentColor,
+        String imageName,
+        int progressMode,
+        double progressValue,
+        double[] segmentWeights,
+        int[] segmentColors,
+        double[] pointPositions,
+        String trackerIcon,
+        int timerMode,
+        long timerAnchorMs,
+        long pausedElapsedMs,
+        String deepLink,
+        String[] actionLabels,
+        String[] actionDeepLinks,
+        String[] actionIcons,
         boolean promoted,
         boolean ongoing,
         String alertTitle,
-        String alertBody
+        String payload
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return false;
@@ -70,52 +94,45 @@ public final class NaluLiveUpdates {
             manager.createNotificationChannel(new NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT));
         }
 
-        JSONObject payload;
-        try {
-            payload = new JSONObject(payloadJson);
-        } catch (JSONException e) {
-            payload = new JSONObject();
-        }
-
         Notification.Builder builder = new Notification.Builder(context, channelId)
             .setSmallIcon(smallIcon != 0 ? smallIcon : context.getApplicationInfo().icon)
             .setOngoing(ongoing)
             .setOnlyAlertOnce(alertTitle == null)
-            .setContentIntent(contentIntent(context, payload.optString("deepLink", null)));
+            .setContentIntent(contentIntent(context, deepLink));
 
         if (alertTitle != null) {
             builder.setTicker(alertTitle);
         }
 
-        String title = payload.optString("title", null);
         if (title != null) {
             builder.setContentTitle(title);
         }
 
-        String subtitle = payload.optString("subtitle", null);
         if (subtitle != null) {
             builder.setContentText(subtitle);
         }
 
-        Integer accent = parseColor(payload.optString("accentColor", null));
-        if (accent != null) {
-            builder.setColor(accent);
+        if (accentColor != 0) {
+            builder.setColor(accentColor);
             builder.setColorized(false);
         }
 
-        Integer largeIcon = drawableId(context, payload.optString("imageName", null));
-        if (largeIcon != null) {
+        int largeIcon = drawableId(context, imageName);
+        if (largeIcon != 0) {
             builder.setLargeIcon(Icon.createWithResource(context, largeIcon));
         }
 
-        applyTimer(builder, payload.optJSONObject("timer"));
-        applyActions(context, builder, payload.optJSONArray("actions"));
+        applyTimer(builder, timerMode, timerAnchorMs, pausedElapsedMs);
+        applyActions(context, builder, actionLabels, actionDeepLinks, actionIcons);
 
-        JSONObject progress = payload.optJSONObject("progress");
-        boolean modern = Build.VERSION.SDK_INT >= 36;
+        if (Build.VERSION.SDK_INT >= 36) {
+            if (chipText != null) {
+                builder.setShortCriticalText(chipText);
+            }
 
-        if (modern) {
-            applyModernStyle(context, builder, payload, progress, accent);
+            if (progressMode != PROGRESS_NONE) {
+                builder.setStyle(progressStyle(context, progressMode, progressValue, segmentWeights, segmentColors, pointPositions, trackerIcon, accentColor));
+            }
 
             if (promoted && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
                 // Promotion to a Live Update (status-bar chip + floating card): the system
@@ -123,18 +140,16 @@ public final class NaluLiveUpdates {
                 // characteristics and the POST_PROMOTED_NOTIFICATIONS permission.
                 builder.setRequestPromotedOngoing(true);
             }
-        } else if (progress != null) {
-            if (progress.optBoolean("indeterminate", false)) {
-                builder.setProgress(0, 0, true);
-            } else if (progress.has("value")) {
-                builder.setProgress(PROGRESS_SCALE, scaled(progress.optDouble("value", 0)), false);
-            }
+        } else if (progressMode == PROGRESS_INDETERMINATE) {
+            builder.setProgress(0, 0, true);
+        } else if (progressMode == PROGRESS_VALUE) {
+            builder.setProgress(PROGRESS_SCALE, scaled(progressValue), false);
         }
 
         Bundle extras = new Bundle();
         extras.putString(EXTRA_ID, activityId);
         extras.putString(EXTRA_KIND, kind);
-        extras.putString(EXTRA_PAYLOAD, payloadJson);
+        extras.putString(EXTRA_PAYLOAD, payload);
         // addExtras merges — setExtras would replace the builder's bundle and wipe what
         // other builder APIs stored there (setRequestPromotedOngoing among them).
         builder.addExtras(extras);
@@ -153,7 +168,8 @@ public final class NaluLiveUpdates {
 
     /**
      * The live activities currently on screen as a JSON array of {id, kind, payload}
-     * objects — the rehydration source after a process restart.
+     * objects — the rehydration source after a process restart (cold path; the payload
+     * is the same opaque string handed to {@link #post}).
      */
     public static String getActiveJson(Context context, String tag) {
         JSONArray result = new JSONArray();
@@ -191,117 +207,102 @@ public final class NaluLiveUpdates {
         return result.toString();
     }
 
-    private static void applyModernStyle(Context context, Notification.Builder builder, JSONObject payload, JSONObject progress, Integer accent) {
-        String chipText = payload.optString("chipText", null);
-        if (chipText != null) {
-            builder.setShortCriticalText(chipText);
-        }
-
-        if (progress == null) {
-            return;
-        }
-
+    private static Notification.ProgressStyle progressStyle(
+        Context context,
+        int progressMode,
+        double progressValue,
+        double[] segmentWeights,
+        int[] segmentColors,
+        double[] pointPositions,
+        String trackerIcon,
+        int accentColor
+    ) {
         Notification.ProgressStyle style = new Notification.ProgressStyle();
 
-        if (progress.optBoolean("indeterminate", false)) {
+        if (progressMode == PROGRESS_INDETERMINATE) {
             style.setProgressIndeterminate(true);
-        } else if (progress.has("value")) {
-            style.setProgress(scaled(progress.optDouble("value", 0)));
+        } else {
+            style.setProgress(scaled(progressValue));
         }
 
-        JSONArray segments = progress.optJSONArray("segments");
-        if (segments != null && segments.length() > 0) {
+        if (segmentWeights != null && segmentWeights.length > 0) {
             double totalWeight = 0;
-            for (int i = 0; i < segments.length(); i++) {
-                totalWeight += segments.optJSONObject(i) != null ? segments.optJSONObject(i).optDouble("weight", 1) : 1;
+            for (double weight : segmentWeights) {
+                totalWeight += weight;
             }
 
-            for (int i = 0; i < segments.length(); i++) {
-                JSONObject segment = segments.optJSONObject(i);
-                double weight = segment != null ? segment.optDouble("weight", 1) : 1;
-                Notification.ProgressStyle.Segment platformSegment =
-                    new Notification.ProgressStyle.Segment((int) (weight / totalWeight * PROGRESS_SCALE));
+            for (int i = 0; i < segmentWeights.length; i++) {
+                Notification.ProgressStyle.Segment segment =
+                    new Notification.ProgressStyle.Segment((int) (segmentWeights[i] / totalWeight * PROGRESS_SCALE));
 
-                Integer color = parseColor(segment != null ? segment.optString("color", null) : null);
-                if (color == null) {
-                    color = accent;
-                }
-                if (color != null) {
-                    platformSegment.setColor(color);
+                int color = segmentColors != null && i < segmentColors.length && segmentColors[i] != 0 ? segmentColors[i] : accentColor;
+                if (color != 0) {
+                    segment.setColor(color);
                 }
 
-                style.addProgressSegment(platformSegment);
+                style.addProgressSegment(segment);
             }
         } else {
             Notification.ProgressStyle.Segment segment = new Notification.ProgressStyle.Segment(PROGRESS_SCALE);
-            if (accent != null) {
-                segment.setColor(accent);
+            if (accentColor != 0) {
+                segment.setColor(accentColor);
             }
             style.addProgressSegment(segment);
         }
 
-        JSONArray points = progress.optJSONArray("points");
-        if (points != null) {
-            for (int i = 0; i < points.length(); i++) {
-                JSONObject point = points.optJSONObject(i);
-                if (point != null) {
-                    style.addProgressPoint(new Notification.ProgressStyle.Point(scaled(point.optDouble("position", 0))));
-                }
+        if (pointPositions != null) {
+            for (double position : pointPositions) {
+                style.addProgressPoint(new Notification.ProgressStyle.Point(scaled(position)));
             }
         }
 
-        Integer trackerIcon = drawableId(context, progress.optString("trackerIcon", null));
-        if (trackerIcon != null) {
-            style.setProgressTrackerIcon(Icon.createWithResource(context, trackerIcon));
+        int trackerIconId = drawableId(context, trackerIcon);
+        if (trackerIconId != 0) {
+            style.setProgressTrackerIcon(Icon.createWithResource(context, trackerIconId));
         }
 
-        builder.setStyle(style);
+        return style;
     }
 
-    private static void applyTimer(Notification.Builder builder, JSONObject timer) {
-        if (timer == null) {
-            return;
-        }
+    private static void applyTimer(Notification.Builder builder, int timerMode, long timerAnchorMs, long pausedElapsedMs) {
+        switch (timerMode) {
+            case TIMER_COUNT_DOWN:
+                builder.setWhen(timerAnchorMs).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true);
+                break;
 
-        String mode = timer.optString("mode", "");
-        long startsAt = timer.optLong("startsAt", 0);
-        long endsAt = timer.optLong("endsAt", 0);
+            case TIMER_COUNT_UP:
+                builder.setWhen(timerAnchorMs).setShowWhen(true).setUsesChronometer(true);
+                break;
 
-        if ("CountDown".equals(mode) && endsAt > 0) {
-            builder.setWhen(endsAt).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true);
-        } else if ("CountUp".equals(mode) && startsAt > 0) {
-            builder.setWhen(startsAt).setShowWhen(true).setUsesChronometer(true);
-        } else if ("Paused".equals(mode) && timer.has("pausedElapsed")) {
-            long elapsedSeconds = timer.optLong("pausedElapsed", 0) / 1000;
-            long hours = elapsedSeconds / 3600;
-            long minutes = (elapsedSeconds % 3600) / 60;
-            long seconds = elapsedSeconds % 60;
-            builder.setSubText(hours > 0
-                ? String.format(java.util.Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
-                : String.format(java.util.Locale.ROOT, "%d:%02d", minutes, seconds));
+            case TIMER_PAUSED:
+                long elapsedSeconds = pausedElapsedMs / 1000;
+                long hours = elapsedSeconds / 3600;
+                long minutes = (elapsedSeconds % 3600) / 60;
+                long seconds = elapsedSeconds % 60;
+                builder.setSubText(hours > 0
+                    ? String.format(java.util.Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
+                    : String.format(java.util.Locale.ROOT, "%d:%02d", minutes, seconds));
+                break;
+
+            default:
+                break;
         }
     }
 
-    private static void applyActions(Context context, Notification.Builder builder, JSONArray actions) {
-        if (actions == null) {
+    private static void applyActions(Context context, Notification.Builder builder, String[] labels, String[] deepLinks, String[] icons) {
+        if (labels == null || deepLinks == null) {
             return;
         }
 
-        for (int i = 0; i < actions.length(); i++) {
-            JSONObject action = actions.optJSONObject(i);
-            if (action == null) {
+        for (int i = 0; i < labels.length && i < deepLinks.length; i++) {
+            PendingIntent intent = contentIntent(context, deepLinks[i]);
+            if (labels[i] == null || intent == null) {
                 continue;
             }
 
-            String label = action.optString("label", null);
-            PendingIntent intent = contentIntent(context, action.optString("deepLink", null));
-            if (label == null || intent == null) {
-                continue;
-            }
-
-            Integer iconId = drawableId(context, action.optString("icon", null));
-            Icon icon = iconId != null ? Icon.createWithResource(context, iconId) : null;
-            builder.addAction(new Notification.Action.Builder(icon, label, intent).build());
+            int iconId = icons != null && i < icons.length ? drawableId(context, icons[i]) : 0;
+            Icon icon = iconId != 0 ? Icon.createWithResource(context, iconId) : null;
+            builder.addAction(new Notification.Action.Builder(icon, labels[i], intent).build());
         }
     }
 
@@ -325,25 +326,8 @@ public final class NaluLiveUpdates {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
-    private static Integer drawableId(Context context, String name) {
-        if (name == null) {
-            return null;
-        }
-
-        int id = context.getResources().getIdentifier(name, "drawable", context.getPackageName());
-        return id == 0 ? null : id;
-    }
-
-    private static Integer parseColor(String hex) {
-        if (hex == null) {
-            return null;
-        }
-
-        try {
-            return Color.parseColor(hex);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+    private static int drawableId(Context context, String name) {
+        return name == null ? 0 : context.getResources().getIdentifier(name, "drawable", context.getPackageName());
     }
 
     private static int scaled(double value) {

@@ -1,10 +1,13 @@
+using System.Globalization;
 using Application = Android.App.Application;
 
 namespace Nalu;
 
 /// <summary>
-/// Android live activity handle: each applied snapshot is handed to the native Java layer
-/// as one call ((re)posting over the same notification tag/id).
+/// Android live activity handle: each applied snapshot is flattened into ONE typed call
+/// into the native Java layer ((re)posting over the same notification tag/id). The
+/// serialized payload travels along only as the opaque rehydration snapshot — nothing
+/// is parsed on the Java side.
 /// </summary>
 internal sealed class AndroidLiveActivity : LiveActivityBase
 {
@@ -22,7 +25,7 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
     {
         if (_manager.Support != LiveActivitySupport.Unavailable)
         {
-            Post(payload, alert, promoted: true, ongoing: true);
+            Post(content, payload, alert, promoted: true, ongoing: true);
         }
 
         return Task.CompletedTask;
@@ -43,17 +46,38 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
         {
             // Mirror the iOS default-dismissal semantics: leave the final content visible
             // as a regular, swipeable notification (no chip, not ongoing).
-            Post(payload, alert: null, promoted: false, ongoing: false);
+            Post(content, payload, alert: null, promoted: false, ongoing: false);
         }
 
         return Task.CompletedTask;
     }
 
     internal void Post(LiveActivityAlert? alert, bool promoted, bool ongoing)
-        => Post(Payload, alert, promoted, ongoing);
+        => Post(Snapshot, Payload, alert, promoted, ongoing);
 
-    private void Post(string payload, LiveActivityAlert? alert, bool promoted, bool ongoing)
-        => Platform.NaluLiveUpdates.Post(
+    private void Post(LiveActivityContent content, string payload, LiveActivityAlert? alert, bool promoted, bool ongoing)
+    {
+        var progress = content.Progress;
+        var progressMode = progress switch
+        {
+            null => Platform.NaluLiveUpdates.ProgressNone,
+            { Indeterminate: true } => Platform.NaluLiveUpdates.ProgressIndeterminate,
+            _ => Platform.NaluLiveUpdates.ProgressValue
+        };
+
+        var (timerMode, timerAnchorMs, pausedElapsedMs) = content.Timer switch
+        {
+            { Mode: LiveActivityTimerMode.CountDown, EndsAt: { } endsAt } => (Platform.NaluLiveUpdates.TimerCountDown, endsAt.ToUnixTimeMilliseconds(), 0L),
+            { Mode: LiveActivityTimerMode.CountUp, StartsAt: { } startsAt } => (Platform.NaluLiveUpdates.TimerCountUp, startsAt.ToUnixTimeMilliseconds(), 0L),
+            { Mode: LiveActivityTimerMode.Paused, PausedElapsed: { } elapsed } => (Platform.NaluLiveUpdates.TimerPaused, 0L, (long)elapsed.TotalMilliseconds),
+            _ => (Platform.NaluLiveUpdates.TimerNone, 0L, 0L)
+        };
+
+        var segments = progress?.Segments;
+        var points = progress?.Points;
+        var actions = content.Actions;
+
+        Platform.NaluLiveUpdates.Post(
             Application.Context,
             AndroidLiveActivityManager.NotificationTag,
             _notificationId,
@@ -62,12 +86,41 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
             _manager.GetChannelId(Kind),
             _manager.Options.GetKindDisplayName(Kind),
             _manager.Options.AndroidSmallIcon,
-            payload,
+            content.Title,
+            content.Subtitle,
+            content.ChipText,
+            ParseColor(content.AccentColor),
+            content.ImageName,
+            progressMode,
+            progress?.Value ?? 0,
+            segments is { Count: > 0 } ? segments.Select(static s => s.Weight).ToArray() : null,
+            segments is { Count: > 0 } ? segments.Select(static s => ParseColor(s.Color)).ToArray() : null,
+            points is { Count: > 0 } ? points.Select(static p => p.Position).ToArray() : null,
+            progress?.TrackerIcon,
+            timerMode,
+            timerAnchorMs,
+            pausedElapsedMs,
+            content.DeepLink,
+            actions is { Count: > 0 } ? actions.Select(static a => a.Label).ToArray() : null,
+            actions is { Count: > 0 } ? actions.Select(static a => a.DeepLink).ToArray() : null,
+            actions is { Count: > 0 } ? actions.Select(static a => a.Icon ?? string.Empty).ToArray() : null,
             promoted,
             ongoing,
             alert?.Title,
-            alert?.Body
+            payload
         );
+    }
+
+    /// <summary>ARGB int from "#RRGGBB"; 0 means "not set" (real colors always carry FF alpha).</summary>
+    private static int ParseColor(string? hex)
+    {
+        if (hex is null || !hex.StartsWith('#') || hex.Length != 7 || !int.TryParse(hex.AsSpan(1), NumberStyles.HexNumber, null, out var rgb))
+        {
+            return 0;
+        }
+
+        return unchecked((int)0xFF000000 | rgb);
+    }
 
     /// <summary>Deterministic notification id from the activity id (stable across restarts).</summary>
     private static int ComputeNotificationId(string id)
