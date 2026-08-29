@@ -22,10 +22,17 @@ public class LiveActivityTests : ContentPage
     {
         _manager = manager;
 
+        // Reconcile with activities that survived a process restart: adopt the running
+        // "demo" activity instead of starting a duplicate next to it.
+        _activity = _manager.Activities.LastOrDefault(a => a.Kind == "demo" && a.State != LiveActivityState.Ended);
+        _progress = _activity?.Content.Progress?.Value ?? 0;
+
         _statusLabel = new Label
         {
             AutomationId = "LiveActivityStatus",
-            Text = $"Support: {_manager.Support}, activities: {_manager.Activities.Count}"
+            Text = _activity is null
+                ? $"Support: {_manager.Support}, activities: {_manager.Activities.Count}"
+                : $"Adopted {_activity.Id} at {_progress * 100:0}% ({_activity.State})"
         };
 
         Content = new VerticalStackLayout

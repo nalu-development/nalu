@@ -26,10 +26,31 @@ public class LiveActivityTimerTests : ContentPage
     {
         _manager = manager;
 
+        // Reconcile with an appointment that survived a process restart: adopt it and
+        // re-arm the overflow watcher instead of starting a duplicate next to it.
+        _activity = _manager.Activities.LastOrDefault(a => a.Kind == "appointment" && a.State != LiveActivityState.Ended);
+
+        var status = $"Support: {_manager.Support}";
+
+        if (_activity?.Content.Timer is { } timer)
+        {
+            if (timer is { Mode: LiveActivityTimerMode.CountDown, EndsAt: { } endsAt })
+            {
+                _appointmentEnd = endsAt;
+                status = $"Adopted appointment until {endsAt:HH:mm:ss} ({_activity.State})";
+                WatchForOverflow();
+            }
+            else if (timer is { Mode: LiveActivityTimerMode.CountUp, StartsAt: { } overflowStart })
+            {
+                _appointmentEnd = overflowStart;
+                status = $"Adopted overflow since {overflowStart:HH:mm:ss} ({_activity.State})";
+            }
+        }
+
         _statusLabel = new Label
         {
             AutomationId = "LiveActivityTimerStatus",
-            Text = $"Support: {_manager.Support}"
+            Text = status
         };
 
         Content = new VerticalStackLayout

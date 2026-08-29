@@ -125,10 +125,12 @@ struct NaluLiveActivityWidget: Widget {
             } compactLeading: {
                 CompactLabel(content: content)
             } compactTrailing: {
+                // Text(timerInterval:) is width-greedy: align the digits to the trailing
+                // edge so the reserved width never reads as asymmetric padding.
                 TimerText(timer: content.timer)
                     .monospacedDigit()
-                    .foregroundStyle(content.accent)
-                    .frame(maxWidth: 60)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 52, alignment: .trailing)
             } minimal: {
                 CompactLabel(content: content)
             }
@@ -153,7 +155,6 @@ private struct LockScreenView: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
             .activityBackgroundTint(nil)
-            .activitySystemActionForegroundColor(content.accent)
             .widgetURL(content.url)
     }
 }
@@ -196,7 +197,6 @@ private struct ContentCard: View {
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(content.accent)
                     .frame(maxWidth: 92, alignment: .trailing)
             }
 
@@ -232,8 +232,8 @@ private struct ActionRow: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .foregroundStyle(content.accent)
-                        .background(content.accent.opacity(0.16), in: Capsule())
+                        .foregroundStyle(.primary)
+                        .background(.quaternary, in: Capsule())
                     }
                 }
             }
@@ -337,10 +337,10 @@ private struct CompactLabel: View {
             Text(chipText)
                 .font(.caption2.weight(.bold))
                 .monospacedDigit()
-                .foregroundStyle(content.accent)
+                .foregroundStyle(.primary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(content.accent.opacity(0.18), in: Capsule())
+                .background(.quaternary, in: Capsule())
         } else {
             Image(systemName: content.symbol ?? "circle.fill")
                 .imageScale(.small)
