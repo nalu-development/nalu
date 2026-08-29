@@ -35,5 +35,16 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Gathering weather information for the current location.</string>
     
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.nalu.maui.testapp.deeplinks</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nalutest</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

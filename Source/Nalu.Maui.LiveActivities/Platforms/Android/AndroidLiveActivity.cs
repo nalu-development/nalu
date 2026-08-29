@@ -75,7 +75,10 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
 
         var segments = progress?.Segments;
         var points = progress?.Points;
-        var actions = content.Actions;
+
+        // v1 renders only link-backed actions; id-only actions are reserved for the
+        // upcoming direct-callback support.
+        var actions = content.Actions?.Where(static a => a.DeepLink is not null).ToList();
 
         Platform.NaluLiveUpdates.Post(
             Application.Context,
@@ -102,7 +105,7 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
             pausedElapsedMs,
             content.DeepLink,
             actions is { Count: > 0 } ? actions.Select(static a => a.Label).ToArray() : null,
-            actions is { Count: > 0 } ? actions.Select(static a => a.DeepLink).ToArray() : null,
+            actions is { Count: > 0 } ? actions.Select(static a => a.DeepLink!).ToArray() : null,
             actions is { Count: > 0 } ? actions.Select(static a => a.Icon ?? string.Empty).ToArray() : null,
             promoted,
             ongoing,

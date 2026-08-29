@@ -29,6 +29,7 @@ struct LiveContent: Codable {
     var deepLink: String?
     var progress: ProgressInfo?
     var timer: TimerInfo?
+    var actions: [ActionInfo]?
     var custom: [String: String]?
 
     struct ProgressInfo: Codable {
@@ -45,6 +46,13 @@ struct LiveContent: Codable {
 
     struct PointInfo: Codable {
         var position: Double?
+    }
+
+    struct ActionInfo: Codable {
+        var id: String?
+        var label: String?
+        var icon: String?
+        var deepLink: String?
     }
 
     struct TimerInfo: Codable {
@@ -84,6 +92,17 @@ struct LiveContent: Codable {
     /// SF Symbol name on iOS (on Android it is a drawable resource name).
     var symbol: String? {
         chipIcon
+    }
+
+    /// v1 renders only link-backed actions; id-only actions are reserved for the
+    /// upcoming direct-callback support.
+    var renderableActions: [(String, String?, URL)] {
+        (actions ?? []).compactMap { action in
+            guard let label = action.label, let link = action.deepLink, let url = URL(string: link) else {
+                return nil
+            }
+            return (label, action.icon, url)
+        }
     }
 }
 
@@ -182,6 +201,43 @@ private struct ContentCard: View {
             }
 
             ProgressTrack(content: content)
+
+            ActionRow(content: content)
+        }
+    }
+}
+
+/// Deep-link action buttons, mirroring the Android notification actions: tapping opens
+/// the app at the action's link (in-place callbacks arrive with the v2 action support).
+private struct ActionRow: View {
+    let content: LiveContent
+
+    var body: some View {
+        let actions = content.renderableActions
+
+        if !actions.isEmpty {
+            HStack(spacing: 8) {
+                ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
+                    let (label, icon, url) = action
+
+                    Link(destination: url) {
+                        HStack(spacing: 5) {
+                            if let icon {
+                                Image(systemName: icon)
+                                    .imageScale(.small)
+                            }
+                            Text(label)
+                                .font(.footnote.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(content.accent)
+                        .background(content.accent.opacity(0.16), in: Capsule())
+                    }
+                }
+            }
+            .padding(.top, 2)
         }
     }
 }

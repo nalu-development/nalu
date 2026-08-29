@@ -115,6 +115,9 @@ public interface ILiveActivityTimer
 /// </summary>
 public interface ILiveActivityAction
 {
+    /// <inheritdoc cref="LiveActivityAction.Id"/>
+    string? Id { get; }
+
     /// <inheritdoc cref="LiveActivityAction.Label"/>
     string Label { get; }
 
@@ -122,5 +125,5 @@ public interface ILiveActivityAction
     string? Icon { get; }
 
     /// <inheritdoc cref="LiveActivityAction.DeepLink"/>
-    string DeepLink { get; }
+    string? DeepLink { get; }
 }

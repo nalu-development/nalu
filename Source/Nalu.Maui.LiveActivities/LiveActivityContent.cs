@@ -174,17 +174,28 @@ public sealed record LiveActivityTimer : ILiveActivityTimer
         => new() { Mode = LiveActivityTimerMode.Paused, PausedElapsed = elapsed };
 }
 
-/// <summary>An action button: a label and a deep link (no in-process callbacks).</summary>
+/// <summary>An action button on the live activity.</summary>
+/// <remarks>
+/// v1 renders only actions carrying a <see cref="DeepLink"/> (tapping opens the app at
+/// that link). Actions without one are reserved for the upcoming direct-callback support
+/// — identified by <see cref="Id"/> — and are not rendered yet.
+/// </remarks>
 public sealed record LiveActivityAction : ILiveActivityAction
 {
+    /// <summary>
+    /// Stable identity of the action, reported back to the app when direct action
+    /// callbacks land; defaults to <see cref="Label"/> when omitted.
+    /// </summary>
+    public string? Id { get; set; }
+
     /// <summary>Button label.</summary>
     public required string Label { get; set; }
 
-    /// <summary>Optional icon (platform image name).</summary>
+    /// <summary>Optional icon (Android drawable name / iOS SF Symbol name).</summary>
     public string? Icon { get; set; }
 
-    /// <summary>Deep link opened when the button is tapped.</summary>
-    public required string DeepLink { get; set; }
+    /// <summary>Deep link opened when the button is tapped; see the remarks for omission.</summary>
+    public string? DeepLink { get; set; }
 }
 
 /// <summary>
