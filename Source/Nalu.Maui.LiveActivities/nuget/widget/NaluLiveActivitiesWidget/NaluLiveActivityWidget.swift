@@ -116,11 +116,48 @@ struct NaluLiveActivityWidget: Widget {
             let content = LiveContent.decode(context.state.payload)
 
             return DynamicIsland {
-                // Everything lives in the full-width bottom region: the narrow
-                // leading/trailing slots truncate real-world titles immediately.
+                // The top row flanks the sensor housing (Android-card header shape):
+                // identity glyph leading, ticking timer trailing. Title/subtitle/track/
+                // actions get the full width below — long titles never truncate.
+                DynamicIslandExpandedRegion(.leading) {
+                    if let symbol = content.symbol {
+                        Image(systemName: symbol)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(content.accent)
+                            .frame(width: 30, height: 30)
+                            .background(content.accent.opacity(0.16), in: Circle())
+                    }
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    TimerText(timer: content.timer)
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 70, alignment: .trailing)
+                }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ContentCard(content: content)
-                        .padding(.top, 4)
+                    VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            if let title = content.title {
+                                Text(title)
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                            }
+                            if let subtitle = content.subtitle {
+                                Text(subtitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+
+                        ProgressTrack(content: content)
+
+                        ActionRow(content: content)
+                    }
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
                 }
             } compactLeading: {
                 CompactLabel(content: content)
@@ -358,7 +395,17 @@ private struct TimerText: View {
         case "CountDown":
             if let endsAt = timer?.endsAt {
                 let end = Date(timeIntervalSince1970: endsAt / 1000)
-                Text(timerInterval: Date.now...max(end, Date.now), countsDown: true)
+                if end > Date.now {
+                    Text(timerInterval: Date.now...end, countsDown: true)
+                } else {
+                    // Already ran over at render time: mirror Android's negative
+                    // chronometer (count up from the end, negated). Note the platform
+                    // limit: this view only re-renders on content updates, so a
+                    // countdown crossing zero holds at 0:00 until the next update —
+                    // apps wanting an exact boundary flip should update at the end
+                    // instant (see the appointment pattern).
+                    Text(verbatim: "−") + Text(end, style: .timer)
+                }
             }
 
         case "CountUp":
