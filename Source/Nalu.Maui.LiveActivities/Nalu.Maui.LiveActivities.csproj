@@ -64,6 +64,16 @@
     <ObjcBindingApiDefinition Include="AppleNative\ApiDefinition.cs" />
   </ItemGroup>
 
+  <!-- Native Android layer (MAUI-style): the .NET build drives the gradle project and binds
+       the resulting aar. The whole notification is rendered in Java from the serialized
+       content payload — one JNI call per update, and the Live Updates promotion opt-in
+       (Builder.setRequestPromotedOngoing, API 36.1) is compiled against directly instead
+       of reflected. -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidGradleProject Include="AndroidNative/build.gradle" ModuleName="liveactivities" />
+    <TransformFile Include="AndroidNative/Transforms/Metadata.xml" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Nalu.Maui.Core\Nalu.Maui.Core.csproj" />
   </ItemGroup>

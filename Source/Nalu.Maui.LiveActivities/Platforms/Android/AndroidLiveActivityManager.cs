@@ -1,6 +1,4 @@
 using Android.App;
-using Android.Content;
-using Android.OS;
 using Application = Android.App.Application;
 
 [assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
@@ -9,17 +7,16 @@ using Application = Android.App.Application;
 namespace Nalu;
 
 /// <summary>
-/// Android manager: renders live activities as (promoted) ongoing notifications.
-/// On Android 16+ (with net10 bindings) the notification carries ProgressStyle, the
-/// status-bar chip text and the promoted-ongoing flag; older versions get a plain
-/// ongoing notification with a classic progress bar and chronometer.
+/// Android manager: renders live activities as (promoted) ongoing notifications through
+/// the native Java layer (see AndroidNative — one JNI call per update). On Android 16+
+/// the notification carries ProgressStyle, the status-bar chip text and the
+/// promoted-ongoing request; Android 8–15 gets a plain ongoing notification with a classic
+/// progress bar and chronometer. Below API 26 (notification channels) the feature is
+/// unavailable.
 /// </summary>
 internal sealed class AndroidLiveActivityManager : ILiveActivityManager
 {
     internal const string NotificationTag = "nalu.live";
-    internal const string ExtraKind = "nalu.live.kind";
-    internal const string ExtraId = "nalu.live.id";
-    internal const string ExtraPayload = "nalu.live.payload";
 
     private readonly LiveActivityOptions _options;
     private readonly List<AndroidLiveActivity> _activities;
@@ -34,18 +31,17 @@ internal sealed class AndroidLiveActivityManager : ILiveActivityManager
     {
         get
         {
-            // API 26 (notification channels) is the effective floor of the feature.
-            if (!OperatingSystem.IsAndroidVersionAtLeast(26) || GetNotificationManager() is not { } manager || !manager.AreNotificationsEnabled())
+            if (!OperatingSystem.IsAndroidVersionAtLeast(26)
+                || Application.Context.GetSystemService(Android.Content.Context.NotificationService) is not NotificationManager manager
+                || !manager.AreNotificationsEnabled())
             {
                 return LiveActivitySupport.Unavailable;
             }
 
-#if NET10_0_OR_GREATER
             if (OperatingSystem.IsAndroidVersionAtLeast(36))
             {
                 return LiveActivitySupport.Full;
             }
-#endif
 
             return _options.DisableAndroidFallback ? LiveActivitySupport.Unavailable : LiveActivitySupport.Degraded;
         }
@@ -67,45 +63,17 @@ internal sealed class AndroidLiveActivityManager : ILiveActivityManager
         var activity = new AndroidLiveActivity(this, Guid.NewGuid().ToString("N"), kind, content.DeepClone());
         _activities.Add(activity);
 
-        if (Support == LiveActivitySupport.Unavailable)
+        if (Support != LiveActivitySupport.Unavailable)
         {
-            return Task.FromResult<ILiveActivity>(activity);
+            activity.Post(alert: null, promoted: true, ongoing: true);
         }
 
-        EnsureChannel(kind);
-        activity.Post(alert: null, promoted: true, ongoing: true);
         return Task.FromResult<ILiveActivity>(activity);
     }
 
     internal LiveActivityOptions Options => _options;
 
-    internal static NotificationManager? GetNotificationManager()
-        => Application.Context.GetSystemService(Context.NotificationService) as NotificationManager;
-
     internal string GetChannelId(string kind) => $"nalu_live_{kind}";
-
-    private void EnsureChannel(string kind)
-    {
-        if (!OperatingSystem.IsAndroidVersionAtLeast(26))
-        {
-            return;
-        }
-
-        var manager = GetNotificationManager();
-
-        if (manager is null)
-        {
-            return;
-        }
-
-        var channelId = GetChannelId(kind);
-
-        if (manager.GetNotificationChannel(channelId) is null)
-        {
-            var channel = new NotificationChannel(channelId, _options.GetKindDisplayName(kind), NotificationImportance.Default);
-            manager.CreateNotificationChannel(channel);
-        }
-    }
 
     private List<AndroidLiveActivity> RehydrateActivities()
     {
@@ -116,31 +84,17 @@ internal sealed class AndroidLiveActivityManager : ILiveActivityManager
             return activities;
         }
 
-        var manager = GetNotificationManager();
+        var json = Platform.NaluLiveUpdates.GetActiveJson(Application.Context, NotificationTag);
 
-        if (manager is null)
+        foreach (var info in LiveActivityRehydration.Parse(json))
         {
-            return activities;
-        }
-
-        foreach (var statusBarNotification in manager.GetActiveNotifications() ?? [])
-        {
-            if (statusBarNotification.Tag != NotificationTag)
+            if (info is not { Id: not null, Kind: not null, Payload: not null }
+                || LiveActivityContentSerializer.Deserialize(info.Payload) is not { } content)
             {
                 continue;
             }
 
-            var extras = statusBarNotification.Notification?.Extras;
-            var id = extras?.GetString(ExtraId);
-            var kind = extras?.GetString(ExtraKind);
-            var payload = extras?.GetString(ExtraPayload);
-
-            if (id is null || kind is null || payload is null || LiveActivityContentSerializer.Deserialize(payload) is not { } content)
-            {
-                continue;
-            }
-
-            var activity = new AndroidLiveActivity(this, id, kind, content, payload);
+            var activity = new AndroidLiveActivity(this, info.Id, info.Kind, content, info.Payload);
 
             if (content.StaleAt is { } staleAt && staleAt <= DateTimeOffset.UtcNow)
             {

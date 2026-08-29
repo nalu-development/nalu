@@ -1,6 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 namespace Nalu;
 
 /// <summary>
@@ -78,18 +75,8 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
         }
 
         var json = NaluLiveActivitiesBridge.ActivitiesJson();
-        List<BridgeActivityInfo>? infos;
 
-        try
-        {
-            infos = JsonSerializer.Deserialize(json, BridgeJsonContext.Default.ListBridgeActivityInfo);
-        }
-        catch (JsonException)
-        {
-            return activities;
-        }
-
-        foreach (var info in infos ?? [])
+        foreach (var info in LiveActivityRehydration.Parse(json))
         {
             if (info is not { Id: not null, Kind: not null, Payload: not null }
                 || LiveActivityContentSerializer.Deserialize(info.Payload) is not { } content)
@@ -109,10 +96,4 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
 
         return activities;
     }
-
-    internal sealed record BridgeActivityInfo(string? Id, string? Kind, string? Payload, string? State);
 }
-
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[JsonSerializable(typeof(List<AppleLiveActivityManager.BridgeActivityInfo>))]
-internal sealed partial class BridgeJsonContext : JsonSerializerContext;

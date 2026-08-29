@@ -30,6 +30,31 @@ internal static class LiveActivityContentSerializer
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    UseStringEnumConverter = true)]
+    UseStringEnumConverter = true,
+    Converters = [typeof(EpochMsDateTimeOffsetConverter), typeof(MsTimeSpanConverter)])]
 [JsonSerializable(typeof(LiveActivityContent))]
 internal sealed partial class LiveActivityJsonContext : JsonSerializerContext;
+
+/// <summary>
+/// Instants travel as epoch milliseconds: trivially consumed by the Swift widget
+/// (<c>Date(timeIntervalSince1970:)</c>) and the Java notification renderer, unlike
+/// .NET's 7-fractional-digit ISO strings.
+/// </summary>
+internal sealed class EpochMsDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+{
+    public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64());
+
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options)
+        => writer.WriteNumberValue(value.ToUnixTimeMilliseconds());
+}
+
+/// <summary>Durations travel as milliseconds; see <see cref="EpochMsDateTimeOffsetConverter"/>.</summary>
+internal sealed class MsTimeSpanConverter : JsonConverter<TimeSpan>
+{
+    public override TimeSpan Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => TimeSpan.FromMilliseconds(reader.GetInt64());
+
+    public override void Write(Utf8JsonWriter writer, TimeSpan value, JsonSerializerOptions options)
+        => writer.WriteNumberValue((long)value.TotalMilliseconds);
+}

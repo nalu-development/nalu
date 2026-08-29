@@ -1,0 +1,5 @@
+// Root build script of the Nalu LiveActivities native layer.
+// Invoked automatically by the .NET build through @(AndroidGradleProject).
+plugins {
+    id 'com.android.library' version '8.13.0' apply false
+}

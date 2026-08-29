@@ -1,8 +1,10 @@
+using Application = Android.App.Application;
+
 namespace Nalu;
 
 /// <summary>
-/// Android live activity handle: each applied snapshot is rendered by
-/// <see cref="AndroidLiveActivityRenderer"/> and (re)posted over the same notification.
+/// Android live activity handle: each applied snapshot is handed to the native Java layer
+/// as one call ((re)posting over the same notification tag/id).
 /// </summary>
 internal sealed class AndroidLiveActivity : LiveActivityBase
 {
@@ -20,7 +22,7 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
     {
         if (_manager.Support != LiveActivitySupport.Unavailable)
         {
-            Post(content, payload, alert, promoted: true, ongoing: true);
+            Post(payload, alert, promoted: true, ongoing: true);
         }
 
         return Task.CompletedTask;
@@ -35,31 +37,37 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
 
         if (dismissal == LiveActivityDismissal.Immediate)
         {
-            AndroidLiveActivityManager.GetNotificationManager()?.Cancel(AndroidLiveActivityManager.NotificationTag, _notificationId);
+            Platform.NaluLiveUpdates.Cancel(Application.Context, AndroidLiveActivityManager.NotificationTag, _notificationId);
         }
         else
         {
             // Mirror the iOS default-dismissal semantics: leave the final content visible
             // as a regular, swipeable notification (no chip, not ongoing).
-            Post(content, payload, alert: null, promoted: false, ongoing: false);
+            Post(payload, alert: null, promoted: false, ongoing: false);
         }
 
         return Task.CompletedTask;
     }
 
     internal void Post(LiveActivityAlert? alert, bool promoted, bool ongoing)
-        => Post(Snapshot, Payload, alert, promoted, ongoing);
+        => Post(Payload, alert, promoted, ongoing);
 
-    private void Post(LiveActivityContent content, string payload, LiveActivityAlert? alert, bool promoted, bool ongoing)
-    {
-        if (!OperatingSystem.IsAndroidVersionAtLeast(26))
-        {
-            return;
-        }
-
-        var notification = AndroidLiveActivityRenderer.Render(_manager, Id, Kind, content, payload, alert, promoted, ongoing);
-        AndroidLiveActivityManager.GetNotificationManager()?.Notify(AndroidLiveActivityManager.NotificationTag, _notificationId, notification);
-    }
+    private void Post(string payload, LiveActivityAlert? alert, bool promoted, bool ongoing)
+        => Platform.NaluLiveUpdates.Post(
+            Application.Context,
+            AndroidLiveActivityManager.NotificationTag,
+            _notificationId,
+            Id,
+            Kind,
+            _manager.GetChannelId(Kind),
+            _manager.Options.GetKindDisplayName(Kind),
+            _manager.Options.AndroidSmallIcon,
+            payload,
+            promoted,
+            ongoing,
+            alert?.Title,
+            alert?.Body
+        );
 
     /// <summary>Deterministic notification id from the activity id (stable across restarts).</summary>
     private static int ComputeNotificationId(string id)
