@@ -129,11 +129,15 @@ struct NaluLiveActivityWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
+                    // Scale down instead of truncating: overflow grows ("−1:02:03") and
+                    // an ellipsised clock is worse than a smaller one.
                     TimerText(timer: content.timer)
-                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .font(.system(.headline, design: .rounded).weight(.bold))
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                         .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 70, alignment: .trailing)
+                        .frame(maxWidth: 84, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 8) {
@@ -166,6 +170,8 @@ struct NaluLiveActivityWidget: Widget {
                 // edge so the reserved width never reads as asymmetric padding.
                 TimerText(timer: content.timer)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 52, alignment: .trailing)
             } minimal: {
@@ -233,6 +239,8 @@ private struct ContentCard: View {
                 TimerText(timer: content.timer)
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 92, alignment: .trailing)
             }
