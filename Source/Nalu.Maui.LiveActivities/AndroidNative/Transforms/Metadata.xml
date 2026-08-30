@@ -1,0 +1,5 @@
+<metadata>
+  <!-- Bind the native layer into the library's platform namespace instead of the
+       auto-generated Com.Nalu.Maui.Liveactivities. -->
+  <attr path="/api/package[@name='com.nalu.maui.liveactivities']" name="managedName">Nalu.Platform</attr>
+</metadata>

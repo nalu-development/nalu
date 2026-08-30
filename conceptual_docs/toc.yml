@@ -74,6 +74,15 @@
       href: virtualscroll-dragdrop.md
     - name: Performance
       href: virtualscroll-performance.md
+- name: Live Activities
+  href: liveactivities.md
+  items:
+    - name: Overview
+      href: liveactivities.md
+    - name: Timers
+      href: liveactivities-timers.md
+    - name: Use Cases
+      href: liveactivities-examples.md
 - name: Core
   href: core.md
 - name: Controls

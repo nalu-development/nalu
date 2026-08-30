@@ -160,23 +160,25 @@ jobs:
           key: ${{runner.os}}-gradle-${{hashFiles('Source/**/AndroidNative/**/*.gradle', 'Source/**/AndroidNative/**/gradle.properties', 'Source/**/AndroidNative/**/gradle-wrapper.properties')}}
           restore-keys: |
             ${{runner.os}}-gradle-
-      # Gradle semaphore, in two phases. Phase 1 builds every library except VirtualScroll
-      # fully parallel (Nalu.Libraries.Managed.slnf = Nalu.Libraries.slnf minus the
-      # gradle-native VirtualScroll), covering Core and the source generators as
-      # references.
+      # Gradle semaphore, in two phases. Phase 1 builds every library without a gradle
+      # layer fully parallel (Nalu.Libraries.Managed.slnf = Nalu.Libraries.slnf minus the
+      # gradle-native VirtualScroll and LiveActivities), covering Core and the source
+      # generators as references.
       # The inner quotes on -p values reach MSBuild so the semicolons stay inside the
       # property value instead of being parsed as extra -p switches (MSB1006).
       - name: "Build libraries"
         run: |
           mkdir -p Binlog
           dotnet build Nalu.Libraries.Managed.slnf --configuration Release -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android ${CI_BINLOG:+-bl:Binlog/build-libraries.binlog}
-      # Phase 2 builds VirtualScroll alone on a single MSBuild node: its two android TFMs
-      # drive Gradle in the SAME AndroidNative project directory, and concurrent
-      # single-use Gradle daemons race on the daemon registry and build dir (XAGRDL0000
-      # "daemon vm is shutting down"). Core is already up-to-date from phase 1, so the
-      # serial tail is just VirtualScroll's two TFMs.
+      # Phase 2 builds each gradle-native library alone on a single MSBuild node: its two
+      # android TFMs drive Gradle in the SAME AndroidNative project directory, and
+      # concurrent single-use Gradle daemons race on the daemon registry and build dir
+      # (XAGRDL0000 "daemon vm is shutting down"). Core is already up-to-date from
+      # phase 1, so the serial tail is just the two TFMs of each.
       - name: "Build VirtualScroll (serialized Gradle)"
         run: dotnet build Source/Nalu.Maui.VirtualScroll/Nalu.Maui.VirtualScroll.csproj --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android ${CI_BINLOG:+-bl:Binlog/build-virtualscroll.binlog}
+      - name: "Build LiveActivities (serialized Gradle)"
+        run: dotnet build Source/Nalu.Maui.LiveActivities/Nalu.Maui.LiveActivities.csproj --configuration Release -m:1 -p:AllTargetFrameworks='"net9.0-android;net10.0-android"' -p:ScaffoldTargetFrameworks=net10.0-android ${CI_BINLOG:+-bl:Binlog/build-liveactivities.binlog}
       # -m:1 stays here as cheap insurance: the android Gradle target still runs its
       # up-to-date check during pack (a no-op with fresh stamps) and would race again if
       # it ever decided to re-run; pack itself is only seconds.

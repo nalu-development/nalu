@@ -62,6 +62,9 @@ public static class MauiProgram
             .UseNaluLayouts()
             .UseNaluControls()
             .UseNaluVirtualScroll()
+            .UseNaluLiveActivities(live => live
+                .AddKind("demo", "Demo live activities")
+                .AddKind("appointment", "Appointment tracking"))
             .UseMauiCommunityToolkit()
             .ConfigureFonts(fonts =>
                 {

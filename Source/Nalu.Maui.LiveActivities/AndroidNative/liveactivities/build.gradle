@@ -1,0 +1,24 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.nalu.maui.liveactivities'
+    // 36.1 (Android 16 QPR1) exposes Notification.Builder.setRequestPromotedOngoing —
+    // the Live Updates promotion opt-in — which plain 36 does not.
+    compileSdk 36
+    compileSdkMinor 1
+
+    defaultConfig {
+        minSdk 21
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    publishing {
+        singleVariant("release")
+    }
+}
