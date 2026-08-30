@@ -114,6 +114,7 @@ struct NaluLiveActivityWidget: Widget {
             LockScreenView(content: LiveContent.decode(context.state.payload))
         } dynamicIsland: { context in
             let content = LiveContent.decode(context.state.payload)
+            let hasCornerContent = content.symbol != nil || content.chipText != nil
 
             return DynamicIsland {
                 // The sensor-flanking corners carry SMALL metadata only (the grammar of
@@ -122,11 +123,15 @@ struct NaluLiveActivityWidget: Widget {
                 // full-width body below, flight-card style.
                 DynamicIslandExpandedRegion(.leading) {
                     if let symbol = content.symbol {
+                        // Inset away from the island's large corner radius or the mask
+                        // clips the glyph.
                         Image(systemName: symbol)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(content.accent)
                             .frame(width: 22, height: 22)
                             .background(content.accent.opacity(0.16), in: Circle())
+                            .padding(.leading, 8)
+                            .padding(.top, 6)
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -135,11 +140,16 @@ struct NaluLiveActivityWidget: Widget {
                             .font(.caption.weight(.semibold))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
+                            .padding(.trailing, 8)
+                            .padding(.top, 10)
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
+                    // Without corner metadata the body hugs the sensor band (the band
+                    // itself is hardware — content cannot rise beside the camera), so
+                    // the bubble gets as short as the platform allows.
                     ContentCard(content: content, showsGlyph: false)
-                        .padding(.top, 2)
+                        .padding(.top, hasCornerContent ? 2 : 0)
                         .padding(.bottom, 4)
                 }
             } compactLeading: {
