@@ -158,6 +158,29 @@ retained-state pagers and a constraint-based layout system.
 
 ---
 
+### Live Activities [![Nalu.Maui.LiveActivities NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.LiveActivities.svg)](https://www.nuget.org/packages/Nalu.Maui.LiveActivities/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.LiveActivities)](https://www.nuget.org/packages/Nalu.Maui.LiveActivities/)
+
+Your app's live state on the system surfaces of both platforms from one semantic content
+model: an ActivityKit **Live Activity** on iOS (Lock Screen + Dynamic Island, widget built
+and embedded automatically by the package) and an Android 16 **Live Update** (status-bar
+chip + floating card), degrading gracefully on older Android. OS-ticked timers, stepped
+progress, action buttons — [read more](liveactivities.md).
+
+```csharp
+var activity = await liveActivities.StartAsync("delivery", new LiveActivityContent
+{
+    Title = "Pizza on the way",
+    ChipText = "12 min",
+    Progress = new LiveActivityProgress { Value = 0.4 },
+    Timer = LiveActivityTimer.CountDown(order.Eta),
+});
+
+await activity.UpdateAsync(c => c.Progress!.Value = 0.8);
+```
+
+Available on [NuGet.org](https://www.nuget.org/packages/Nalu.Maui.LiveActivities/):
+`dotnet add package Nalu.Maui.LiveActivities`
+
 ### Core [![Nalu.Maui.Core NuGet Package](https://img.shields.io/nuget/v/Nalu.Maui.Core.svg)](https://www.nuget.org/packages/Nalu.Maui.Core/) [![Nalu.Maui NuGet Package Downloads](https://img.shields.io/nuget/dt/Nalu.Maui.Core)](https://www.nuget.org/packages/Nalu.Maui.Core/)
 
 The core library is intended to provide a set of common use utilities.
