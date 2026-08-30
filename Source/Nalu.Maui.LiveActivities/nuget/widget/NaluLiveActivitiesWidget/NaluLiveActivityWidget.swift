@@ -251,6 +251,8 @@ private struct ActionRow: View {
         let actions = content.renderableActions
 
         if !actions.isEmpty {
+            // Extra bottom inset: the island's bottom corner radius shaves capsules
+            // sitting flush against the edge.
             HStack(spacing: 8) {
                 ForEach(Array(actions.enumerated()), id: \.offset) { _, action in
                     let (label, icon, url) = action
@@ -273,6 +275,7 @@ private struct ActionRow: View {
                 }
             }
             .padding(.top, 2)
+            .padding(.bottom, 8)
         }
     }
 }
