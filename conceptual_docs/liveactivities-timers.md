@@ -82,7 +82,12 @@ await activity.UpdateAsync(
 ```
 
 After that single update the OS ticks the overflow forever — no matter how long the meeting
-runs over, you never send another update for time passing.
+runs over, you never send another update for time passing:
+
+<p>
+  <img src="assets/images/liveactivity-overflow-android.png" alt="Android after the boundary update: Running over, chronometer counting up, alert fired" width="400" />
+  <img src="assets/images/liveactivity-overflow-ios.png" alt="iOS Dynamic Island after the boundary update: Running over with the overflow counting up" width="400" />
+</p>
 
 The full decision ladder:
 

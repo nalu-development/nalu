@@ -64,6 +64,11 @@ On Android 16 the segments and points are the native `ProgressStyle`; the iOS wi
 the same weighted capsule track with milestone dots. On Android 8–15 the segments merge into
 a classic bar — same information, humbler clothes.
 
+<p>
+  <img src="assets/images/liveactivity-delivery-android-card.png" alt="Android: stepped ProgressStyle — three weighted segments, passed milestone filled, upcoming milestone hollow" width="400" />
+  <img src="assets/images/liveactivity-delivery-ios-expanded.png" alt="iOS: the same steps as a segmented capsule track with milestone dots in the expanded Dynamic Island" width="400" />
+</p>
+
 ## Appointment that can run over
 
 Countdown while it lasts, overflow when it doesn't — the complete pattern (including the

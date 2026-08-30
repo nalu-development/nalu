@@ -80,19 +80,36 @@ public class LiveActivityTests : ContentPage
 
     private async Task StartAsync()
     {
-        _progress = 0.1;
+        _progress = 0.4;
+        var eta = DateTimeOffset.UtcNow.AddMinutes(12);
         _activity = await _manager.StartAsync("demo", new LiveActivityContent
         {
-            Title = "Nalu delivery",
-            Subtitle = "Preparing your order",
-            ChipText = "10%",
+            Title = "Pizza Margherita ×2",
+            Subtitle = "On the way",
+            ChipText = "12 min",
+            ChipIcon = "takeoutbag.and.cup.and.straw.fill",
             AccentColor = "#4C7DF0",
-            Progress = new LiveActivityProgress { Value = _progress },
-            Timer = LiveActivityTimer.CountDown(DateTimeOffset.UtcNow.AddMinutes(5)),
+            // Stepped progress: phase segments + milestone points (the docs' delivery example).
+            Progress = new LiveActivityProgress
+            {
+                Value = _progress,
+                Segments =
+                [
+                    new LiveActivityProgressSegment { Weight = 2 },
+                    new LiveActivityProgressSegment { Weight = 5 },
+                    new LiveActivityProgressSegment { Weight = 1, Color = "#30A46C" }
+                ],
+                Points =
+                [
+                    new LiveActivityProgressPoint { Position = 0.25 },
+                    new LiveActivityProgressPoint { Position = 0.875 }
+                ]
+            },
+            Timer = LiveActivityTimer.CountDown(eta),
             // StaleAt at the countdown end makes the SYSTEM re-render the widget at the
             // boundary (ActivityKit staleDate): the countdown flips to negative overflow
             // with no app involvement — the only zero-crossing trigger iOS offers.
-            StaleAt = DateTimeOffset.UtcNow.AddMinutes(5),
+            StaleAt = eta,
             Actions =
             [
                 // v1: link-backed actions render as buttons and open the app at the link.

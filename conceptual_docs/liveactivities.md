@@ -13,7 +13,12 @@ of both platforms from one C# API:
 The design principle is a **semantic content model**: you describe *what the activity says*
 — title, chip, progress, a ticking timer, actions — and each platform renders it natively in
 its own visual language. Both platforms end up with the same information in the same roles,
-because the model *is* the intersection of what they can render.
+because the model *is* the intersection of what they can render. One content, two systems:
+
+<p>
+  <img src="assets/images/liveactivity-delivery-android-card.png" alt="Android Live Update card: title, subtitle, segmented progress with milestone points, countdown, action buttons" width="400" />
+  <img src="assets/images/liveactivity-delivery-ios-expanded.png" alt="iOS expanded Dynamic Island: same content — glyph and chip caption in the corners, title, big countdown, segmented track, action buttons" width="400" />
+</p>
 
 ```csharp
 var activity = await liveActivities.StartAsync("delivery", new LiveActivityContent
@@ -140,7 +145,12 @@ while `LiveActivityDismissal.Immediate` removes it instantly.
 | `Custom` | ignored | forwarded verbatim to [custom widget UIs](#custom-ios-ui) |
 
 Keep `ChipText` under ~7 characters ("12 min", "3–2", "60%") — it lives in the tiny
-always-visible surface on both platforms.
+always-visible surface on both platforms:
+
+<p>
+  <img src="assets/images/liveactivity-delivery-android-chip.png" alt="Android status-bar chip: icon + 12 min pill" width="330" />
+  <img src="assets/images/liveactivity-delivery-ios-compact.png" alt="iOS compact Dynamic Island: 12 min pill leading, ticking countdown trailing" width="430" />
+</p>
 
 ### Progress with steps
 
