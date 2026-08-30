@@ -163,6 +163,7 @@ struct NaluLiveActivityWidget: Widget {
                     .minimumScaleFactor(0.6)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 52, alignment: .trailing)
+                    .padding(.trailing, 5)
             } minimal: {
                 CompactLabel(content: content)
             }
