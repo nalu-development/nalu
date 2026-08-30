@@ -89,6 +89,10 @@ public class LiveActivityTests : ContentPage
             AccentColor = "#4C7DF0",
             Progress = new LiveActivityProgress { Value = _progress },
             Timer = LiveActivityTimer.CountDown(DateTimeOffset.UtcNow.AddMinutes(5)),
+            // StaleAt at the countdown end makes the SYSTEM re-render the widget at the
+            // boundary (ActivityKit staleDate): the countdown flips to negative overflow
+            // with no app involvement — the only zero-crossing trigger iOS offers.
+            StaleAt = DateTimeOffset.UtcNow.AddMinutes(5),
             Actions =
             [
                 // v1: link-backed actions render as buttons and open the app at the link.
