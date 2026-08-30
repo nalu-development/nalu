@@ -275,7 +275,8 @@ private struct ActionRow: View {
                 }
             }
             .padding(.top, 2)
-            .padding(.bottom, 8)
+            .padding(.leading, 8)
+            .padding(.bottom, 10)
         }
     }
 }
