@@ -19,7 +19,7 @@ builder.UseNaluLayouts();
 - **ExpanderViewBox**: Animated expand/collapse (accordion-style).
 - **HorizontalWrapLayout / VerticalWrapLayout**: Tags, chips, flowing content.
 - **Popups**: Modal pages with scrim; style via `PopupScrim` and `PopupContainer`.
-- **Magnet**: Constraint-based layout (alpha); use for complex layouts where Grid is cumbersome.
+- **Magnet**: Compiled constraint-based layout (ConstraintLayout-like); use for complex/relative layouts where Grid is cumbersome, and for layout-driven animations (`TransitionToAsync`).
 
 ## ViewBox, TemplateBox, ToggleTemplate
 
@@ -69,11 +69,32 @@ Inherit from `PopupPageBase`; set content via `PopupContent`. Style `PopupScrim`
 
 ## Magnet
 
-Constraint-based layout (alpha). Good for complex or responsive layouts; avoid inside frequently recycled templates. See docs for API.
+Constraint-based layout; nodes are identified by a mandatory `MagnetId`. Constraints go on the child via attached properties; virtual nodes (barrier/guideline/chain) go in `Magnet.Definition`.
+
+```xml
+<nalu:Magnet>
+    <nalu:Magnet.Definition>
+        <nalu:MagnetDefinition>
+            <nalu:MagnetBarrier MagnetId="textsEnd" Direction="Bottom" Margin="8">
+                <x:String>avatar</x:String><x:String>subtitle</x:String>
+            </nalu:MagnetBarrier>
+        </nalu:MagnetDefinition>
+    </nalu:Magnet.Definition>
+    <Image nalu:Magnet.MagnetId="avatar" nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="48"
+           nalu:Magnet.LeftTo="parent.Left,16" nalu:Magnet.TopTo="parent.Top,16" />
+    <Label nalu:Magnet.MagnetId="title" nalu:Magnet.After="avatar,12,0"
+           nalu:Magnet.RightTo="parent.Right,16" nalu:Magnet.AlignTop="avatar" nalu:Magnet.HorizontalBias="0" />
+    <Button nalu:Magnet.MagnetId="cta" nalu:Magnet.FillWidth="parent" nalu:Magnet.Below="textsEnd" />
+</nalu:Magnet>
+```
+
+- Anchors: `LeftTo/RightTo/TopTo/BottomTo="target.Pole[,margin[,gone:goneMargin]]"` or shortcuts `After/Before/Below/Above/Align*/HorizontallyWithin/VerticallyWithin/Within/FillWidth/FillHeight="target[,margin[,gone]]"`; `parent` is the stage. All constraint attached props are SET-ONLY (read via `Magnet.GetConstraints(view)`); last set wins. Sizes (`WidthSizing`/`HeightSizing`): `48`, `*`, `50%` (of the anchor span) as strings; `{nalu:MagnetSizing 1.5, Unit=Ratio|StagePercent|Measured, Min=…, Max=…}` for the rest.
+- Chains are explicit `MagnetChain` nodes (members listed as `<x:String>`); `IsVisible=false` = GONE.
+- Animate: `await magnet.TransitionToAsync(() => { …edit nodes / toggle IsVisible… })`.
 
 ## Caveats
 
-- Magnet is alpha; API may change. In CollectionView item templates, reference `MagnetStage` from Resources, not inside the template.
+- Magnet: never share a `MagnetDefinition` across layouts (throws); declare it inline, also inside DataTemplates. A `MagnetId` declared both in the definition and inline is an error.
 
 ## Additional context
 

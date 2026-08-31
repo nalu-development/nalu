@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             x:Class="Nalu.Maui.TestApp.Tests.MagnetXamlTestsPage">
+    <VerticalStackLayout Padding="16" Spacing="12">
+        <nalu:Magnet AutomationId="XamlMagnetRoot" WidthRequest="320" HorizontalOptions="Start" BackgroundColor="LightGray">
+            <nalu:Magnet.Definition>
+                <nalu:MagnetDefinition>
+                    <nalu:MagnetBarrier MagnetId="textsEnd" Direction="Bottom" Margin="8">
+                        <x:String>avatar</x:String>
+                        <x:String>subtitle</x:String>
+                    </nalu:MagnetBarrier>
+                    <nalu:MagnetGuideline MagnetId="mid" Orientation="Vertical" Percent="0.5" />
+                </nalu:MagnetDefinition>
+            </nalu:Magnet.Definition>
+
+            <BoxView nalu:Magnet.MagnetId="avatar" Color="SteelBlue"
+                     nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="{nalu:MagnetSizing 1, Unit=Ratio}"
+                     nalu:Magnet.LeftTo="parent.Left,16" nalu:Magnet.TopTo="parent.Top,16" />
+            <Label nalu:Magnet.MagnetId="title" Text="Title" FontSize="18" BackgroundColor="LightGoldenrodYellow"
+                   nalu:Magnet.After="avatar,12,0" nalu:Magnet.RightTo="parent.Right,16"
+                   nalu:Magnet.AlignTop="avatar" nalu:Magnet.HorizontalBias="0" />
+            <Label nalu:Magnet.MagnetId="subtitle" Text="Subtitle" FontSize="13" BackgroundColor="LightGreen"
+                   nalu:Magnet.AlignLeft="title" nalu:Magnet.Below="title,2" />
+            <BoxView nalu:Magnet.MagnetId="half" Color="IndianRed"
+                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="24"
+                     nalu:Magnet.LeftTo="mid.Left" nalu:Magnet.RightTo="parent.Right,16"
+                     nalu:Magnet.TopTo="textsEnd.Bottom" nalu:Magnet.BottomTo="parent.Bottom,16" />
+        </nalu:Magnet>
+    </VerticalStackLayout>
+</ContentPage>
