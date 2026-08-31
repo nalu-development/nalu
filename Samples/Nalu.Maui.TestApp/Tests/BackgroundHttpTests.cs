@@ -12,16 +12,51 @@ namespace Nalu.Maui.TestApp.Tests;
 /// </summary>
 public sealed class BackgroundHttpLostMessageHandler : INSUrlBackgroundSessionLostMessageHandler
 {
+    /// <summary>
+    /// When set, lost responses are routed here instead of the display log — the
+    /// "Background Http Callbacks" harness installs it around its lost-request scenarios
+    /// so it can assert on the exact handle it synthesized.
+    /// </summary>
+    public static Func<NSUrlBackgroundResponseHandle, Task>? Interceptor { get; set; }
+
     public async Task HandleLostMessageAsync(NSUrlBackgroundResponseHandle responseHandle)
     {
+        if (Interceptor is { } interceptor)
+        {
+            await interceptor(responseHandle);
+
+            return;
+        }
+
         try
         {
             using var response = await responseHandle.GetResponseAsync();
-            var content = await response.Content.ReadAsStringAsync();
-            BackgroundHttpTests.AppendResult($"LOST {responseHandle.RequestIdentifier} [{(int) response.StatusCode}] {BackgroundHttpTests.Truncate(content)}");
+
+            // Stream-count instead of ReadAsString: lost responses include multi-MB downloads
+            // from the kill/relaunch scenarios, and the LENGTH is what those assert on.
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            var buffer = new byte[64 * 1024];
+            long total = 0;
+            var previewLength = 0;
+            int read;
+
+            while ((read = await stream.ReadAsync(buffer)) > 0)
+            {
+                if (total == 0)
+                {
+                    previewLength = read;
+                }
+
+                total += read;
+            }
+
+            var preview = System.Text.Encoding.UTF8.GetString(buffer, 0, Math.Min(previewLength, 120));
+            BackgroundHttpLostResults.RecordOk(responseHandle.RequestIdentifier, (int) response.StatusCode, total);
+            BackgroundHttpTests.AppendResult($"LOST {responseHandle.RequestIdentifier} [{(int) response.StatusCode}] len={total} {BackgroundHttpTests.Truncate(preview)}");
         }
         catch (Exception ex)
         {
+            BackgroundHttpLostResults.RecordError(responseHandle.RequestIdentifier, ex.Message);
             BackgroundHttpTests.AppendResult($"LOST {responseHandle.RequestIdentifier} FAILED: {ex.Message}");
         }
     }

@@ -24,4 +24,11 @@
     <PackageReference Include="Microsoft.Maui.DevFlow.Driver" Version="0.1.0-preview.12.26368.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Chaos HTTP server for the background-session fault-injection suite: hosted IN-PROCESS by
+         ChaosServerFixture (the device reaches it over the LAN), shared with the standalone
+         manual runner in Tools/Nalu.ChaosServer (dotnet run). -->
+    <ProjectReference Include="..\..\Tools\Nalu.ChaosServer\Nalu.ChaosServer.csproj" />
+  </ItemGroup>
+
 </Project>

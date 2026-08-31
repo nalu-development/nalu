@@ -49,6 +49,59 @@ activated in DEBUG builds in `MauiProgram.cs`, per-platform ports: Android **922
    platform when apps on several platforms are running at once).
 6. On failure: take a screenshot + visual tree via MCP, diagnose, fix (test, page, or library), repeat.
 
+### Background-HTTP fault harness (iOS NSUrlSession)
+
+Error handling of `NSUrlBackgroundSessionHttpMessageHandler` is covered by a three-part harness:
+
+- **ChaosServer** (`Tools/Nalu.ChaosServer`): raw-socket HTTP server producing wire faults by path
+  (`/truncate`, `/reset`, `/garbage`, `/stall`, `/drip`, `/redirect-loop`…). Hosted in-process by
+  `ChaosServerFixture` for the UI tests (device reaches the Mac's LAN IP over shared Wi-Fi), or
+  standalone: `dotnet run --project Tools/Nalu.ChaosServer`.
+- **"Background Http Chaos"** TestApp page + `BackgroundHttpChaosUiTests`: the network-fault matrix.
+  Encodes REAL background-session semantics: connection-level faults are silently RETRIED by
+  nsurlsessiond until the 24h resource timeout (tests assert cancellable-never-succeeds + server-side
+  retry hits); garbage bytes are delivered as an HTTP/0.9 200 body; only redirect loops fail fast (-1007).
+- **"Background Http Callbacks"** TestApp page + `BackgroundHttpCallbackUiTests`: self-asserting
+  callback-injection suite — invokes the delegate's session callbacks directly with fake
+  `NSUrlSessionDownloadTask` subclasses (`NSObjectFlag.Empty`, overriding State/Error/Response/…)
+  to deterministically reach every error branch: unexpected states, null descriptions, missing files,
+  throwing getters, duplicates, lost-request flow, background-completion handler. Requires
+  `InternalsVisibleTo("Nalu.Maui.TestApp")` on Core. Runs on simulator AND device.
+  CAUTION: never synthesize `DidBecomeInvalid` on the live delegate — recreating the session while
+  the old one is alive gives two sessions with one identifier, and on a device nsurlsessiond then
+  wedges every later request into eternal "pending". Invalidate the REAL session
+  (`InvalidateAndCancel`) so the callback arrives naturally (see the session-invalid-recovery scenario).
+  Also covers the FILE-REMOVAL family (download file gone before staging, staged file racing the
+  deferred processing, whole tmp-dir purge → recreate-and-recover, `.nsresponse` unlinked while the
+  consumer reads — POSIX keeps the open stream alive, orphan sweep at delegate init, 8-way burst with
+  one missing file) and duplicate-identifier ATTACH semantics (same identifier while in flight →
+  returns the in-flight response; the duplicate's token cancels only its own wait).
+- **"Background Http Lifecycle"** TestApp page + `BackgroundHttpLifecycleUiTests`: the same use
+  cases across APP-LIFECYCLE transitions — the host backgrounds the app (foregrounds Settings),
+  SIGKILLs it (crash-like: background tasks survive, unlike a user swipe-kill) and relaunches it
+  via simctl/devicectl (`NaluApp.BackgroundAppAsync/ForegroundAppAsync/KillAppAsync/RelaunchAppAsync`).
+  Covers: delayed responses and uploads completing across backgrounding, fail-fast faults surfacing
+  after foreground, retrying faults persisting across backgrounding + cancel, kill+relaunch delivery
+  through the lost-message flow (including a mid-flight download nsurlsessiond finishes for the dead
+  app), and error completions after death being absorbed silently. Outcomes are read from the page's
+  invariant labels; `BackgroundHttpLostResults` (static, per-process) accumulates lost deliveries in
+  the relaunched process. Kill tests assert on the PER-KIND label (`LostByKindLabel`,
+  "kind=ok/err/bytes"): kills make nsurlsessiond re-deliver a previous test's not-fully-acknowledged
+  event into the next relaunch ("ghost" deliveries), so global lost counters are not stable.
+  VERIFIED findings: an 8MB upload killed MID-BODY still completes and delivers (nsurlsessiond owns
+  the serialized body); iOS IGNORES the per-request native timeout on background sessions, so
+  `DefaultTimeout` is now enforced MANAGED-side (linked CTS; surfaces as TaskCanceledException
+  wrapping TimeoutException, the HttpClient.Timeout convention).
+
+**Physical-device loop** (background sessions are only meaningful on a real iPhone): build with
+`dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios -p:RuntimeIdentifier=ios-arm64`, install/launch
+via `xcrun devicectl device install app|process launch`, then reach the device agent over USB with
+`iproxy 9224 9224 -u <device-udid>` (the agent binds loopback on devices) and run tests with
+`DEVFLOW_HOST=localhost DEVFLOW_PORT=9224`. The lifecycle suite kills/relaunches the app, which can
+land the agent on the +1000 fallback port — keep a second forward running: `iproxy 10224 10224`.
+Expired team provisioning can be regenerated headlessly by building any stub Xcode project with the
+same bundle id and `-allowProvisioningUpdates`.
+
 ### Current status / open points
 
 - Windows support in DevFlow is still partial; Windows UI tests are postponed.

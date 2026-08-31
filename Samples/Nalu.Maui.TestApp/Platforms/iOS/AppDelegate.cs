@@ -10,5 +10,9 @@ public class AppDelegate : MauiUIApplicationDelegate
 
     [Export("application:handleEventsForBackgroundURLSession:completionHandler:")]
     public virtual void HandleEventsForBackgroundUrl(UIApplication application, string sessionIdentifier, Action completionHandler)
-        => NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
+    {
+        // Lifecycle-harness instrumentation: proves iOS woke the app for background URL events.
+        Tests.BackgroundHttpLostResults.NotifyBackgroundEvents();
+        NSUrlBackgroundSessionHttpMessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
+    }
 }

@@ -103,6 +103,12 @@ To identify the request, we have to add a special header to the request:
 httpRequestMessage.Headers.Add(NSUrlBackgroundSessionHttpMessageHandler.RequestIdentifierHeaderName, requestIdentifier);
 ```
 
+An identifier maps to one transfer: sending a request while one with the same identifier is still
+in flight does not start a new transfer — it **attaches** to the pending one and returns its
+response, exactly as if it had awaited the original call (the duplicate's `CancellationToken` only
+stops its own wait, never the shared transfer). Once the request completes — success or failure —
+the identifier is free again, so retrying after a failure starts a fresh transfer.
+
 We can then register a singleton service implementing the `INSUrlBackgroundSessionLostMessageHandler` interface to handle the lost response.
 
 ```csharp

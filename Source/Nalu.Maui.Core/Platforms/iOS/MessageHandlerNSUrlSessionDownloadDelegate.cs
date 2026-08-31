@@ -85,7 +85,52 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
     private MessageHandlerNSUrlSessionDownloadDelegate()
     {
+        // BEFORE the session exists: no callback can be creating files concurrently, so every
+        // matching file is stale by construction.
+        CleanupOrphanedFiles();
         _ = Session;
+    }
+
+    /// <summary>
+    /// Deletes request/response temp files a PREVIOUS process left behind — e.g. an app killed
+    /// between a response being delivered and its content being consumed (the handoff is not
+    /// transactional: that response is gone for good — nsurlsessiond never re-delivers events it
+    /// already delivered — and its <c>.nsresponse</c> file would otherwise sit in tmp forever).
+    /// Same for <c>.nsrequest</c> bodies (nsurlsessiond owns its own copy of the body once the
+    /// task is created) and <c>.nsdownload</c> staging leftovers.
+    /// </summary>
+    internal void CleanupOrphanedFiles()
+    {
+        try
+        {
+            var tempPath = Path.GetTempPath();
+            var deleted = 0;
+
+            foreach (var pattern in (string[]) ["*.nsrequest", "*.nsresponse", "*.nsdownload"])
+            {
+                foreach (var file in Directory.EnumerateFiles(tempPath, pattern))
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        deleted++;
+                    }
+                    catch (Exception)
+                    {
+                        // Never let cleanup interfere with startup.
+                    }
+                }
+            }
+
+            if (deleted > 0)
+            {
+                Logger.LogDebug("Deleted {Count} orphaned background-session temp files", deleted);
+            }
+        }
+        catch (Exception)
+        {
+            // e.g. the temp directory itself is missing: nothing to clean.
+        }
     }
 
     public IReadOnlyDictionary<string, Task<HttpResponseMessage>> GetPendingResponses()
@@ -98,6 +143,62 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var requestUrl = BuildNativeUrl(request.RequestUri);
         var requestIdentifier = TryGetRequestIdentifier(request, out var id) ? id : Guid.NewGuid().ToString("N");
 
+        // iOS IGNORES the per-request timeout on BACKGROUND sessions (verified on-device with
+        // the chaos harness), so DefaultTimeout is enforced MANAGED-side: an ad-hoc token linked
+        // to the caller's cancels the transfer when the timeout elapses, surfaced with the
+        // HttpClient.Timeout convention (TaskCanceledException wrapping a TimeoutException) so
+        // callers can tell a timeout from their own cancellation.
+        using var timeoutCts = defaultTimeout == _infiniteTimeout ? null : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts?.CancelAfter(defaultTimeout);
+        var effectiveToken = timeoutCts?.Token ?? cancellationToken;
+
+        [DoesNotReturn]
+        void ThrowCancellation(OperationCanceledException original)
+        {
+            if (timeoutCts is { IsCancellationRequested: true } && !cancellationToken.IsCancellationRequested)
+            {
+                var message = FormattableString.Invariant(
+                    $"The request timed out after {defaultTimeout.TotalSeconds:0.###} seconds (NSUrlBackgroundSessionHttpMessageHandler.DefaultTimeout)."
+                );
+
+                throw new TaskCanceledException(message, new TimeoutException(message, original));
+            }
+
+            throw original;
+        }
+
+        // A canceled or timed-out attached wait WALKS AWAY and nothing more: the transfer is
+        // still healthy and owned by the ORIGINAL awaiter (an attach always coexists with one —
+        // after a relaunch the pending map starts empty, so there is nothing to attach to).
+        // Releasing the handle here would delete the shared files and orphan that original
+        // awaiter forever, while ITS cancellation path handles the teardown.
+        async Task<HttpResponseMessage> AttachAsync(NSUrlRequestHandle handle)
+        {
+            try
+            {
+                return await handle.ResponseCompletionSource.Task.WaitAsync(effectiveToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException ex)
+            {
+                ThrowCancellation(ex);
+
+                throw; // Unreachable: ThrowCancellation always throws (reachability analysis ignores [DoesNotReturn]).
+            }
+        }
+
+        // One transfer per identifier: a second send while one is in flight ATTACHES to it and
+        // returns its response, exactly as if it awaited the original call — it must not start
+        // a competing transfer (which would also overwrite the pending handle, orphaning the
+        // first awaiter, and the shared on-disk body file). WaitAsync scopes the duplicate's
+        // token to ITS wait only: cancelling an attached awaiter never cancels the transfer.
+        // Checked before any side effect; the TryAdd below closes the remaining race window.
+        if (_pendingRequests.TryGetValue(requestIdentifier, out var inFlightHandle))
+        {
+            Logger.LogDebug("SendAsync {RequestName} attached to the already in-flight request", requestIdentifier);
+
+            return await AttachAsync(inFlightHandle).ConfigureAwait(false);
+        }
+
         Logger.LogDebug("SendAsync {RequestName} for [{Method}] {Url}", requestIdentifier, request.Method.Method, request.RequestUri);
 
         var nativeHttpRequest = new NSMutableUrlRequest(requestUrl)
@@ -107,6 +208,8 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
 
         if (defaultTimeout != _infiniteTimeout)
         {
+            // Kept for completeness (and in case a future iOS honors it), but INERT on
+            // background sessions — the linked timeoutCts above is what actually enforces it.
             nativeHttpRequest.TimeoutInterval = defaultTimeout.TotalSeconds;
         }
 
@@ -118,13 +221,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             {
                 contentPath = GetRequestBodyPath(requestIdentifier);
                 await using var fileStream = File.Create(contentPath);
-                await content.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                await content.CopyToAsync(fileStream, effectiveToken).ConfigureAwait(false);
                 Logger.LogDebug("MultipartContent or StreamContent for request {RequestName}", requestIdentifier);
             }
             else
             {
                 await using var memoryStream = new MemoryStream();
-                await content.CopyToAsync(memoryStream, cancellationToken).ConfigureAwait(false);
+                await content.CopyToAsync(memoryStream, effectiveToken).ConfigureAwait(false);
                 var body = memoryStream.ToArray();
                 nativeHttpRequest.Body = NSData.FromArray(body);
                 Logger.LogDebug("BufferedContent for request {RequestName} with size {Size}", requestIdentifier, body.Length);
@@ -157,7 +260,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
 
         var requestHandle = new NSUrlRequestHandle(requestIdentifier, cookieContainer, contentPath);
-        requestHandle.CancellationTokenRegistration = cancellationToken.Register(() =>
+        requestHandle.CancellationTokenRegistration = effectiveToken.Register(() =>
             {
                 Logger.LogDebug("Cancellation requested for {RequestName} task", requestIdentifier);
 
@@ -171,15 +274,31 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 }
                 finally
                 {
-                    requestHandle.ResponseCompletionSource.TrySetCanceled(cancellationToken);
+                    requestHandle.ResponseCompletionSource.TrySetCanceled(effectiveToken);
                     requestHandle.Complete();
                 }
             }
         );
 
-        _pendingRequests[requestIdentifier] = requestHandle;
+        while (!_pendingRequests.TryAdd(requestIdentifier, requestHandle))
+        {
+            if (_pendingRequests.TryGetValue(requestIdentifier, out var concurrentHandle))
+            {
+                // Lost a race with a concurrent same-identifier request past the early check:
+                // withdraw our native task (without deleting the shared body file — the winner
+                // may be reading it) and attach to the winner instead.
+                requestHandle.CancellationTokenRegistration?.Dispose();
+                requestHandle.CancellationTokenRegistration = null;
+                task.Cancel();
+                Logger.LogDebug("SendAsync {RequestName} attached to a concurrently started request", requestIdentifier);
 
-        cancellationToken.ThrowIfCancellationRequested();
+                return await AttachAsync(concurrentHandle).ConfigureAwait(false);
+            }
+
+            // The winner completed and vanished between TryAdd and TryGetValue: the slot is free.
+        }
+
+        effectiveToken.ThrowIfCancellationRequested();
         
         task.TaskDescription = requestIdentifier;
         task.Resume();
@@ -192,13 +311,15 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         {
             return await requestHandle.ResponseCompletionSource.Task.ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // The native completion callback may never arrive for a canceled background task,
             // so proactively release the handle and its temporary files to avoid leaking them.
             CompleteAndRemoveHandle(requestHandle);
 
-            throw;
+            ThrowCancellation(ex);
+
+            throw; // Unreachable: ThrowCancellation always throws (reachability analysis ignores [DoesNotReturn]).
         }
     }
 
@@ -317,7 +438,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                         // for NSURLErrorDomain -1): surface domain, code and the underlying error chain.
                         var msg = FormatNSError(task.Error);
                         Logger.LogDebug("Task {RequestIdentifier} completed with error: {Error}", requestIdentifier, msg);
-                        handle.ResponseCompletionSource.TrySetException(new HttpRequestException(msg));
+                        handle.ResponseCompletionSource.TrySetException(new HttpRequestException(MapHttpRequestError(task.Error), msg));
                     }
 
                     CompleteAndRemoveHandle(handle);
@@ -379,7 +500,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             var stagedFilePath = SecureDownloadedFile(location, out var stagingFailureReason);
             var originalSourcePath = location.Path;
 
-            ProcessCallback(task.TaskDescription, () => ProcessFinishedDownload(task, stagedFilePath, originalSourcePath, stagingFailureReason));
+            ProcessCallback(task.TaskDescription, () => ProcessFinishedDownload(task, stagedFilePath, originalSourcePath, stagingFailureReason), stagedFilePath);
         }
         catch (Exception ex)
         {
@@ -424,7 +545,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         {
             Logger.LogError("Response is not NSHttpUrlResponse");
             DeleteStagedFile(stagedFilePath);
-            handle.ResponseCompletionSource.TrySetException(new HttpRequestException("Response is not NSHttpUrlResponse"));
+            handle.ResponseCompletionSource.TrySetException(new HttpRequestException(HttpRequestError.InvalidResponse, "Response is not NSHttpUrlResponse"));
             CompleteAndRemoveHandle(handle);
 
             return;
@@ -567,7 +688,13 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
     /// are concurrent, and completion races are settled by TrySet* — so processing runs in
     /// parallel with no ordering requirements.
     /// </summary>
-    private void ProcessCallback(string? requestIdentifier, Action action)
+    /// <remarks>
+    /// <paramref name="stagedFilePath" /> is the secured download awaiting processing: when
+    /// <paramref name="action" /> throws before consuming it, it must be deleted here or it
+    /// leaks in the temp directory until the system purges it (deleting is idempotent, so a
+    /// path the action already moved or removed is safe to pass).
+    /// </remarks>
+    private void ProcessCallback(string? requestIdentifier, Action action, string? stagedFilePath)
         => _ = Task.Run(() =>
             {
                 try
@@ -577,6 +704,7 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "Unhandled error while processing a session callback for {RequestIdentifier}", requestIdentifier);
+                    DeleteStagedFile(stagedFilePath);
                     FaultPendingRequest(requestIdentifier, ex);
                 }
                 finally
@@ -793,8 +921,10 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         }
     }
 
+    // Sanitized like the response path: the identifier is caller-provided header content and
+    // must not be able to escape the temp directory or produce an invalid file name.
     private static string GetRequestBodyPath(string requestIdentifier)
-        => Path.Combine(Path.GetTempPath(), $"{requestIdentifier}.nsrequest");
+        => Path.Combine(Path.GetTempPath(), $"{ToSafeUnixFileName(requestIdentifier)}.nsrequest");
 
     private NSMutableDictionary GetPlatformHeaders(HttpRequestMessage request, CookieContainer? cookieContainer)
     {
@@ -866,6 +996,31 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         requestIdentifier = null;
 
         return false;
+    }
+
+    /// <summary>
+    /// Maps NSURLErrorDomain codes to <see cref="HttpRequestError" /> so callers can branch on
+    /// <see cref="HttpRequestException.HttpRequestError" /> without parsing messages — the same
+    /// contract SocketsHttpHandler provides since .NET 8. Codes without a faithful counterpart
+    /// (e.g. -1001 native timeout) stay <see cref="HttpRequestError.Unknown" />.
+    /// </summary>
+    private static HttpRequestError MapHttpRequestError(NSError? error)
+    {
+        if (error is null || error.Domain?.ToString() != "NSURLErrorDomain")
+        {
+            return HttpRequestError.Unknown;
+        }
+
+        return (long) error.Code switch
+        {
+            -1003 or -1006 => HttpRequestError.NameResolutionError, // CannotFindHost, DNSLookupFailed
+            -1004 or -1005 or -1009 or -1018 or -1020 => HttpRequestError.ConnectionError, // CannotConnectToHost, NetworkConnectionLost, NotConnectedToInternet, RoamingOff, DataNotAllowed
+            -1022 or (>= -1206 and <= -1200) => HttpRequestError.SecureConnectionError, // ATS violation, TLS/certificate family
+            -1007 => HttpRequestError.HttpProtocolError, // HTTPTooManyRedirects
+            -1011 or -1017 => HttpRequestError.InvalidResponse, // BadServerResponse, CannotParseResponse
+            -1013 => HttpRequestError.UserAuthenticationError, // UserAuthenticationRequired
+            _ => HttpRequestError.Unknown
+        };
     }
 
     private static readonly NSString _failingUrlErrorKey = new("NSErrorFailingURLStringKey");

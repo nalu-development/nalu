@@ -33,8 +33,17 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     }
 
     /// <summary>
-    /// Gets or sets the default native timeout for requests.
+    /// Gets or sets the default timeout for requests.
     /// </summary>
+    /// <remarks>
+    /// iOS IGNORES the per-request native timeout on background sessions (verified on-device
+    /// with the chaos harness: a 3s value against a stalled server never fires), so this is
+    /// enforced MANAGED-side: when it elapses the transfer is canceled and the request throws a
+    /// <see cref="TaskCanceledException" /> wrapping a <see cref="TimeoutException" /> — the
+    /// same convention as <see cref="HttpClient.Timeout" />. Because enforcement is managed, it
+    /// only ticks while the app is alive: a transfer surviving a process kill is governed by
+    /// the session's resource timeout instead.
+    /// </remarks>
     public TimeSpan DefaultTimeout
     {
         get => _defaultTimeout;
@@ -49,8 +58,18 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
     /// The name of the header that contains the identifier of the <see cref="NSUrlSessionTask" /> associated with the request.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// When this header is set on a request, even if the app is terminated by the system, once the app is relaunched and the request completes,
     /// the request will be found in the <see cref="NSUrlBackgroundSessionHttpMessageHandler.GetPendingResponses" /> collection.
+    /// </para>
+    /// <para>
+    /// An identifier maps to ONE transfer: sending a request while one with the same identifier
+    /// is still in flight does not start a new transfer — it ATTACHES to the pending one and
+    /// returns its response, exactly as if it had awaited the original call. The duplicate's
+    /// <see cref="CancellationToken" /> only stops its own wait, never the shared transfer.
+    /// Once the request completes (success or failure) the identifier is free again, so
+    /// retrying after a failure starts a fresh transfer.
+    /// </para>
     /// </remarks>
     public const string RequestIdentifierHeaderName = "X-NSUrlRequest-Identifier";
 

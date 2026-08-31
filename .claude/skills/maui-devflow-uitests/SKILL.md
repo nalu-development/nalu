@@ -60,6 +60,14 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
       The agent then comes up on its platform port (iOS 9224) — or **+1000** (10224) if the
       previous instance's port lingers in TIME_WAIT; probe with a no-op MCP call, never curl.
 
+   **Physical iOS device loop** (needed for background-NSUrlSession suites): build with
+   `-p:RuntimeIdentifier=ios-arm64`, deploy with `xcrun devicectl device install app --device <udid> <.app>`
+   and `xcrun devicectl device process launch --terminate-existing --device <udid> com.nalu.maui.testapp`.
+   The agent binds LOOPBACK on devices, so forward it over USB: `iproxy 9224 9224 -u <device-udid>`
+   (libimobiledevice), then `DEVFLOW_HOST=localhost DEVFLOW_PORT=9224 dotnet test …`. Expired Xcode-managed
+   provisioning: build any stub Xcode project with the same bundle id using
+   `xcodebuild … -allowProvisioningUpdates` to regenerate the profile headlessly.
+
    **Android rebuild/deploy trap**: Debug builds use FAST DEPLOYMENT — assemblies are NOT in
    the APK. `adb install <apk>` runs the app with STALE assemblies (or breaks launch after an
    uninstall); always deploy with `dotnet build -f net10.0-android -t:Install` (or `-t:Run`).

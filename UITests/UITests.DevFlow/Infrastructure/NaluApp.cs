@@ -651,6 +651,32 @@ public sealed class NaluApp : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Fills and then VERIFIES the entry actually holds the text, retrying once. Use when a
+    /// stale value silently changes the scenario's meaning (a fill that reports success but
+    /// doesn't land was observed on the preview agent — e.g. a timeout entry left at "0"
+    /// turned a bounded background-HTTP test into an eternal "pending").
+    /// </summary>
+    public async Task FillVerifiedAsync(string automationId, string text, TimeSpan? timeout = null)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            await FillAsync(automationId, text, timeout).ConfigureAwait(false);
+
+            if (await GetPropertyAsync(automationId, "Text").ConfigureAwait(false) == text)
+            {
+                return;
+            }
+
+            if (attempt == 2)
+            {
+                throw new InvalidOperationException($"Fill on '{automationId}' did not stick after {attempt} attempts (expected '{text}').");
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Waits until no element with the given AutomationId is present in the visual tree.</summary>
     public async Task WaitForElementGoneAsync(string automationId, TimeSpan? timeout = null)
     {
@@ -1540,6 +1566,192 @@ public sealed class NaluApp : IAsyncLifetime
 
             await Task.Delay(_pollInterval).ConfigureAwait(false);
         }
+    }
+
+    #endregion
+
+    #region Background/kill lifecycle (iOS simulator + physical device)
+
+    private const string _settingsAppId = "com.apple.Preferences";
+    private bool? _isPhysicalIos;
+    private string? _deviceCtlId;
+
+    /// <summary>True when the connected agent runs on a PHYSICAL iOS device.</summary>
+    /// <remarks>
+    /// Read STRUCTURALLY from the agent status (a "DeviceType" string equal to "Physical"
+    /// anywhere in the first two levels) for the same reason as <see cref="FindAppId" />: the
+    /// preview's status shape moves between builds and this file absorbs that churn.
+    /// </remarks>
+    public async Task<bool> IsPhysicalIosDeviceAsync()
+    {
+        if (_isPhysicalIos is { } cached)
+        {
+            return cached;
+        }
+
+        var platform = await GetPlatformAsync().ConfigureAwait(false);
+
+        if (!platform.Contains("ios", StringComparison.OrdinalIgnoreCase))
+        {
+            return (_isPhysicalIos = false).Value;
+        }
+
+        var status = await _client.GetStatusAsync().ConfigureAwait(false);
+        var deviceType = status is null ? null : FindStringProperty(status, "DeviceType", 0);
+
+        return (_isPhysicalIos = string.Equals(deviceType, "Physical", StringComparison.OrdinalIgnoreCase)).Value;
+    }
+
+    private static string? FindStringProperty(object source, string propertyName, int depth)
+    {
+        if (depth > 2)
+        {
+            return null;
+        }
+
+        foreach (var property in source.GetType().GetProperties())
+        {
+            if (property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            object? value;
+
+            try
+            {
+                value = property.GetValue(source);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            switch (value)
+            {
+                case string text when string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase):
+                    return text;
+
+                case not null and not string when property.PropertyType.Namespace?.StartsWith("System", StringComparison.Ordinal) != true:
+                    if (FindStringProperty(value, propertyName, depth + 1) is { } nested)
+                    {
+                        return nested;
+                    }
+
+                    break;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The CoreDevice identifier for devicectl commands (DEVFLOW_DEVICE_ID overrides discovery,
+    /// which takes the first available paired device).
+    /// </summary>
+    private async Task<string> GetDeviceCtlIdAsync()
+    {
+        if (_deviceCtlId is not null)
+        {
+            return _deviceCtlId;
+        }
+
+        if (Environment.GetEnvironmentVariable("DEVFLOW_DEVICE_ID") is { Length: > 0 } configured)
+        {
+            return _deviceCtlId = configured;
+        }
+
+        var output = await RunProcessAsync("xcrun", "devicectl list devices").ConfigureAwait(false);
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            output,
+            @"([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\s+available"
+        );
+
+        return _deviceCtlId = match.Success
+            ? match.Groups[1].Value
+            : throw new InvalidOperationException($"No available paired device found. devicectl said:\n{output}");
+    }
+
+    /// <summary>
+    /// Sends the TestApp to the BACKGROUND by foregrounding the Settings app — the honest way to
+    /// exercise background URL-session behavior (there is no direct "background it" command).
+    /// </summary>
+    public async Task BackgroundAppAsync()
+    {
+        if (await IsPhysicalIosDeviceAsync().ConfigureAwait(false))
+        {
+            await RunProcessAsync("xcrun", $"devicectl device process launch --device {await GetDeviceCtlIdAsync().ConfigureAwait(false)} {_settingsAppId}").ConfigureAwait(false);
+        }
+        else
+        {
+            await RunSimctlAsync("launch", await GetBootedSimulatorUdidAsync().ConfigureAwait(false), _settingsAppId).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Brings the TestApp back to the FOREGROUND (launch activates an already-running app on
+    /// both simctl and devicectl) and waits until the agent answers with a rendered window.
+    /// </summary>
+    public async Task ForegroundAppAsync(TimeSpan? timeout = null)
+    {
+        if (await IsPhysicalIosDeviceAsync().ConfigureAwait(false))
+        {
+            await RunProcessAsync("xcrun", $"devicectl device process launch --device {await GetDeviceCtlIdAsync().ConfigureAwait(false)} {_testAppId}").ConfigureAwait(false);
+        }
+        else
+        {
+            await RunSimctlAsync("launch", await GetBootedSimulatorUdidAsync().ConfigureAwait(false), _testAppId).ConfigureAwait(false);
+        }
+
+        await WaitForAgentReadyAsync(timeout).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// KILLS the TestApp the way a crash/jetsam does (SIGKILL on devices, simctl terminate on
+    /// simulators): background URL-session tasks SURVIVE this — unlike a user's app-switcher
+    /// swipe, which cancels them by design.
+    /// </summary>
+    public async Task KillAppAsync()
+    {
+        if (await IsPhysicalIosDeviceAsync().ConfigureAwait(false))
+        {
+            var deviceId = await GetDeviceCtlIdAsync().ConfigureAwait(false);
+            var processes = await RunProcessAsync("xcrun", $"devicectl device info processes --device {deviceId}").ConfigureAwait(false);
+
+            // The main executable only — PlugIns (widget appex) lines also carry the app name.
+            var match = System.Text.RegularExpressions.Regex.Match(
+                processes,
+                @"(?m)^\s*(\d+)\s+\S*Nalu\.Maui\.TestApp\.app/Nalu\.Maui\.TestApp\s*$"
+            );
+
+            if (!match.Success)
+            {
+                throw new InvalidOperationException("The TestApp process was not found on the device — is it running?");
+            }
+
+            await RunProcessAsync("xcrun", $"devicectl device process signal --device {deviceId} --pid {match.Groups[1].Value} --signal SIGKILL").ConfigureAwait(false);
+        }
+        else
+        {
+            await RunSimctlAsync("terminate", await GetBootedSimulatorUdidAsync().ConfigureAwait(false), _testAppId).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Relaunches the TestApp after <see cref="KillAppAsync" /> and waits for the agent.</summary>
+    public Task RelaunchAppAsync(TimeSpan? timeout = null) => ForegroundAppAsync(timeout);
+
+    /// <summary>
+    /// Waits until the agent answers again AND the app has drawn something — required after any
+    /// foreground/relaunch, since the agent is unreachable while the app is suspended. Retries
+    /// the platform's port PAIR (base / +1000) because a relaunch after a kill can land on the
+    /// fallback port while the base lingers in TIME_WAIT — on a physical device that requires a
+    /// second forward: <c>iproxy 10224 10224</c> next to the base one.
+    /// </summary>
+    public async Task WaitForAgentReadyAsync(TimeSpan? timeout = null)
+    {
+        await ReconnectSamePlatformAsync().ConfigureAwait(false);
+        await WaitForAppForegroundAsync(timeout).ConfigureAwait(false);
     }
 
     #endregion
