@@ -1,32 +1,30 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Maui.Layouts;
-using Nalu.MagnetLayout;
 
 namespace Nalu;
 
-internal class MagnetLayoutManager : LayoutManager
+internal class MagnetLayoutManager(Magnet magnet) : LayoutManager(magnet)
 {
-    // TODO: create an interface so we can unit test this layout manager the right way
-    public Magnet Magnet { get; }
+    public Magnet Magnet { get; } = magnet;
 
-    public MagnetLayoutManager(Magnet magnet)
-        : base(magnet)
-    {
-        Magnet = magnet;
-    }
+    // True once ArrangeChildren ran after the last Measure: a further arrange without a measure in between
+    // (e.g. a recycled cell re-bound and re-arranged at the same size) must re-measure the children.
+    private bool _arrangedSinceMeasure;
 
     public override Size Measure(double widthConstraint, double heightConstraint)
     {
-        if (Magnet.Stage is not { } stage)
+        var padding = Magnet.Padding;
+        var horizontalPadding = padding.HorizontalThickness;
+        var verticalPadding = padding.VerticalThickness;
+
+        if (Magnet.IsTransitioning)
         {
-            return NoStageMeasure(widthConstraint, heightConstraint);
+            return Magnet.TransitionMeasure();
         }
+
+        Magnet.EnsureCompiled();
 
         var maxWidth = 0.0;
         var maxHeight = 0.0;
-        var hasMagnetViews = false;
-
         var layout = Layout;
         var childCount = layout.Count;
 
@@ -34,101 +32,7 @@ internal class MagnetLayoutManager : LayoutManager
         {
             var child = layout[index];
 
-            if (TryGetMagnetView(stage, child, out var magnetView))
-            {
-                hasMagnetViews = true;
-                magnetView.View = child;
-            }
-            else
-            {
-                var size = child.Measure(widthConstraint, heightConstraint);
-                maxWidth = Math.Max(size.Width, maxWidth);
-                maxHeight = Math.Max(size.Height, maxHeight);
-            }
-        }
-
-        var padding = Magnet.Padding;
-        var horizontalPadding = padding.HorizontalThickness;
-        var verticalPadding = padding.VerticalThickness;
-        var width = widthConstraint - horizontalPadding;
-        var height = heightConstraint - verticalPadding;
-
-        if (hasMagnetViews)
-        {
-            stage.PrepareForMeasure(width, height);
-
-            maxWidth = Math.Max(stage.Right.CurrentValue, maxWidth);
-            maxHeight = Math.Max(stage.Bottom.CurrentValue, maxHeight);
-        }
-
-        var measured = new Size(maxWidth + horizontalPadding, maxHeight + verticalPadding);
-
-        return measured;
-    }
-
-    public override Size ArrangeChildren(Rect bounds)
-    {
-        if (Magnet.Stage is not { } stage)
-        {
-            return NoStageArrange(bounds);
-        }
-
-        var layout = Layout;
-        var childCount = layout.Count;
-        for (var index = 0; index < childCount; ++index)
-        {
-            var child = layout[index];
-
-            if (TryGetMagnetView(stage, child, out var magnetView))
-            {
-                magnetView.View = child;
-            }
-        }
-
-        var padding = Magnet.Padding;
-        var horizontalPadding = padding.HorizontalThickness;
-        var verticalPadding = padding.VerticalThickness;
-        var width = bounds.Width - horizontalPadding;
-        var height = bounds.Height - verticalPadding;
-        var left = bounds.X + padding.Left;
-        var top = bounds.Y + padding.Top;
-
-        stage.PrepareForArrange(width, height);
-
-        for (var index = 0; index < childCount; ++index)
-        {
-            var child = layout[index];
-
-            if (child.Visibility is Visibility.Collapsed)
-            {
-                continue;
-            }
-
-            if (TryGetMagnetView(stage, child, out var magnetView))
-            {
-                var frame = magnetView.GetFrame().Offset(left, top);
-                child.Arrange(frame);
-            }
-            else
-            {
-                var frame = new Rect(Point.Zero, child.DesiredSize).Offset(left, top);
-                child.Arrange(frame);
-            }
-        }
-
-        return bounds.Size;
-    }
-
-    private Size NoStageMeasure(double widthConstraint, double heightConstraint)
-    {
-        var padding = Magnet.Padding;
-
-        var maxWidth = 0.0;
-        var maxHeight = 0.0;
-
-        foreach (var child in Magnet)
-        {
-            if (child.Visibility is Visibility.Collapsed)
+            if (Magnet.GetBoundNode(child) is not null || child.Visibility == Visibility.Collapsed)
             {
                 continue;
             }
@@ -138,53 +42,86 @@ internal class MagnetLayoutManager : LayoutManager
             maxHeight = Math.Max(size.Height, maxHeight);
         }
 
-        var measuredWidth = maxWidth + padding.Left + padding.Right;
-        var measuredHeight = maxHeight + padding.Top + padding.Bottom;
+        if (Magnet.HasNodes)
+        {
+            var stage = Magnet.Engine.Measure(widthConstraint - horizontalPadding, heightConstraint - verticalPadding);
+            maxWidth = Math.Max(stage.Width, maxWidth);
+            maxHeight = Math.Max(stage.Height, maxHeight);
+        }
 
-        return new Size(measuredWidth, measuredHeight);
+        _arrangedSinceMeasure = false;
+
+        return new Size(maxWidth + horizontalPadding, maxHeight + verticalPadding);
     }
 
-    private Size NoStageArrange(Rect bounds)
+    public override Size ArrangeChildren(Rect bounds)
     {
         var padding = Magnet.Padding;
-        var paddingLeft = padding.Left;
-        var paddingTop = padding.Top;
+        var horizontalPadding = padding.HorizontalThickness;
+        var verticalPadding = padding.VerticalThickness;
+        var width = bounds.Width - horizontalPadding;
+        var height = bounds.Height - verticalPadding;
+        var left = bounds.X + padding.Left;
+        var top = bounds.Y + padding.Top;
 
-        var maxWidth = 0.0;
-        var maxHeight = 0.0;
-
-        foreach (var child in Layout)
+        if (Magnet.IsTransitioning)
         {
-            if (child.Visibility is Visibility.Collapsed)
+            Magnet.LastArrangeBounds = bounds;
+            Magnet.TransitionArrange(bounds);
+
+            return bounds.Size;
+        }
+
+        Magnet.LastArrangeBounds = bounds;
+
+        if (Magnet.HasNodes)
+        {
+            Magnet.EnsureCompiled();
+            var engine = Magnet.Engine;
+            var reuse = engine.HasMeasured
+                        && !_arrangedSinceMeasure
+                        && MatchesAxis(width, engine.LastMeasureArgs.Width, engine.LastMeasured.Width)
+                        && MatchesAxis(height, engine.LastMeasureArgs.Height, engine.LastMeasured.Height);
+
+            engine.Arrange(width, height, !reuse);
+            ArrangeNodes(engine, left, top);
+        }
+
+        var layout = Layout;
+        var childCount = layout.Count;
+
+        for (var index = 0; index < childCount; ++index)
+        {
+            var child = layout[index];
+
+            if (Magnet.GetBoundNode(child) is not null || child.Visibility == Visibility.Collapsed)
             {
                 continue;
             }
 
-            var frame = new Rect(paddingLeft + bounds.Left, paddingTop + bounds.Top, child.DesiredSize.Width, child.DesiredSize.Height);
-            maxWidth = Math.Max(frame.Width, maxWidth);
-            maxHeight = Math.Max(frame.Height, maxHeight);
-            child.Arrange(frame);
+            child.Arrange(new Rect(new Point(left, top), child.DesiredSize));
         }
 
-        var measuredWidth = maxWidth + padding.Left + padding.Right;
-        var measuredHeight = maxHeight + padding.Top + padding.Bottom;
-        var size = new Size(measuredWidth, measuredHeight);
+        _arrangedSinceMeasure = true;
 
-        return size.AdjustForFill(bounds, Magnet);
+        return bounds.Size;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryGetMagnetView(IMagnetStage stage, IView child, [NotNullWhen(true)] out MagnetView? magnetView)
+    internal static void ArrangeNodes(MagnetLayout.Engine.MagnetEngine engine, double left, double top)
     {
-        if (Magnet.GetStageId(child) is { } stageId && stage.TryGetElement(stageId, out var element) && element is MagnetView view)
+        var nodes = engine.Nodes;
+
+        for (var i = 0; i < nodes.Length; i++)
         {
-            magnetView = view;
+            if (nodes[i] is not MagnetView || engine.IsCollapsed(i) || engine.GetView(i) is not { } view)
+            {
+                continue;
+            }
 
-            return true;
+            view.Arrange(engine.GetFrame(i).Offset(left, top));
         }
-
-        magnetView = null;
-
-        return false;
     }
+
+    private static bool MatchesAxis(double arranged, double measureArg, double measured)
+        => Math.Abs(arranged - measureArg) < 0.5 || Math.Abs(arranged - measured) < 0.5;
 }

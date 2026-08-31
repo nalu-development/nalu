@@ -1,81 +1,108 @@
-using System.Diagnostics.CodeAnalysis;
-using Nalu.Cassowary;
-using Nalu.Internals;
-using static Nalu.Cassowary.Strength;
-using static Nalu.Cassowary.WeightedRelation;
-using PoleConnection =
-    (Nalu.Cassowary.Expression Pole, Nalu.MagnetLayout.Traction Traction, Nalu.Cassowary.WeightedRelation Relation, Nalu.Cassowary.Expression ToPole, Nalu.MagnetLayout.MagnetView?
-    ChainedView);
-
-namespace Nalu.MagnetLayout;
+namespace Nalu;
 
 /// <summary>
-/// Represents a view in a <see cref="Magnet" /> layout.
+/// The constraints of a view inside a <see cref="Magnet" /> layout.
 /// </summary>
-public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnetView, IHorizontalPoles, IVerticalPoles, IHorizontalChainPoles, IVerticalChainPoles
+/// <remarks>
+/// Visibility is deliberately not part of the node: the single source of truth is <see cref="IView.Visibility" /> of the bound view
+/// (<c>IsVisible="False"</c> collapses the view, its size becomes 0 and anchors to it use <see cref="MagnetAnchor.GoneMargin" />).
+/// </remarks>
+public sealed class MagnetView : MagnetNode
 {
-#pragma warning disable CS1591
-    public enum ConstraintTypes
-    {
-        Consistency,
-        Width,
-        Height,
-        HorizontalPosition,
-        VerticalPosition
-    }
-#pragma warning restore CS1591
+    /// <summary>Bindable property for <see cref="LeftTo" />.</summary>
+    public static readonly BindableProperty LeftToProperty = CreateAnchorProperty(nameof(LeftTo));
 
-    /// <summary>
-    /// Bindable property for the <see cref="Width" /> property.
-    /// </summary>
-    public static readonly BindableProperty WidthProperty = GenericBindableProperty<MagnetView>.Create(
-        nameof(Width),
-        SizeValue.Default,
-        propertyChanged: b => b.OnWidthChanged
-    );
+    /// <summary>Bindable property for <see cref="RightTo" />.</summary>
+    public static readonly BindableProperty RightToProperty = CreateAnchorProperty(nameof(RightTo));
 
-    /// <summary>
-    /// Gets or sets the width sizing strategy for this view.
-    /// </summary>
-    public SizeValue Width
-    {
-        get => (SizeValue) GetValue(WidthProperty);
-        set => SetValue(WidthProperty, value);
-    }
+    /// <summary>Bindable property for <see cref="TopTo" />.</summary>
+    public static readonly BindableProperty TopToProperty = CreateAnchorProperty(nameof(TopTo));
 
-    /// <summary>
-    /// Bindable property for the <see cref="Height" /> property.
-    /// </summary>
-    public static readonly BindableProperty HeightProperty = GenericBindableProperty<MagnetView>.Create(
-        nameof(Height),
-        SizeValue.Default,
-        propertyChanged: b => b.OnHeightChanged
-    );
+    /// <summary>Bindable property for <see cref="BottomTo" />.</summary>
+    public static readonly BindableProperty BottomToProperty = CreateAnchorProperty(nameof(BottomTo));
 
-    /// <summary>
-    /// Gets or sets the height sizing strategy for this view.
-    /// </summary>
-    public SizeValue Height
-    {
-        get => (SizeValue) GetValue(HeightProperty);
-        set => SetValue(HeightProperty, value);
-    }
+    /// <summary>Bindable property for <see cref="WidthSizing" />.</summary>
+    public static readonly BindableProperty WidthSizingProperty = CreateSizeProperty(nameof(WidthSizing));
 
-    /// <summary>
-    /// Bindable property for the <see cref="HorizontalBias" /> property.
-    /// </summary>
-    public static readonly BindableProperty HorizontalBiasProperty = GenericBindableProperty<MagnetView>.Create(
+    /// <summary>Bindable property for <see cref="HeightSizing" />.</summary>
+    public static readonly BindableProperty HeightSizingProperty = CreateSizeProperty(nameof(HeightSizing));
+
+    /// <summary>Bindable property for <see cref="HorizontalBias" />.</summary>
+    public static readonly BindableProperty HorizontalBiasProperty = BindableProperty.Create(
         nameof(HorizontalBias),
+        typeof(double),
+        typeof(MagnetView),
         0.5,
-        propertyChanged: b => b.OnHorizontalBiasChanged
+        propertyChanged: OnValuePropertyChanged
+    );
+
+    /// <summary>Bindable property for <see cref="VerticalBias" />.</summary>
+    public static readonly BindableProperty VerticalBiasProperty = BindableProperty.Create(
+        nameof(VerticalBias),
+        typeof(double),
+        typeof(MagnetView),
+        0.5,
+        propertyChanged: OnValuePropertyChanged
     );
 
     /// <summary>
-    /// Gets or sets the horizontal positioning bias for this view.
+    /// Gets or sets the anchor of the left side.
     /// </summary>
-    /// <remarks>
-    /// This is only effective when the <see cref="Width" /> is set to <see cref="SizeUnit.Constraint" />.
-    /// </remarks>
+    public MagnetAnchor? LeftTo
+    {
+        get => (MagnetAnchor?) GetValue(LeftToProperty);
+        set => SetValue(LeftToProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the anchor of the right side.
+    /// </summary>
+    public MagnetAnchor? RightTo
+    {
+        get => (MagnetAnchor?) GetValue(RightToProperty);
+        set => SetValue(RightToProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the anchor of the top side.
+    /// </summary>
+    public MagnetAnchor? TopTo
+    {
+        get => (MagnetAnchor?) GetValue(TopToProperty);
+        set => SetValue(TopToProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the anchor of the bottom side.
+    /// </summary>
+    public MagnetAnchor? BottomTo
+    {
+        get => (MagnetAnchor?) GetValue(BottomToProperty);
+        set => SetValue(BottomToProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how the width is resolved. Defaults to <see cref="MagnetSizing.Measured" />.
+    /// </summary>
+    public MagnetSizing WidthSizing
+    {
+        get => (MagnetSizing) GetValue(WidthSizingProperty);
+        set => SetValue(WidthSizingProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how the height is resolved. Defaults to <see cref="MagnetSizing.Measured" />.
+    /// </summary>
+    public MagnetSizing HeightSizing
+    {
+        get => (MagnetSizing) GetValue(HeightSizingProperty);
+        set => SetValue(HeightSizingProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the horizontal bias (0 = left, 1 = right) used when both horizontal anchors are set and the view does not fill the span.
+    /// Also used as the bias of a packed horizontal chain when this view is the chain head.
+    /// </summary>
     public double HorizontalBias
     {
         get => (double) GetValue(HorizontalBiasProperty);
@@ -83,20 +110,9 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     }
 
     /// <summary>
-    /// Bindable property for the <see cref="VerticalBias" /> property.
+    /// Gets or sets the vertical bias (0 = top, 1 = bottom) used when both vertical anchors are set and the view does not fill the span.
+    /// Also used as the bias of a packed vertical chain when this view is the chain head.
     /// </summary>
-    public static readonly BindableProperty VerticalBiasProperty = GenericBindableProperty<MagnetView>.Create(
-        nameof(VerticalBias),
-        0.5,
-        propertyChanged: b => b.OnVerticalBiasChanged
-    );
-
-    /// <summary>
-    /// Gets or sets the horizontal positioning bias for this view.
-    /// </summary>
-    /// <remarks>
-    /// This is only effective when the <see cref="Width" /> is set to <see cref="SizeUnit.Constraint" />.
-    /// </remarks>
     public double VerticalBias
     {
         get => (double) GetValue(VerticalBiasProperty);
@@ -104,853 +120,300 @@ public class MagnetView : MagnetElementBase<MagnetView.ConstraintTypes>, IMagnet
     }
 
     /// <summary>
-    /// Bindable property for the <see cref="LeftTo" /> property.
+    /// The view bound to this node (by identifier match or inline transfer).
     /// </summary>
-    public static readonly BindableProperty LeftToProperty = GenericBindableProperty<MagnetView>.Create<HorizontalPullTarget?>(
-        nameof(LeftTo),
-        propertyChanged: b => b.OnLeftToChanged
-    );
+    internal IView? View { get; set; }
 
-    /// <summary>
-    /// Gets or sets the <see cref="HorizontalPullTarget" /> to which the left side of this view will be attracted to.
-    /// </summary>
-    public HorizontalPullTarget? LeftTo
+    /// <summary>Gets the anchor of a side of this view.</summary>
+    internal MagnetAnchor? GetAnchor(MagnetPole side)
+        => side switch
+        {
+            MagnetPole.Left => LeftTo,
+            MagnetPole.Right => RightTo,
+            MagnetPole.Top => TopTo,
+            _ => BottomTo
+        };
+
+    /// <summary>Sets the anchor of a side of this view.</summary>
+    internal void SetAnchor(MagnetPole side, MagnetAnchor? anchor)
     {
-        get => (HorizontalPullTarget?) GetValue(LeftToProperty);
-        set => SetValue(LeftToProperty, value);
-    }
-
-    /// <summary>
-    /// Bindable property for the <see cref="RightTo" /> property.
-    /// </summary>
-    public static readonly BindableProperty RightToProperty = GenericBindableProperty<MagnetView>.Create<HorizontalPullTarget?>(
-        nameof(RightTo),
-        propertyChanged: b => b.OnRightToChanged
-    );
-
-    /// <summary>
-    /// Gets or sets the <see cref="HorizontalPullTarget" /> to which the right side of this view will be attracted to.
-    /// </summary>
-    public HorizontalPullTarget? RightTo
-    {
-        get => (HorizontalPullTarget?) GetValue(RightToProperty);
-        set => SetValue(RightToProperty, value);
-    }
-
-    /// <summary>
-    /// Bindable property for the <see cref="TopTo" /> property.
-    /// </summary>
-    public static readonly BindableProperty TopToProperty = GenericBindableProperty<MagnetView>.Create<VerticalPullTarget?>(
-        nameof(TopTo),
-        propertyChanged: b => b.OnTopToChanged
-    );
-
-    /// <summary>
-    /// Gets or sets the <see cref="VerticalPullTarget" /> to which the top side of this view will be attracted to.
-    /// </summary>
-    public VerticalPullTarget? TopTo
-    {
-        get => (VerticalPullTarget?) GetValue(TopToProperty);
-        set => SetValue(TopToProperty, value);
-    }
-
-    /// <summary>
-    /// Bindable property for the <see cref="BottomTo" /> property.
-    /// </summary>
-    public static readonly BindableProperty BottomToProperty = GenericBindableProperty<MagnetView>.Create<VerticalPullTarget?>(
-        nameof(BottomTo),
-        propertyChanged: b => b.OnBottomToChanged
-    );
-
-    /// <summary>
-    /// Gets or sets the <see cref="VerticalPullTarget" /> to which the bottom side of this view will be attracted to.
-    /// </summary>
-    public VerticalPullTarget? BottomTo
-    {
-        get => (VerticalPullTarget?) GetValue(BottomToProperty);
-        set => SetValue(BottomToProperty, value);
-    }
-
-    /// <summary>
-    /// Bindable property for the <see cref="Margin" /> property.
-    /// </summary>
-    public static readonly BindableProperty MarginProperty = GenericBindableProperty<MagnetView>.Create<Thickness>(
-        nameof(Margin),
-        propertyChanged: b => b.OnMarginChanged
-    );
-
-    /// <summary>
-    /// Gets or sets the view margins
-    /// </summary>
-    public Thickness Margin
-    {
-        get => (Thickness) GetValue(MarginProperty);
-        set => SetValue(MarginProperty, value);
-    }
-
-    /// <summary>
-    /// Bindable property for the <see cref="CollapsedMargin" /> property.
-    /// </summary>
-    public static readonly BindableProperty CollapsedMarginProperty = GenericBindableProperty<MagnetView>.Create<Thickness>(
-        nameof(CollapsedMargin),
-        propertyChanged: b => b.OnMarginChanged
-    );
-
-    /// <summary>
-    /// Gets or sets the view margins when the pull target has <see cref="Visibility" /> set to <see cref="Visibility.Collapsed" />.
-    /// </summary>
-    public Thickness CollapsedMargin
-    {
-        get => (Thickness) GetValue(CollapsedMarginProperty);
-        set => SetValue(CollapsedMarginProperty, value);
-    }
-
-    /// <inheritdoc />
-    public bool Collapsed { get; private set; }
-
-    /// <inheritdoc />
-    Variable IHorizontalPoles.Left => _left;
-
-    private readonly Variable _left = new();
-
-    /// <inheritdoc />
-    Variable IHorizontalPoles.Right => _right;
-
-    private readonly Variable _right = new();
-
-    /// <inheritdoc />
-    Variable IVerticalPoles.Top => _top;
-
-    private readonly Variable _top = new();
-
-    /// <inheritdoc />
-    Variable IVerticalPoles.Bottom => _bottom;
-
-    private readonly Variable _bottom = new();
-
-    /// <inheritdoc />
-    Variable IHorizontalChainPoles.ChainLeft => _chainLeft;
-
-    private readonly Variable _chainLeft = new();
-
-    /// <inheritdoc />
-    Variable IHorizontalChainPoles.ChainRight => _chainRight;
-
-    private readonly Variable _chainRight = new();
-
-    /// <inheritdoc />
-    Variable IVerticalChainPoles.ChainTop => _chainTop;
-
-    private readonly Variable _chainTop = new();
-
-    /// <inheritdoc />
-    Variable IVerticalChainPoles.ChainBottom => _chainBottom;
-
-    private readonly Variable _chainBottom = new();
-
-    /// <summary>
-    /// Gets the top position of the view.
-    /// </summary>
-    public double Top => _top.CurrentValue;
-
-    /// <summary>
-    /// Gets the bottom position of the view.
-    /// </summary>
-    public double Bottom => _bottom.CurrentValue;
-
-    /// <summary>
-    /// Gets the left position of the view.
-    /// </summary>
-    public double Left => _left.CurrentValue;
-
-    /// <summary>
-    /// Gets the right position of the view.
-    /// </summary>
-    public double Right => _right.CurrentValue;
-
-    /// <summary>
-    /// Internally used to store the real view associated with this magnet view.
-    /// </summary>
-    internal IView? View
-    {
-        get => _viewRef?.TryGetTarget(out var view) is true ? view : null;
-        set
+        switch (side)
         {
-            if (value == null)
-            {
-                _viewRef = null;
-
-                return;
-            }
-
-            _viewRef = new WeakReference<IView>(value);
-            var collapsed = value.Visibility == Visibility.Collapsed;
-
-            if (collapsed != Collapsed)
-            {
-                Collapsed = collapsed;
-                _collapsedChanged = true;
-            }
-        }
-    }
-
-    private readonly Variable _measuredWidth = new();
-    private readonly Variable _measuredHeight = new();
-    private readonly Variable _constraintsWidth = new();
-    private readonly Variable _constraintsHeight = new();
-    private readonly Variable _desiredWidth = new();
-    private readonly Variable _desiredHeight = new();
-    private readonly Variable _horizontalTailSpace = new();
-    private readonly Variable _verticalTailSpace = new();
-    private double _marginTop = double.NaN;
-    private double _marginBottom = double.NaN;
-    private double _marginLeft = double.NaN;
-    private double _marginRight = double.NaN;
-    private bool _collapsedChanged = true;
-    private bool _horizontalChainChanged = true;
-    private bool _verticalChainChanged = true;
-    private WeakReference<IView>? _viewRef;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="MagnetView" /> class.
-    /// </summary>
-    public MagnetView()
-    {
-        UpdateConstraints(ConstraintTypes.Width, GetWidthConstraints);
-        UpdateConstraints(ConstraintTypes.Height, GetHeightConstraints);
-    }
-
-    /// <inheritdoc />
-    protected override void SetVariableNames(string id)
-    {
-        _top.SetName($"{id}.Top");
-        _bottom.SetName($"{id}.Bottom");
-        _left.SetName($"{id}.Left");
-        _right.SetName($"{id}.Right");
-        _chainTop.SetName($"{id}.ChainTop");
-        _chainBottom.SetName($"{id}.ChainBottom");
-        _chainLeft.SetName($"{id}.ChainLeft");
-        _chainRight.SetName($"{id}.ChainRight");
-        _measuredWidth.SetName($"{id}.MeasuredWidth");
-        _measuredHeight.SetName($"{id}.MeasuredHeight");
-        _constraintsWidth.SetName($"{id}.ConstraintsWidth");
-        _constraintsHeight.SetName($"{id}.ConstraintsHeight");
-        _desiredWidth.SetName($"{id}.DesiredWidth");
-        _desiredHeight.SetName($"{id}.DesiredHeight");
-        _horizontalTailSpace.SetName($"{id}.HorizontalTailSpace");
-        _verticalTailSpace.SetName($"{id}.VerticalTailSpace");
-    }
-
-    private void OnMarginChanged(Thickness oldValue, Thickness newValue) => InvalidateStage();
-
-    /// <inheritdoc />
-    protected override void DetectChanges(IMagnetStage stage)
-    {
-        if (_collapsedChanged)
-        {
-            if (GetLeftConnection(stage) is { ChainedView: { } chainLeft })
-            {
-                chainLeft._horizontalChainChanged = true;
-            }
-
-            if (GetRightConnection(stage) is { ChainedView: { } chainRight })
-            {
-                chainRight._horizontalChainChanged = true;
-            }
-
-            if (GetTopConnection(stage) is { ChainedView: { } chainTop })
-            {
-                chainTop._verticalChainChanged = true;
-            }
-
-            if (GetBottomConnection(stage) is { ChainedView: { } chainBottom })
-            {
-                chainBottom._verticalChainChanged = true;
-            }
-        }
-    }
-
-    /// <inheritdoc />
-    protected override void ApplyConstraints(IMagnetStage stage)
-    {
-        if (_collapsedChanged)
-        {
-            UpdateConstraints(ConstraintTypes.Consistency, GetConsistencyConstraints);
-            UpdatePolesConstraintsIfNeeded(stage);
-        }
-
-        if (_horizontalChainChanged)
-        {
-            UpdateConstraints(ConstraintTypes.HorizontalPosition, GetHorizontalConstraints);
-        }
-
-        if (_verticalChainChanged)
-        {
-            UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
-        }
-
-        if (View is { } view && !Collapsed)
-        {
-            // We have to measure the view when either the width or height is set to auto.
-            if (Height.Unit is SizeUnit.Measured || Width.Unit is SizeUnit.Measured)
-            {
-                var widthConstraint = stage.WidthRequest;
-                var heightConstraint = stage.HeightRequest;
-                var size = view.Measure(widthConstraint, heightConstraint);
-
-                UpdateMeasureConstraints(stage, size);
-            }
-        }
-        else if (_collapsedChanged)
-        {
-            UpdateMeasureConstraints(stage, Size.Zero);
-        }
-
-        _collapsedChanged = false;
-        _horizontalChainChanged = false;
-        _verticalChainChanged = false;
-
-        base.ApplyConstraints(stage);
-    }
-
-    /// <inheritdoc />
-    protected override void FinalizeConstraints(IMagnetStage stage)
-    {
-        if (View is not { } view || Collapsed)
-        {
-            return;
-        }
-
-        // If the allocated space is less than the desired size, we need to re-measure the view
-        var needsMeasure = false;
-        var widthConstraint = stage.WidthRequest;
-        var heightConstraint = stage.HeightRequest;
-
-        if (Height.Unit is SizeUnit.Measured && view.DesiredSize.Width > Right - Left)
-        {
-            widthConstraint = Right - Left;
-            needsMeasure = true;
-        }
-
-        if (Width.Unit is SizeUnit.Measured && view.DesiredSize.Height > Bottom - Top)
-        {
-            heightConstraint = Bottom - Top;
-            needsMeasure = true;
-        }
-
-        if (needsMeasure)
-        {
-            var size = view.Measure(widthConstraint, heightConstraint);
-            UpdateMeasureConstraints(stage, size);
-        }
-    }
-
-    /// <inheritdoc />
-    protected override (Variable Variable, double Strength)[] GetEditableVariables() => [(_measuredWidth, Required - 1), (_measuredHeight, Required - 1)];
-
-    private IEnumerable<Constraint> GetConsistencyConstraints(IMagnetStage _)
-    {
-        if (Collapsed)
-        {
-            yield return _left | Eq(Required) | _right;
-            yield return _top | Eq(Required) | _bottom;
-        }
-        else
-        {
-            yield return _right | GreaterOrEq(Required) | _left;
-            yield return _bottom | GreaterOrEq(Required) | _top;
-        }
-    }
-
-    private void UpdateMeasureConstraints(IMagnetStage stage, Size size)
-    {
-        if (Width.Unit is SizeUnit.Measured && _measuredWidth.CurrentValue != size.Width)
-        {
-            stage.SuggestValue(_measuredWidth, size.Width);
-        }
-
-        if (Height.Unit is SizeUnit.Measured && _measuredHeight.CurrentValue != size.Height)
-        {
-            stage.SuggestValue(_measuredHeight, size.Height);
-        }
-    }
-
-    private void UpdatePolesConstraintsIfNeeded(IMagnetStage stage)
-    {
-        var margin = Margin;
-        var collapsedMargin = CollapsedMargin;
-
-        var needsHorizontalConstraintsUpdate = EnsureEffectiveLeftMargin(stage, collapsedMargin, margin);
-        needsHorizontalConstraintsUpdate = EnsureEffectiveRightMargin(stage, collapsedMargin, margin) || needsHorizontalConstraintsUpdate;
-        var needsVerticalConstraintsUpdate = EnsureEffectiveTopMargin(stage, collapsedMargin, margin);
-        needsVerticalConstraintsUpdate = EnsureEffectiveBottomMargin(stage, collapsedMargin, margin) || needsVerticalConstraintsUpdate;
-
-        if (needsHorizontalConstraintsUpdate)
-        {
-            UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
-            _horizontalChainChanged = false;
-        }
-
-        if (needsVerticalConstraintsUpdate)
-        {
-            UpdateConstraints(ConstraintTypes.HorizontalPosition, GetHorizontalConstraints);
-            _verticalChainChanged = false;
-        }
-    }
-
-    private bool EnsureEffectiveBottomMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
-    {
-        if (BottomTo is { } bottomTo)
-        {
-            var bottomMargin = bottomTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Bottom : margin.Bottom;
-
-            if (_marginBottom != bottomMargin)
-            {
-                _marginBottom = bottomMargin;
-
-                return true;
-            }
-        }
-        else
-        {
-            _marginBottom = 0;
-        }
-
-        return false;
-    }
-
-    private bool EnsureEffectiveTopMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
-    {
-        if (TopTo is { } topTo)
-        {
-            var topMargin = topTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Top : margin.Top;
-
-            if (_marginTop != topMargin)
-            {
-                _marginTop = topMargin;
-
-                return true;
-            }
-        }
-        else
-        {
-            _marginTop = 0;
-        }
-
-        return false;
-    }
-
-    private bool EnsureEffectiveRightMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
-    {
-        if (RightTo is { } rightTo)
-        {
-            var rightMargin = rightTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Right : margin.Right;
-
-            if (_marginRight != rightMargin)
-            {
-                _marginRight = rightMargin;
-
-                return true;
-            }
-        }
-        else
-        {
-            _marginRight = 0;
-        }
-
-        return false;
-    }
-
-    private bool EnsureEffectiveLeftMargin(IMagnetStage stage, Thickness collapsedMargin, Thickness margin)
-    {
-        if (LeftTo is { } leftTo)
-        {
-            var leftMargin = leftTo.GetElement(stage) is IMagnetView { Collapsed: true } ? collapsedMargin.Left : margin.Left;
-
-            if (_marginLeft != leftMargin)
-            {
-                _marginLeft = leftMargin;
-
-                return true;
-            }
-        }
-        else
-        {
-            _marginLeft = 0;
-        }
-
-        return false;
-    }
-
-    private void OnLeftToChanged(HorizontalPullTarget? oldValue, HorizontalPullTarget? newValue) => OnHorizontalPropertyChanged();
-
-    private void OnRightToChanged(HorizontalPullTarget? oldValue, HorizontalPullTarget? newValue) => OnHorizontalPropertyChanged();
-
-    private void OnTopToChanged(VerticalPullTarget? oldValue, VerticalPullTarget? newValue) => OnVerticalPropertyChanged();
-
-    private void OnBottomToChanged(VerticalPullTarget? oldValue, VerticalPullTarget? newValue) => OnVerticalPropertyChanged();
-
-    private IEnumerable<Constraint> GetHorizontalConstraints(IMagnetStage stage)
-    {
-        var maybeLeftConnection = GetLeftConnection(stage);
-        var maybeRightConnection = GetRightConnection(stage);
-
-        if (maybeLeftConnection is { } lc)
-        {
-            yield return lc.Pole | lc.Relation | lc.ToPole;
-
-            if (lc.ChainedView is not null)
-            {
-                yield return GetChainLeftConstraints();
-            }
-        }
-
-        if (maybeRightConnection is { } rc)
-        {
-            yield return rc.Pole | rc.Relation | rc.ToPole;
-
-            if (rc.ChainedView is not null)
-            {
-                yield return GetChainRightConstraints();
-            }
-        }
-
-        if (maybeLeftConnection is { } leftConnection && maybeRightConnection is { } rightConnection)
-        {
-            if (Width is { Unit: SizeUnit.Constraint })
-            {
-                if (leftConnection.ChainedView is { } chainedView)
-                {
-                    // if we're part of the chain, we need to add the constraint to the previous sibling
-                    yield return _constraintsWidth | Eq(Strong) | chainedView._constraintsWidth;
-                }
-                else if (rightConnection.ChainedView is null)
-                {
-                    // if we're not the chain head, we need to add the constraint
-                    yield return _constraintsWidth | Eq(Strong) | (rightConnection.ToPole - leftConnection.ToPole);
-                }
-            }
-            else if (leftConnection is { Traction: Traction.Strong, ChainedView: { } prev })
-            {
-                if (rightConnection.Traction == Traction.Strong)
-                {
-                    // We're part of the pack-chain, so we just need to propagate the information about the space from the tail to its right target
-                    yield return _horizontalTailSpace | Eq(Required) | prev._horizontalTailSpace;
-                }
-                else
-                {
-                    // We're the pack-chain tail, so it's finally time to compute the space from me to the right target
-                    yield return _horizontalTailSpace | Eq(Required) | (rightConnection.ToPole - rightConnection.Pole);
-                }
-            }
-            else if (rightConnection.Traction == Traction.Strong && leftConnection.Traction == Traction.Default && rightConnection.ChainedView is { } nextChainedView)
-            {
-                // We're the pack-chain head, so we need to apply the bias to the entire chain
-                yield return ((nextChainedView._horizontalTailSpace + (leftConnection.Pole - leftConnection.ToPole)) * HorizontalBias) | Eq(Required) |
-                             (leftConnection.Pole - leftConnection.ToPole);
-            }
-
-            if (leftConnection.Traction == Traction.Default && rightConnection.Traction == Traction.Default)
-            {
-                yield return GetBiasConstraint(HorizontalBias, rightConnection.Pole, rightConnection.ToPole, leftConnection.Pole, leftConnection.ToPole);
-            }
-        }
-    }
-
-    private IEnumerable<Constraint> GetVerticalConstraints(IMagnetStage stage)
-    {
-        var maybeTopConnection = GetTopConnection(stage);
-        var maybeBottomConnection = GetBottomConnection(stage);
-
-        if (maybeTopConnection is { } tc)
-        {
-            yield return tc.Pole | tc.Relation | tc.ToPole;
-
-            if (tc.ChainedView is not null)
-            {
-                yield return GetChainTopConstraints();
-            }
-        }
-
-        if (maybeBottomConnection is { } bc)
-        {
-            yield return bc.Pole | bc.Relation | bc.ToPole;
-
-            if (bc.ChainedView is not null)
-            {
-                yield return GetChainBottomConstraints();
-            }
-        }
-
-        if (maybeTopConnection is { } topConnection && maybeBottomConnection is { } bottomConnection)
-        {
-            if (Width is { Unit: SizeUnit.Constraint })
-            {
-                if (topConnection.ChainedView is { } chainedView)
-                {
-                    // if we're part of the chain, we need to add the constraint to the previous sibling
-                    yield return _constraintsHeight | Eq(Strong) | chainedView._constraintsHeight;
-                }
-                else if (bottomConnection.ChainedView is null)
-                {
-                    // if we're not the chain head, we need to add the constraint
-                    yield return _constraintsHeight | Eq(Strong) | (bottomConnection.ToPole - topConnection.ToPole);
-                }
-            }
-            else if (topConnection is { Traction: Traction.Strong, ChainedView: { } prev })
-            {
-                if (bottomConnection.Traction == Traction.Strong)
-                {
-                    // We're part of the pack-chain, so we just need to propagate the information about the space from the tail to its bottom target
-                    yield return _verticalTailSpace | Eq(Required) | prev._verticalTailSpace;
-                }
-                else
-                {
-                    // We're the pack-chain tail, so it's finally time to compute the space from me to the bottom target
-                    yield return _verticalTailSpace | Eq(Required) | (bottomConnection.ToPole - bottomConnection.Pole);
-                }
-            }
-            else if (bottomConnection.Traction == Traction.Strong && topConnection.Traction == Traction.Default && bottomConnection.ChainedView is { } nextChainedView)
-            {
-                // We're the pack-chain head, so we need to apply the bias to the entire chain
-                yield return ((nextChainedView._verticalTailSpace + (topConnection.Pole - topConnection.ToPole)) * VerticalBias) | Eq(Required) |
-                             (topConnection.Pole - topConnection.ToPole);
-            }
-
-            if (topConnection.Traction == Traction.Default && bottomConnection.Traction == Traction.Default)
-            {
-                yield return GetBiasConstraint(VerticalBias, bottomConnection.Pole, bottomConnection.ToPole, topConnection.Pole, topConnection.ToPole);
-            }
-        }
-    }
-
-    private PoleConnection? GetLeftConnection(IMagnetStage stage)
-    {
-        PoleConnection? connection = null;
-
-        if (LeftTo is { } leftTo)
-        {
-            var target = leftTo.GetElement(stage);
-            var pole = Expression.From(_left);
-            var traction = leftTo.Traction;
-            var relation = traction == Traction.Default ? GreaterOrEq(Medium) : Eq(Medium);
-            var toPole = (IsLeftPoleChained(target, out var chainedView) ? target.GetChainPole(leftTo.Pole) : target.GetPole(leftTo.Pole)) + _marginLeft;
-            connection = (pole, traction, relation, toPole, chainedView);
-        }
-
-        return connection;
-    }
-
-    private PoleConnection? GetRightConnection(IMagnetStage stage)
-    {
-        PoleConnection? connection = null;
-
-        if (RightTo is { } rightTo)
-        {
-            var target = rightTo.GetElement(stage);
-            var pole = Expression.From(_right);
-            var traction = rightTo.Traction;
-            var relation = traction == Traction.Default ? LessOrEq(Medium) : Eq(Medium);
-            var toPole = (IsRightPoleChained(target, out var chainedView) ? target.GetChainPole(rightTo.Pole) : target.GetPole(rightTo.Pole)) - _marginRight;
-            connection = (pole, traction, relation, toPole, chainedView);
-        }
-
-        return connection;
-    }
-
-    private PoleConnection? GetTopConnection(IMagnetStage stage)
-    {
-        PoleConnection? connection = null;
-
-        if (TopTo is { } topTo)
-        {
-            var target = topTo.GetElement(stage);
-            var pole = Expression.From(_top);
-            var traction = topTo.Traction;
-            var relation = traction == Traction.Default ? GreaterOrEq(Medium) : Eq(Medium);
-            var toPole = (IsTopPoleChained(target, out var chainedView) ? target.GetChainPole(topTo.Pole) : target.GetPole(topTo.Pole)) + _marginTop;
-            connection = (pole, traction, relation, toPole, chainedView);
-        }
-
-        return connection;
-    }
-
-    private PoleConnection? GetBottomConnection(IMagnetStage stage)
-    {
-        PoleConnection? connection = null;
-
-        if (BottomTo is { } bottomTo)
-        {
-            var target = bottomTo.GetElement(stage);
-            var pole = Expression.From(_bottom);
-            var traction = bottomTo.Traction;
-            var relation = traction == Traction.Default ? LessOrEq(Medium) : Eq(Medium);
-            var toPole = (IsBottomPoleChained(target, out var chainedView) ? target.GetChainPole(bottomTo.Pole) : target.GetPole(bottomTo.Pole)) - _marginBottom;
-            connection = (pole, traction, relation, toPole, chainedView);
-        }
-
-        return connection;
-    }
-
-    private Constraint GetChainTopConstraints() => _chainTop | Eq(Required) | (_top - _marginTop);
-    private Constraint GetChainBottomConstraints() => _chainBottom | Eq(Required) | (_bottom + _marginBottom);
-    private Constraint GetChainLeftConstraints() => _chainLeft | Eq(Required) | (_left - _marginLeft);
-    private Constraint GetChainRightConstraints() => _chainRight | Eq(Required) | (_right + _marginRight);
-
-    private void OnWidthChanged(SizeValue oldValue, SizeValue newValue)
-    {
-        UpdateConstraints(ConstraintTypes.Width, GetWidthConstraints);
-
-        if (oldValue.Unit != newValue.Unit)
-        {
-            OnHorizontalPropertyChanged();
-        }
-    }
-
-    private void OnHeightChanged(SizeValue oldValue, SizeValue newValue)
-    {
-        UpdateConstraints(ConstraintTypes.Height, GetHeightConstraints);
-
-        if (oldValue.Unit != newValue.Unit)
-        {
-            OnVerticalPropertyChanged();
-        }
-    }
-
-    private IEnumerable<Constraint> GetWidthConstraints(IMagnetStage stage)
-        => GetSizeConstraints(Width, _measuredWidth, _desiredWidth, _left, _right, _constraintsWidth, stage.Left, stage.Right, _bottom - _top);
-
-    private IEnumerable<Constraint> GetHeightConstraints(IMagnetStage stage)
-        => GetSizeConstraints(Height, _measuredHeight, _desiredHeight, _top, _bottom, _constraintsHeight, stage.Top, stage.Bottom, _right - _left);
-
-    private void OnHorizontalPropertyChanged()
-        => UpdateConstraints(ConstraintTypes.HorizontalPosition, GetHorizontalConstraints);
-
-    private void OnVerticalPropertyChanged()
-        => UpdateConstraints(ConstraintTypes.VerticalPosition, GetVerticalConstraints);
-
-    private bool IsLeftPoleChained(IMagnetElementBase leftElement, [NotNullWhen(true)] out MagnetView? chainedView)
-    {
-        if (leftElement is MagnetView { RightTo: { Pole: HorizontalPoles.Left } rightToMe } maybeChainedView && rightToMe.Id == Id)
-        {
-            chainedView = maybeChainedView;
-
-            return true;
-        }
-
-        chainedView = null;
-
-        return false;
-    }
-
-    private bool IsRightPoleChained(IMagnetElementBase rightElement, [NotNullWhen(true)] out MagnetView? chainedView)
-    {
-        if (rightElement is MagnetView { LeftTo: { Pole: HorizontalPoles.Right } leftToMe } maybeChainedView && leftToMe.Id == Id)
-        {
-            chainedView = maybeChainedView;
-
-            return true;
-        }
-
-        chainedView = null;
-
-        return false;
-    }
-
-    private bool IsTopPoleChained(IMagnetElementBase topElement, [NotNullWhen(true)] out MagnetView? chainedView)
-    {
-        if (topElement is MagnetView { BottomTo: { Pole: VerticalPoles.Top } bottomToMe } maybeChainedView && bottomToMe.Id == Id)
-        {
-            chainedView = maybeChainedView;
-
-            return true;
-        }
-
-        chainedView = null;
-
-        return false;
-    }
-
-    private bool IsBottomPoleChained(IMagnetElementBase rightElement, [NotNullWhen(true)] out MagnetView? chainedView)
-    {
-        if (rightElement is MagnetView { TopTo: { Pole: VerticalPoles.Bottom } topToMe } maybeChainedView && topToMe.Id == Id)
-        {
-            chainedView = maybeChainedView;
-
-            return true;
-        }
-
-        chainedView = null;
-
-        return false;
-    }
-
-    private void OnHorizontalBiasChanged(double oldValue, double newValue)
-        => OnHorizontalPropertyChanged();
-
-    private void OnVerticalBiasChanged(double oldValue, double newValue)
-        => OnVerticalPropertyChanged();
-
-    private IEnumerable<Constraint> GetSizeConstraints(
-        SizeValue size,
-        Variable measured,
-        Variable desired,
-        Variable left,
-        Variable right,
-        Variable constraintSize,
-        Variable sceneLeft,
-        Variable sceneRight,
-        Expression otherAxisSize
-    )
-    {
-        var multiplier = size.Value;
-
-        var relation = size.Behavior == SizeBehavior.Shrink ? Eq(Weak) : Eq(Strong);
-
-        switch (size.Unit)
-        {
-            case SizeUnit.Measured:
-                yield return desired | Eq(Strong) | (measured * multiplier);
-                yield return (right - left) | relation | desired;
+            case MagnetPole.Left:
+                LeftTo = anchor;
 
                 break;
 
-            case SizeUnit.Constraint:
-                yield return (right - left) | relation | (constraintSize * multiplier);
-                yield return (right - left) | Eq(Medium) | (sceneRight - sceneLeft);
+            case MagnetPole.Right:
+                RightTo = anchor;
 
                 break;
 
-            case SizeUnit.Stage:
-                yield return (right - left) | relation | ((sceneRight - sceneLeft) * multiplier);
-                yield return (right - left) | Eq(Medium) | (sceneRight - sceneLeft);
-
-                break;
-
-            case SizeUnit.Ratio:
-                yield return desired | Eq(Strong) | (otherAxisSize * multiplier);
-                yield return (right - left) | relation | desired;
+            case MagnetPole.Top:
+                TopTo = anchor;
 
                 break;
 
             default:
-                throw new NotSupportedException();
+                BottomTo = anchor;
+
+                break;
         }
     }
 
-    private static Constraint GetBiasConstraint(double bias, Expression end, Expression endTarget, Expression start, Expression startTarget)
-        => bias switch
-        {
-            1d => end | Eq(Required) | endTarget,
-            0d => start | Eq(Required) | startTarget,
+    #region Fluent API
 
-            // start = startTarget + (endTarget - startTarget - size) * bias
-            // start = startTarget + (endTarget - startTarget - end + start) * bias
-            // 0 = startTarget + (endTarget - startTarget - end + start) * bias - start
-            // 0 = startTarget + bias * endTarget - bias * startTarget - bias * end + bias * start - start
-            // 0 = startTarget - bias * startTarget + bias * endTarget - bias * end + bias * start - start
-            // 0 = startTarget * (1 - bias) + bias * endTarget - bias * end + start * (bias - 1)
-            // bias * end = startTarget * (1 - bias) + bias * endTarget + start * (bias - 1)
-            _ => (bias * end) | Eq(Required) | ((startTarget * (1 - bias)) + (endTarget * bias) + (start * (bias - 1)))
+    /// <summary>Sets <see cref="MagnetNode.MagnetId" />.</summary>
+    public MagnetView Id(string magnetId)
+    {
+        MagnetId = magnetId;
+
+        return this;
+    }
+
+    /// <summary>Anchors the left side.</summary>
+    public MagnetView Left(string target, MagnetPole pole = MagnetPole.Left, double margin = 0, double? goneMargin = null)
+    {
+        LeftTo = new MagnetAnchor(target, pole, margin, goneMargin);
+
+        return this;
+    }
+
+    /// <summary>Anchors the right side.</summary>
+    public MagnetView Right(string target, MagnetPole pole = MagnetPole.Right, double margin = 0, double? goneMargin = null)
+    {
+        RightTo = new MagnetAnchor(target, pole, margin, goneMargin);
+
+        return this;
+    }
+
+    /// <summary>Anchors the top side.</summary>
+    public MagnetView Top(string target, MagnetPole pole = MagnetPole.Top, double margin = 0, double? goneMargin = null)
+    {
+        TopTo = new MagnetAnchor(target, pole, margin, goneMargin);
+
+        return this;
+    }
+
+    /// <summary>Anchors the bottom side.</summary>
+    public MagnetView Bottom(string target, MagnetPole pole = MagnetPole.Bottom, double margin = 0, double? goneMargin = null)
+    {
+        BottomTo = new MagnetAnchor(target, pole, margin, goneMargin);
+
+        return this;
+    }
+
+    /// <summary>Anchors all four sides to the same node with the given margins.</summary>
+    public MagnetView Fill(string target, Thickness margin)
+        => Left(target, MagnetPole.Left, margin.Left)
+           .Top(target, MagnetPole.Top, margin.Top)
+           .Right(target, MagnetPole.Right, margin.Right)
+           .Bottom(target, MagnetPole.Bottom, margin.Bottom)
+           .Size(MagnetSizing.Constraint, MagnetSizing.Constraint);
+
+    // --- Relative shortcuts (readable verbs, C# only: XAML uses LeftTo/RightTo/TopTo/BottomTo) ---
+
+    /// <summary>Places this view after (to the right of) the target: <c>LeftTo = target.Right</c>.</summary>
+    public MagnetView After(MagnetTarget target) => Left(target.Target, MagnetPole.Right, target.Margin, target.GoneMargin);
+
+    /// <summary>Places this view before (to the left of) the target: <c>RightTo = target.Left</c>.</summary>
+    public MagnetView Before(MagnetTarget target) => Right(target.Target, MagnetPole.Left, target.Margin, target.GoneMargin);
+
+    /// <summary>Places this view below the target: <c>TopTo = target.Bottom</c>.</summary>
+    public MagnetView Below(MagnetTarget target) => Top(target.Target, MagnetPole.Bottom, target.Margin, target.GoneMargin);
+
+    /// <summary>Places this view above the target: <c>BottomTo = target.Top</c>.</summary>
+    public MagnetView Above(MagnetTarget target) => Bottom(target.Target, MagnetPole.Top, target.Margin, target.GoneMargin);
+
+    /// <summary>Aligns the left side with the target's left side: <c>LeftTo = target.Left</c>.</summary>
+    public MagnetView AlignLeft(MagnetTarget target) => Left(target.Target, MagnetPole.Left, target.Margin, target.GoneMargin);
+
+    /// <summary>Aligns the right side with the target's right side: <c>RightTo = target.Right</c>.</summary>
+    public MagnetView AlignRight(MagnetTarget target) => Right(target.Target, MagnetPole.Right, target.Margin, target.GoneMargin);
+
+    /// <summary>Aligns the top side with the target's top side: <c>TopTo = target.Top</c>.</summary>
+    public MagnetView AlignTop(MagnetTarget target) => Top(target.Target, MagnetPole.Top, target.Margin, target.GoneMargin);
+
+    /// <summary>Aligns the bottom side with the target's bottom side: <c>BottomTo = target.Bottom</c>.</summary>
+    public MagnetView AlignBottom(MagnetTarget target) => Bottom(target.Target, MagnetPole.Bottom, target.Margin, target.GoneMargin);
+
+    /// <summary>Anchors left and right to the target: the view is placed inside it by <see cref="HorizontalBias" /> (0.5 = centered).</summary>
+    public MagnetView HorizontallyWithin(MagnetTarget target) => AlignLeft(target).AlignRight(target);
+
+    /// <summary>Anchors top and bottom to the target: the view is placed inside it by <see cref="VerticalBias" /> (0.5 = centered).</summary>
+    public MagnetView VerticallyWithin(MagnetTarget target) => AlignTop(target).AlignBottom(target);
+
+    /// <summary>Anchors all four sides to the target: the view is placed inside it by the biases (0.5 = centered).</summary>
+    public MagnetView Within(MagnetTarget target) => HorizontallyWithin(target).VerticallyWithin(target);
+
+    /// <summary>Anchors left and right to the target and sets <c>Width="*"</c>.</summary>
+    public MagnetView FillWidth(MagnetTarget target)
+    {
+        HorizontallyWithin(target);
+        WidthSizing = MagnetSizing.Constraint;
+
+        return this;
+    }
+
+    /// <summary>Anchors top and bottom to the target and sets <c>Height="*"</c>.</summary>
+    public MagnetView FillHeight(MagnetTarget target)
+    {
+        VerticallyWithin(target);
+        HeightSizing = MagnetSizing.Constraint;
+
+        return this;
+    }
+
+
+    // --- String targets with margins ---
+
+    /// <inheritdoc cref="After(MagnetTarget)" />
+    public MagnetView After(string target, double margin, double? goneMargin = null) => After(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Before(MagnetTarget)" />
+    public MagnetView Before(string target, double margin, double? goneMargin = null) => Before(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Below(MagnetTarget)" />
+    public MagnetView Below(string target, double margin, double? goneMargin = null) => Below(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Above(MagnetTarget)" />
+    public MagnetView Above(string target, double margin, double? goneMargin = null) => Above(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignLeft(MagnetTarget)" />
+    public MagnetView AlignLeft(string target, double margin, double? goneMargin = null) => AlignLeft(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignRight(MagnetTarget)" />
+    public MagnetView AlignRight(string target, double margin, double? goneMargin = null) => AlignRight(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignTop(MagnetTarget)" />
+    public MagnetView AlignTop(string target, double margin, double? goneMargin = null) => AlignTop(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignBottom(MagnetTarget)" />
+    public MagnetView AlignBottom(string target, double margin, double? goneMargin = null) => AlignBottom(new MagnetTarget(target, margin, goneMargin));
+
+    /// <inheritdoc cref="HorizontallyWithin(MagnetTarget)" />
+    public MagnetView HorizontallyWithin(string target, double margin) => HorizontallyWithin(new MagnetTarget(target, margin));
+
+    /// <inheritdoc cref="VerticallyWithin(MagnetTarget)" />
+    public MagnetView VerticallyWithin(string target, double margin) => VerticallyWithin(new MagnetTarget(target, margin));
+
+    /// <inheritdoc cref="Within(MagnetTarget)" />
+    public MagnetView Within(string target, double margin) => Within(new MagnetTarget(target, margin));
+
+    /// <inheritdoc cref="FillWidth(MagnetTarget)" />
+    public MagnetView FillWidth(string target, double margin) => FillWidth(new MagnetTarget(target, margin));
+
+    /// <inheritdoc cref="FillHeight(MagnetTarget)" />
+    public MagnetView FillHeight(string target, double margin) => FillHeight(new MagnetTarget(target, margin));
+
+    // --- Typed targets: a view carrying Magnet.MagnetId, or a node ---
+
+    /// <summary>Resolves the <see cref="MagnetNode.MagnetId" /> of a view or node used as a target.</summary>
+    public static string IdOf(BindableObject target)
+    {
+        var id = target switch
+        {
+            MagnetNode node => node.MagnetId,
+            _ => Magnet.GetMagnetId(target)
         };
+
+        return string.IsNullOrEmpty(id)
+            ? throw new InvalidOperationException($"The target {target.GetType().Name} has no MagnetId (set Magnet.MagnetId on it, or use Magnet.GetConstraints(view).Id(...)).")
+            : id;
+    }
+
+    /// <summary>Builds a <see cref="MagnetTarget" /> from a view or node.</summary>
+    public static MagnetTarget TargetOf(BindableObject target, double margin = 0, double? goneMargin = null) => new(IdOf(target), margin, goneMargin);
+
+    /// <inheritdoc cref="Left(string, MagnetPole, double, double?)" />
+    public MagnetView Left(BindableObject target, MagnetPole pole = MagnetPole.Left, double margin = 0, double? goneMargin = null) => Left(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Right(string, MagnetPole, double, double?)" />
+    public MagnetView Right(BindableObject target, MagnetPole pole = MagnetPole.Right, double margin = 0, double? goneMargin = null) => Right(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Top(string, MagnetPole, double, double?)" />
+    public MagnetView Top(BindableObject target, MagnetPole pole = MagnetPole.Top, double margin = 0, double? goneMargin = null) => Top(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Bottom(string, MagnetPole, double, double?)" />
+    public MagnetView Bottom(BindableObject target, MagnetPole pole = MagnetPole.Bottom, double margin = 0, double? goneMargin = null) => Bottom(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="After(MagnetTarget)" />
+    public MagnetView After(BindableObject target, double margin = 0, double? goneMargin = null) => After(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Before(MagnetTarget)" />
+    public MagnetView Before(BindableObject target, double margin = 0, double? goneMargin = null) => Before(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Below(MagnetTarget)" />
+    public MagnetView Below(BindableObject target, double margin = 0, double? goneMargin = null) => Below(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Above(MagnetTarget)" />
+    public MagnetView Above(BindableObject target, double margin = 0, double? goneMargin = null) => Above(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignLeft(MagnetTarget)" />
+    public MagnetView AlignLeft(BindableObject target, double margin = 0, double? goneMargin = null) => AlignLeft(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignRight(MagnetTarget)" />
+    public MagnetView AlignRight(BindableObject target, double margin = 0, double? goneMargin = null) => AlignRight(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignTop(MagnetTarget)" />
+    public MagnetView AlignTop(BindableObject target, double margin = 0, double? goneMargin = null) => AlignTop(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignBottom(MagnetTarget)" />
+    public MagnetView AlignBottom(BindableObject target, double margin = 0, double? goneMargin = null) => AlignBottom(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="HorizontallyWithin(MagnetTarget)" />
+    public MagnetView HorizontallyWithin(BindableObject target, double margin = 0) => HorizontallyWithin(TargetOf(target, margin));
+
+    /// <inheritdoc cref="VerticallyWithin(MagnetTarget)" />
+    public MagnetView VerticallyWithin(BindableObject target, double margin = 0) => VerticallyWithin(TargetOf(target, margin));
+
+    /// <inheritdoc cref="Within(MagnetTarget)" />
+    public MagnetView Within(BindableObject target, double margin = 0) => Within(TargetOf(target, margin));
+
+    /// <inheritdoc cref="FillWidth(MagnetTarget)" />
+    public MagnetView FillWidth(BindableObject target, double margin = 0) => FillWidth(TargetOf(target, margin));
+
+    /// <inheritdoc cref="FillHeight(MagnetTarget)" />
+    public MagnetView FillHeight(BindableObject target, double margin = 0) => FillHeight(TargetOf(target, margin));
+
+    /// <summary>Sets width and height.</summary>
+    public MagnetView Size(MagnetSizing width, MagnetSizing height)
+    {
+        WidthSizing = width;
+        HeightSizing = height;
+
+        return this;
+    }
+
+    /// <summary>Sets a fixed width and height.</summary>
+    public MagnetView Size(double width, double height) => Size(MagnetSizing.Fixed(width), MagnetSizing.Fixed(height));
+
+    /// <summary>Sets horizontal and vertical bias.</summary>
+    public MagnetView Bias(double horizontal, double vertical)
+    {
+        HorizontalBias = horizontal;
+        VerticalBias = vertical;
+
+        return this;
+    }
+
+    #endregion
+
+    private static BindableProperty CreateAnchorProperty(string name)
+        => BindableProperty.Create(
+            name,
+            typeof(MagnetAnchor?),
+            typeof(MagnetView),
+            null,
+            propertyChanged: (b, o, n) => ((MagnetView) b).Notify(MagnetAnchor.Diff((MagnetAnchor?) o, (MagnetAnchor?) n))
+        );
+
+    private static BindableProperty CreateSizeProperty(string name)
+        => BindableProperty.Create(
+            name,
+            typeof(MagnetSizing),
+            typeof(MagnetView),
+            MagnetSizing.Measured,
+            propertyChanged: (b, o, n) => ((MagnetView) b).Notify(((MagnetSizing) o).DiffWith((MagnetSizing) n))
+        );
 }

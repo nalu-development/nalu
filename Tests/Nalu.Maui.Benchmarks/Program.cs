@@ -9,13 +9,34 @@ public class Program
     {
         if (args.Length > 0)
         {
+            if (args[0] == "--profile-magnet")
+            {
+                // dotnet trace collect --format speedscope -- dotnet Tests/Nalu.Maui.Benchmarks/bin/Release/net10.0/Nalu.Maui.Benchmarks.dll --profile-magnet
+                var card = new MagnetCardBenchmarks();
+                card.Setup();
+
+                for (var i = 0; i < 20000; i++)
+                {
+                    card.MagnetCardInvalidatedPerf();
+                }
+
+                return;
+            }
+
+            if (args[0] == "--alloc-magnet")
+            {
+                MagnetAllocationProbe.Run();
+
+                return;
+            }
+
             if (args[0] == "--speedscope-magnet")
             {
                 // dotnet build -c Release && dotnet trace collect --format speedscope -- dotnet bin/Release/net9.0/Nalu.Maui.Benchmarks.dll --speedscope-magnet && speedscope *.speedscope.json && rm -rf *.speedscope.json *.nettrace
                 Console.WriteLine("Direct run");
 
                 var magnetBenchmarks = new MagnetBenchmarks();
-                magnetBenchmarks.MagnetLayoutPerf(100_000);
+                magnetBenchmarks.MagnetInvalidatedPerf(100_000);
 
                 return;
             }
