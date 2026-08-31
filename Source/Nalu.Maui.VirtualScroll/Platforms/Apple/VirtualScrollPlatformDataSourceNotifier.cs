@@ -56,6 +56,24 @@ internal class VirtualScrollPlatformDataSourceNotifier : IDisposable
         // a Reset notification while more sections were added in the same main-loop pass).
         UpdateSourceCount();
 
+        // Incremental updates are only legal once UICollectionView has loaded its initial
+        // content (first layout pass with a real size) and while it is attached to a window.
+        // An InsertItems/PerformBatchUpdates arriving before that (e.g. items pushed one-by-one
+        // right after the page appeared, while the platform view is still settling into the
+        // window) makes UIKit run its very first data load INSIDE the update transaction: the
+        // "before" counts it captures then already include the change, and the count validation
+        // dies with the _Bug_Detected_In_Client_Of_UICollectionView_Invalid_Batch_Updates
+        // assertion. ReloadData is always valid and the pending initial layout picks up the
+        // fresh snapshot. The same window reopens when the data source is replaced (UIKit holds
+        // a pending full reload until the next layout), hence the HasLoadedData reset there.
+        if (_collectionView.Window is null || _collectionView is VirtualScrollCollectionView { HasLoadedData: false })
+        {
+            _collectionView.ReloadData();
+            _previousSectionCount = newSectionCount;
+
+            return;
+        }
+
         // If Reset is present, handle section count changes and reload
         if (pendingChanges.Any(c => c.Operation == VirtualScrollChangeOperation.Reset))
         {

@@ -54,6 +54,27 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
 
     bool IVirtualScrollCellsLayoutController.NeedsCellsLayout => _needsCellsLayout;
 
+    /// <summary>
+    /// True once the collection view has performed a layout pass with a real size — i.e. UIKit
+    /// has loaded its initial content and incremental updates (InsertItems and friends) are legal.
+    /// Reset via <see cref="ResetHasLoadedData"/> when the data source is replaced, because UIKit
+    /// then holds a pending full reload until the next layout and incremental updates would be
+    /// validated against never-loaded counts.
+    /// </summary>
+    internal bool HasLoadedData { get; private set; }
+
+    internal void ResetHasLoadedData() => HasLoadedData = false;
+
+    /// <inheritdoc/>
+    public override void ReloadData()
+    {
+        // A full reload also re-enters the pending-load state until the next layout pass:
+        // incremental updates issued in that window would be validated against the counts of
+        // the reload UIKit performs lazily inside the update transaction itself.
+        HasLoadedData = false;
+        base.ReloadData();
+    }
+
 #if !NET10_0_OR_GREATER
     /// <summary>
     /// True while this collection view is inside <see cref="LayoutSubviews"/>. Used by
@@ -101,6 +122,11 @@ public class VirtualScrollCollectionView : UICollectionView, IVirtualScrollCells
             IsPerformingLayout = false;
         }
 #endif
+
+        if (!HasLoadedData && Bounds.Width > 0 && Bounds.Height > 0)
+        {
+            HasLoadedData = true;
+        }
 
         // Detect content size changes to update fading edge
         var contentSize = ContentSize;

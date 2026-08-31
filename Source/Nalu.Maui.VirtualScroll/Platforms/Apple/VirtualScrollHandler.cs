@@ -506,6 +506,14 @@ public partial class VirtualScrollHandler
         var collectionView = handler.PlatformCollectionView;
         var oldDataSource = collectionView.DataSource;
 
+        // Replacing the data source puts UIKit back into the "pending full reload" state until
+        // the next layout pass: route interim adapter changes through the notifier's ReloadData
+        // fallback instead of incremental updates (see VirtualScrollPlatformDataSourceNotifier).
+        if (collectionView is VirtualScrollCollectionView virtualScrollCollectionView)
+        {
+            virtualScrollCollectionView.ResetHasLoadedData();
+        }
+
         if (virtualScroll.Adapter is { } adapter)
         {
             var reuseIdManager = handler._reuseIdManager ?? throw new InvalidOperationException("ReuseIdManager is not initialized.");
