@@ -83,6 +83,14 @@ internal class MagnetLayoutManager(Magnet magnet) : LayoutManager(magnet)
                         && MatchesAxis(width, engine.LastMeasureArgs.Width, engine.LastMeasured.Width)
                         && MatchesAxis(height, engine.LastMeasureArgs.Height, engine.LastMeasured.Height);
 
+            if (reuse && engine.Tape!.HasStageDependentMeasures)
+            {
+                // Stage-dependent measures are valid only for the solved (hug) size: at any other arrange
+                // size the children were measured against the wrong solution and must be re-measured.
+                reuse = Math.Abs(width - engine.LastMeasured.Width) < 0.5
+                        && Math.Abs(height - engine.LastMeasured.Height) < 0.5;
+            }
+
             engine.Arrange(width, height, !reuse);
             ArrangeNodes(engine, left, top);
         }

@@ -98,9 +98,9 @@ internal static class MagnetPerfCards
             )
         };
 
-        var image = new BoxView { Color = Colors.SteelBlue, WidthRequest = 60, HeightRequest = 48, Margin = 4, CornerRadius = 8 };
+        var image = new Border { BackgroundColor = Colors.SteelBlue, StrokeThickness = 0, WidthRequest = 60, HeightRequest = 48, Margin = 4, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 } };
         name = new Label { Text = NameFor(i), FontSize = 16, MaxLines = 1, LineBreakMode = LineBreakMode.TailTruncation };
-        var star = new BoxView { Color = Colors.Goldenrod, WidthRequest = 16, HeightRequest = 16, Margin = new Thickness(4, 0, 0, 0), VerticalOptions = LayoutOptions.Center, IsVisible = i % 3 == 0 };
+        var star = new Border { BackgroundColor = Colors.Goldenrod, StrokeThickness = 0, WidthRequest = 16, HeightRequest = 16, Margin = new Thickness(4, 0, 0, 0), VerticalOptions = LayoutOptions.Center, IsVisible = i % 3 == 0 };
         var detail = new Label { Text = $"Mastercard · {(i % 12) + 1:00}/{27 + (i % 5)}", FontSize = 12 };
         var money = new Label { Text = $"€ {(i * 37) % 900 + 12:N2}", FontSize = 18, Padding = 8, BackgroundColor = Colors.LightGoldenrodYellow, VerticalTextAlignment = TextAlignment.Center };
 
@@ -131,11 +131,11 @@ internal static class MagnetPerfCards
             Definition = new MagnetDefinition().Add(new MagnetChain { MagnetId = "nameRow", Style = MagnetChainStyle.Packed }.With("name", "star"))
         };
 
-        var image = new BoxView { Color = Colors.SteelBlue, CornerRadius = 8 };
+        var image = new Border { BackgroundColor = Colors.SteelBlue, StrokeThickness = 0, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 } };
         Magnet.GetConstraints(image).Id("image").Size(60, 48).AlignLeft(p, 4).VerticallyWithin(p, 4);
         name = new Label { Text = NameFor(i), FontSize = 16, MaxLines = 1, LineBreakMode = LineBreakMode.TailTruncation };
         Magnet.GetConstraints(name).Id("name").After(image, 8).AlignTop(p).Bias(0, 0.5);
-        var star = new BoxView { Color = Colors.Goldenrod, IsVisible = i % 3 == 0 };
+        var star = new Border { BackgroundColor = Colors.Goldenrod, StrokeThickness = 0, IsVisible = i % 3 == 0 };
         Magnet.GetConstraints(star).Id("star").Size(16, 16).After(name, 4).Before("money", 8).VerticallyWithin(name);
         var detail = new Label { Text = $"Mastercard · {(i % 12) + 1:00}/{27 + (i % 5)}", FontSize = 12 };
         Magnet.GetConstraints(detail).Id("detail").AlignLeft(name).Below(name);

@@ -162,6 +162,13 @@ internal sealed class MagnetTape
 
     public bool HasFeedback => FeedbackSlots.Length > 0;
 
+    /// <summary>
+    /// Whether any child is measured with stage-end-dependent constraints (star spans, chain-distributed sizes…).
+    /// When true, the measures of a measure pass are valid only for the SOLVED (hug) size: arranging at any other
+    /// size must re-measure (the args-match reuse shortcut would hand children constraints from the wrong solution).
+    /// </summary>
+    public required bool HasStageDependentMeasures { get; init; }
+
     public const int StageLeft = 0;
     public const int StageTop = 1;
     public const int StageRight = 2;

@@ -37,6 +37,7 @@ internal sealed class MagnetCompiler
         public int Chain = -1;
         public bool Weighted;
         public int WeightedSizeSlot = -1;
+        public bool StageDependent; // the size vertex is reachable from the stage end
     }
 
     private sealed class NodeInfo
@@ -66,6 +67,7 @@ internal sealed class MagnetCompiler
     private readonly List<MarginEntry> _margins;
     private readonly List<int> _reqSlots;
     private readonly List<int> _feedbackSlots = [];
+    private bool _hasStageDependentMeasures;
     private int _slots;
     private int _inputStart, _inputEnd;
 
@@ -240,7 +242,8 @@ internal sealed class MagnetCompiler
             Margins = _margins.ToArray(),
             InputStart = _inputStart,
             InputEnd = _inputEnd,
-            FeedbackSlots = _feedbackSlots.ToArray()
+            FeedbackSlots = _feedbackSlots.ToArray(),
+            HasStageDependentMeasures = _hasStageDependentMeasures
         };
     }
 
@@ -919,7 +922,7 @@ internal sealed class MagnetCompiler
         {
             if (!phaseOne[v] && v != StageV)
             {
-                EmitVertex(axis, v);
+                EmitVertex(axis, v, stageDependent: false);
             }
         }
 
@@ -929,7 +932,7 @@ internal sealed class MagnetCompiler
         {
             if (phaseOne[v] && v != StageV)
             {
-                EmitVertex(axis, v);
+                EmitVertex(axis, v, stageDependent: true);
             }
         }
 
@@ -971,7 +974,7 @@ internal sealed class MagnetCompiler
 
     private readonly List<int> _pendingReqs = [];
 
-    private void EmitVertex(int axis, int v)
+    private void EmitVertex(int axis, int v, bool stageDependent)
     {
         var node = v / 2;
         var n = _nodes[node];
@@ -986,7 +989,7 @@ internal sealed class MagnetCompiler
                 }
                 else
                 {
-                    EmitViewSize(axis, node);
+                    EmitViewSize(axis, node, stageDependent);
                 }
 
                 break;
@@ -1088,10 +1091,11 @@ internal sealed class MagnetCompiler
         return Lin(endPos, 1, PoleSlot(axis, start), -1, start.EffSlot, -1);
     }
 
-    private void EmitViewSize(int axis, int node)
+    private void EmitViewSize(int axis, int node, bool stageDependent)
     {
         var n = _nodes[node];
         var ax = n.Axes[axis];
+        ax.StageDependent = stageDependent;
         var other = n.Axes[1 - axis];
         var size = ax.Size;
         var view = (MagnetView) n.Node;
@@ -1203,6 +1207,7 @@ internal sealed class MagnetCompiler
             }
 
             Emit(new Op(OpKind.MeasureChild, -1, node, wc, hc));
+            _hasStageDependentMeasures |= stageDependent;
         }
 
         switch (size.Unit)
@@ -1343,7 +1348,10 @@ internal sealed class MagnetCompiler
             // MAUI contract: every child is measured each pass. Views with no Measured axis are measured
             // with their EXACT resolved sizes (like a Grid star cell) once both axes are known — skipping
             // this leaves platform containers with a zero DesiredSize and their content never laid out.
+            // The op itself may sit in Y phase 0 while reading a stage-dependent X size (finalized at the
+            // hug): flag it from the CONSTRAINT dependencies, not from the op's own phase.
             Emit(new Op(OpKind.MeasureChild, -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
+            _hasStageDependentMeasures |= n.Axes[0].StageDependent || stageDependent;
         }
     }
 

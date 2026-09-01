@@ -27,9 +27,10 @@ public class MagnetChainPlaygroundPage : ContentPage
 
     public MagnetChainPlaygroundPage()
     {
-        // (margin, gone) of the anchor of member i towards member i-1; null = first member.
-        (double Margin, double Gone)?[] gaps = [null, (8, 2), (16, 4)];
-        (double Margin, double Gone)?[] gaps4 = [null, (5, 1), (6, 2), (7, 3)];
+        // (margin, gone) of the anchor of member i towards member i-1 (index 0 = the leading margin
+        // of the first member towards the chain start); gone null = default (falls back to the margin).
+        (double Margin, double? Gone)?[] gaps = [null, (8, 2), (16, 4)];
+        (double Margin, double? Gone)?[] gaps4 = [null, (5, 1), (6, 2), (7, 3)];
 
         var stack = new VerticalStackLayout { Spacing = 10, Padding = 16 };
 
@@ -51,6 +52,7 @@ public class MagnetChainPlaygroundPage : ContentPage
         AddDemo(stack, "SpreadInside · same gaps", "si", MagnetChainStyle.SpreadInside, gaps, weights: null, bias: null);
         AddDemo(stack, "Weighted 1:2:1 · gaps 4", "wt", MagnetChainStyle.Spread, [null, (4, 4), (4, 4)], weights: [1, 2, 1], bias: null);
         AddDemo(stack, "Packed ×4 · gaps 5/6/7 (gone 1/2/3)", "p4", MagnetChainStyle.Packed, gaps4, weights: null, bias: 0);
+        AddDemo(stack, "10 A 20 B 30 C · gone = margin (default)", "ex", MagnetChainStyle.Packed, [(10, null), (20, null), (30, null)], weights: null, bias: 0);
 
         Content = new ScrollView { Content = stack };
     }
@@ -60,7 +62,7 @@ public class MagnetChainPlaygroundPage : ContentPage
         string caption,
         string prefix,
         MagnetChainStyle style,
-        (double Margin, double Gone)?[] gaps,
+        (double Margin, double? Gone)?[] gaps,
         double[]? weights,
         double? bias
     )
@@ -82,7 +84,7 @@ public class MagnetChainPlaygroundPage : ContentPage
         {
             var letter = (char) ('A' + i);
             var id = $"{prefix}{letter}";
-            var view = CreateMember(letter, _colors[i]);
+            var view = CreateMember(id, letter, _colors[i]);
             var node = Magnet.GetConstraints(view).Id(id).Top(P);
 
             if (weights is null)
@@ -96,7 +98,7 @@ public class MagnetChainPlaygroundPage : ContentPage
 
             if (i == 0)
             {
-                node.Left(P);
+                node.Left(P, margin: gaps[0]?.Margin ?? 0, goneMargin: gaps[0]?.Gone);
 
                 if (bias is { } b)
                 {
@@ -125,7 +127,7 @@ public class MagnetChainPlaygroundPage : ContentPage
         stack.Children.Add(magnet);
     }
 
-    private static View CreateMember(char letter, Color color)
+    private static View CreateMember(string id, char letter, Color color)
         => new Border
         {
             BackgroundColor = color,
@@ -133,6 +135,7 @@ public class MagnetChainPlaygroundPage : ContentPage
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
             Content = new Label
             {
+                AutomationId = $"{id}Label",
                 Text = $"{letter}",
                 TextColor = Colors.White,
                 FontSize = 13,

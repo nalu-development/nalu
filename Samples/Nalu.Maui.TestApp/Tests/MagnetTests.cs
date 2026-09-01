@@ -25,7 +25,7 @@ public class MagnetTestsPage : ContentPage
             )
         };
 
-        var avatar = new BoxView { Color = Colors.SteelBlue };
+        var avatar = new Border { BackgroundColor = Colors.SteelBlue, StrokeThickness = 0 };
         Magnet.GetConstraints(avatar).Id("avatar").Size(48, 48).AlignLeft(p, 16).AlignTop(p, 16);
 
         var title = new Label { Text = "Title", FontSize = 18, BackgroundColor = Colors.LightGoldenrodYellow };
@@ -34,14 +34,14 @@ public class MagnetTestsPage : ContentPage
         var subtitle = new Label { Text = "Subtitle", FontSize = 13, BackgroundColor = Colors.LightGreen };
         Magnet.GetConstraints(subtitle).Id("subtitle").AlignLeft(title).Below(title, 2);
 
-        var badge = new BoxView { Color = Colors.IndianRed };
+        var badge = new Border { BackgroundColor = Colors.IndianRed, StrokeThickness = 0 };
         Magnet.GetConstraints(badge).Id("badge").Size(20, 20).AlignRight(p, 16).AlignTop(p, 16);
 
-        var f1 = new BoxView { Color = Colors.Coral };
+        var f1 = new Border { BackgroundColor = Colors.Coral, StrokeThickness = 0 };
         Magnet.GetConstraints(f1).Id("f1").Size(40, 24).AlignLeft(p, 16).Below("textsEnd").AlignBottom(p, 16);
-        var f2 = new BoxView { Color = Colors.MediumPurple };
+        var f2 = new Border { BackgroundColor = Colors.MediumPurple, StrokeThickness = 0 };
         Magnet.GetConstraints(f2).Id("f2").Size(40, 24).AlignTop(f1);
-        var f3 = new BoxView { Color = Colors.SeaGreen };
+        var f3 = new Border { BackgroundColor = Colors.SeaGreen, StrokeThickness = 0 };
         Magnet.GetConstraints(f3).Id("f3").Size(40, 24).AlignRight(p, 16).AlignTop(f1);
 
         magnet.Add(avatar);
@@ -105,7 +105,7 @@ public class MagnetTestsPage : ContentPage
             Definition = sceneA
         };
 
-        var sceneIcon = new BoxView { Color = Colors.DarkOrange };
+        var sceneIcon = new Border { BackgroundColor = Colors.DarkOrange, StrokeThickness = 0 };
         Magnet.SetMagnetId(sceneIcon, "sceneIcon");
         var sceneText = new Label { Text = "Scene text", FontSize = 15 };
         Magnet.SetMagnetId(sceneText, "sceneText");
