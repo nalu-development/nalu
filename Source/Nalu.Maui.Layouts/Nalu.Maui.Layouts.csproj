@@ -5,6 +5,8 @@
     <PackageTags>MAUI;layouts;templates;expander;slidebox;constraint-layout;xaml</PackageTags>
     <RootNamespace>Nalu</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- CsWinRT1030: the WinRT source generator needs unsafe to marshal MagnetNode[] across the ABI (same as Core/Navigation). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
