@@ -1,6 +1,6 @@
 ## Magnet by example
 
-Ten small, real-world layouts that build the Magnet mental model one concept at a time — the same way Android
+Twelve small, real-world layouts that build the Magnet mental model one concept at a time — the same way Android
 developers learn ConstraintLayout. Every screenshot is rendered by the actual library (the gallery lives in the
 TestApp: `Samples/Nalu.Maui.TestApp/Tests/MagnetExamplesPage.xaml`, page "Magnet Examples"); the snippets keep every
 layout-relevant attribute and omit only colors and fonts.
@@ -272,6 +272,58 @@ whose measured member shrinks to leave room for its siblings.
 - The name keeps its default `Measured` sizing: in a chain, a measured member is measured with the room left by the
   other members, so it wraps/truncates exactly when it must.
 - `HorizontalBias="0"` on the head packs the group to the start.
+
+### 11 · Vertical centering in a horizontal chain — the guideline idiom
+
+![Chain vertical centering](assets/images/magnet/magnet-example-11.png)
+
+A horizontal chain owns only the X axis: each member's Y is free. To center members of different heights on each
+other, give them all `VerticallyWithin` the same reference. The most flexible reference is a horizontal
+**guideline**: it spans a zero-height segment, so the default bias 0.5 puts every member's **center exactly on the
+line** (the thin line in the screenshot is a real 1dp view, itself centered on the guideline).
+
+```xml
+<nalu:Magnet HeightRequest="72">
+  <nalu:Magnet.Definition>
+    <nalu:MagnetDefinition>
+      <nalu:MagnetGuideline MagnetId="midline" Orientation="Horizontal" Percent="0.5" />
+      <nalu:MagnetChain MagnetId="row" Style="Spread" Nodes="tall,short,mid" />
+    </nalu:MagnetDefinition>
+  </nalu:Magnet.Definition>
+  <Border nalu:Magnet.MagnetId="tall"  nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="48"
+          nalu:Magnet.VerticallyWithin="midline" />
+  <Border nalu:Magnet.MagnetId="short" nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="16"
+          nalu:Magnet.VerticallyWithin="midline" />
+  <Border nalu:Magnet.MagnetId="mid"   nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="28"
+          nalu:Magnet.VerticallyWithin="midline" />
+</nalu:Magnet>
+```
+
+- The two simpler variants of the same idiom: `VerticallyWithin="parent"` centers each member in the row, and
+  `VerticallyWithin="tall"` centers the others on a reference member (works even when the reference is *shorter* —
+  negative slack still centers).
+- There is no CenterY pole — like ConstraintLayout, centering is "both anchors + bias 0.5", and the zero-height
+  guideline turns that into an exact center line.
+
+### 12 · Chain margins under collapse — Anchors vs Separators
+
+![Gap modes under collapse](assets/images/magnet/magnet-example-12.png)
+
+The same `10 A 20 B 30 C` packed chain, three times: everyone visible, then A and B hidden with the two
+`GapMode`s. `Anchors` (the default) follows the ConstraintLayout rules — the collapsed members drop their own
+margins and C lands at its gone margin (30). `Separators` treats margins as structure — the leading 10 belongs to
+the **chain** and survives, so the first visible member sits at the chain lead, whichever member it is.
+
+```xml
+<nalu:MagnetChain MagnetId="row" Style="Packed" GapMode="Separators" Nodes="a,b,c" />
+<!-- a: LeftTo="parent.Left,10" · b: After="a,20" · c: After="b,30" -->
+```
+
+- In `Separators` mode the inner margins apply only between visible members (gone margins are not involved), and
+  the last member's end margin survives the tail collapsing too.
+- For a uniform gap, skip the per-pair anchors entirely: `Gap="8"` on the chain has separator semantics in both
+  modes and is animatable.
+- This is the StackLayout padding+spacing model, per pair — a semantics ConstraintLayout cannot express statically.
 
 ### Regenerating the screenshots
 

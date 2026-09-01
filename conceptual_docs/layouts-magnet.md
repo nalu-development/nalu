@@ -291,6 +291,16 @@ and fades it out (`Opacity` → 0), its siblings animate to the layout solved *a
 `IsVisible = false` lands at the end (also when the transition is interrupted); a `Show` applies up front and fades
 in. Outside a transition (a plain `Definition` swap, or a late-bound child) the action applies immediately.
 
+Swapping the whole definition is not required — toggling the node property inside the mutate gets the same
+animated treatment:
+
+```csharp
+await magnet.TransitionToAsync(() => badgeNode.ApplyVisibility = MagnetVisibilityAction.Hide);
+```
+
+`ApplyVisibility` applies **on change**: re-assigning the value it already holds is a no-op (so after manually
+setting the view's `IsVisible` back, re-assert a scene action by passing through `None` first).
+
 Rules to keep scenes predictable:
 
 - **Scenes are total, there is no auto-revert**: swapping back to a definition with no opinion (`None`, the default)

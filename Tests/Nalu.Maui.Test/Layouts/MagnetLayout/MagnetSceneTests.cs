@@ -222,6 +222,65 @@ public class MagnetSceneTests
     }
 
     [Fact]
+    public async Task TogglingApplyVisibilityInsideTheMutateAnimatesWithoutSwappingTheDefinition()
+    {
+        Animation? captured = null;
+        Action<double, bool>? finished = null;
+        Magnet.AnimationDriver = (_, animation, _, f) =>
+        {
+            captured = animation;
+            finished = f;
+        };
+
+        try
+        {
+            var (magnet, manager) = CreateMagnet();
+            var badgeNode = new MagnetView().Id("badge").Left(_p).Top(_p);
+            magnet.Definition = new MagnetDefinition().Add(
+                badgeNode,
+                new MagnetView().Id("label").Left("badge", MagnetPole.Right, 12, goneMargin: 0).Top(_p)
+            );
+            var badge = NamedView("badge", 24, 24);
+            var label = NamedView("label", 100, 20);
+            magnet.Add(badge);
+            magnet.Add(label);
+            Layout(manager, 400, 400, 400, 400);
+            label.Frame.X.Should().Be(36);
+
+            // ONE definition, no swap: the node property toggle is collected by the mutate and deferred.
+            var task = magnet.TransitionToAsync(() => badgeNode.ApplyVisibility = MagnetVisibilityAction.Hide, easing: Easing.Linear);
+
+            badge.IsVisible.Should().BeTrue("the write is deferred while the badge fades out");
+            captured!.GetCallback()(0.5);
+            manager.Measure(400, 400);
+            manager.ArrangeChildren(new Rect(0, 0, 400, 400));
+            badge.Opacity.Should().BeApproximately(0.5, 0.001);
+            label.Frame.X.Should().Be(18);
+            finished!(1, false);
+
+            (await task).Should().BeTrue();
+            badge.IsVisible.Should().BeFalse();
+            badge.Opacity.Should().Be(1);
+
+            // Toggle back with Show, same definition.
+            var back = magnet.TransitionToAsync(() => badgeNode.ApplyVisibility = MagnetVisibilityAction.Show, easing: Easing.Linear);
+            badge.IsVisible.Should().BeTrue("Show applies up front and fades in");
+            captured.GetCallback()(1);
+            manager.Measure(400, 400);
+            manager.ArrangeChildren(new Rect(0, 0, 400, 400));
+            finished!(1, false);
+            (await back).Should().BeTrue();
+
+            Layout(manager, 400, 400, 400, 400);
+            label.Frame.X.Should().Be(36);
+        }
+        finally
+        {
+            Magnet.AnimationDriver = null;
+        }
+    }
+
+    [Fact]
     public async Task InterruptedTransitionStillAppliesTheDeferredHide()
     {
         Animation? captured = null;
