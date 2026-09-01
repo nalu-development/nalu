@@ -250,6 +250,87 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- 11 · Vertical centering in a horizontal chain: members center on a guideline -->
+                <Border AutomationId="Example11" StyleClass="card">
+                    <nalu:Magnet HeightRequest="72">
+                        <nalu:Magnet.Definition>
+                            <nalu:MagnetDefinition>
+                                <nalu:MagnetGuideline MagnetId="midline" Orientation="Horizontal" Percent="0.5" />
+                                <nalu:MagnetChain MagnetId="row" Style="Spread" Nodes="tall,short,mid" />
+                            </nalu:MagnetDefinition>
+                        </nalu:Magnet.Definition>
+                        <Border nalu:Magnet.MagnetId="line" BackgroundColor="#D2D8E4" StrokeThickness="0"
+                                 nalu:Magnet.FillWidth="parent" nalu:Magnet.HeightSizing="1"
+                                 nalu:Magnet.VerticallyWithin="midline" />
+                        <Border nalu:Magnet.MagnetId="tall" BackgroundColor="#5B8DEF" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                 nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="48"
+                                 nalu:Magnet.VerticallyWithin="midline" />
+                        <Border nalu:Magnet.MagnetId="short" BackgroundColor="#9B7BF3" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                 nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="16"
+                                 nalu:Magnet.VerticallyWithin="midline" />
+                        <Border nalu:Magnet.MagnetId="mid" BackgroundColor="#F58C6E" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                 nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="28"
+                                 nalu:Magnet.VerticallyWithin="midline" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 12 · Chain margins under collapse: Anchors vs Separators (A and B are IsVisible=False) -->
+                <Border AutomationId="Example12" StyleClass="card">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="10 A 20 B 30 C · everyone visible" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="row" Style="Packed" Nodes="ra,rb,rc" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Border nalu:Magnet.MagnetId="ra" BackgroundColor="#5B8DEF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.LeftTo="parent.Left,10" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.HorizontalBias="0" />
+                            <Border nalu:Magnet.MagnetId="rb" BackgroundColor="#9B7BF3" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.After="ra,20" nalu:Magnet.TopTo="parent.Top" />
+                            <Border nalu:Magnet.MagnetId="rc" BackgroundColor="#F58C6E" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.After="rb,30" nalu:Magnet.TopTo="parent.Top" />
+                        </nalu:Magnet>
+                        <Label Text="A and B hidden · GapMode=Anchors: C sits at its gone margin (30)" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="row" Style="Packed" Nodes="aa,ab,ac" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Border nalu:Magnet.MagnetId="aa" IsVisible="False" BackgroundColor="#5B8DEF" StrokeThickness="0"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.LeftTo="parent.Left,10" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.HorizontalBias="0" />
+                            <Border nalu:Magnet.MagnetId="ab" IsVisible="False" BackgroundColor="#9B7BF3" StrokeThickness="0"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.After="aa,20" nalu:Magnet.TopTo="parent.Top" />
+                            <Border nalu:Magnet.MagnetId="ac" BackgroundColor="#F58C6E" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.After="ab,30" nalu:Magnet.TopTo="parent.Top" />
+                        </nalu:Magnet>
+                        <Label Text="A and B hidden · GapMode=Separators: C sits at the chain lead (10)" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="row" Style="Packed" GapMode="Separators" Nodes="sa,sb,sc" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Border nalu:Magnet.MagnetId="sa" IsVisible="False" BackgroundColor="#5B8DEF" StrokeThickness="0"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.LeftTo="parent.Left,10" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.HorizontalBias="0" />
+                            <Border nalu:Magnet.MagnetId="sb" IsVisible="False" BackgroundColor="#9B7BF3" StrokeThickness="0"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.After="sa,20" nalu:Magnet.TopTo="parent.Top" />
+                            <Border nalu:Magnet.MagnetId="sc" BackgroundColor="#F58C6E" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="40" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.After="sb,30" nalu:Magnet.TopTo="parent.Top" />
+                        </nalu:Magnet>
+                    </VerticalStackLayout>
+                </Border>
+
             </VerticalStackLayout>
         </ScrollView>
     </Grid>

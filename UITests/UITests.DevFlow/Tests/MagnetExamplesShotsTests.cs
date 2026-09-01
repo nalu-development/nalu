@@ -19,7 +19,7 @@ public class MagnetExamplesShotsTests(NaluApp app) : BaseUiTest(app)
         Directory.CreateDirectory(directory!);
         await App.OpenTestPageAsync("Magnet Examples");
 
-        for (var i = 1; i <= 10; i++)
+        for (var i = 1; i <= 12; i++)
         {
             var id = $"Example{i:00}";
             await App.FillAsync("ExampleSelector", i.ToString());

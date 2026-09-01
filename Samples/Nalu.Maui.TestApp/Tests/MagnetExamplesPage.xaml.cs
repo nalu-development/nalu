@@ -21,7 +21,9 @@ public partial class MagnetExamplesPage : ContentPage
         "07 · Media card (Ratio)",
         "08 · Guideline split",
         "09 · Visibility & gone margins",
-        "10 · Packed chain + measured"
+        "10 · Packed chain + measured",
+        "11 · Chain vertical centering",
+        "12 · Gap modes under collapse"
     ];
 
     public MagnetExamplesPage()
