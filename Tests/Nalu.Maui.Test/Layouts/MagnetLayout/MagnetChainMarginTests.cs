@@ -199,6 +199,26 @@ public class MagnetChainMarginTests
     }
 
     [Fact]
+    public void ChainMembersCenterVerticallyOnAGuidelineAndOnEachOther()
+    {
+        var h = new EngineHarness();
+        h.Add(new MagnetGuideline { MagnetId = "mid", Orientation = MagnetOrientation.Horizontal, Position = 50 });
+        h.View("a", 30, 40).Left(P).VerticallyWithin("mid");   // tall member centered ON the line
+        h.View("b", 30, 16).VerticallyWithin("mid");            // short member centered ON the line
+        h.View("c", 30, 24).VerticallyWithin("a");              // centered on another member's span
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Spread }.With("a", "b", "c"));
+
+        h.Layout(200, 100, 200, 100);
+
+        // VerticallyWithin a horizontal guideline spans a zero-height segment: bias 0.5 puts the CENTER on the line.
+        h.Frame("a").Y.Should().Be(30);
+        h.Frame("b").Y.Should().Be(42);
+        (h.Frame("a").Y + (h.Frame("a").Height / 2)).Should().Be(50);
+        (h.Frame("b").Y + (h.Frame("b").Height / 2)).Should().Be(50);
+        (h.Frame("c").Y + (h.Frame("c").Height / 2)).Should().Be(50, "centering within a member aligns the centers even when the target is taller");
+    }
+
+    [Fact]
     public void AllWeightedMembersHiddenLeavesTheFixedMembersSpread()
     {
         var h = new EngineHarness();
