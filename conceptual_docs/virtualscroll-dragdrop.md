@@ -45,22 +45,28 @@ The simplest way to enable drag and drop is with an `ObservableCollection<T>`:
 ```csharp
 public partial class MyPageModel : ObservableObject
 {
-    public ObservableCollection<MyItem> Items { get; }
     public IReorderableVirtualScrollAdapter Adapter { get; }
 
     public MyPageModel()
     {
-        Items = new ObservableCollection<MyItem>(
+        var items = new ObservableCollection<MyItem>(
             Enumerable.Range(1, 20).Select(i => new MyItem($"Item {i}"))
         );
         
         // Create adapter - it automatically supports drag & drop
-        Adapter = VirtualScroll.CreateObservableCollectionAdapter(Items);
+        Adapter = VirtualScroll.CreateObservableCollectionAdapter(items);
     }
 }
 ```
 
 When you bind the adapter to `DragHandler`, users can long-press and drag items to reorder them. The underlying `ObservableCollection` is automatically updated, and change notifications are properly handled.
+
+Alternatively, you can skip creating the adapter yourself: binding a mutable `INotifyCollectionChanged` list (like an `ObservableCollection<T>`) directly to `ItemsSource` auto-wraps it in a reorderable adapter, which you can reference as the drag handler through the VirtualScroll's own `Adapter` property:
+
+```xml
+<vs:VirtualScroll ItemsSource="{Binding Items}"
+                  DragHandler="{Binding Adapter, Source={RelativeSource Self}, x:DataType=vs:VirtualScroll}">
+```
 
 ### Grouped Collections
 

@@ -42,9 +42,11 @@ The simplest way to use `VirtualScroll` is to bind it to an `ObservableCollectio
 ```
 
 The `ItemsSource` property accepts:
-- **`IVirtualScrollAdapter`**: The standard adapter interface returned by factory methods (e.g., `CreateObservableCollectionAdapter`, `CreateStaticCollectionAdapter`) or implemented for custom scenarios ✅ **AOT-compatible** (recommended for AOT)
-- **`ObservableCollection<T>`**, **`ReadOnlyObservableCollection<T>`**: Automatically wrapped with full change notification support (add, remove, move, replace, reset) ⚠️ **Not AOT-compatible** - use `IVirtualScrollAdapter` instead when using AOT
-- **`IEnumerable`**: Static lists are supported but won't react to changes ✅ **AOT-compatible**
+- **`IVirtualScrollAdapter`**: The standard adapter interface returned by factory methods (e.g., `CreateObservableCollectionAdapter`, `CreateStaticCollectionAdapter`) or implemented for custom scenarios
+- **`ObservableCollection<T>`**, **`ReadOnlyObservableCollection<T>`**, or any list implementing `INotifyCollectionChanged`: Automatically wrapped with full change notification support (add, remove, move, replace, reset); mutable lists additionally get drag-and-drop reordering support (bind `DragHandler` to the `Adapter` property via `{RelativeSource Self}` to enable it)
+- **`IEnumerable`**: Static lists are supported but won't react to changes
+
+All of these — including automatic wrapping — are fully AOT-compatible.
 
 ### Factory Methods
 
@@ -69,7 +71,7 @@ var adapter = VirtualScroll.CreateObservableCollectionAdapter(
 
 The factory methods support various combinations of `ObservableCollection<T>` and `ReadOnlyObservableCollection<T>` for both sections and items.
 
-> **⚠️ AOT Compatibility:** When using AOT (Ahead-of-Time compilation), you must use these factory methods or create adapters explicitly. Automatic adapter creation from `INotifyCollectionChanged` collections is not supported in AOT mode and will throw a `NotSupportedException`. Always provide an `IVirtualScrollAdapter` when using AOT.
+> **Note:** Automatic adapter creation from `INotifyCollectionChanged` collections is fully AOT-compatible. The factory methods remain useful for grouped collections (which are never auto-wrapped) and when you want a strongly-typed adapter instance to customize or use as a `DragHandler` directly.
 
 #### Static Collection Adapters
 

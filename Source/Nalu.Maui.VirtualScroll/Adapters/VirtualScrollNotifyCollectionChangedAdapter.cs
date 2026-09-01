@@ -4,26 +4,40 @@ using System.Collections.Specialized;
 namespace Nalu;
 
 /// <summary>
-/// An adapter that wraps an observable collection for use with <see cref="VirtualScroll"/>.
+/// An adapter that wraps a list implementing <see cref="INotifyCollectionChanged"/> for use with <see cref="VirtualScroll"/>.
 /// </summary>
-/// <typeparam name="TItemCollection">The type of the observable collection.</typeparam>
-public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVirtualScrollAdapter
-    where TItemCollection : IList, INotifyCollectionChanged
+/// <remarks>
+/// This non-generic adapter is fully AOT-compatible and is used by <see cref="VirtualScroll"/> to automatically
+/// wrap <see cref="INotifyCollectionChanged"/> collections assigned to <see cref="VirtualScroll.ItemsSource"/>.
+/// </remarks>
+public class VirtualScrollNotifyCollectionChangedAdapter : IVirtualScrollAdapter
 {
-    private readonly TItemCollection _collection;
+    private readonly IList _collection;
+    private readonly INotifyCollectionChanged _collectionChanged;
     private const int _sectionIndex = 0;
 
     /// <summary>
     /// The underlying observable collection.
     /// </summary>
-    protected TItemCollection Collection => _collection;
+    protected IList Collection => _collection;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="VirtualScrollNotifyCollectionChangedAdapter{TItemCollection}" /> class based on the specified observable collection.
+    /// Initializes a new instance of the <see cref="VirtualScrollNotifyCollectionChangedAdapter" /> class based on the specified observable collection.
     /// </summary>
-    public VirtualScrollNotifyCollectionChangedAdapter(TItemCollection collection)
+    /// <param name="collection">A list which also implements <see cref="INotifyCollectionChanged"/>.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="collection"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="collection"/> does not implement <see cref="INotifyCollectionChanged"/>.</exception>
+    public VirtualScrollNotifyCollectionChangedAdapter(IList collection)
     {
-        _collection = collection ?? throw new ArgumentNullException(nameof(collection));
+        ArgumentNullException.ThrowIfNull(collection);
+
+        if (collection is not INotifyCollectionChanged collectionChanged)
+        {
+            throw new ArgumentException($"The collection must implement {nameof(INotifyCollectionChanged)}.", nameof(collection));
+        }
+
+        _collection = collection;
+        _collectionChanged = collectionChanged;
     }
 
     /// <inheritdoc/>
@@ -42,34 +56,36 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
         {
             return null;
         }
-        
+
         return _collection[itemIndex];
     }
 
     /// <inheritdoc/>
-    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new ObservableCollectionAdapterSubscription(_collection, changeCallback, ShouldIgnoreCollectionChanges);
+    public IDisposable Subscribe(Action<VirtualScrollChangeSet> changeCallback) => new ObservableCollectionAdapterSubscription(_collection, _collectionChanged, changeCallback, ShouldIgnoreCollectionChanges);
 
     /// <summary>
     /// Tells if the adapter should ignore collection changes, therefore not notifying subscribers.
     /// </summary>
     /// <returns></returns>
-    protected virtual bool ShouldIgnoreCollectionChanges() => false;
-    
+    private protected virtual bool ShouldIgnoreCollectionChanges() => false;
+
     private sealed class ObservableCollectionAdapterSubscription : IDisposable
     {
-        private readonly TItemCollection _collection;
+        private readonly IList _collection;
+        private readonly INotifyCollectionChanged _collectionChanged;
         private readonly Action<VirtualScrollChangeSet> _changeCallback;
         private readonly Func<bool> _shouldIgnoreCollectionChanges;
         private bool _disposed;
         private bool _isEmpty;
 
-        public ObservableCollectionAdapterSubscription(TItemCollection collection, Action<VirtualScrollChangeSet> changeCallback, Func<bool> shouldIgnoreCollectionChanges)
+        public ObservableCollectionAdapterSubscription(IList collection, INotifyCollectionChanged collectionChanged, Action<VirtualScrollChangeSet> changeCallback, Func<bool> shouldIgnoreCollectionChanges)
         {
             _collection = collection;
+            _collectionChanged = collectionChanged;
             _changeCallback = changeCallback;
             _shouldIgnoreCollectionChanges = shouldIgnoreCollectionChanges;
             _isEmpty = _collection.Count == 0;
-            _collection.CollectionChanged += OnCollectionChanged;
+            _collectionChanged.CollectionChanged += OnCollectionChanged;
         }
 
         private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -165,14 +181,14 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
                     {
                         var remainingNewCount = e.NewItems.Count - e.OldItems.Count;
                         var insertStartIndex = startIndex + replaceCount;
-                        
+
                         // Check if this will transition from empty to non-empty
                         if (_isEmpty)
                         {
                             changes.Add(VirtualScrollChangeFactory.InsertSection(_sectionIndex));
                             _isEmpty = false;
                         }
-                        
+
                         if (remainingNewCount == 1)
                         {
                             changes.Add(VirtualScrollChangeFactory.InsertItem(_sectionIndex, insertStartIndex));
@@ -197,7 +213,7 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
                             var removeEndIndex = removeStartIndex + remainingOldCount - 1;
                             changes.Add(VirtualScrollChangeFactory.RemoveItemRange(_sectionIndex, removeStartIndex, removeEndIndex));
                         }
-                        
+
                         // Check if this will transition from non-empty to empty
                         if (willBeEmptyAfterReplace && !_isEmpty)
                         {
@@ -224,7 +240,7 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
                         var itemCount = e.OldItems.Count;
                         var fromIndex = e.OldStartingIndex;
                         var toIndex = e.NewStartingIndex;
-                        
+
                         // If moving forward, process from end to start to avoid index shifting issues
                         if (toIndex > fromIndex)
                         {
@@ -267,9 +283,30 @@ public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : IVir
         {
             if (!_disposed)
             {
-                _collection.CollectionChanged -= OnCollectionChanged;
+                _collectionChanged.CollectionChanged -= OnCollectionChanged;
                 _disposed = true;
             }
         }
+    }
+}
+
+/// <summary>
+/// An adapter that wraps an observable collection for use with <see cref="VirtualScroll"/>.
+/// </summary>
+/// <typeparam name="TItemCollection">The type of the observable collection.</typeparam>
+public class VirtualScrollNotifyCollectionChangedAdapter<TItemCollection> : VirtualScrollNotifyCollectionChangedAdapter
+    where TItemCollection : IList, INotifyCollectionChanged
+{
+    /// <summary>
+    /// The underlying observable collection.
+    /// </summary>
+    protected new TItemCollection Collection => (TItemCollection)base.Collection;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VirtualScrollNotifyCollectionChangedAdapter{TItemCollection}" /> class based on the specified observable collection.
+    /// </summary>
+    public VirtualScrollNotifyCollectionChangedAdapter(TItemCollection collection)
+        : base(collection)
+    {
     }
 }

@@ -20,21 +20,25 @@ public class VirtualScrollObservableCollectionAdapter<TItem> : VirtualScrollNoti
     
     /// <inheritdoc/>
     public virtual bool CanDragItem(VirtualScrollDragInfo dragInfo) => true;
-
+    
     /// <inheritdoc/>
-    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+    void IVirtualScrollDragHandler.MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
     {
         _movingItemsViaDrag = true;
 
         try
         {
-            Collection.Move(dragMoveInfo.CurrentItemIndex, dragMoveInfo.DestinationItemIndex);
+            MoveItem(dragMoveInfo);
         }
         finally
         {
             _movingItemsViaDrag = false;
         }
     }
+
+    /// <inheritdoc cref="IVirtualScrollDragHandler.MoveItem"/>
+    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+        => Collection.Move(dragMoveInfo.CurrentItemIndex, dragMoveInfo.DestinationItemIndex);
 
     /// <inheritdoc/>
     public virtual bool CanDropItemAt(VirtualScrollDragDropInfo dragDropInfo) => true;
@@ -55,5 +59,5 @@ public class VirtualScrollObservableCollectionAdapter<TItem> : VirtualScrollNoti
     }
 
     /// <inheritdoc/>
-    protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
+    private protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
 }

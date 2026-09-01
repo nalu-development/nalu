@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Microsoft.Maui.Controls.Internals;
 
@@ -35,6 +34,7 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
             var virtualScroll = (VirtualScroll)bindable;
             virtualScroll._adapter = CoerceAdapter(value);
             virtualScroll.Handler?.UpdateValue(nameof(Adapter));
+            virtualScroll.OnPropertyChanged(nameof(Adapter));
         }
     );
 
@@ -190,7 +190,10 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// <remarks>
     /// Providing an <see cref="IVirtualScrollAdapter"/> directly is recommended for optimal functionality,
     /// otherwise, common collection types such as <see cref="ObservableCollection{T}"/> or any <see cref="IEnumerable"/> will be automatically
-    /// wrapped in a suitable adapter.
+    /// wrapped in a suitable adapter. Automatic wrapping is fully AOT-compatible: mutable <see cref="INotifyCollectionChanged"/>
+    /// lists produce an <see cref="IReorderableVirtualScrollAdapter"/> (usable as <see cref="DragHandler"/> by binding
+    /// <see cref="Adapter"/> through <c>{RelativeSource Self}</c>), read-only ones a change-tracking adapter,
+    /// and other enumerables a static adapter.
     /// </remarks>
     public object? ItemsSource
     {
@@ -203,8 +206,10 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
     /// </summary>
     /// <remarks>
     /// Drag and drop is enabled only when a drag handler is provided.
-    /// Adapter created via <see cref="CreateObservableCollectionAdapter{T}(ObservableCollection{T})"/> can be used as drag handler.
-    /// It's also possible to customize its behavior by inheriting from <see cref="VirtualScrollNotifyCollectionChangedAdapter{TItemCollection}"/>. 
+    /// Adapter created via <see cref="CreateObservableCollectionAdapter{T}(ObservableCollection{T})"/> can be used as drag handler,
+    /// and so can the <see cref="Adapter"/> automatically created for a mutable <see cref="INotifyCollectionChanged"/> list
+    /// (<c>DragHandler="{Binding Adapter, Source={RelativeSource Self}}"</c>).
+    /// It's also possible to customize its behavior by inheriting from <see cref="VirtualScrollNotifyCollectionChangedAdapter{TItemCollection}"/>.
     /// </remarks>
     public IVirtualScrollDragHandler? DragHandler
     {
@@ -725,44 +730,19 @@ public class VirtualScroll : View, IVirtualScroll, IVirtualScrollLayoutInfo, IVi
             return (IVirtualScrollAdapter?)value;
         }
 
-        // Check if it's an ObservableCollection<T> or inherits from it
-        var valueType = value.GetType();
-        if (value is IList and INotifyCollectionChanged)
+        if (value is IList list and INotifyCollectionChanged)
         {
-            if (!RuntimeFeature.IsDynamicCodeSupported)
-            {
-                throw new NotSupportedException("By using AOT it's not possible to create a VirtualScroll adapter for INotifyCollectionChanged collections, please provide an IVirtualScrollAdapter instead.");
-            }
-
-            var adapterType = GetObservableCollectionItemType(valueType) is { } itemType
-                ? typeof(VirtualScrollObservableCollectionAdapter<>).MakeGenericType(itemType)
-                : typeof(VirtualScrollNotifyCollectionChangedAdapter<>).MakeGenericType(valueType);
-
-            return (IVirtualScrollAdapter?) Activator.CreateInstance(adapterType, value);
+            return list.IsReadOnly || list.IsFixedSize
+                ? new VirtualScrollNotifyCollectionChangedAdapter(list)
+                : new VirtualScrollReorderableNotifyCollectionChangedAdapter(list);
         }
 
         if (value is IEnumerable enumerable)
         {
             return new VirtualScrollListAdapter(enumerable);
         }
-            
-        throw new NotSupportedException($"{value.GetType()} is not supported as an adapter for VirtualScroll. Please provide an IVirtualScrollAdapter or a supported enumerable.");
-    }
 
-    private static Type? GetObservableCollectionItemType(Type? type)
-    {
-        // go through type and base types to see whether this is an ObservableCollection<>
-        while (type is not null)
-        {
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ObservableCollection<>))
-            {
-                return type.GetGenericArguments()[0];
-            }
-            
-            type = type.BaseType;
-        }
-        
-        return null;
+        throw new NotSupportedException($"{value.GetType()} is not supported as an adapter for VirtualScroll. Please provide an IVirtualScrollAdapter or a supported enumerable.");
     }
 
     /// <summary>

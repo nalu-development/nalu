@@ -89,7 +89,7 @@ public class VirtualScrollGroupedNotifyCollectionChangedAdapter<TSectionCollecti
     /// Tells if the adapter should ignore collection changes, therefore not notifying subscribers.
     /// </summary>
     /// <returns></returns>
-    protected virtual bool ShouldIgnoreCollectionChanges() => false;
+    private protected virtual bool ShouldIgnoreCollectionChanges() => false;
     
     private sealed class GroupedObservableCollectionAdapterSubscription : IDisposable
     {

@@ -11,7 +11,7 @@ VirtualScroll provides built-in adapters for common scenarios. You can create th
 For flat lists backed by an `ObservableCollection<T>`:
 
 ```csharp
-// Simple usage - VirtualScroll auto-wraps ObservableCollection (⚠️ not AOT-compatible - see below)
+// Simple usage - VirtualScroll auto-wraps ObservableCollection
 public ObservableCollection<ItemInfo> Items { get; } = new();
 
 // Or explicit adapter creation
@@ -21,7 +21,7 @@ var adapter = new VirtualScrollObservableCollectionAdapter<ItemInfo>(Items);
 var adapter = VirtualScroll.CreateObservableCollectionAdapter(Items);
 ```
 
-> **⚠️ AOT Compatibility Note:** When using AOT (Ahead-of-Time compilation), automatic adapter creation for `INotifyCollectionChanged` collections is not supported. You must explicitly provide an `IVirtualScrollAdapter` instead. Use the factory methods or create adapters explicitly for AOT compatibility.
+> **Note:** Automatic wrapping is fully AOT-compatible and works for any list implementing `INotifyCollectionChanged`. Mutable lists are wrapped in a reorderable adapter — bind `DragHandler` to the VirtualScroll's own `Adapter` property via `{RelativeSource Self}` to enable drag-and-drop reordering; read-only lists such as `ReadOnlyObservableCollection<T>` get a change-tracking adapter without reordering. During a drag reorder the auto-created adapter uses `ObservableCollection<T>.Move` when available, so other subscribers of the collection observe a single Move notification; for other mutable lists it falls back to `RemoveAt` + `Insert`.
 
 The adapter automatically subscribes to `CollectionChanged` events and notifies the VirtualScroll of additions, removals, replacements, moves, and resets.
 

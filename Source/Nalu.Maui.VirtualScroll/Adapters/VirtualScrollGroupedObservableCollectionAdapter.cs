@@ -27,31 +27,37 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     public virtual bool CanDragItem(VirtualScrollDragInfo dragInfo) => true;
 
     /// <inheritdoc/>
-    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+    void IVirtualScrollDragHandler.MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
     {
         _movingItemsViaDrag = true;
 
         try
         {
-            var currentSectionIndex = dragMoveInfo.CurrentSectionIndex;
-            var destinationSectionIndex = dragMoveInfo.DestinationSectionIndex;
-
-            var source = GetSectionItems(currentSectionIndex);
-
-            if (currentSectionIndex == destinationSectionIndex)
-            {
-                source.Move(dragMoveInfo.CurrentItemIndex, dragMoveInfo.DestinationItemIndex);
-            }
-            else
-            {
-                var destination = GetSectionItems(dragMoveInfo.DestinationSectionIndex);
-                source.RemoveAt(dragMoveInfo.CurrentItemIndex);
-                destination.Insert(dragMoveInfo.DestinationItemIndex, (TItem) dragMoveInfo.Item!);
-            }
+            MoveItem(dragMoveInfo);
         }
         finally
         {
             _movingItemsViaDrag = false;
+        }
+    }
+
+    /// <inheritdoc cref="IVirtualScrollDragHandler.MoveItem"/>
+    public virtual void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)
+    {
+        var currentSectionIndex = dragMoveInfo.CurrentSectionIndex;
+        var destinationSectionIndex = dragMoveInfo.DestinationSectionIndex;
+
+        var source = GetSectionItems(currentSectionIndex);
+
+        if (currentSectionIndex == destinationSectionIndex)
+        {
+            source.Move(dragMoveInfo.CurrentItemIndex, dragMoveInfo.DestinationItemIndex);
+        }
+        else
+        {
+            var destination = GetSectionItems(dragMoveInfo.DestinationSectionIndex);
+            source.RemoveAt(dragMoveInfo.CurrentItemIndex);
+            destination.Insert(dragMoveInfo.DestinationItemIndex, (TItem) dragMoveInfo.Item!);
         }
     }
 
@@ -74,5 +80,5 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     }
 
     /// <inheritdoc/>
-    protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
+    private protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
 }
