@@ -10,6 +10,14 @@ internal abstract class LiveActivityBase : ILiveActivity
     private LiveActivityContent _content;
     private string _payload;
 
+    /// <summary>
+    /// Latched by <see cref="MarkDismissed"/> and never cleared. The gates below read THIS
+    /// rather than <see cref="State"/>: the dismissal arrives off-lock, so a State check
+    /// racing an in-flight update could otherwise be overwritten back to Active and lose the
+    /// dismissal for good.
+    /// </summary>
+    private volatile bool _dismissed;
+
     protected LiveActivityBase(string id, string kind, LiveActivityContent content, string? payload = null)
     {
         Id = id;
@@ -22,6 +30,8 @@ internal abstract class LiveActivityBase : ILiveActivity
     public string Kind { get; }
     public LiveActivityState State { get; protected set; }
     public ILiveActivityContent Content => _content;
+
+    public event EventHandler? Dismissed;
 
     /// <summary>The serialized form of the current snapshot (the iOS widget/persistence payload).</summary>
     protected string Payload => _payload;
@@ -41,6 +51,19 @@ internal abstract class LiveActivityBase : ILiveActivity
             patch(draft);
             var payload = LiveActivityContentSerializer.Serialize(draft);
 
+            // The user swiped it away: never push again. Android would happily re-post the
+            // notification (NotificationManager.notify resurrects a dismissed one) and both
+            // platforms ask apps not to — reposting is what makes users revoke the
+            // permission outright. The snapshot still advances so Content stays truthful
+            // and a later EndAsync carries the final state.
+            if (_dismissed)
+            {
+                _content = draft;
+                _payload = payload;
+
+                return;
+            }
+
             // An alert must fire even when the content is unchanged.
             if (payload == _payload && alert is null)
             {
@@ -50,7 +73,11 @@ internal abstract class LiveActivityBase : ILiveActivity
             await ApplyUpdateAsync(draft, payload, alert).ConfigureAwait(false);
             _content = draft;
             _payload = payload;
-            State = LiveActivityState.Active;
+
+            // A dismissal landing while the update was in flight wins: it is terminal.
+            // Re-derived from the latch rather than assigned blindly, so the state converges
+            // even when the flag flips during this very block.
+            State = _dismissed ? LiveActivityState.Dismissed : LiveActivityState.Active;
         }
         finally
         {
@@ -79,7 +106,13 @@ internal abstract class LiveActivityBase : ILiveActivity
                 payload = LiveActivityContentSerializer.Serialize(draft);
             }
 
-            await ApplyEndAsync(draft, payload, dismissal).ConfigureAwait(false);
+            // Nothing is on screen to end — and the Default dismissal would POST the final
+            // content, resurrecting exactly what the user swiped away.
+            if (!_dismissed)
+            {
+                await ApplyEndAsync(draft, payload, dismissal).ConfigureAwait(false);
+            }
+
             _content = draft;
             _payload = payload;
             State = LiveActivityState.Ended;
@@ -97,6 +130,24 @@ internal abstract class LiveActivityBase : ILiveActivity
         {
             State = LiveActivityState.Stale;
         }
+    }
+
+    /// <summary>
+    /// The user removed the activity from screen. Terminal and idempotent, and deliberately
+    /// NOT taken under the handle lock: it arrives on a platform callback thread while an
+    /// update may be in flight, and <see cref="UpdateAsync"/> re-checks the state after its
+    /// await for exactly that race.
+    /// </summary>
+    internal void MarkDismissed()
+    {
+        if (_dismissed || State == LiveActivityState.Ended)
+        {
+            return;
+        }
+
+        _dismissed = true;
+        State = LiveActivityState.Dismissed;
+        Dismissed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Pushes the new snapshot to the platform surface.</summary>

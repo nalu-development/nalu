@@ -43,5 +43,13 @@ namespace Nalu
 		[Static]
 		[Export("activitiesJson")]
 		string ActivitiesJson();
+
+		/// <summary>
+		/// Reports every activity state transition as (activityId, state) for the life of the
+		/// process — "active", "stale", "dismissed" (the user removed it) or "ended".
+		/// </summary>
+		[Static]
+		[Export("observeActivityStates:")]
+		void ObserveActivityStates(Action<NSString, NSString> callback);
 	}
 }

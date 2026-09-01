@@ -19,6 +19,15 @@ public interface ILiveActivity
     LiveActivityState State { get; }
 
     /// <summary>
+    /// Raised once when the user removes the activity from screen, moving
+    /// <see cref="State"/> to <see cref="LiveActivityState.Dismissed"/>. Handling it is
+    /// optional — the library already stops pushing updates — but it lets app code drop
+    /// whatever was feeding the activity (a timer, a poll, a subscription).
+    /// Raised on the main thread on both platforms.
+    /// </summary>
+    event EventHandler? Dismissed;
+
+    /// <summary>
     /// The last applied content snapshot. Read-only by contract: casting to
     /// <see cref="LiveActivityContent"/> and mutating is unsupported.
     /// </summary>
@@ -29,6 +38,10 @@ public interface ILiveActivity
     /// the result. The patch must be synchronous; it runs under the handle's lock on the
     /// freshest state. A patch producing identical content is skipped entirely.
     /// </summary>
+    /// <para>
+    /// Once the user has dismissed the activity this becomes a silent no-op: the snapshot
+    /// still advances, so <see cref="Content"/> stays truthful, but nothing is re-posted.
+    /// </para>
     /// <param name="patch">Mutates the draft; only changes made here are applied.</param>
     /// <param name="alert">Draws the user's attention instead of updating silently.</param>
     Task UpdateAsync(Action<LiveActivityContent> patch, LiveActivityAlert? alert = null);
@@ -37,6 +50,10 @@ public interface ILiveActivity
     /// Ends the activity, optionally patching the content one final time
     /// (e.g. "Delivered ✓"). After this the handle is <see cref="LiveActivityState.Ended"/>.
     /// </summary>
+    /// <para>
+    /// On an already-dismissed activity there is nothing on screen to end: the handle just
+    /// becomes <see cref="LiveActivityState.Ended"/> without touching the platform.
+    /// </para>
     /// <param name="finalPatch">Optional final content mutation.</param>
     /// <param name="dismissal">How the activity leaves the screen.</param>
     Task EndAsync(Action<LiveActivityContent>? finalPatch = null, LiveActivityDismissal dismissal = LiveActivityDismissal.Default);

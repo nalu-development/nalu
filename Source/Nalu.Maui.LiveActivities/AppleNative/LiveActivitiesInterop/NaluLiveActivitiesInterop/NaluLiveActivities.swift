@@ -135,8 +135,30 @@ public class NaluLiveActivitiesBridge: NSObject {
         }
     }
 
+    /// Reports every activity state transition as (activityId, state) until the process
+    /// dies — the live counterpart of `activitiesJson`, which only sees the state at
+    /// startup. Newly started activities are picked up through `activityUpdates`, so one
+    /// call at init covers activities started later too.
+    @objc(observeActivityStates:)
+    public static func observeActivityStates(_ callback: @escaping @Sendable (String, String) -> Void) {
+        guard #available(iOS 16.2, *) else {
+            return
+        }
+
+        for activity in Activity<NaluLiveActivityAttributes>.activities {
+            track(activity.id, callback)
+        }
+
+        Task {
+            for await activity in Activity<NaluLiveActivityAttributes>.activityUpdates {
+                track(activity.id, callback)
+            }
+        }
+    }
+
     /// The running activities as a JSON array of {id, kind, payload, state} objects,
-    /// where state is "active" | "stale" | "ended". Used for rehydration after restarts.
+    /// where state is "active" | "stale" | "dismissed" | "ended". Used for rehydration
+    /// after restarts.
     @objc(activitiesJson)
     public static func activitiesJson() -> String {
         guard #available(iOS 16.2, *) else {
@@ -144,20 +166,11 @@ public class NaluLiveActivitiesBridge: NSObject {
         }
 
         let items: [[String: String]] = Activity<NaluLiveActivityAttributes>.activities.map { activity in
-            let state: String
-            switch activity.activityState {
-            case .active:
-                state = "active"
-            case .stale:
-                state = "stale"
-            default:
-                state = "ended"
-            }
-            return [
+            [
                 "id": activity.id,
                 "kind": activity.attributes.kind,
                 "payload": activity.content.state.payload,
-                "state": state
+                "state": stateName(activity.activityState)
             ]
         }
 
@@ -166,6 +179,43 @@ public class NaluLiveActivitiesBridge: NSObject {
             return "[]"
         }
         return json
+    }
+
+    /// Pumps one activity's state transitions into the callback. The task ends by itself
+    /// when ActivityKit finishes the sequence (the activity is gone for good).
+    ///
+    /// Only the id crosses into the Task: neither `Activity` nor its `activityStateUpdates`
+    /// sequence is Sendable, so capturing either is a Swift 6 concurrency error. The handle
+    /// is re-resolved on the other side instead.
+    @available(iOS 16.2, *)
+    private static func track(
+        _ id: String,
+        _ callback: @escaping @Sendable (String, String) -> Void
+    ) {
+        Task {
+            guard let tracked = findActivity(id) else {
+                return
+            }
+
+            for await state in tracked.activityStateUpdates {
+                callback(id, stateName(state))
+            }
+        }
+    }
+
+    /// `dismissed` is the USER taking the activity off screen; `ended` is the app ending it.
+    @available(iOS 16.2, *)
+    private static func stateName(_ state: ActivityState) -> String {
+        switch state {
+        case .active:
+            return "active"
+        case .stale:
+            return "stale"
+        case .dismissed:
+            return "dismissed"
+        default:
+            return "ended"
+        }
     }
 
     @available(iOS 16.2, *)
