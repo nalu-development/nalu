@@ -1337,6 +1337,14 @@ internal sealed class MagnetCompiler
         {
             LinInto(n.RatioFeedbackSlot, ax.SizeSlot, 1);
         }
+
+        if (axis == 1 && !n.Measured)
+        {
+            // MAUI contract: every child is measured each pass. Views with no Measured axis are measured
+            // with their EXACT resolved sizes (like a Grid star cell) once both axes are known — skipping
+            // this leaves platform containers with a zero DesiredSize and their content never laid out.
+            Emit(new Op(OpKind.MeasureChild, -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
+        }
     }
 
     private void EmitViewPosition(int axis, int node)

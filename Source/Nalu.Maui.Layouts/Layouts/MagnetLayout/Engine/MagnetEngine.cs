@@ -816,13 +816,10 @@ internal sealed class MagnetEngine
         ref readonly var meta = ref _tape!.Nodes[op.A];
         var values = _values;
         var view = _views[op.A];
+        var width = 0d;
+        var height = 0d;
 
-        if (view is null || _vis[op.A] == 0)
-        {
-            values[meta.MeasuredWidth] = 0;
-            values[meta.MeasuredHeight] = 0;
-        }
-        else
+        if (view is not null && _vis[op.A] != 0)
         {
             var wc = affine ? Eval(op.B) : values[op.B];
             var hc = affine ? Eval(op.C) : values[op.C];
@@ -846,12 +843,19 @@ internal sealed class MagnetEngine
             }
 
             var size = view.Measure(wc, hc);
-            values[meta.MeasuredWidth] = size.Width;
-            values[meta.MeasuredHeight] = size.Height;
+            width = size.Width;
+            height = size.Height;
         }
 
-        _slopes[meta.MeasuredWidth] = 0;
-        _slopes[meta.MeasuredHeight] = 0;
+        // Views with no Measured axis are measured too (the MAUI contract: containers size their own
+        // content from the measure pass) but have no measured slots to write.
+        if (meta.MeasuredWidth >= 0)
+        {
+            values[meta.MeasuredWidth] = width;
+            values[meta.MeasuredHeight] = height;
+            _slopes[meta.MeasuredWidth] = 0;
+            _slopes[meta.MeasuredHeight] = 0;
+        }
     }
 
     /// <summary>

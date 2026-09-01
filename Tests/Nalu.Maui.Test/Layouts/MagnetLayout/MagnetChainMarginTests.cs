@@ -148,6 +148,30 @@ public class MagnetChainMarginTests
     }
 
     [Fact]
+    public void DefaultGoneMarginPreservesTheGapOfTheSurvivingAnchor()
+    {
+        // "10 A 20 B 30 C" with NO explicit gone margins: the gone margin defaults to the margin itself.
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P, margin: 10).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Left("a", MagnetPole.Right, 20).Top(P);
+        h.View("c", 30, 20).Left("b", MagnetPole.Right, 30).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed }.With("a", "b", "c"));
+
+        // B gone → "10 A 30 C": C's own margin survives as its default gone margin.
+        h.Fake("b").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("a").ShouldBe(10, 0, 30, 20);
+        h.Frame("c").ShouldBe(70, 0, 30, 20);
+
+        // A also gone → "30 C" TODAY: the leading 10 belongs to A and collapses with it, C keeps its
+        // default gone margin. Separator semantics ("10 C": first visible member adopts the chain's
+        // leading margin) are not expressible statically — candidate for a chain-level opt-in.
+        h.Fake("a").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("c").ShouldBe(30, 0, 30, 20);
+    }
+
+    [Fact]
     public void WeightedChainRedistributesTheShareOfAHiddenMember()
     {
         var h = new EngineHarness();

@@ -71,7 +71,11 @@ public class MagnetEngineTests
         h.Layout(100, 100);
 
         h.Frame("a").ShouldBe(0, 0, 30, 15);
-        h.Fake("a").MeasureCount.Should().Be(0);
+
+        // MAUI contract: even a fully-determined child is measured (exactly once, with its resolved size),
+        // so platform containers can lay out their own content.
+        h.Fake("a").MeasureCount.Should().Be(1);
+        h.Fake("a").Constraints[^1].Should().Be((30d, 15d));
     }
 
     [Fact]
