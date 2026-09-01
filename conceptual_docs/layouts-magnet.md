@@ -37,6 +37,9 @@ xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
 </nalu:Magnet>
 ```
 
+> Building the mental model is easiest by example: [Magnet by example](layouts-magnet-examples.md) walks through ten
+> screenshot-driven everyday layouts (login screen, list rows, toolbars, barriers, chains, ratios…).
+
 The same in C# (fluent, targets can be ids, views or nodes):
 
 ```csharp

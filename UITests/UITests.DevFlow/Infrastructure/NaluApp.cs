@@ -954,6 +954,31 @@ public sealed class NaluApp : IAsyncLifetime
     /// <summary>Captures a PNG screenshot (useful when diagnosing failing tests).</summary>
     public Task<byte[]?> ScreenshotAsync() => _client.ScreenshotAsync();
 
+    /// <summary>Reads any MAUI property of an element (e.g. "Text", "Frame", "DesiredSize").</summary>
+    public async Task<string?> GetElementPropertyAsync(string automationId, string propertyName)
+    {
+        var element = await WaitForElementAsync(automationId).ConfigureAwait(false);
+
+        return await _client.GetPropertyAsync(element.Id, propertyName).ConfigureAwait(false);
+    }
+
+    /// <summary>Sets any MAUI property of an element (e.g. "Text", "IsVisible").</summary>
+    public async Task<bool> SetElementPropertyAsync(string automationId, string propertyName, string value)
+    {
+        var element = await WaitForElementAsync(automationId).ConfigureAwait(false);
+
+        return await _client.SetPropertyAsync(element.Id, propertyName, value).ConfigureAwait(false);
+    }
+
+    /// <summary>Captures a PNG screenshot cropped to a single element (used to produce the docs example images).</summary>
+    public async Task<byte[]> ScreenshotElementAsync(string automationId)
+    {
+        var element = await WaitForElementAsync(automationId).ConfigureAwait(false);
+
+        return await _client.ScreenshotAsync(elementId: element.Id).ConfigureAwait(false)
+               ?? throw new InvalidOperationException($"Element screenshot of '{automationId}' failed.");
+    }
+
     /// <summary>
     /// Samples several points of ONE screenshot, addressed as fractions (0..1) of the window —
     /// the only way to observe a page while it MOVES: the visual tree reports layout geometry,
