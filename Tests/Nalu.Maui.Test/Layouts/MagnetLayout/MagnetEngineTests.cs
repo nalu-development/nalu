@@ -1,3 +1,5 @@
+using Nalu.MagnetLayout.Engine;
+
 namespace Nalu.Maui.Test.Layouts.MagnetLayout;
 
 public class MagnetEngineTests
@@ -564,6 +566,71 @@ public class MagnetTapeCacheTests
         c.View("y", 30, 30).Right("x", MagnetPole.Left, 5).VerticallyWithin(P);
         c.Layout(200, 200);
         c.Engine.Tape.Should().NotBeSameAs(a.Engine.Tape);
+    }
+
+    [Fact]
+    public void MinAndMaxBoundednessAreSeparateStructuralBits()
+    {
+        // The compiler emits the measure-constraint clamp only for a finite Max, so a min-only and a
+        // max-only Measured sizing are structurally different tapes and must not share a cache entry
+        // (regardless of which one compiles first).
+        var minOnly = new EngineHarness();
+        minOnly.View("x", 100, 20, shrink: true).Left(P).Right(P).Top(P).Size(MagnetSizing.Measured.WithBounds(min: 10), 20);
+        var maxOnly = new EngineHarness();
+        maxOnly.View("x", 100, 20, shrink: true).Left(P).Right(P).Top(P).Size(MagnetSizing.Measured.WithBounds(max: 40), 20);
+
+        minOnly.Layout(200, 200, 200, 200);
+        maxOnly.Layout(200, 200, 200, 200);
+
+        minOnly.Engine.Tape.Should().NotBeSameAs(maxOnly.Engine.Tape);
+
+        // The unbounded-max view measures against the full span, the bounded one against its Max.
+        minOnly.Fake("x").Constraints[^1].W.Should().Be(200);
+        maxOnly.Fake("x").Constraints[^1].W.Should().Be(40);
+        maxOnly.Frame("x").Width.Should().Be(40);
+    }
+
+    [Fact]
+    public void CompilationCacheCapacityIsConfigurableAtRuntime()
+    {
+        var initial = Magnet.CompilationCacheCapacity;
+        initial.Should().Be(64);
+
+        try
+        {
+            MagnetTapeCache.Clear();
+            Magnet.CompilationCacheCapacity = 2;
+
+            var a = new EngineHarness();
+            a.View("cap", 10, 10).Left(P).Top(P);
+            a.Layout(100, 100);
+            var b = new EngineHarness();
+            b.View("cap", 10, 10).Left(P).Top(P).Size(20, 20);
+            b.Layout(100, 100);
+            var c = new EngineHarness();
+            c.View("cap", 10, 10).Left(P).Right(P).Top(P).Size(MagnetSizing.Constraint, 20);
+            c.Layout(100, 100);
+
+            // Other test classes may add entries concurrently, but the capacity invariant always holds.
+            MagnetTapeCache.Count.Should().BeLessThanOrEqualTo(2);
+
+            // "a" (least recently used) was evicted: an identical structure compiles a fresh tape.
+            var a2 = new EngineHarness();
+            a2.View("cap", 10, 10).Left(P).Top(P);
+            a2.Layout(100, 100);
+            a2.Engine.Tape.Should().NotBeSameAs(a.Engine.Tape);
+
+            // Shrinking trims immediately.
+            Magnet.CompilationCacheCapacity = 1;
+            MagnetTapeCache.Count.Should().BeLessThanOrEqualTo(1);
+
+            var act = () => Magnet.CompilationCacheCapacity = -1;
+            act.Should().Throw<ArgumentOutOfRangeException>();
+        }
+        finally
+        {
+            Magnet.CompilationCacheCapacity = initial;
+        }
     }
 }
 

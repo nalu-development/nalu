@@ -843,12 +843,12 @@ internal sealed class MagnetCompiler
         }
 
         ids.Add(ids[0]);
-        sb.Append(CultureInfoJoin(ids));
+        sb.Append(FormatCyclePath(ids));
 
         return new InvalidOperationException($"Constraint cycle on {(axis == 0 ? "X" : "Y")} axis: {sb}. Use a MagnetChain for mutually dependent views.");
     }
 
-    private static string CultureInfoJoin(List<string> ids) => string.Join(" → ", ids.Select(i => $"'{i}'"));
+    private static string FormatCyclePath(List<string> ids) => string.Join(" → ", ids.Select(i => $"'{i}'"));
 
     #endregion
 

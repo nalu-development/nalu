@@ -7,7 +7,7 @@ namespace Nalu.MagnetLayout.Engine;
 /// </summary>
 internal static class MagnetTapeCache
 {
-    private const int Capacity = 32;
+    private static int _capacity = 64;
     private static readonly Lock _lock = new();
     private static readonly Dictionary<string, LinkedListNode<(string Key, MagnetTape Tape)>> _entries = new(StringComparer.Ordinal);
     private static readonly LinkedList<(string Key, MagnetTape Tape)> _lru = [];
@@ -22,6 +22,32 @@ internal static class MagnetTapeCache
             lock (_lock)
             {
                 return _entries.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maximum number of compiled tapes kept alive (exposed as <see cref="Magnet.CompilationCacheCapacity" />).
+    /// A safety net against unbounded growth rather than a tuning knob: an evicted structure is transparently
+    /// recompiled. Shrinking trims the least recently used entries immediately; 0 disables caching.
+    /// </summary>
+    public static int Capacity
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _capacity;
+            }
+        }
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+
+            lock (_lock)
+            {
+                _capacity = value;
+                TrimExcess();
             }
         }
     }
@@ -49,20 +75,23 @@ internal static class MagnetTapeCache
     {
         lock (_lock)
         {
-            if (_entries.ContainsKey(key))
+            if (_capacity == 0 || _entries.ContainsKey(key))
             {
                 return;
             }
 
-            if (_entries.Count >= Capacity)
-            {
-                var last = _lru.Last!;
-                _lru.RemoveLast();
-                _entries.Remove(last.Value.Key);
-            }
+            _entries[key] = _lru.AddFirst((key, tape));
+            TrimExcess();
+        }
+    }
 
-            var node = _lru.AddFirst((key, tape));
-            _entries[key] = node;
+    private static void TrimExcess()
+    {
+        while (_entries.Count > _capacity)
+        {
+            var last = _lru.Last!;
+            _lru.RemoveLast();
+            _entries.Remove(last.Value.Key);
         }
     }
 
@@ -141,7 +170,12 @@ internal static class MagnetTapeCache
     }
 
     private static void AppendSize(StringBuilder sb, MagnetSizing size)
-        => sb.Append((int) size.Unit).Append(size.HasBounds ? 'b' : 'u').Append(';');
+        // Min/Max boundedness are separate structural bits (see MagnetSizing.DiffWith): a finite Max also
+        // changes the emitted measure-constraint clamp, so 'min-only' and 'max-only' must not share a tape.
+        => sb.Append((int) size.Unit)
+             .Append(size.Min > 0 ? 'm' : '-')
+             .Append(double.IsPositiveInfinity(size.Max) ? '-' : 'M')
+             .Append(';');
 
     private static void AppendList(StringBuilder sb, IList<string> items)
     {

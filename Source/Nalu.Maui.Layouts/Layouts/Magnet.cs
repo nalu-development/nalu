@@ -798,5 +798,20 @@ public partial class Magnet : Layout, IMagnetOwner
     /// </summary>
     internal bool HasNodes => _definition is { Count: > 0 };
 
+    /// <summary>
+    /// Gets or sets the maximum number of compiled layout structures kept in the process-wide cache. Defaults to 64.
+    /// </summary>
+    /// <remarks>
+    /// Structurally identical definitions (e.g. template-instantiated cells) share one compiled entry, so the
+    /// capacity counts distinct structures, not instances. It is a safety net against unbounded growth rather than
+    /// a tuning knob: an evicted structure is transparently recompiled in a few tens of microseconds. Shrinking
+    /// trims the least recently used entries immediately; 0 disables caching.
+    /// </remarks>
+    public static int CompilationCacheCapacity
+    {
+        get => MagnetTapeCache.Capacity;
+        set => MagnetTapeCache.Capacity = value;
+    }
+
     #endregion
 }

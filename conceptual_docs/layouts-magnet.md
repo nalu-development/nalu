@@ -299,8 +299,10 @@ interpreter does more work than three trivial specialized layouts, see the on-de
 coin); an arrange that follows a measure with matching bounds re-uses the child measures, an arrange without a measure
 in between (recycled cells) re-measures; the remaining allocations come from MAUI's own `Measure`/`Arrange` plumbing
 (the engine allocates only when compiling).
-Compiled tapes are pure and shared through a small LRU cache keyed by the structure of the definition, so
+Compiled tapes are pure and shared through a process-wide LRU cache keyed by the structure of the definition, so
 template-instantiated cells compile once; inflating a card costs about the same as its nested-Grid equivalent.
+The cache holds 64 distinct structures by default (a safety net, not a tuning knob: an evicted structure is
+transparently recompiled in a few tens of microseconds) and is configurable via `Magnet.CompilationCacheCapacity`.
 
 ### When to use Magnet
 
