@@ -17,6 +17,7 @@ internal sealed class MagnetEngine
     private byte[] _vis = [];
     private IView?[] _views = [];
     private double _eval;
+    private HashSet<int>? _forcedCollapsed;
 
     /// <summary>
     /// Gets whether a tape is compiled.
@@ -153,8 +154,11 @@ internal sealed class MagnetEngine
             case PatchKind.GuidelinePosition:
                 return ((MagnetGuideline) node).Position;
 
-            case PatchKind.ChainWeightFraction:
-                return ChainFraction((MagnetChain) node, aux);
+            case PatchKind.ChainWeight:
+                return ChainWeight((MagnetChain) node, aux);
+
+            case PatchKind.ChainGap:
+                return ((MagnetChain) node).Gap;
 
             default:
                 throw new NotSupportedException(kind.ToString());
@@ -163,7 +167,11 @@ internal sealed class MagnetEngine
 
     private static MagnetSizing GetSize(MagnetView view, int axis) => axis == 0 ? view.WidthSizing : view.HeightSizing;
 
-    private double ChainFraction(MagnetChain chain, int member)
+    /// <summary>
+    /// The raw weight of a chain member (validated). Fractions are computed at runtime by the tape so that
+    /// collapsed members are excluded and the others absorb their share.
+    /// </summary>
+    private double ChainWeight(MagnetChain chain, int member)
     {
         var horizontal = chain.Orientation == MagnetOrientation.Horizontal;
         var sum = 0d;
@@ -207,11 +215,9 @@ internal sealed class MagnetEngine
             {
                 throw new InvalidOperationException($"MagnetChain '{chain.MagnetId}': total weight is 0.");
             }
-
-            return 0;
         }
 
-        return sum == 0 ? 0 : own / sum;
+        return own;
     }
 
     /// <summary>
@@ -233,6 +239,13 @@ internal sealed class MagnetEngine
                 var view = ((MagnetView) _nodes[i]).View;
                 _views[i] = view;
                 visible = view is not null && view.Visibility != Visibility.Collapsed ? (byte) 1 : (byte) 0;
+
+                if (visible == 1 && _forcedCollapsed?.Contains(i) == true)
+                {
+                    // Transition-scoped override: the end state of a deferred Hide is solved as collapsed
+                    // while the view is still natively visible (it is fading out).
+                    visible = 0;
+                }
             }
 
             _vis[i] = visible;
@@ -428,6 +441,12 @@ internal sealed class MagnetEngine
 
         return false;
     }
+
+    /// <summary>
+    /// Sets (or clears, with <c>null</c>) the transition-scoped set of node indexes solved as collapsed
+    /// regardless of the bound view's visibility.
+    /// </summary>
+    public void SetForcedCollapsed(HashSet<int>? nodes) => _forcedCollapsed = nodes;
 
     /// <summary>
     /// Gets the frame of a node.
@@ -800,13 +819,10 @@ internal sealed class MagnetEngine
         ref readonly var meta = ref _tape!.Nodes[op.A];
         var values = _values;
         var view = _views[op.A];
+        var width = 0d;
+        var height = 0d;
 
-        if (view is null || _vis[op.A] == 0)
-        {
-            values[meta.MeasuredWidth] = 0;
-            values[meta.MeasuredHeight] = 0;
-        }
-        else
+        if (view is not null && _vis[op.A] != 0)
         {
             var wc = affine ? Eval(op.B) : values[op.B];
             var hc = affine ? Eval(op.C) : values[op.C];
@@ -830,12 +846,19 @@ internal sealed class MagnetEngine
             }
 
             var size = view.Measure(wc, hc);
-            values[meta.MeasuredWidth] = size.Width;
-            values[meta.MeasuredHeight] = size.Height;
+            width = size.Width;
+            height = size.Height;
         }
 
-        _slopes[meta.MeasuredWidth] = 0;
-        _slopes[meta.MeasuredHeight] = 0;
+        // Views with no Measured axis are measured too (the MAUI contract: containers size their own
+        // content from the measure pass) but have no measured slots to write.
+        if (meta.MeasuredWidth >= 0)
+        {
+            values[meta.MeasuredWidth] = width;
+            values[meta.MeasuredHeight] = height;
+            _slopes[meta.MeasuredWidth] = 0;
+            _slopes[meta.MeasuredHeight] = 0;
+        }
     }
 
     /// <summary>

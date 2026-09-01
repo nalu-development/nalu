@@ -187,6 +187,24 @@ public sealed class MagnetChain : MagnetNode
         propertyChanged: OnStructurePropertyChanged
     );
 
+    /// <summary>Bindable property for <see cref="Gap" />.</summary>
+    public static readonly BindableProperty GapProperty = BindableProperty.Create(
+        nameof(Gap),
+        typeof(double),
+        typeof(MagnetChain),
+        0d,
+        propertyChanged: OnValuePropertyChanged
+    );
+
+    /// <summary>Bindable property for <see cref="GapMode" />.</summary>
+    public static readonly BindableProperty GapModeProperty = BindableProperty.Create(
+        nameof(GapMode),
+        typeof(MagnetChainGapMode),
+        typeof(MagnetChain),
+        MagnetChainGapMode.Anchors,
+        propertyChanged: OnStructurePropertyChanged
+    );
+
     private readonly IList<string> _nodes;
     private readonly IList<double> _weights;
 
@@ -229,7 +247,35 @@ public sealed class MagnetChain : MagnetNode
     }
 
     /// <summary>
+    /// Gets or sets the uniform gap placed between consecutive VISIBLE members (separator semantics:
+    /// a collapsed member takes its gap away — no gone margins to think about). Animatable.
+    /// </summary>
+    /// <remarks>
+    /// Applies to member pairs with no adjacent-member anchors: declaring an anchor to the adjacent member
+    /// (<c>After="a,8"</c>) overrides the chain gap for that pair with the per-anchor margin/gone semantics.
+    /// </remarks>
+    public double Gap
+    {
+        get => (double) GetValue(GapProperty);
+        set => SetValue(GapProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how the margins between members are interpreted. Defaults to
+    /// <see cref="MagnetChainGapMode.Anchors" /> (ConstraintLayout semantics); with
+    /// <see cref="MagnetChainGapMode.Separators" /> the head/tail margins belong to the chain and survive their
+    /// member collapsing, and inner margins apply only between visible members (a StackLayout-like padding+spacing
+    /// model — the first visible member sits at the chain's leading margin, whichever member it is).
+    /// </summary>
+    public MagnetChainGapMode GapMode
+    {
+        get => (MagnetChainGapMode) GetValue(GapModeProperty);
+        set => SetValue(GapModeProperty, value);
+    }
+
+    /// <summary>
     /// Gets or sets the weights of the members (positional, aligned with <see cref="Nodes" />, applies to <see cref="MagnetSizingUnit.Constraint" />-sized members only; missing entries default to 1).
+    /// Collapsed members are excluded: their share is redistributed to the visible weighted members.
     /// XAML: a comma-separated attribute, <c>Weights="2,1"</c>.
     /// </summary>
     /// <remarks>The setter replaces the contents: the backing list never changes identity.</remarks>

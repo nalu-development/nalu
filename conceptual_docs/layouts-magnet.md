@@ -138,8 +138,13 @@ such a node pay nothing for this.
 
 #### Visibility (GONE)
 
-There is no visibility on nodes: `IsVisible="False"` on the view collapses it — its size becomes 0, anchors to it use
+The single source of truth is the view: `IsVisible="False"` collapses it — its size becomes 0, anchors to it use
 the gone margin, chains and barriers skip it. Toggling visibility never recompiles the layout.
+
+A node can additionally *declare* a visibility action applied **onto** the view (see
+[Scenes](#scenes-two-definitions-animated) below): `ApplyVisibility="Hide"`/`"Show"` stamps `IsVisible` when the
+definition attaches, when the view binds, and when the value changes. It is a one-shot write, never read back —
+the view remains the runtime truth.
 
 #### Chains
 
@@ -155,9 +160,24 @@ Chains are **explicit** nodes (unlike Android, which infers them from mutual anc
 
 The chain start is the first member's `LeftTo` (default `parent.Left`), the end is the last member's `RightTo`
 (default `parent.Right`). Inner members must not carry anchors on the chain axis, except anchors to the adjacent
-member (which only contribute their margin, e.g. `b.LeftTo="a.Right,8"`). `Packed` uses the first member's bias
-(`HorizontalBias="0.3"` on the head puts the packed group at 30% of the free space). Members sized `*` share the
-remaining space according to `Weights` (positional, aligned with `Nodes`, default 1). `Measured` members are measured with the room left by
+member (which only contribute their margin, e.g. `b.LeftTo="a.Right,8"`) — so **gaps can differ per pair**, and each
+carries its own gone margin (`b.LeftTo="a.Right,8,gone:2"`). For the common uniform case, declare the gap ONCE on the
+chain instead: `Gap="8"` places it between consecutive **visible** members (separator semantics: a collapsed member
+takes its gap away, no gone margins involved — like Android's `Flow` `flow_horizontalGap`); it is animatable, and a
+per-pair adjacent anchor overrides it for that pair.
+
+`GapMode="Separators"` extends the separator semantics to the per-pair anchors and the chain ends — the
+StackLayout padding+spacing mental model, per pair: the first member's start margin and the last member's end
+margin belong to the **chain** (they survive the head/tail collapsing, so the first visible member sits at the
+chain's leading margin whichever member it is), and a member's margin towards the previous one applies only when
+a visible member precedes it (gone margins are not involved). With the default `GapMode="Anchors"` the margins
+follow the ConstraintLayout rules above. `"10 A 20 B 30 C"` with A and B collapsed yields `30 C` in Anchors mode
+and `10 C` in Separators mode. Collapsed members follow the GONE rules: they drop
+their own margins (including the chain's start/end margin when the head/tail collapses), the anchor pointing *at* a
+collapsed member uses its gone margin, and spread gaps only count visible members. `Packed` uses the first member's
+bias (`HorizontalBias="0.3"` on the head puts the packed group at 30% of the free space). Members sized `*` share the
+remaining space according to `Weights` (positional, aligned with `Nodes`, default 1; collapsed members are excluded,
+their share goes back to the visible ones). `Measured` members are measured with the room left by
 the other members (in chain order): a packed `[name, star]` chain lets the name grow until it must ellipsize while the
 star stays glued to its right — the pattern that needs a `FlexLayout` elsewhere.
 
@@ -240,12 +260,48 @@ await magnet.TransitionToAsync(() =>
 
 - **value-only** changes interpolate the constraint *inputs*, so intermediate frames obey the constraints exactly
   (animating a guideline `Percent` or a chain weight moves every dependent view correctly);
-- structural changes and visibility toggles interpolate frames; appearing views fade in (a view hidden with
-  `IsVisible=false` disappears immediately: the platform hides it before the animation can run);
+- structural changes and visibility toggles interpolate frames; appearing views fade in (a view hidden with a
+  manual `IsVisible=false` disappears immediately — the platform hides it before the animation can run; use
+  `ApplyVisibility="Hide"` on the node to get the animated fade-out);
 - a new transition retargets from the current interpolated state (the previous task completes with `false`);
 - when the layout's own size changes the ancestors reflow every tick (inherently more expensive).
 
 `TransitionToAsync(MagnetDefinition end)` swaps the whole definition, matching nodes by `MagnetId`.
+
+### Scenes (two definitions, animated)
+
+A "scene" is a definition that declares both the geometry **and** the visibility of the views it manages, using
+`ApplyVisibility` on its nodes:
+
+```xml
+<nalu:MagnetDefinition x:Key="SceneA">
+  <nalu:MagnetView MagnetId="badge" ApplyVisibility="Show" ... />
+</nalu:MagnetDefinition>
+<nalu:MagnetDefinition x:Key="SceneB">
+  <nalu:MagnetView MagnetId="badge" ApplyVisibility="Hide" ... />
+</nalu:MagnetDefinition>
+```
+
+```csharp
+await magnet.TransitionToAsync(sceneB); // the badge fades out while its siblings animate to the collapsed layout
+```
+
+Applying a scene inside a transition defers the visibility writes: a `Hide` on a visible view freezes it in place
+and fades it out (`Opacity` → 0), its siblings animate to the layout solved *as if it were already collapsed*, and
+`IsVisible = false` lands at the end (also when the transition is interrupted); a `Show` applies up front and fades
+in. Outside a transition (a plain `Definition` swap, or a late-bound child) the action applies immediately.
+
+Rules to keep scenes predictable:
+
+- **Scenes are total, there is no auto-revert**: swapping back to a definition with no opinion (`None`, the default)
+  leaves the view as the previous scene left it. Each scene declares `ApplyVisibility` for every view it manages.
+- **Ownership**: applying writes `IsVisible` with standard MAUI semantics, which **permanently detaches any binding**
+  on that property. A view whose visibility is scene-managed must not also bind `IsVisible` — in MVVM, trigger the
+  transition from the view model instead of binding the visibility.
+- Scene visibility works with **definition-declared nodes** (views bound by `MagnetId`); views carrying inline
+  constraints cannot be scene-hidden (an id declared both inline and in the definition is an error).
+- `ApplyVisibility` does not affect the compiled layout: definitions differing only in visibility actions share the
+  same compiled tape.
 
 ### Performance
 

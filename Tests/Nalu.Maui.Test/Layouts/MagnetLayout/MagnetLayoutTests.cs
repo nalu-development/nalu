@@ -2,6 +2,7 @@ using Microsoft.Maui.Layouts;
 
 namespace Nalu.Maui.Test.Layouts.MagnetLayout;
 
+[Collection("MagnetSharedState")] // shared statics (Magnet.AnimationDriver, MagnetTapeCache): never run these classes concurrently.
 public class MagnetLayoutTests
 {
     private const string _p = MagnetAnchor.Parent;
@@ -199,6 +200,27 @@ public class MagnetLayoutTests
         // A second arrange without a measure in between cannot know whether children changed: it re-measures.
         manager.ArrangeChildren(new Rect(0, 0, 400, 400));
         a.MeasureCount.Should().Be(count + 2);
+    }
+
+    [Fact]
+    public void StarSizedChildrenAreRemeasuredWhenArrangedAwayFromTheHug()
+    {
+        var (magnet, manager) = CreateMagnet();
+        var a = new TestView(40, 20);
+        Magnet.SetMagnetId(a, "a");
+        Magnet.SetLeftTo(a, "parent.Left");
+        Magnet.SetRightTo(a, "parent.Right");
+        Magnet.SetTopTo(a, "parent.Top");
+        Magnet.SetWidthSizing(a, "*");
+        magnet.Add(a);
+
+        manager.Measure(400, 400); // hug width ≈ 0: the star child contributes only its margins
+        manager.ArrangeChildren(new Rect(0, 0, 400, 400));
+
+        // The measure pass measured the child against the hug solution; arranging at 400 must re-measure
+        // with the real span, or containers keep a stale (zero) DesiredSize for their own content.
+        a.Frame.Width.Should().Be(400);
+        a.MeasureCount.Should().Be(2);
     }
 
     [Fact]

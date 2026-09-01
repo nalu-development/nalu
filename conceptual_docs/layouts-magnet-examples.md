@@ -157,17 +157,18 @@ Members sized `*` inside a chain share the remaining space according to `Weights
 <nalu:Magnet>
   <nalu:Magnet.Definition>
     <nalu:MagnetDefinition>
-      <nalu:MagnetChain MagnetId="bar" Nodes="w1,w2,w3" Weights="2,1,1" />
+      <nalu:MagnetChain MagnetId="bar" Nodes="w1,w2,w3" Weights="2,1,1" Gap="4" />
     </nalu:MagnetDefinition>
   </nalu:Magnet.Definition>
   <Border nalu:Magnet.MagnetId="w1" nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
-  <Border nalu:Magnet.MagnetId="w2" nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.After="w1,4" />
-  <Border nalu:Magnet.MagnetId="w3" nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.After="w2,4" />
+  <Border nalu:Magnet.MagnetId="w2" nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
+  <Border nalu:Magnet.MagnetId="w3" nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
 </nalu:Magnet>
 ```
 
 - `Weights` is positional (aligned with `Nodes`); members without a weight default to 1.
-- The `After="…,4"` margins become the gaps; collapsed members give their share back to the others.
+- `Gap="4"` declares the uniform gap once on the chain, between consecutive visible members; collapsed members give
+  their share (and their gap) back to the others. Per-pair `After="…,4"` anchors override it where declared.
 
 ### 7 · Media card — a 16:9 image via Ratio sizing
 

@@ -954,6 +954,9 @@ public sealed class NaluApp : IAsyncLifetime
     /// <summary>Captures a PNG screenshot (useful when diagnosing failing tests).</summary>
     public Task<byte[]?> ScreenshotAsync() => _client.ScreenshotAsync();
 
+    /// <summary>Reads the app-side structured logs (diagnostics).</summary>
+    public Task<string> GetLogsAsync(int limit = 100) => _client.GetLogsAsync(limit);
+
     /// <summary>Reads any MAUI property of an element (e.g. "Text", "Frame", "DesiredSize").</summary>
     public async Task<string?> GetElementPropertyAsync(string automationId, string propertyName)
     {

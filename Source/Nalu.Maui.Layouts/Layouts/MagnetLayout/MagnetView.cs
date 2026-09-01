@@ -4,8 +4,10 @@ namespace Nalu;
 /// The constraints of a view inside a <see cref="Magnet" /> layout.
 /// </summary>
 /// <remarks>
-/// Visibility is deliberately not part of the node: the single source of truth is <see cref="IView.Visibility" /> of the bound view
+/// The single source of truth for visibility is <see cref="IView.Visibility" /> of the bound view
 /// (<c>IsVisible="False"</c> collapses the view, its size becomes 0 and anchors to it use <see cref="MagnetAnchor.GoneMargin" />).
+/// <see cref="ApplyVisibility" /> is a declared, one-shot action STAMPED onto that property when the node is applied —
+/// it is never read back and does not participate in the layout solve.
 /// </remarks>
 public sealed class MagnetView : MagnetNode
 {
@@ -43,6 +45,15 @@ public sealed class MagnetView : MagnetNode
         typeof(MagnetView),
         0.5,
         propertyChanged: OnValuePropertyChanged
+    );
+
+    /// <summary>Bindable property for <see cref="ApplyVisibility" />.</summary>
+    public static readonly BindableProperty ApplyVisibilityProperty = BindableProperty.Create(
+        nameof(ApplyVisibility),
+        typeof(MagnetVisibilityAction),
+        typeof(MagnetView),
+        MagnetVisibilityAction.None,
+        propertyChanged: (b, _, _) => ((MagnetView) b).RequestVisibilityApply()
     );
 
     /// <summary>
@@ -120,9 +131,77 @@ public sealed class MagnetView : MagnetNode
     }
 
     /// <summary>
+    /// Gets or sets the visibility action applied to the bound view's <c>IsVisible</c> — when the definition attaches,
+    /// when the view binds (late-added child) and when this value changes. <see cref="MagnetVisibilityAction.None" />
+    /// (the default) leaves the view untouched.
+    /// </summary>
+    /// <remarks>
+    /// One-shot writes with standard MAUI semantics: applying detaches any binding on the view's <c>IsVisible</c>.
+    /// A view whose visibility is scene-managed is owned by <see cref="ApplyVisibility" /> — do not also bind its
+    /// <c>IsVisible</c>. Inside <see cref="Magnet.TransitionToAsync(System.Action,uint,Easing?)" /> the write is
+    /// deferred and animated (fade-out for <see cref="MagnetVisibilityAction.Hide" />); scenes do not auto-revert:
+    /// each definition declares the state of the views it manages.
+    /// </remarks>
+    public MagnetVisibilityAction ApplyVisibility
+    {
+        get => (MagnetVisibilityAction) GetValue(ApplyVisibilityProperty);
+        set => SetValue(ApplyVisibilityProperty, value);
+    }
+
+    private IView? _view;
+
+    /// <summary>
     /// The view bound to this node (by identifier match or inline transfer).
     /// </summary>
-    internal IView? View { get; set; }
+    internal IView? View
+    {
+        get => _view;
+        set
+        {
+            if (ReferenceEquals(_view, value))
+            {
+                return;
+            }
+
+            _view = value;
+
+            if (value is not null)
+            {
+                RequestVisibilityApply();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Routes a pending <see cref="ApplyVisibility" /> to the owner (which defers it during a transition) or applies it directly.
+    /// </summary>
+    private void RequestVisibilityApply()
+    {
+        if (ApplyVisibility == MagnetVisibilityAction.None || _view is null)
+        {
+            return;
+        }
+
+        if (Owner is Magnet magnet)
+        {
+            magnet.OnApplyVisibilityRequested(this);
+        }
+        else
+        {
+            ApplyVisibilityNow();
+        }
+    }
+
+    /// <summary>
+    /// Stamps <see cref="ApplyVisibility" /> onto the bound view's <c>IsVisible</c> (no-op for <see cref="MagnetVisibilityAction.None" />).
+    /// </summary>
+    internal void ApplyVisibilityNow()
+    {
+        if (_view is VisualElement ve && ApplyVisibility is not MagnetVisibilityAction.None)
+        {
+            ve.IsVisible = ApplyVisibility == MagnetVisibilityAction.Show;
+        }
+    }
 
     /// <summary>Gets the anchor of a side of this view.</summary>
     internal MagnetAnchor? GetAnchor(MagnetPole side)
@@ -162,6 +241,14 @@ public sealed class MagnetView : MagnetNode
     }
 
     #region Fluent API
+
+    /// <summary>Sets <see cref="ApplyVisibility" /> (fluent).</summary>
+    public MagnetView Visibility(MagnetVisibilityAction action)
+    {
+        ApplyVisibility = action;
+
+        return this;
+    }
 
     /// <summary>Sets <see cref="MagnetNode.MagnetId" />.</summary>
     public MagnetView Id(string magnetId)

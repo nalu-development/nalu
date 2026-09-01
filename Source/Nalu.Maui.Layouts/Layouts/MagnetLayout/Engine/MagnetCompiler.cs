@@ -37,6 +37,7 @@ internal sealed class MagnetCompiler
         public int Chain = -1;
         public bool Weighted;
         public int WeightedSizeSlot = -1;
+        public bool StageDependent; // the size vertex is reachable from the stage end
     }
 
     private sealed class NodeInfo
@@ -54,7 +55,10 @@ internal sealed class MagnetCompiler
         public int Axis; // 0 = X, 1 = Y
         public int[] Members = [];
         public int MarginSlot, PercentSlot, PositionSlot;
-        public int[] FractionSlots = [];
+        public int[] WeightSlots = [];
+        public int GapSlot = -1;
+        public int[] GapAfterSlots = [];
+        public int GapsTotalSlot = MagnetTape.Zero;
         public int StartSlot = -1, EndSlot = -1, SpanSlot = -1; // chain
         public int RatioFeedbackSlot = -1; // Ratio width fed by a Y-dependent height
     }
@@ -66,6 +70,7 @@ internal sealed class MagnetCompiler
     private readonly List<MarginEntry> _margins;
     private readonly List<int> _reqSlots;
     private readonly List<int> _feedbackSlots = [];
+    private bool _hasStageDependentMeasures;
     private int _slots;
     private int _inputStart, _inputEnd;
 
@@ -240,7 +245,8 @@ internal sealed class MagnetCompiler
             Margins = _margins.ToArray(),
             InputStart = _inputStart,
             InputEnd = _inputEnd,
-            FeedbackSlots = _feedbackSlots.ToArray()
+            FeedbackSlots = _feedbackSlots.ToArray(),
+            HasStageDependentMeasures = _hasStageDependentMeasures
         };
     }
 
@@ -346,11 +352,12 @@ internal sealed class MagnetCompiler
 
                 case MagnetChain chain:
                     n.Axis = chain.Orientation == MagnetOrientation.Horizontal ? 0 : 1;
-                    n.FractionSlots = new int[chain.Nodes.Count];
+                    n.GapSlot = Input(i, PatchKind.ChainGap, 0);
+                    n.WeightSlots = new int[chain.Nodes.Count];
 
                     for (var m = 0; m < chain.Nodes.Count; m++)
                     {
-                        n.FractionSlots[m] = Input(i, PatchKind.ChainWeightFraction, m);
+                        n.WeightSlots[m] = Input(i, PatchKind.ChainWeight, m);
                     }
 
                     break;
@@ -919,7 +926,7 @@ internal sealed class MagnetCompiler
         {
             if (!phaseOne[v] && v != StageV)
             {
-                EmitVertex(axis, v);
+                EmitVertex(axis, v, stageDependent: false);
             }
         }
 
@@ -929,7 +936,7 @@ internal sealed class MagnetCompiler
         {
             if (phaseOne[v] && v != StageV)
             {
-                EmitVertex(axis, v);
+                EmitVertex(axis, v, stageDependent: true);
             }
         }
 
@@ -971,7 +978,7 @@ internal sealed class MagnetCompiler
 
     private readonly List<int> _pendingReqs = [];
 
-    private void EmitVertex(int axis, int v)
+    private void EmitVertex(int axis, int v, bool stageDependent)
     {
         var node = v / 2;
         var n = _nodes[node];
@@ -986,7 +993,7 @@ internal sealed class MagnetCompiler
                 }
                 else
                 {
-                    EmitViewSize(axis, node);
+                    EmitViewSize(axis, node, stageDependent);
                 }
 
                 break;
@@ -1057,22 +1064,10 @@ internal sealed class MagnetCompiler
             avail = Lin(avail, 1, _nodes[m].Axes[axis].SizeSlot, -1);
         }
 
-        // Gaps between adjacent members (margins of adjacent anchors).
-        var members = chainInfo.Members;
-
-        for (var i = 0; i < members.Length; i++)
+        // All inter-member gaps (anchored pairs + chain Gap), precomputed at the span vertex.
+        if (chainInfo.GapsTotalSlot != MagnetTape.Zero)
         {
-            var ax = _nodes[members[i]].Axes[axis];
-
-            if (i > 0 && ax.Start is { Adjacent: true } start)
-            {
-                avail = Lin(avail, 1, start.EffSlot, -1);
-            }
-
-            if (i < members.Length - 1 && ax.End is { Adjacent: true } end)
-            {
-                avail = Lin(avail, 1, end.EffSlot, -1);
-            }
+            avail = Lin(avail, 1, chainInfo.GapsTotalSlot, -1);
         }
 
         return avail;
@@ -1088,10 +1083,11 @@ internal sealed class MagnetCompiler
         return Lin(endPos, 1, PoleSlot(axis, start), -1, start.EffSlot, -1);
     }
 
-    private void EmitViewSize(int axis, int node)
+    private void EmitViewSize(int axis, int node, bool stageDependent)
     {
         var n = _nodes[node];
         var ax = n.Axes[axis];
+        ax.StageDependent = stageDependent;
         var other = n.Axes[1 - axis];
         var size = ax.Size;
         var view = (MagnetView) n.Node;
@@ -1203,6 +1199,7 @@ internal sealed class MagnetCompiler
             }
 
             Emit(new Op(OpKind.MeasureChild, -1, node, wc, hc));
+            _hasStageDependentMeasures |= stageDependent;
         }
 
         switch (size.Unit)
@@ -1337,6 +1334,17 @@ internal sealed class MagnetCompiler
         {
             LinInto(n.RatioFeedbackSlot, ax.SizeSlot, 1);
         }
+
+        if (axis == 1 && !n.Measured)
+        {
+            // MAUI contract: every child is measured each pass. Views with no Measured axis are measured
+            // with their EXACT resolved sizes (like a Grid star cell) once both axes are known — skipping
+            // this leaves platform containers with a zero DesiredSize and their content never laid out.
+            // The op itself may sit in Y phase 0 while reading a stage-dependent X size (finalized at the
+            // hug): flag it from the CONSTRAINT dependencies, not from the op's own phase.
+            Emit(new Op(OpKind.MeasureChild, -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
+            _hasStageDependentMeasures |= n.Axes[0].StageDependent || stageDependent;
+        }
     }
 
     private void EmitViewPosition(int axis, int node)
@@ -1382,11 +1390,19 @@ internal sealed class MagnetCompiler
     private void EmitChainSpan(int axis, int node)
     {
         var n = _nodes[node];
+        var separators = ((MagnetChain) n.Node).GapMode == MagnetChainGapMode.Separators;
         var first = _nodes[n.Members[0]].Axes[axis];
         var last = _nodes[n.Members[^1]].Axes[axis];
 
-        n.StartSlot = first.Start is { } s ? Lin(PoleSlot(axis, s), 1, s.EffSlot, 1) : StageStartSlot(axis);
-        n.EndSlot = last.End is { } e ? Lin(PoleSlot(axis, e), 1, e.EffSlot, -1) : StageEndSlot(axis);
+        // Separators mode: the head/tail margins belong to the CHAIN — read them raw, skipping only the
+        // self-collapsed zeroing (the target-gone logic still applies when the anchor targets a view).
+        int ChainOwnedMargin(ResolvedAnchor anchor)
+            => anchor.Target < 0
+                ? anchor.MarginSlot
+                : MulAdd(Lin(anchor.MarginSlot, 1, anchor.GoneSlot, -1), _nodes[anchor.Target].VisSlot, anchor.GoneSlot);
+
+        n.StartSlot = first.Start is { } s ? Lin(PoleSlot(axis, s), 1, separators ? ChainOwnedMargin(s) : s.EffSlot, 1) : StageStartSlot(axis);
+        n.EndSlot = last.End is { } e ? Lin(PoleSlot(axis, e), 1, separators ? ChainOwnedMargin(e) : e.EffSlot, -1) : StageEndSlot(axis);
         n.SpanSlot = Lin(n.EndSlot, 1, n.StartSlot, -1);
 
         // Weighted members get their size slot up-front so downstream vertices can reference it.
@@ -1399,6 +1415,68 @@ internal sealed class MagnetCompiler
                 ax.WeightedSizeSlot = Alloc();
             }
         }
+
+        // Per-pair gaps, emitted here so both the chain positioning and the Measured-member avail can read
+        // them: adjacent-anchor margins when declared (per-anchor margin/gone semantics), otherwise the chain
+        // Gap applied between consecutive VISIBLE members (separator semantics: a collapsed member takes its
+        // gap away — Gap × vis(next) × min(visibleBefore, 1)).
+        var k = n.Members.Length;
+        n.GapAfterSlots = new int[k];
+        var gapsTotal = MagnetTape.Zero;
+        var prefixVis = MagnetTape.Zero;
+
+        for (var i = 0; i < k; i++)
+        {
+            var ax = _nodes[n.Members[i]].Axes[axis];
+            prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
+
+            if (i == k - 1)
+            {
+                n.GapAfterSlots[i] = MagnetTape.Zero;
+
+                break;
+            }
+
+            var g1 = MagnetTape.Zero;
+            var g2 = MagnetTape.Zero;
+            var anchored = false;
+
+            if (ax.End is { Adjacent: true } endAnchor)
+            {
+                // Separators: the raw declared margin IS the separator (gone margins are not involved).
+                g1 = separators ? endAnchor.MarginSlot : endAnchor.EffSlot;
+                anchored = true;
+            }
+
+            var next = _nodes[n.Members[i + 1]].Axes[axis];
+
+            if (next.Start is { Adjacent: true } startAnchor)
+            {
+                g2 = separators ? startAnchor.MarginSlot : startAnchor.EffSlot;
+                anchored = true;
+            }
+
+            int gap;
+
+            if (anchored && !separators)
+            {
+                gap = Lin(g1, 1, g2, 1);
+            }
+            else
+            {
+                // Separator gating (anchored pairs in Separators mode and chain-Gap pairs in any mode):
+                // value × vis(next) × min(visibleBefore, 1) — the gap exists only between visible members.
+                var value = anchored ? Lin(g1, 1, g2, 1) : n.GapSlot;
+                var hasVisibleBefore = Clamp(prefixVis, MagnetTape.Zero, MagnetTape.One);
+                var scaled = MulAdd(value, _nodes[n.Members[i + 1]].VisSlot);
+                gap = MulAdd(scaled, hasVisibleBefore);
+            }
+
+            n.GapAfterSlots[i] = gap;
+            gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+        }
+
+        n.GapsTotalSlot = gapsTotal;
     }
 
     private void EmitChain(int axis, int node)
@@ -1442,41 +1520,9 @@ internal sealed class MagnetCompiler
             Emit(new Op(OpKind.SumRange, totalNw, block, nwCount, MagnetTape.Zero));
         }
 
-        // Gaps (adjacent-anchor margins) total, per member "gap after"
-        var gapAfter = new int[k]; // slot holding the gap after member i (Zero if none)
-        var gapsTotal = MagnetTape.Zero;
-
-        for (var i = 0; i < k; i++)
-        {
-            var g1 = MagnetTape.Zero;
-            var g2 = MagnetTape.Zero;
-            var ax = _nodes[n.Members[i]].Axes[axis];
-
-            if (i < k - 1)
-            {
-                if (ax.End is { Adjacent: true } e)
-                {
-                    g1 = e.EffSlot;
-                }
-
-                var next = _nodes[n.Members[i + 1]].Axes[axis];
-
-                if (next.Start is { Adjacent: true } s)
-                {
-                    g2 = s.EffSlot;
-                }
-            }
-
-            if (g1 == MagnetTape.Zero && g2 == MagnetTape.Zero)
-            {
-                gapAfter[i] = MagnetTape.Zero;
-            }
-            else
-            {
-                gapAfter[i] = Lin(g1, 1, g2, 1);
-                gapsTotal = Lin(gapsTotal, 1, gapAfter[i], 1);
-            }
-        }
+        // Per-pair gaps: precomputed at the span vertex (anchored pairs + chain Gap separator pairs).
+        var gapAfter = n.GapAfterSlots;
+        var gapsTotal = n.GapsTotalSlot;
 
         // Weighted sizes
         var totalW = MagnetTape.Zero;
@@ -1485,6 +1531,28 @@ internal sealed class MagnetCompiler
         {
             var dist = Lin(n.SpanSlot, 1, totalNw, -1, gapsTotal, -1);
             dist = Clamp(dist, MagnetTape.Zero, MagnetTape.PosInf);
+
+            // Effective weights: a collapsed member contributes 0, so the visible members absorb its share
+            // (fractions must be computed at runtime — visibility is not a patched input).
+            var weightedCount = k - nwCount;
+            var weightBlock = _slots;
+            _slots += weightedCount;
+            var gathered = weightBlock;
+
+            for (var i = 0; i < k; i++)
+            {
+                var member = n.Members[i];
+
+                if (_nodes[member].Axes[axis].Weighted)
+                {
+                    Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
+                }
+            }
+
+            var totalWeight = Alloc();
+            Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
+
+            var gatheredSlot = weightBlock;
 
             for (var i = 0; i < k; i++)
             {
@@ -1495,7 +1563,8 @@ internal sealed class MagnetCompiler
                     continue;
                 }
 
-                var raw = MulAdd(dist, n.FractionSlots[i]);
+                var fraction = Div(gatheredSlot++, totalWeight);
+                var raw = MulAdd(dist, fraction);
                 var bounded = ax.Size.HasBounds ? Clamp(raw, ax.MinSlot, ax.MaxSlot) : raw;
                 MulAddInto(ax.WeightedSizeSlot, bounded, _nodes[n.Members[i]].VisSlot);
                 ax.SizeSlot = ax.WeightedSizeSlot;
