@@ -19,7 +19,7 @@ for 1.x does not compile against 2.0; this page maps every 1.x concept to its 2.
 | `SizeUnit.Measured` coefficient (`"1.5"` = 1.5 × measured) | `{nalu:MagnetSizing 1.5, Unit=Measured}`; a bare number is now a **fixed** size |
 | `"*"` with a single anchor (as wide as the stage) | `{nalu:MagnetSizing 1, Unit=StagePercent}` |
 | `SizeBehavior.Shrink` (`~`) | measured views are measured with their available span, so a wrapping view already fits; use `max:` for hard limits |
-| `HorizontalBarrier` / `VerticalBarrier` (`Elements="a,b"`, `Pole`) | `MagnetBarrier` (`Direction`, `Nodes` as `<x:String>` content) |
+| `HorizontalBarrier` / `VerticalBarrier` (`Elements="a,b"`, `Pole`) | `MagnetBarrier` (`Direction`, `Nodes="a,b"` or `<x:String>` content) |
 | `HorizontalGuideline` / `VerticalGuideline` (`FractionalPosition`, `Position`) | `MagnetGuideline` (`Orientation`, `Percent`, `Position`) |
 | implicit chains (mutual anchors `a.RightTo=b.Left` + `b.LeftTo=a.Right`, `Traction.Strong`) | explicit `MagnetChain` node (`Style`, `Weights`) |
 

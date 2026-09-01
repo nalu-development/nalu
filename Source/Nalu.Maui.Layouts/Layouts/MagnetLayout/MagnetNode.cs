@@ -122,6 +122,30 @@ public abstract class MagnetNode : BindableObject
         return list;
     }
 
+    /// <summary>
+    /// Replaces the contents of <paramref name="list" /> with <paramref name="items" />: the backing list (and its
+    /// change subscription) never changes identity, so XAML attribute assignment and element content behave the same.
+    /// </summary>
+    private protected static void ReplaceListContents<T>(IList<T> list, IEnumerable<T>? items)
+    {
+        if (ReferenceEquals(list, items))
+        {
+            return;
+        }
+
+        list.Clear();
+
+        if (items is null)
+        {
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            list.Add(item);
+        }
+    }
+
     private void OnStructureListChanged(object? sender, NotifyCollectionChangedEventArgs e) => Notify(MagnetChange.Structure);
 
     private void OnValuesListChanged(object? sender, NotifyCollectionChangedEventArgs e) => Notify(MagnetChange.Values);

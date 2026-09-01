@@ -4,7 +4,7 @@ namespace Nalu.Maui.Test.Layouts.MagnetLayout;
 
 public class MagnetLayoutTests
 {
-    private const string P = MagnetAnchor.Parent;
+    private const string _p = MagnetAnchor.Parent;
 
     private sealed class TestView(double width, double height) : View
     {
@@ -80,8 +80,8 @@ public class MagnetLayoutTests
     {
         var (magnet, manager) = CreateMagnet();
         magnet.Definition = new MagnetDefinition().Add(
-            new MagnetView().Id("a").Left(P, margin: 10).Top(P),
-            new MagnetView().Id("b").Left("a", MagnetPole.Right, 5).Top(P)
+            new MagnetView().Id("a").Left(_p, margin: 10).Top(_p),
+            new MagnetView().Id("b").Left("a", MagnetPole.Right, 5).Top(_p)
         );
         var a = new TestView(40, 20);
         Magnet.SetMagnetId(a, "a");
@@ -105,7 +105,7 @@ public class MagnetLayoutTests
     public void DuplicateIdBetweenDefinitionAndInlineIsAnError()
     {
         var (magnet, _) = CreateMagnet();
-        magnet.Definition = new MagnetDefinition().Add(new MagnetView().Id("title").Left(P));
+        magnet.Definition = new MagnetDefinition().Add(new MagnetView().Id("title").Left(_p));
         var title = new TestView(40, 20);
         Magnet.SetMagnetId(title, "title");
         Magnet.SetLeftTo(title, "parent.Left");
@@ -225,7 +225,7 @@ public class MagnetLayoutTests
     {
         var (magnet, manager) = CreateMagnet();
         var a = new TestView(40, 20);
-        Magnet.GetConstraints(a).Id("a").Within(P).Size(20, 20);
+        Magnet.GetConstraints(a).Id("a").Within(_p).Size(20, 20);
         magnet.Add(a);
 
         Layout(manager, 100, 100, 100, 100);
@@ -388,6 +388,39 @@ public class MagnetValueTypeTests
         s.DiffWith(MagnetSizing.Constraint).Should().Be(MagnetChange.Structure);
         s.DiffWith(s.WithBounds(max: 50)).Should().Be(MagnetChange.Structure);
         s.WithBounds(max: 50).DiffWith(s.WithBounds(max: 60)).Should().Be(MagnetChange.Values);
+    }
+
+    [Fact]
+    public void NodeIdsAreCoercibleFromCommaSeparatedStrings()
+    {
+        var converter = new MagnetNodeIdsTypeConverter();
+        converter.ConvertFrom("avatar, subtitle").Should().BeEquivalentTo(new[] { "avatar", "subtitle" }, o => o.WithStrictOrdering());
+        converter.ConvertFrom("a,,b, ").Should().BeEquivalentTo(new[] { "a", "b" }, o => o.WithStrictOrdering());
+        converter.ConvertTo(new[] { "a", "b" }, typeof(string)).Should().Be("a, b");
+
+        // The setter replaces the contents: the change-tracked backing list never changes identity.
+        var barrier = new MagnetBarrier();
+        var backing = barrier.Nodes;
+        barrier.Nodes = (IList<string>) converter.ConvertFrom("avatar,subtitle")!;
+        barrier.Nodes.Should().BeSameAs(backing).And.Equal("avatar", "subtitle");
+        barrier.Nodes = ["other"];
+        barrier.Nodes.Should().BeSameAs(backing).And.Equal("other");
+
+        var chain = new MagnetChain { Nodes = ["a", "b"] };
+        chain.Nodes.Should().Equal("a", "b");
+    }
+
+    [Fact]
+    public void WeightsAreCoercibleFromCommaSeparatedStrings()
+    {
+        var converter = new MagnetWeightsTypeConverter();
+        converter.ConvertFrom("2, 1.5").Should().BeEquivalentTo(new[] { 2d, 1.5 }, o => o.WithStrictOrdering());
+        converter.ConvertTo(new[] { 2d, 1.5 }, typeof(string)).Should().Be("2, 1.5");
+
+        var chain = new MagnetChain();
+        var backing = chain.Weights;
+        chain.Weights = (IList<double>) converter.ConvertFrom("2,1")!;
+        chain.Weights.Should().BeSameAs(backing).And.Equal(2, 1);
     }
 }
 

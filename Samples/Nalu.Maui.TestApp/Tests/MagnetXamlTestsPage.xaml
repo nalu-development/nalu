@@ -8,7 +8,9 @@
         <nalu:Magnet AutomationId="XamlMagnetRoot" WidthRequest="320" HorizontalOptions="Start" BackgroundColor="LightGray">
             <nalu:Magnet.Definition>
                 <nalu:MagnetDefinition>
-                    <nalu:MagnetBarrier MagnetId="textsEnd" Direction="Bottom" Margin="8">
+                    <!-- Both Nodes syntaxes are compiled: the comma-separated attribute and <x:String> content. -->
+                    <nalu:MagnetBarrier MagnetId="textsEnd" Direction="Bottom" Margin="8" Nodes="avatar,subtitle" />
+                    <nalu:MagnetBarrier MagnetId="textsEndElements" Direction="Bottom" Margin="8">
                         <x:String>avatar</x:String>
                         <x:String>subtitle</x:String>
                     </nalu:MagnetBarrier>

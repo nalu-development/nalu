@@ -20,10 +20,7 @@ xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
 <nalu:Magnet>
   <nalu:Magnet.Definition>
     <nalu:MagnetDefinition>
-      <nalu:MagnetBarrier MagnetId="textsEnd" Direction="Bottom" Margin="8">
-        <x:String>avatar</x:String>
-        <x:String>subtitle</x:String>
-      </nalu:MagnetBarrier>
+      <nalu:MagnetBarrier MagnetId="textsEnd" Direction="Bottom" Margin="8" Nodes="avatar,subtitle" />
     </nalu:MagnetDefinition>
   </nalu:Magnet.Definition>
 
@@ -146,6 +143,8 @@ the gone margin, chains and barriers skip it. Toggling visibility never recompil
 Chains are **explicit** nodes (unlike Android, which infers them from mutual anchors):
 
 ```xml
+<nalu:MagnetChain MagnetId="row" Orientation="Horizontal" Style="Spread" Nodes="a,b,c" Weights="2,1,1" />
+<!-- equivalent: <x:String> items as element content -->
 <nalu:MagnetChain MagnetId="row" Orientation="Horizontal" Style="Spread">
   <x:String>a</x:String><x:String>b</x:String><x:String>c</x:String>
 </nalu:MagnetChain>
@@ -171,7 +170,7 @@ the `Magnet` in a filling slot when you want fill semantics.
 #### Barriers and guidelines
 
 ```xml
-<nalu:MagnetBarrier MagnetId="textsEnd" Direction="Right" Margin="8"><x:String>title</x:String>…</nalu:MagnetBarrier>   <!-- content = Nodes -->
+<nalu:MagnetBarrier MagnetId="textsEnd" Direction="Right" Margin="8" Nodes="title,subtitle" />   <!-- or <x:String> items as content -->
 <nalu:MagnetGuideline MagnetId="mid" Orientation="Vertical" Percent="0.5" Position="0" />
 ```
 

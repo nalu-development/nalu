@@ -1,3 +1,6 @@
+using System.ComponentModel;
+using System.Globalization;
+
 namespace Nalu;
 
 /// <summary>
@@ -28,12 +31,14 @@ public sealed class MagnetBarrier : MagnetNode
         propertyChanged: OnValuePropertyChanged
     );
 
+    private readonly IList<string> _nodes;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MagnetBarrier" /> class.
     /// </summary>
     public MagnetBarrier()
     {
-        Nodes = CreateStructureList<string>();
+        _nodes = CreateStructureList<string>();
     }
 
     /// <summary>
@@ -46,9 +51,15 @@ public sealed class MagnetBarrier : MagnetNode
     }
 
     /// <summary>
-    /// Gets the identifiers of the member nodes.
+    /// Gets or sets the identifiers of the member nodes (XAML: <c>&lt;x:String&gt;</c> items or a comma-separated attribute, <c>Nodes="a,b"</c>).
     /// </summary>
-    public IList<string> Nodes { get; }
+    /// <remarks>The setter replaces the contents: the backing list never changes identity.</remarks>
+    [TypeConverter(typeof(MagnetNodeIdsTypeConverter))]
+    public IList<string> Nodes
+    {
+        get => _nodes;
+        set => ReplaceListContents(_nodes, value);
+    }
 
     /// <summary>
     /// Gets or sets a margin pushing the barrier outward (positive values move a Right/Bottom barrier further right/down, a Left/Top barrier further left/up).
@@ -176,13 +187,16 @@ public sealed class MagnetChain : MagnetNode
         propertyChanged: OnStructurePropertyChanged
     );
 
+    private readonly IList<string> _nodes;
+    private readonly IList<double> _weights;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="MagnetChain" /> class.
     /// </summary>
     public MagnetChain()
     {
-        Nodes = CreateStructureList<string>();
-        Weights = CreateValuesList<double>();
+        _nodes = CreateStructureList<string>();
+        _weights = CreateValuesList<double>();
     }
 
     /// <summary>
@@ -195,9 +209,15 @@ public sealed class MagnetChain : MagnetNode
     }
 
     /// <summary>
-    /// Gets the ordered identifiers of the member views.
+    /// Gets or sets the ordered identifiers of the member views (XAML: <c>&lt;x:String&gt;</c> items or a comma-separated attribute, <c>Nodes="a,b"</c>).
     /// </summary>
-    public IList<string> Nodes { get; }
+    /// <remarks>The setter replaces the contents: the backing list never changes identity.</remarks>
+    [TypeConverter(typeof(MagnetNodeIdsTypeConverter))]
+    public IList<string> Nodes
+    {
+        get => _nodes;
+        set => ReplaceListContents(_nodes, value);
+    }
 
     /// <summary>
     /// Gets or sets the distribution style.
@@ -209,9 +229,16 @@ public sealed class MagnetChain : MagnetNode
     }
 
     /// <summary>
-    /// Gets the weights of the members (positional, aligned with <see cref="Nodes" />, applies to <see cref="MagnetSizingUnit.Constraint" />-sized members only; missing entries default to 1).
+    /// Gets or sets the weights of the members (positional, aligned with <see cref="Nodes" />, applies to <see cref="MagnetSizingUnit.Constraint" />-sized members only; missing entries default to 1).
+    /// XAML: a comma-separated attribute, <c>Weights="2,1"</c>.
     /// </summary>
-    public IList<double> Weights { get; }
+    /// <remarks>The setter replaces the contents: the backing list never changes identity.</remarks>
+    [TypeConverter(typeof(MagnetWeightsTypeConverter))]
+    public IList<double> Weights
+    {
+        get => _weights;
+        set => ReplaceListContents(_weights, value);
+    }
 
     /// <summary>Adds members (fluent).</summary>
     public MagnetChain With(params string[] elements)
@@ -234,4 +261,46 @@ public sealed class MagnetChain : MagnetNode
 
         return this;
     }
+}
+
+/// <summary>
+/// Converts a comma-separated string of node identifiers (<c>"a, b"</c>) for <see cref="MagnetBarrier.Nodes" /> and <see cref="MagnetChain.Nodes" />.
+/// </summary>
+public class MagnetNodeIdsTypeConverter : TypeConverter
+{
+    /// <inheritdoc />
+    public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) => sourceType == typeof(string);
+
+    /// <inheritdoc />
+    public override bool CanConvertTo(ITypeDescriptorContext? context, Type? destinationType) => destinationType == typeof(string);
+
+    /// <inheritdoc />
+    public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+        => value is string ids ? ids.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) : throw new NotSupportedException();
+
+    /// <inheritdoc />
+    public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType)
+        => value is IEnumerable<string> ids ? string.Join(", ", ids) : throw new NotSupportedException();
+}
+
+/// <summary>
+/// Converts a comma-separated string of weights (<c>"2, 1"</c>) for <see cref="MagnetChain.Weights" />.
+/// </summary>
+public class MagnetWeightsTypeConverter : TypeConverter
+{
+    /// <inheritdoc />
+    public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) => sourceType == typeof(string);
+
+    /// <inheritdoc />
+    public override bool CanConvertTo(ITypeDescriptorContext? context, Type? destinationType) => destinationType == typeof(string);
+
+    /// <inheritdoc />
+    public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+        => value is string weights
+            ? weights.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(w => double.Parse(w, CultureInfo.InvariantCulture)).ToArray()
+            : throw new NotSupportedException();
+
+    /// <inheritdoc />
+    public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType)
+        => value is IEnumerable<double> weights ? string.Join(", ", weights.Select(w => w.ToString(CultureInfo.InvariantCulture))) : throw new NotSupportedException();
 }
