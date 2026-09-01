@@ -94,6 +94,7 @@ internal sealed class VirtualScrollReorderableNotifyCollectionChangedAdapter : V
         Collection.Insert(toIndex, item);
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2070", Justification = "Best-effort lookup: when trimming removed ObservableCollection<T>.Move, GetMethod returns null and the IList RemoveAt+Insert fallback is used.")]
     [UnconditionalSuppressMessage("Trimming", "IL2075", Justification = "Best-effort lookup: when trimming removed ObservableCollection<T>.Move, GetMethod returns null and the IList RemoveAt+Insert fallback is used.")]
     private static MethodInfo? ResolveObservableCollectionMoveMethod(Type? type)
     {
