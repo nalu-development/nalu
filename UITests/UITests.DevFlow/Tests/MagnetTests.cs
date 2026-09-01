@@ -101,6 +101,27 @@ public class MagnetTests(NaluApp app) : BaseUiTest(app)
     }
 
     [Fact]
+    public async Task SceneSwapFadesTheHiddenNodeAndRelayoutsSiblings()
+    {
+        await App.OpenTestPageAsync(PageName);
+        var root = await App.WaitForStableBoundsAsync("SceneRoot");
+        var text = await App.GetBoundsAsync("sceneText");
+
+        // Scene A: icon (24) at x+16, text 12 after it.
+        text.X.Should().BeApproximately(root.X + 52, 1);
+
+        // Scene B hides the icon via ApplyVisibility: the text animates to the gone position (gone margin 0).
+        await App.TapAsync("SceneButton");
+        await App.WaitForBoundsAsync("sceneText", b => Math.Abs(b.X - root.X) < 1, TimeSpan.FromSeconds(5));
+
+        // Back to scene A: the icon fades back in and the text returns after it.
+        await App.TapAsync("SceneButton");
+        await App.WaitForBoundsAsync("sceneText", b => Math.Abs(b.X - (root.X + 52)) < 1, TimeSpan.FromSeconds(5));
+        var icon = await App.GetBoundsAsync("sceneIcon");
+        icon.X.Should().BeApproximately(root.X + 16, 1);
+    }
+
+    [Fact]
     public async Task XamlAttachedPropertiesAndDefinitionNodesWork()
     {
         await App.OpenTestPageAsync(XamlPageName);

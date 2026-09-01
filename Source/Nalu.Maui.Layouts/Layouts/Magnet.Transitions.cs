@@ -16,6 +16,7 @@ public partial class Magnet
     {
         Interpolate,
         Appear,
+        Disappear,
         Skip
     }
 
@@ -42,6 +43,10 @@ public partial class Magnet
         // Current interpolated frames (kept up to date for retargeting)
         public Rect[] CurrentFrames = [];
         public Size CurrentMeasured;
+
+        // Deferred ApplyVisibility=Hide: nodes fading out during the transition, IsVisible written at settle.
+        public List<MagnetView>? DeferredHides;
+        public HashSet<int>? ForcedCollapsed;
     }
 
     /// <summary>
@@ -52,6 +57,79 @@ public partial class Magnet
     private TransitionState? _transition;
     private double[] _valuesBackup = [];
     private Rect _lastArrangeBounds = new(0, 0, double.NaN, double.NaN);
+    private readonly List<MagnetView> _pendingVisibilityApplies = [];
+
+    /// <summary>
+    /// Entry point of <see cref="MagnetView.ApplyVisibility" />: inside a <see cref="TransitionToAsync(Action,uint,Easing?)" />
+    /// mutate the write is collected (deferred and animated), otherwise it is stamped immediately.
+    /// </summary>
+    internal void OnApplyVisibilityRequested(MagnetView node)
+    {
+        if (_suppressNotifications)
+        {
+            if (!_pendingVisibilityApplies.Contains(node))
+            {
+                _pendingVisibilityApplies.Add(node);
+            }
+
+            return;
+        }
+
+        node.ApplyVisibilityNow();
+    }
+
+    /// <summary>
+    /// Applies the pending Show / no-op writes immediately and returns the nodes whose Hide must be deferred
+    /// (still natively visible: they fade out and their <c>IsVisible</c> is written at settle), or <c>null</c>.
+    /// </summary>
+    private List<MagnetView>? ProcessPendingVisibilityApplies()
+    {
+        if (_pendingVisibilityApplies.Count == 0)
+        {
+            return null;
+        }
+
+        List<MagnetView>? hides = null;
+
+        foreach (var node in _pendingVisibilityApplies)
+        {
+            if (node.ApplyVisibility == MagnetVisibilityAction.Hide && node.View is VisualElement { IsVisible: true })
+            {
+                (hides ??= []).Add(node);
+            }
+            else
+            {
+                node.ApplyVisibilityNow();
+            }
+        }
+
+        _pendingVisibilityApplies.Clear();
+
+        return hides;
+    }
+
+    /// <summary>
+    /// Ends the deferred hides of a transition: clears the engine override and writes the deferred
+    /// <c>IsVisible = false</c> (applied on completion, cancellation and retargeting alike).
+    /// </summary>
+    private void SettleDeferredHides(TransitionState state)
+    {
+        if (state.ForcedCollapsed is not null)
+        {
+            _engine.SetForcedCollapsed(null);
+        }
+
+        if (state.DeferredHides is { } hides)
+        {
+            foreach (var node in hides)
+            {
+                if (node.View is VisualElement ve)
+                {
+                    ve.IsVisible = false;
+                }
+            }
+        }
+    }
 
     internal Rect LastArrangeBounds
     {
@@ -138,14 +216,19 @@ public partial class Magnet
         var change = _suppressedChanges;
         _dirty |= change;
 
-        var visibilityChanged = VisibilityChanged(startFrames);
+        // ApplyVisibility writes collected during the mutate: Show applies now (the view must participate in the
+        // end solve), Hide on a visible view is deferred so it can fade out.
+        var deferredHides = ProcessPendingVisibilityApplies();
+
+        var visibilityChanged = VisibilityChanged(startFrames) || deferredHides is not null;
         var state = new TransitionState
         {
             Mode = change is MagnetChange.None or MagnetChange.Values && !visibilityChanged && startInputs is not null ? TransitionMode.Values : TransitionMode.Frames,
             Completion = new TaskCompletionSource<bool>(),
             StageSize = stageSize,
             StartMeasured = startMeasured,
-            CurrentMeasured = startMeasured
+            CurrentMeasured = startMeasured,
+            DeferredHides = deferredHides
         };
 
         if (state.Mode == TransitionMode.Values)
@@ -195,6 +278,23 @@ public partial class Magnet
 
     private void PrepareFrameTransition(TransitionState state, Dictionary<string, (Rect Frame, bool Visible)> startFrames)
     {
+        if (state.DeferredHides is { } hides)
+        {
+            // Solve the end state with the deferred hides collapsed while their views are still natively visible.
+            var forced = new HashSet<int>();
+
+            foreach (var hide in hides)
+            {
+                if (hide.Index >= 0)
+                {
+                    forced.Add(hide.Index);
+                }
+            }
+
+            state.ForcedCollapsed = forced;
+            _engine.SetForcedCollapsed(forced);
+        }
+
         var stage = state.StageSize;
         var args = _engine.LastMeasureArgs;
         var measureArgs = double.IsNaN(args.Width) ? stage : args;
@@ -230,7 +330,20 @@ public partial class Magnet
 
             if (!endVisible)
             {
-                state.Modes[i] = FrameMode.Skip;
+                if (state.ForcedCollapsed?.Contains(i) == true
+                    && startFrames.TryGetValue(id, out var visibleStart) && visibleStart.Visible
+                    && iview is VisualElement dve)
+                {
+                    // Deferred Hide: still natively visible — freeze in place and fade out.
+                    state.Modes[i] = FrameMode.Disappear;
+                    state.StartFrames[i] = visibleStart.Frame;
+                    state.EndFrames[i] = visibleStart.Frame;
+                    state.EndOpacity[i] = dve.Opacity;
+                }
+                else
+                {
+                    state.Modes[i] = FrameMode.Skip;
+                }
             }
             else if (startFrames.TryGetValue(id, out var start) && start.Visible)
             {
@@ -376,6 +489,10 @@ public partial class Magnet
             {
                 ve.Opacity = state.EndOpacity[i] * t;
             }
+            else if (state.Modes[i] == FrameMode.Disappear && view is VisualElement dve)
+            {
+                dve.Opacity = state.EndOpacity[i] * (1 - t);
+            }
 
             view.Arrange(frame.Offset(left, top));
         }
@@ -429,6 +546,8 @@ public partial class Magnet
             }
         }
 
+        SettleDeferredHides(state);
+
         // Settle through the normal pipeline.
         InvalidateMeasure();
         state.Completion.TrySetResult(!cancelled);
@@ -453,6 +572,8 @@ public partial class Magnet
             RestoreOpacity(state);
         }
 
+        SettleDeferredHides(state);
+
         if (settle)
         {
             InvalidateMeasure();
@@ -465,7 +586,7 @@ public partial class Magnet
     {
         for (var i = 0; i < state.Modes.Length; i++)
         {
-            if (state.Modes[i] == FrameMode.Appear && _engine.GetView(i) is VisualElement ve)
+            if (state.Modes[i] is FrameMode.Appear or FrameMode.Disappear && _engine.GetView(i) is VisualElement ve)
             {
                 ve.Opacity = state.EndOpacity[i];
             }

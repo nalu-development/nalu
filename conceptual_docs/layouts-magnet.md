@@ -138,8 +138,13 @@ such a node pay nothing for this.
 
 #### Visibility (GONE)
 
-There is no visibility on nodes: `IsVisible="False"` on the view collapses it — its size becomes 0, anchors to it use
+The single source of truth is the view: `IsVisible="False"` collapses it — its size becomes 0, anchors to it use
 the gone margin, chains and barriers skip it. Toggling visibility never recompiles the layout.
+
+A node can additionally *declare* a visibility action applied **onto** the view (see
+[Scenes](#scenes-two-definitions-animated) below): `ApplyVisibility="Hide"`/`"Show"` stamps `IsVisible` when the
+definition attaches, when the view binds, and when the value changes. It is a one-shot write, never read back —
+the view remains the runtime truth.
 
 #### Chains
 
@@ -240,12 +245,48 @@ await magnet.TransitionToAsync(() =>
 
 - **value-only** changes interpolate the constraint *inputs*, so intermediate frames obey the constraints exactly
   (animating a guideline `Percent` or a chain weight moves every dependent view correctly);
-- structural changes and visibility toggles interpolate frames; appearing views fade in (a view hidden with
-  `IsVisible=false` disappears immediately: the platform hides it before the animation can run);
+- structural changes and visibility toggles interpolate frames; appearing views fade in (a view hidden with a
+  manual `IsVisible=false` disappears immediately — the platform hides it before the animation can run; use
+  `ApplyVisibility="Hide"` on the node to get the animated fade-out);
 - a new transition retargets from the current interpolated state (the previous task completes with `false`);
 - when the layout's own size changes the ancestors reflow every tick (inherently more expensive).
 
 `TransitionToAsync(MagnetDefinition end)` swaps the whole definition, matching nodes by `MagnetId`.
+
+### Scenes (two definitions, animated)
+
+A "scene" is a definition that declares both the geometry **and** the visibility of the views it manages, using
+`ApplyVisibility` on its nodes:
+
+```xml
+<nalu:MagnetDefinition x:Key="SceneA">
+  <nalu:MagnetView MagnetId="badge" ApplyVisibility="Show" ... />
+</nalu:MagnetDefinition>
+<nalu:MagnetDefinition x:Key="SceneB">
+  <nalu:MagnetView MagnetId="badge" ApplyVisibility="Hide" ... />
+</nalu:MagnetDefinition>
+```
+
+```csharp
+await magnet.TransitionToAsync(sceneB); // the badge fades out while its siblings animate to the collapsed layout
+```
+
+Applying a scene inside a transition defers the visibility writes: a `Hide` on a visible view freezes it in place
+and fades it out (`Opacity` → 0), its siblings animate to the layout solved *as if it were already collapsed*, and
+`IsVisible = false` lands at the end (also when the transition is interrupted); a `Show` applies up front and fades
+in. Outside a transition (a plain `Definition` swap, or a late-bound child) the action applies immediately.
+
+Rules to keep scenes predictable:
+
+- **Scenes are total, there is no auto-revert**: swapping back to a definition with no opinion (`None`, the default)
+  leaves the view as the previous scene left it. Each scene declares `ApplyVisibility` for every view it manages.
+- **Ownership**: applying writes `IsVisible` with standard MAUI semantics, which **permanently detaches any binding**
+  on that property. A view whose visibility is scene-managed must not also bind `IsVisible` — in MVVM, trigger the
+  transition from the view model instead of binding the visibility.
+- Scene visibility works with **definition-declared nodes** (views bound by `MagnetId`); views carrying inline
+  constraints cannot be scene-hidden (an id declared both inline and in the definition is an error).
+- `ApplyVisibility` does not affect the compiled layout: definitions differing only in visibility actions share the
+  same compiled tape.
 
 ### Performance
 

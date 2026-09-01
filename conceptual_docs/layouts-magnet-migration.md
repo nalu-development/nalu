@@ -67,8 +67,9 @@ Replace mutual anchors with a chain node. Margins between members go on the anch
 
 ### Visibility
 
-1.x tracked `Collapsed` on the element; 2.0 reads `IView.Visibility` of the bound view only (`IsVisible="False"`
-collapses). There is no visibility on nodes — a difference from Android's `ConstraintSet`.
+1.x tracked `Collapsed` on the element; 2.0 reads `IView.Visibility` of the bound view (`IsVisible="False"`
+collapses). A node can also *declare* `ApplyVisibility="Hide"/"Show"` (`ConstraintSet`-style scenes): a one-shot
+action stamped onto the view's `IsVisible` when the definition is applied — see the Scenes section of the Magnet page.
 
 ### Sharing definitions
 

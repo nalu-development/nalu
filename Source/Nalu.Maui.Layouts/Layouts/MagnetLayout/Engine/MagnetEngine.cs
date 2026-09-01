@@ -17,6 +17,7 @@ internal sealed class MagnetEngine
     private byte[] _vis = [];
     private IView?[] _views = [];
     private double _eval;
+    private HashSet<int>? _forcedCollapsed;
 
     /// <summary>
     /// Gets whether a tape is compiled.
@@ -233,6 +234,13 @@ internal sealed class MagnetEngine
                 var view = ((MagnetView) _nodes[i]).View;
                 _views[i] = view;
                 visible = view is not null && view.Visibility != Visibility.Collapsed ? (byte) 1 : (byte) 0;
+
+                if (visible == 1 && _forcedCollapsed?.Contains(i) == true)
+                {
+                    // Transition-scoped override: the end state of a deferred Hide is solved as collapsed
+                    // while the view is still natively visible (it is fading out).
+                    visible = 0;
+                }
             }
 
             _vis[i] = visible;
@@ -428,6 +436,12 @@ internal sealed class MagnetEngine
 
         return false;
     }
+
+    /// <summary>
+    /// Sets (or clears, with <c>null</c>) the transition-scoped set of node indexes solved as collapsed
+    /// regardless of the bound view's visibility.
+    /// </summary>
+    public void SetForcedCollapsed(HashSet<int>? nodes) => _forcedCollapsed = nodes;
 
     /// <summary>
     /// Gets the frame of a node.

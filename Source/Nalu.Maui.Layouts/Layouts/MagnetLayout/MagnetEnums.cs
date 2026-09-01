@@ -94,3 +94,19 @@ public enum MagnetChainStyle : byte
     /// <summary>Members are packed together; the group is positioned inside the available space using the bias of the first member.</summary>
     Packed
 }
+
+/// <summary>
+/// Declarative visibility action a <see cref="MagnetView" /> node applies to its bound view
+/// (see <see cref="MagnetView.ApplyVisibility" />).
+/// </summary>
+public enum MagnetVisibilityAction : byte
+{
+    /// <summary>No opinion: the view's own <c>IsVisible</c> is left untouched.</summary>
+    None,
+
+    /// <summary>Sets <c>IsVisible = true</c> on the bound view when applied.</summary>
+    Show,
+
+    /// <summary>Sets <c>IsVisible = false</c> on the bound view when applied (animated as a fade-out inside a transition).</summary>
+    Hide
+}

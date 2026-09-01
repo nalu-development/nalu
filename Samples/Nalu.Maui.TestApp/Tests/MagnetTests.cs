@@ -85,11 +85,46 @@ public class MagnetTestsPage : ContentPage
             );
         };
 
+        // Scene switching: two definitions declaring geometry AND visibility (ApplyVisibility).
+        MagnetDefinition CreateScene(MagnetVisibilityAction iconAction)
+            => new MagnetDefinition().Add(
+                new MagnetView().Id("sceneIcon").Size(24, 24).AlignLeft(p, 16).AlignTop(p, 12).Visibility(iconAction),
+                new MagnetView().Id("sceneText").Left("sceneIcon", MagnetPole.Right, 12, goneMargin: 0).AlignTop(p, 14)
+            );
+
+        var sceneA = CreateScene(MagnetVisibilityAction.Show);
+        var sceneB = CreateScene(MagnetVisibilityAction.Hide);
+
+        var sceneMagnet = new Magnet
+        {
+            AutomationId = "SceneRoot",
+            WidthRequest = 320,
+            HeightRequest = 48,
+            HorizontalOptions = LayoutOptions.Start,
+            BackgroundColor = Colors.LightGray,
+            Definition = sceneA
+        };
+
+        var sceneIcon = new BoxView { Color = Colors.DarkOrange };
+        Magnet.SetMagnetId(sceneIcon, "sceneIcon");
+        var sceneText = new Label { Text = "Scene text", FontSize = 15 };
+        Magnet.SetMagnetId(sceneText, "sceneText");
+        sceneMagnet.Add(sceneIcon);
+        sceneMagnet.Add(sceneText);
+
+        var sceneButton = new Button { Text = "Toggle scene", AutomationId = "SceneButton" };
+        var showing = true;
+        sceneButton.Clicked += async (_, _) =>
+        {
+            showing = !showing;
+            await sceneMagnet.TransitionToAsync(showing ? sceneA : sceneB, 400);
+        };
+
         Content = new VerticalStackLayout
         {
             Spacing = 12,
             Padding = 16,
-            Children = { toggleAvatarButton, transitionButton, swapButton, magnet }
+            Children = { toggleAvatarButton, transitionButton, swapButton, magnet, sceneButton, sceneMagnet }
         };
     }
 }
