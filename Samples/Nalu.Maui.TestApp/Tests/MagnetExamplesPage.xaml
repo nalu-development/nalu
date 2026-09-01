@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:nalu="https://nalu-development.github.com/nalu/layouts"
+             x:Class="Nalu.Maui.TestApp.Tests.MagnetExamplesPage"
+             BackgroundColor="#F2F3F7">
+    <ContentPage.Resources>
+        <Style TargetType="Border" Class="card">
+            <Setter Property="BackgroundColor" Value="White" />
+            <Setter Property="Stroke" Value="#E1E4EC" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="WidthRequest" Value="340" />
+            <Setter Property="HorizontalOptions" Value="Start" />
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style TargetType="Label" Class="caption">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextColor" Value="#7A8194" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" Padding="12" RowSpacing="12">
+        <HorizontalStackLayout Spacing="8">
+            <Entry x:Name="ExampleSelector" AutomationId="ExampleSelector" WidthRequest="70" Keyboard="Numeric" Text="1" />
+            <Button AutomationId="ShowExampleButton" Text="Show" Clicked="OnShowExample" />
+            <Label x:Name="ExampleTitle" AutomationId="ExampleTitle" VerticalOptions="Center" />
+        </HorizontalStackLayout>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout x:Name="ExamplesHost" Spacing="12">
+
+                <!-- 01 · List row: anchors, margins and alignment -->
+                <Border AutomationId="Example01" StyleClass="card">
+                    <nalu:Magnet>
+                        <Border nalu:Magnet.MagnetId="avatar" BackgroundColor="#5B8DEF" StrokeThickness="0" StrokeShape="RoundRectangle 24"
+                                 nalu:Magnet.WidthSizing="48" nalu:Magnet.HeightSizing="48"
+                                 nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.TopTo="parent.Top" />
+                        <Label nalu:Magnet.MagnetId="name" Text="Ada Lovelace" FontAttributes="Bold" FontSize="16"
+                               nalu:Magnet.After="avatar,12" nalu:Magnet.Before="time,8"
+                               nalu:Magnet.AlignTop="avatar" nalu:Magnet.HorizontalBias="0" />
+                        <Label nalu:Magnet.MagnetId="message" Text="Working on the analytical engine…" FontSize="13" TextColor="#7A8194"
+                               nalu:Magnet.AlignLeft="name" nalu:Magnet.Below="name,2" />
+                        <Label nalu:Magnet.MagnetId="time" Text="09:41" FontSize="12" TextColor="#7A8194"
+                               nalu:Magnet.RightTo="parent.Right" nalu:Magnet.AlignTop="name" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 02 · Login screen: FillWidth and centering -->
+                <Border AutomationId="Example02" StyleClass="card">
+                    <nalu:Magnet>
+                        <Border nalu:Magnet.MagnetId="logo" BackgroundColor="#4F6BFF" StrokeThickness="0" StrokeShape="RoundRectangle 18"
+                                 nalu:Magnet.WidthSizing="72" nalu:Magnet.HeightSizing="72"
+                                 nalu:Magnet.HorizontallyWithin="parent" nalu:Magnet.TopTo="parent.Top,8" />
+                        <Label nalu:Magnet.MagnetId="welcome" Text="Welcome back" FontSize="20" FontAttributes="Bold"
+                               nalu:Magnet.HorizontallyWithin="parent" nalu:Magnet.Below="logo,16" />
+                        <Entry nalu:Magnet.MagnetId="email" Placeholder="Email"
+                               nalu:Magnet.FillWidth="parent" nalu:Magnet.Below="welcome,24" />
+                        <Entry nalu:Magnet.MagnetId="password" Placeholder="Password" IsPassword="True"
+                               nalu:Magnet.FillWidth="parent" nalu:Magnet.Below="email,12" />
+                        <Button nalu:Magnet.MagnetId="signIn" Text="Sign in" BackgroundColor="#4F6BFF" TextColor="White"
+                                nalu:Magnet.FillWidth="parent" nalu:Magnet.Below="password,20" />
+                        <Label nalu:Magnet.MagnetId="forgot" Text="Forgot password?" FontSize="13" TextColor="#4F6BFF"
+                               nalu:Magnet.HorizontallyWithin="parent" nalu:Magnet.Below="signIn,14" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 03 · Header bar: centering on the parent, not between siblings -->
+                <Border AutomationId="Example03" StyleClass="card">
+                    <nalu:Magnet HeightRequest="48">
+                        <Button nalu:Magnet.MagnetId="back" Text="←" FontSize="18" BackgroundColor="#EEF1F8" TextColor="#30343F"
+                                nalu:Magnet.WidthSizing="44" nalu:Magnet.HeightSizing="40"
+                                nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.VerticallyWithin="parent" />
+                        <Label nalu:Magnet.MagnetId="pageTitle" Text="Settings" FontSize="17" FontAttributes="Bold"
+                               nalu:Magnet.HorizontallyWithin="parent" nalu:Magnet.VerticallyWithin="parent" />
+                        <Button nalu:Magnet.MagnetId="menu" Text="⋯" FontSize="18" BackgroundColor="#EEF1F8" TextColor="#30343F"
+                                nalu:Magnet.WidthSizing="44" nalu:Magnet.HeightSizing="40"
+                                nalu:Magnet.RightTo="parent.Right" nalu:Magnet.VerticallyWithin="parent" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 04 · Form: a barrier aligns the fields after the longest label -->
+                <Border AutomationId="Example04" StyleClass="card">
+                    <nalu:Magnet>
+                        <nalu:Magnet.Definition>
+                            <nalu:MagnetDefinition>
+                                <nalu:MagnetBarrier MagnetId="labelsEnd" Direction="Right" Margin="12" Nodes="nameLabel,emailLabel" />
+                            </nalu:MagnetDefinition>
+                        </nalu:Magnet.Definition>
+                        <Label nalu:Magnet.MagnetId="nameLabel" Text="Name"
+                               nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.VerticallyWithin="nameEntry" />
+                        <Label nalu:Magnet.MagnetId="emailLabel" Text="Email address"
+                               nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.VerticallyWithin="emailEntry" />
+                        <Entry nalu:Magnet.MagnetId="nameEntry" Placeholder="Ada" nalu:Magnet.WidthSizing="*"
+                               nalu:Magnet.LeftTo="labelsEnd.Right" nalu:Magnet.RightTo="parent.Right"
+                               nalu:Magnet.TopTo="parent.Top" />
+                        <Entry nalu:Magnet.MagnetId="emailEntry" Placeholder="ada@example.org" nalu:Magnet.WidthSizing="*"
+                               nalu:Magnet.LeftTo="labelsEnd.Right" nalu:Magnet.RightTo="parent.Right"
+                               nalu:Magnet.Below="nameEntry,8" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 05 · Chain styles: Spread, SpreadInside, Packed -->
+                <Border AutomationId="Example05" StyleClass="card">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Spread" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="row" Style="Spread" Nodes="s1,s2,s3" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Button nalu:Magnet.MagnetId="s1" Text="A" BackgroundColor="#5B8DEF" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                            <Button nalu:Magnet.MagnetId="s2" Text="B" BackgroundColor="#5B8DEF" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                            <Button nalu:Magnet.MagnetId="s3" Text="C" BackgroundColor="#5B8DEF" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                        </nalu:Magnet>
+                        <Label Text="SpreadInside" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="row" Style="SpreadInside" Nodes="i1,i2,i3" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Button nalu:Magnet.MagnetId="i1" Text="A" BackgroundColor="#9B7BF3" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                            <Button nalu:Magnet.MagnetId="i2" Text="B" BackgroundColor="#9B7BF3" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                            <Button nalu:Magnet.MagnetId="i3" Text="C" BackgroundColor="#9B7BF3" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                        </nalu:Magnet>
+                        <Label Text="Packed" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="row" Style="Packed" Nodes="p1,p2,p3" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Button nalu:Magnet.MagnetId="p1" Text="A" BackgroundColor="#F58C6E" TextColor="White" nalu:Magnet.TopTo="parent.Top" />
+                            <Button nalu:Magnet.MagnetId="p2" Text="B" BackgroundColor="#F58C6E" TextColor="White" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.After="p1,8" />
+                            <Button nalu:Magnet.MagnetId="p3" Text="C" BackgroundColor="#F58C6E" TextColor="White" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.After="p2,8" />
+                        </nalu:Magnet>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 06 · Weighted columns: * members share the space 2:1:1 -->
+                <Border AutomationId="Example06" StyleClass="card">
+                    <VerticalStackLayout Spacing="6">
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="bar" Nodes="w1,w2,w3" Weights="2,1,1" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Border nalu:Magnet.MagnetId="w1" BackgroundColor="#4F6BFF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
+                            <Border nalu:Magnet.MagnetId="w2" BackgroundColor="#8FA5FF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top"
+                                     nalu:Magnet.After="w1,4" />
+                            <Border nalu:Magnet.MagnetId="w3" BackgroundColor="#C9D4FF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
+                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top"
+                                     nalu:Magnet.After="w2,4" />
+                        </nalu:Magnet>
+                        <Label Text="Weights=&quot;2,1,1&quot;" StyleClass="caption" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 07 · Media card: 16:9 image via Ratio sizing (a Ratio fill wants a slot with a known size: fixed height here) -->
+                <Border AutomationId="Example07" StyleClass="card">
+                    <nalu:Magnet HeightRequest="240">
+                        <Border nalu:Magnet.MagnetId="hero" BackgroundColor="#B4C4E4" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                 nalu:Magnet.FillWidth="parent" nalu:Magnet.TopTo="parent.Top"
+                                 nalu:Magnet.HeightSizing="{nalu:MagnetSizing 0.5625, Unit=Ratio}" />
+                        <Label nalu:Magnet.MagnetId="cardTitle" Text="A day at the lake" FontSize="16" FontAttributes="Bold"
+                               nalu:Magnet.AlignLeft="hero" nalu:Magnet.Below="hero,10" />
+                        <Label nalu:Magnet.MagnetId="cardMeta" Text="128 photos · Yesterday" FontSize="12" TextColor="#7A8194"
+                               nalu:Magnet.AlignLeft="hero" nalu:Magnet.Below="cardTitle,2" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 08 · Onboarding: a percent guideline splits the stage -->
+                <Border AutomationId="Example08" StyleClass="card">
+                    <nalu:Magnet HeightRequest="300">
+                        <nalu:Magnet.Definition>
+                            <nalu:MagnetDefinition>
+                                <nalu:MagnetGuideline MagnetId="split" Orientation="Horizontal" Percent="0.45" />
+                            </nalu:MagnetDefinition>
+                        </nalu:Magnet.Definition>
+                        <Border nalu:Magnet.MagnetId="art" BackgroundColor="#DCE6FA" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                 nalu:Magnet.FillWidth="parent" nalu:Magnet.HeightSizing="*"
+                                 nalu:Magnet.TopTo="parent.Top" nalu:Magnet.BottomTo="split.Top,8" />
+                        <Label nalu:Magnet.MagnetId="obTitle" Text="Stay organized" FontSize="20" FontAttributes="Bold"
+                               nalu:Magnet.HorizontallyWithin="parent" nalu:Magnet.TopTo="split.Bottom,16" />
+                        <Label nalu:Magnet.MagnetId="obBody" Text="Your notes, synced on every device you own."
+                               FontSize="14" TextColor="#7A8194" HorizontalTextAlignment="Center"
+                               nalu:Magnet.FillWidth="parent,24" nalu:Magnet.Below="obTitle,8" />
+                        <Button nalu:Magnet.MagnetId="obNext" Text="Continue" BackgroundColor="#4F6BFF" TextColor="White"
+                                nalu:Magnet.FillWidth="parent" nalu:Magnet.BottomTo="parent.Bottom" />
+                    </nalu:Magnet>
+                </Border>
+
+                <!-- 09 · Visibility: collapsing a view and gone margins -->
+                <Border AutomationId="Example09" StyleClass="card">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Icon visible" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <Border nalu:Magnet.MagnetId="icon" BackgroundColor="#F0A73C" StrokeThickness="0" StrokeShape="RoundRectangle 12"
+                                     nalu:Magnet.WidthSizing="24" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.TopTo="parent.Top" />
+                            <Label nalu:Magnet.MagnetId="text" Text="Backup completed" FontSize="15"
+                                   nalu:Magnet.After="icon,12,0" nalu:Magnet.VerticallyWithin="icon" />
+                        </nalu:Magnet>
+                        <Label Text="Icon collapsed (IsVisible=False): the 12 margin becomes the 0 gone margin" StyleClass="caption" />
+                        <nalu:Magnet>
+                            <Border nalu:Magnet.MagnetId="icon" BackgroundColor="#F0A73C" StrokeThickness="0" StrokeShape="RoundRectangle 12" IsVisible="False"
+                                     nalu:Magnet.WidthSizing="24" nalu:Magnet.HeightSizing="24"
+                                     nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.TopTo="parent.Top" />
+                            <Label nalu:Magnet.MagnetId="text" Text="Backup completed" FontSize="15"
+                                   nalu:Magnet.After="icon,12,0" nalu:Magnet.TopTo="parent.Top" />
+                        </nalu:Magnet>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- 10 · Packed chain + measured member: the FlexLayout replacement -->
+                <Border AutomationId="Example10" StyleClass="card">
+                    <VerticalStackLayout Spacing="6">
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="shortRow" Style="Packed" Nodes="shortName,shortBadge" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Label nalu:Magnet.MagnetId="shortName" Text="Ada" FontSize="15" FontAttributes="Bold" LineBreakMode="TailTruncation"
+                                   nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.HorizontalBias="0" />
+                            <Border nalu:Magnet.MagnetId="shortBadge" BackgroundColor="#3EBD73" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                     nalu:Magnet.WidthSizing="16" nalu:Magnet.HeightSizing="16"
+                                     nalu:Magnet.After="shortName,6" nalu:Magnet.RightTo="parent.Right"
+                                     nalu:Magnet.VerticallyWithin="shortName" />
+                        </nalu:Magnet>
+                        <nalu:Magnet>
+                            <nalu:Magnet.Definition>
+                                <nalu:MagnetDefinition>
+                                    <nalu:MagnetChain MagnetId="longRow" Style="Packed" Nodes="longName,longBadge" />
+                                </nalu:MagnetDefinition>
+                            </nalu:Magnet.Definition>
+                            <Label nalu:Magnet.MagnetId="longName" Text="Augusta Ada King, Countess of Lovelace and first programmer" FontSize="15" FontAttributes="Bold" LineBreakMode="TailTruncation"
+                                   nalu:Magnet.LeftTo="parent.Left" nalu:Magnet.TopTo="parent.Top" nalu:Magnet.HorizontalBias="0" />
+                            <Border nalu:Magnet.MagnetId="longBadge" BackgroundColor="#3EBD73" StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                     nalu:Magnet.WidthSizing="16" nalu:Magnet.HeightSizing="16"
+                                     nalu:Magnet.After="longName,6" nalu:Magnet.RightTo="parent.Right"
+                                     nalu:Magnet.VerticallyWithin="longName" />
+                        </nalu:Magnet>
+                        <Label Text="The badge stays glued to the name; the name gives way" StyleClass="caption" />
+                    </VerticalStackLayout>
+                </Border>
+
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

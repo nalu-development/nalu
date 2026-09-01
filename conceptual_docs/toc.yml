@@ -17,6 +17,10 @@
       href: layouts-popup.md
     - name: Magnet
       href: layouts-magnet.md
+    - name: Magnet by example
+      href: layouts-magnet-examples.md
+    - name: Magnet 1.x → 2.0 migration
+      href: layouts-magnet-migration.md
 - name: Navigation
   href: navigation.md
   items:
