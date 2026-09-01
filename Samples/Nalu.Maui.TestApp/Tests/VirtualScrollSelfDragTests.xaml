@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vs="https://nalu-development.github.com/nalu/virtualscroll"
+             xmlns:tests="clr-namespace:Nalu.Maui.TestApp.Tests"
+             x:Class="Nalu.Maui.TestApp.Tests.VirtualScrollSelfDragTests"
+             x:DataType="tests:VirtualScrollSelfDragModel">
+    <Grid RowDefinitions="Auto,*">
+        <VerticalStackLayout Padding="16,8" Spacing="4">
+            <Label AutomationId="SelfDragOrderLabel" FontSize="13" Text="{Binding Order}" />
+            <Label x:Name="StatusLabel" AutomationId="SelfDragStatusLabel" FontSize="13" />
+            <HorizontalStackLayout x:Name="ButtonsRow" Spacing="8">
+                <Button AutomationId="SelfDragVerifyButton" Text="Verify" FontSize="11" Clicked="OnVerifyClicked" />
+                <Button AutomationId="SelfDragReplaceButton" Text="Replace" FontSize="11" Clicked="OnReplaceClicked" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <!--
+            The scenario under test: NO adapter in the page model — a plain ObservableCollection is
+            auto-wrapped by ItemsSource coercion and the coerced Adapter is consumed as DragHandler
+            through a {RelativeSource Self} compiled binding. DragHandler is deliberately declared
+            BEFORE ItemsSource: the binding must resolve through the Adapter property-changed
+            notification, not through attribute order.
+        -->
+        <vs:VirtualScroll x:Name="Scroll" Grid.Row="1"
+                          AutomationId="SelfDragScroll"
+                          DragHandler="{Binding Adapter, Source={RelativeSource Self}, x:DataType=vs:VirtualScroll}"
+                          ItemsSource="{Binding Items}">
+            <vs:VirtualScroll.ItemTemplate>
+                <DataTemplate x:DataType="tests:VirtualScrollSelfDragItem">
+                    <!-- Tall fixed rows: real long-press drags need forgiving touch geometry. -->
+                    <Grid HeightRequest="70" BackgroundColor="Transparent">
+                        <BoxView Color="LightGray" HeightRequest="1" VerticalOptions="End" />
+                        <Label Text="{Binding Name}"
+                               AutomationId="{Binding CellId}"
+                               FontSize="20"
+                               VerticalOptions="Center"
+                               Margin="24,0" />
+                    </Grid>
+                </DataTemplate>
+            </vs:VirtualScroll.ItemTemplate>
+        </vs:VirtualScroll>
+    </Grid>
+</ContentPage>

@@ -142,11 +142,13 @@ public partial class VirtualScrollHandler
         _animatorIsRunningListener?.Dispose();
         _recyclerViewAdapter?.Dispose();
         _recyclerViewAdapter = null;
-        _touchHelperCallback?.Dispose();
-        _touchHelperCallback = null;
+        // Detach BEFORE disposing the callback: detaching fires clearView on the callback for a
+        // still-recovering dragged item, and a disposed managed peer cannot be reactivated.
         _itemTouchHelper?.AttachToRecyclerView(null);
         _itemTouchHelper?.Dispose();
         _itemTouchHelper = null;
+        _touchHelperCallback?.Dispose();
+        _touchHelperCallback = null;
         _snapHelper?.Dispose();
         _snapHelper = null;
         _recyclerView?.Dispose();
@@ -289,6 +291,12 @@ public partial class VirtualScrollHandler
     public static void MapDragHandler(VirtualScrollHandler handler, IVirtualScroll virtualScroll)
     {
         var recyclerView = handler.PlatformRecyclerView;
+
+        // A drag-handler swap must not leave the previous ItemTouchHelper attached.
+        handler._itemTouchHelper?.AttachToRecyclerView(null);
+        handler._itemTouchHelper?.Dispose();
+        handler._itemTouchHelper = null;
+
         if (virtualScroll.DragHandler is not null)
         {
             if (handler._touchHelperCallback is null)
@@ -298,11 +306,6 @@ public partial class VirtualScrollHandler
 
             handler._itemTouchHelper = new ItemTouchHelper(handler._touchHelperCallback);
             handler._itemTouchHelper.AttachToRecyclerView(recyclerView);
-        }
-        else
-        {
-            handler._itemTouchHelper?.AttachToRecyclerView(null);
-            handler._itemTouchHelper?.Dispose();
         }
     }
 

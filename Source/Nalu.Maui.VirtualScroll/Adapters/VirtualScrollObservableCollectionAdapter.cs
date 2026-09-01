@@ -59,5 +59,5 @@ public class VirtualScrollObservableCollectionAdapter<TItem> : VirtualScrollNoti
     }
 
     /// <inheritdoc/>
-    private protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
+    protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
 }

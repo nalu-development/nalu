@@ -80,5 +80,5 @@ public class VirtualScrollGroupedObservableCollectionAdapter<TSectionCollection,
     }
 
     /// <inheritdoc/>
-    private protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
+    protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
 }

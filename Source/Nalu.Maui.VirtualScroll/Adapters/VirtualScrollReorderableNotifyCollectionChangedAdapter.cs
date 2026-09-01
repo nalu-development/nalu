@@ -69,7 +69,7 @@ internal sealed class VirtualScrollReorderableNotifyCollectionChangedAdapter : V
     }
 
     /// <inheritdoc/>
-    private protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
+    protected override bool ShouldIgnoreCollectionChanges() => _movingItemsViaDrag;
 
     /// <inheritdoc cref="IVirtualScrollDragHandler.MoveItem"/>
     private void MoveItem(VirtualScrollDragMoveInfo dragMoveInfo)

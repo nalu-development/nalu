@@ -10,8 +10,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <UseMaui>true</UseMaui>
-        
-        <XamlInflator>SourceGen</XamlInflator>
+
+        <MauiXamlInflator>SourceGen</MauiXamlInflator>
 
         <!-- Display name -->
         <ApplicationTitle>Daily Helper</ApplicationTitle>
