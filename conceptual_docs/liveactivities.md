@@ -122,8 +122,10 @@ public interface ILiveActivity
 {
     string Id { get; }
     string Kind { get; }
-    LiveActivityState State { get; }          // Active, Stale, Ended
+    LiveActivityState State { get; }          // Active, Stale, Ended, Dismissed
     ILiveActivityContent Content { get; }     // read-only view of the last applied snapshot
+
+    event EventHandler? Dismissed;            // the user removed it from screen
 
     Task UpdateAsync(Action<LiveActivityContent> patch, LiveActivityAlert? alert = null);
     Task EndAsync(Action<LiveActivityContent>? finalPatch = null,
@@ -202,6 +204,38 @@ applies to the progress track and the identity glyph, nothing else — so the cu
 surface is identical on both platforms and both inherit dark/light adaptivity from the
 system. If you need more than that on iOS, bring [your own widget UI](#custom-ios-ui).
 
+## The user can always take it away
+
+Neither platform lets you pin a live activity on screen, and this is deliberate. Android 14
+changed `setOngoing(true)` so ongoing notifications became dismissable for **all apps,
+regardless of `targetSdkVersion`** — the only carve-outs are `CallStyle`, media, and
+enterprise device-policy notifications, none of which a live activity qualifies for. Android
+16's Live Updates kept that: Google's guidance is explicitly *don't repost what the user
+dismissed*, because reposting is what makes people revoke the app's posting permission
+outright. iOS is the same story — a Live Activity can be cleared from the Lock Screen.
+
+Nalu absorbs this for you. When the user removes it:
+
+- `State` becomes `LiveActivityState.Dismissed` and the `Dismissed` event fires (on the main
+  thread, on both platforms).
+- Further `UpdateAsync` calls become **silent no-ops** — they do not throw the way an ended
+  handle does, so a progress loop can keep running untouched. `Content` still advances, so
+  the snapshot stays truthful.
+- `EndAsync` seals the handle to `Ended` without touching the platform — important because
+  the default dismissal *posts* the final content, which would drag the notification the user
+  just swiped straight back.
+
+You only need the event if something should stop when the activity goes away:
+
+```csharp
+activity.Dismissed += (_, _) => _progressTimer.Stop();
+```
+
+Under the hood this is a delete intent on Android and an ActivityKit state observer on iOS;
+neither reaches your code. Note the asymmetry it papers over: Android would genuinely
+resurrect the notification on the next `notify()`, while ActivityKit merely ignores updates —
+without this, the same app code would behave differently per platform.
+
 ## Activities outlive your app
 
 This is a feature, not a leak: a delivery keeps its Live Activity when the app dies, on both
@@ -211,7 +245,8 @@ on Android) — adopt yours instead of starting a duplicate next to it:
 
 ```csharp
 var existing = liveActivities.Activities
-    .LastOrDefault(a => a.Kind == "delivery" && a.State != LiveActivityState.Ended);
+    .LastOrDefault(a => a.Kind == "delivery"
+                        && a.State is LiveActivityState.Active or LiveActivityState.Stale);
 
 if (existing is not null)
 {

@@ -1,4 +1,5 @@
 using Android.App;
+using Android.Content;
 using Application = Android.App.Application;
 
 [assembly: UsesPermission("android.permission.POST_NOTIFICATIONS")]
@@ -25,6 +26,7 @@ internal sealed class AndroidLiveActivityManager : ILiveActivityManager
     {
         _options = options;
         _activities = RehydrateActivities();
+        RegisterDismissReceiver();
     }
 
     public LiveActivitySupport Support
@@ -77,6 +79,67 @@ internal sealed class AndroidLiveActivityManager : ILiveActivityManager
     internal LiveActivityOptions Options => _options;
 
     internal string GetChannelId(string kind) => $"nalu_live_{kind}";
+
+    /// <summary>
+    /// Routes a user dismissal to its handle, which then stops pushing updates. Unknown ids
+    /// (a notification from a previous process, or an already-ended activity whose final
+    /// content the user swiped) are ignored.
+    /// </summary>
+    private void OnDismissed(string? activityId)
+    {
+        if (activityId is null)
+        {
+            return;
+        }
+
+        // Indexed rather than foreach: StartAsync appends from app code, and this runs on
+        // the main thread whenever the notification is swiped.
+        for (var i = 0; i < _activities.Count; i++)
+        {
+            if (_activities[i].Id == activityId)
+            {
+                _activities[i].MarkDismissed();
+
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Listens for the delete intent the native layer attaches to every posted activity.
+    /// Registered at RUNTIME rather than declared in the manifest on purpose: the signal
+    /// only matters while this process is alive. If the app is dead when the user swipes,
+    /// the next start rehydrates from getActiveNotifications(), which no longer lists the
+    /// dismissed notification — the right outcome, reached without waking the app.
+    /// The receiver lives as long as the manager (an app-lifetime singleton), so it is
+    /// never unregistered.
+    /// </summary>
+    private void RegisterDismissReceiver()
+    {
+        if (!OperatingSystem.IsAndroidVersionAtLeast(26))
+        {
+            return;
+        }
+
+        var receiver = new DismissReceiver(OnDismissed);
+        var filter = new IntentFilter(Platform.NaluLiveUpdates.ActionDismissed);
+
+        if (OperatingSystem.IsAndroidVersionAtLeast(33))
+        {
+            // The broadcast is sent with this app's own identity, so NotExported is enough.
+            Application.Context.RegisterReceiver(receiver, filter, ReceiverFlags.NotExported);
+        }
+        else
+        {
+            Application.Context.RegisterReceiver(receiver, filter);
+        }
+    }
+
+    private sealed class DismissReceiver(Action<string?> onDismissed) : BroadcastReceiver
+    {
+        public override void OnReceive(Context? context, Intent? intent)
+            => onDismissed(intent?.GetStringExtra(Platform.NaluLiveUpdates.ExtraId));
+    }
 
     private List<AndroidLiveActivity> RehydrateActivities()
     {

@@ -1,3 +1,5 @@
+using Foundation;
+
 namespace Nalu;
 
 /// <summary>
@@ -9,9 +11,18 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
 {
     private readonly List<AppleLiveActivity> _activities;
 
+    /// <summary>Held so the Swift side's escaping callback is never collected.</summary>
+    private readonly Action<NSString, NSString> _stateObserver;
+
     public AppleLiveActivityManager()
     {
         _activities = RehydrateActivities();
+        _stateObserver = OnStateChanged;
+
+        if (NaluLiveActivitiesBridge.IsSupported())
+        {
+            NaluLiveActivitiesBridge.ObserveActivityStates(_stateObserver);
+        }
     }
 
     public LiveActivitySupport Support
@@ -65,6 +76,34 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
 
     internal static double ToEpochMs(DateTimeOffset? instant) => instant?.ToUnixTimeMilliseconds() ?? 0;
 
+    /// <summary>
+    /// ActivityKit already ignores updates to an activity the user removed, so nothing can
+    /// resurrect here the way it can on Android — this exists so the handle STATE tells the
+    /// truth (and the Dismissed event fires) instead of the app finding out only at the next
+    /// cold start. Delivered on a Swift task; re-dispatched to the main thread so the event
+    /// reaches app code exactly as it does on Android.
+    /// </summary>
+    private void OnStateChanged(NSString activityId, NSString state)
+    {
+        if (state?.ToString() != "dismissed" || activityId?.ToString() is not { } id)
+        {
+            return;
+        }
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            for (var i = 0; i < _activities.Count; i++)
+            {
+                if (_activities[i].Id == id)
+                {
+                    _activities[i].MarkDismissed();
+
+                    return;
+                }
+            }
+        });
+    }
+
     private static List<AppleLiveActivity> RehydrateActivities()
     {
         var activities = new List<AppleLiveActivity>();
@@ -89,6 +128,11 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
             if (info.State == "stale")
             {
                 activity.MarkStale();
+            }
+            else if (info.State == "dismissed")
+            {
+                // Briefly still listed by ActivityKit right after the user removed it.
+                activity.MarkDismissed();
             }
 
             activities.Add(activity);

@@ -36,7 +36,16 @@ public enum LiveActivityState
     Stale,
 
     /// <summary>The activity has ended and can no longer be updated.</summary>
-    Ended
+    Ended,
+
+    /// <summary>
+    /// The user removed the activity from screen (swiped the Android notification away, or
+    /// cleared the iOS Live Activity). Terminal: further updates are silently dropped rather
+    /// than re-posting, which both platforms ask apps not to do. Unlike
+    /// <see cref="Ended"/>, updating a dismissed handle does not throw — app code can keep
+    /// driving its loop unchanged.
+    /// </summary>
+    Dismissed
 }
 
 /// <summary>

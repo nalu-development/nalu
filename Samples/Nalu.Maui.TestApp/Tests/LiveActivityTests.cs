@@ -27,6 +27,11 @@ public class LiveActivityTests : ContentPage
         _activity = _manager.Activities.LastOrDefault(a => a.Kind == "demo" && a.State != LiveActivityState.Ended);
         _progress = _activity?.Content.Progress?.Value ?? 0;
 
+        if (_activity is not null)
+        {
+            Track(_activity);
+        }
+
         _statusLabel = new Label
         {
             AutomationId = "LiveActivityStatus",
@@ -119,6 +124,7 @@ public class LiveActivityTests : ContentPage
                 new LiveActivityAction { Id = "ping", Label = "Ping" }
             ]
         });
+        Track(_activity);
         SetStatus($"Started {_activity.Id} ({_activity.State})");
     }
 
@@ -187,6 +193,14 @@ public class LiveActivityTests : ContentPage
         SetStatus($"Ended immediately ({_activity.State})");
         _activity = null;
     }
+
+    /// <summary>
+    /// The user swiped the notification away: the library already stops posting, this just
+    /// makes it visible. Subsequent "Advance progress" taps must report Dismissed and leave
+    /// the shade empty.
+    /// </summary>
+    private void Track(ILiveActivity activity)
+        => activity.Dismissed += (_, _) => SetStatus($"Dismissed by user ({activity.State})");
 
     private void SetStatus(string message) => _statusLabel.Text = message;
 }

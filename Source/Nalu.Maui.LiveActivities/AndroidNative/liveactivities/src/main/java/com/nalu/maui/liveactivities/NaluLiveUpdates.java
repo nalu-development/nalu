@@ -25,7 +25,17 @@ import org.json.JSONObject;
  */
 public final class NaluLiveUpdates {
 
-    private static final String EXTRA_ID = "nalu.live.id";
+    /**
+     * Broadcast fired when the USER removes a live activity (swipe, or "Clear all").
+     * Sent with this app's own identity and package-scoped, so a runtime-registered
+     * NOT_EXPORTED receiver is the intended listener. NotificationManager.cancel() —
+     * how the app itself takes an activity down — deliberately does NOT fire it.
+     */
+    public static final String ACTION_DISMISSED = "com.nalu.maui.liveactivities.DISMISSED";
+
+    /** Carries the live activity id, both in the notification extras and on {@link #ACTION_DISMISSED}. */
+    public static final String EXTRA_ID = "nalu.live.id";
+
     private static final String EXTRA_KIND = "nalu.live.kind";
     private static final String EXTRA_PAYLOAD = "nalu.live.payload";
     private static final int PROGRESS_SCALE = 1000;
@@ -108,7 +118,8 @@ public final class NaluLiveUpdates {
             .setSmallIcon(smallIcon != 0 ? smallIcon : context.getApplicationInfo().icon)
             .setOngoing(ongoing)
             .setOnlyAlertOnce(alertTitle == null)
-            .setContentIntent(contentIntent(context, deepLink));
+            .setContentIntent(contentIntent(context, deepLink))
+            .setDeleteIntent(deleteIntent(context, notificationId, activityId));
 
         if (alertTitle != null) {
             builder.setTicker(alertTitle);
@@ -314,6 +325,24 @@ public final class NaluLiveUpdates {
             Icon icon = iconId != 0 ? Icon.createWithResource(context, iconId) : null;
             builder.addAction(new Notification.Action.Builder(icon, labels[i], intent).build());
         }
+    }
+
+    /**
+     * Fires {@link #ACTION_DISMISSED} when the user swipes the notification away, so the
+     * managed side can stop pushing updates to something no longer on screen. Keyed by
+     * notificationId so each activity gets its own PendingIntent, and UPDATE_CURRENT keeps
+     * the extras fresh across the re-posts that every content update performs.
+     */
+    private static PendingIntent deleteIntent(Context context, int notificationId, String activityId) {
+        Intent intent = new Intent(ACTION_DISMISSED)
+            .setPackage(context.getPackageName())
+            .putExtra(EXTRA_ID, activityId);
+
+        return PendingIntent.getBroadcast(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     private static PendingIntent contentIntent(Context context, String deepLink) {
