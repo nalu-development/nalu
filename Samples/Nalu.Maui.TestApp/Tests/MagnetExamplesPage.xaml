@@ -147,19 +147,17 @@
                         <nalu:Magnet>
                             <nalu:Magnet.Definition>
                                 <nalu:MagnetDefinition>
-                                    <nalu:MagnetChain MagnetId="bar" Nodes="w1,w2,w3" Weights="2,1,1" />
+                                    <nalu:MagnetChain MagnetId="bar" Nodes="w1,w2,w3" Weights="2,1,1" Gap="4" />
                                 </nalu:MagnetDefinition>
                             </nalu:Magnet.Definition>
                             <Border nalu:Magnet.MagnetId="w1" BackgroundColor="#4F6BFF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
                                      nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
                             <Border nalu:Magnet.MagnetId="w2" BackgroundColor="#8FA5FF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
-                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top"
-                                     nalu:Magnet.After="w1,4" />
+                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
                             <Border nalu:Magnet.MagnetId="w3" BackgroundColor="#C9D4FF" StrokeThickness="0" StrokeShape="RoundRectangle 6"
-                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top"
-                                     nalu:Magnet.After="w2,4" />
+                                     nalu:Magnet.WidthSizing="*" nalu:Magnet.HeightSizing="28" nalu:Magnet.TopTo="parent.Top" />
                         </nalu:Magnet>
-                        <Label Text="Weights=&quot;2,1,1&quot;" StyleClass="caption" />
+                        <Label Text="Weights=&quot;2,1,1&quot; Gap=&quot;4&quot;" StyleClass="caption" />
                     </VerticalStackLayout>
                 </Border>
 

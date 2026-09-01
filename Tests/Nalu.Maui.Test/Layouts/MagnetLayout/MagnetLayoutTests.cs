@@ -2,7 +2,7 @@ using Microsoft.Maui.Layouts;
 
 namespace Nalu.Maui.Test.Layouts.MagnetLayout;
 
-[Collection("MagnetAnimationDriver")] // Magnet.AnimationDriver is a shared static: never run these classes concurrently.
+[Collection("MagnetSharedState")] // shared statics (Magnet.AnimationDriver, MagnetTapeCache): never run these classes concurrently.
 public class MagnetLayoutTests
 {
     private const string _p = MagnetAnchor.Parent;

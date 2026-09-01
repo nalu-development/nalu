@@ -157,6 +157,9 @@ internal sealed class MagnetEngine
             case PatchKind.ChainWeight:
                 return ChainWeight((MagnetChain) node, aux);
 
+            case PatchKind.ChainGap:
+                return ((MagnetChain) node).Gap;
+
             default:
                 throw new NotSupportedException(kind.ToString());
         }

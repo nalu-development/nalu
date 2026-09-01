@@ -56,6 +56,9 @@ internal sealed class MagnetCompiler
         public int[] Members = [];
         public int MarginSlot, PercentSlot, PositionSlot;
         public int[] WeightSlots = [];
+        public int GapSlot = -1;
+        public int[] GapAfterSlots = [];
+        public int GapsTotalSlot = MagnetTape.Zero;
         public int StartSlot = -1, EndSlot = -1, SpanSlot = -1; // chain
         public int RatioFeedbackSlot = -1; // Ratio width fed by a Y-dependent height
     }
@@ -349,6 +352,7 @@ internal sealed class MagnetCompiler
 
                 case MagnetChain chain:
                     n.Axis = chain.Orientation == MagnetOrientation.Horizontal ? 0 : 1;
+                    n.GapSlot = Input(i, PatchKind.ChainGap, 0);
                     n.WeightSlots = new int[chain.Nodes.Count];
 
                     for (var m = 0; m < chain.Nodes.Count; m++)
@@ -1060,22 +1064,10 @@ internal sealed class MagnetCompiler
             avail = Lin(avail, 1, _nodes[m].Axes[axis].SizeSlot, -1);
         }
 
-        // Gaps between adjacent members (margins of adjacent anchors).
-        var members = chainInfo.Members;
-
-        for (var i = 0; i < members.Length; i++)
+        // All inter-member gaps (anchored pairs + chain Gap), precomputed at the span vertex.
+        if (chainInfo.GapsTotalSlot != MagnetTape.Zero)
         {
-            var ax = _nodes[members[i]].Axes[axis];
-
-            if (i > 0 && ax.Start is { Adjacent: true } start)
-            {
-                avail = Lin(avail, 1, start.EffSlot, -1);
-            }
-
-            if (i < members.Length - 1 && ax.End is { Adjacent: true } end)
-            {
-                avail = Lin(avail, 1, end.EffSlot, -1);
-            }
+            avail = Lin(avail, 1, chainInfo.GapsTotalSlot, -1);
         }
 
         return avail;
@@ -1415,6 +1407,64 @@ internal sealed class MagnetCompiler
                 ax.WeightedSizeSlot = Alloc();
             }
         }
+
+        // Per-pair gaps, emitted here so both the chain positioning and the Measured-member avail can read
+        // them: adjacent-anchor margins when declared (per-anchor margin/gone semantics), otherwise the chain
+        // Gap applied between consecutive VISIBLE members (separator semantics: a collapsed member takes its
+        // gap away — Gap × vis(next) × min(visibleBefore, 1)).
+        var k = n.Members.Length;
+        n.GapAfterSlots = new int[k];
+        var gapsTotal = MagnetTape.Zero;
+        var prefixVis = MagnetTape.Zero;
+
+        for (var i = 0; i < k; i++)
+        {
+            var ax = _nodes[n.Members[i]].Axes[axis];
+            prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
+
+            if (i == k - 1)
+            {
+                n.GapAfterSlots[i] = MagnetTape.Zero;
+
+                break;
+            }
+
+            var g1 = MagnetTape.Zero;
+            var g2 = MagnetTape.Zero;
+            var anchored = false;
+
+            if (ax.End is { Adjacent: true } endAnchor)
+            {
+                g1 = endAnchor.EffSlot;
+                anchored = true;
+            }
+
+            var next = _nodes[n.Members[i + 1]].Axes[axis];
+
+            if (next.Start is { Adjacent: true } startAnchor)
+            {
+                g2 = startAnchor.EffSlot;
+                anchored = true;
+            }
+
+            int gap;
+
+            if (anchored)
+            {
+                gap = Lin(g1, 1, g2, 1);
+            }
+            else
+            {
+                var hasVisibleBefore = Clamp(prefixVis, MagnetTape.Zero, MagnetTape.One);
+                var scaled = MulAdd(n.GapSlot, _nodes[n.Members[i + 1]].VisSlot);
+                gap = MulAdd(scaled, hasVisibleBefore);
+            }
+
+            n.GapAfterSlots[i] = gap;
+            gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+        }
+
+        n.GapsTotalSlot = gapsTotal;
     }
 
     private void EmitChain(int axis, int node)
@@ -1458,41 +1508,9 @@ internal sealed class MagnetCompiler
             Emit(new Op(OpKind.SumRange, totalNw, block, nwCount, MagnetTape.Zero));
         }
 
-        // Gaps (adjacent-anchor margins) total, per member "gap after"
-        var gapAfter = new int[k]; // slot holding the gap after member i (Zero if none)
-        var gapsTotal = MagnetTape.Zero;
-
-        for (var i = 0; i < k; i++)
-        {
-            var g1 = MagnetTape.Zero;
-            var g2 = MagnetTape.Zero;
-            var ax = _nodes[n.Members[i]].Axes[axis];
-
-            if (i < k - 1)
-            {
-                if (ax.End is { Adjacent: true } e)
-                {
-                    g1 = e.EffSlot;
-                }
-
-                var next = _nodes[n.Members[i + 1]].Axes[axis];
-
-                if (next.Start is { Adjacent: true } s)
-                {
-                    g2 = s.EffSlot;
-                }
-            }
-
-            if (g1 == MagnetTape.Zero && g2 == MagnetTape.Zero)
-            {
-                gapAfter[i] = MagnetTape.Zero;
-            }
-            else
-            {
-                gapAfter[i] = Lin(g1, 1, g2, 1);
-                gapsTotal = Lin(gapsTotal, 1, gapAfter[i], 1);
-            }
-        }
+        // Per-pair gaps: precomputed at the span vertex (anchored pairs + chain Gap separator pairs).
+        var gapAfter = n.GapAfterSlots;
+        var gapsTotal = n.GapsTotalSlot;
 
         // Weighted sizes
         var totalW = MagnetTape.Zero;

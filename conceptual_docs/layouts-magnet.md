@@ -161,7 +161,10 @@ Chains are **explicit** nodes (unlike Android, which infers them from mutual anc
 The chain start is the first member's `LeftTo` (default `parent.Left`), the end is the last member's `RightTo`
 (default `parent.Right`). Inner members must not carry anchors on the chain axis, except anchors to the adjacent
 member (which only contribute their margin, e.g. `b.LeftTo="a.Right,8"`) — so **gaps can differ per pair**, and each
-carries its own gone margin (`b.LeftTo="a.Right,8,gone:2"`). Collapsed members follow the GONE rules: they drop
+carries its own gone margin (`b.LeftTo="a.Right,8,gone:2"`). For the common uniform case, declare the gap ONCE on the
+chain instead: `Gap="8"` places it between consecutive **visible** members (separator semantics: a collapsed member
+takes its gap away, no gone margins involved — like Android's `Flow` `flow_horizontalGap`); it is animatable, and a
+per-pair adjacent anchor overrides it for that pair. Collapsed members follow the GONE rules: they drop
 their own margins (including the chain's start/end margin when the head/tail collapses), the anchor pointing *at* a
 collapsed member uses its gone margin, and spread gaps only count visible members. `Packed` uses the first member's
 bias (`HorizontalBias="0.3"` on the head puts the packed group at 30% of the free space). Members sized `*` share the

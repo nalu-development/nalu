@@ -543,6 +543,7 @@ public class MagnetEngineAllocationTests
     }
 }
 
+[Collection("MagnetSharedState")] // mutates the process-wide tape cache (capacity/eviction) and asserts tape identity.
 public class MagnetTapeCacheTests
 {
     private const string P = MagnetAnchor.Parent;

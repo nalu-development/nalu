@@ -7,7 +7,7 @@ namespace Nalu.Maui.Test.Layouts.MagnetLayout;
 /// Scene-visibility semantics: <see cref="MagnetView.ApplyVisibility" /> stamped on attach/bind/change,
 /// deferred and animated inside <see cref="Magnet.TransitionToAsync(System.Action,uint,Easing?)" />.
 /// </summary>
-[Collection("MagnetAnimationDriver")] // Magnet.AnimationDriver is a shared static: never run these classes concurrently.
+[Collection("MagnetSharedState")] // shared statics (Magnet.AnimationDriver, MagnetTapeCache): never run these classes concurrently.
 public class MagnetSceneTests
 {
     private const string _p = MagnetAnchor.Parent;

@@ -187,6 +187,15 @@ public sealed class MagnetChain : MagnetNode
         propertyChanged: OnStructurePropertyChanged
     );
 
+    /// <summary>Bindable property for <see cref="Gap" />.</summary>
+    public static readonly BindableProperty GapProperty = BindableProperty.Create(
+        nameof(Gap),
+        typeof(double),
+        typeof(MagnetChain),
+        0d,
+        propertyChanged: OnValuePropertyChanged
+    );
+
     private readonly IList<string> _nodes;
     private readonly IList<double> _weights;
 
@@ -226,6 +235,20 @@ public sealed class MagnetChain : MagnetNode
     {
         get => (MagnetChainStyle) GetValue(StyleProperty);
         set => SetValue(StyleProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the uniform gap placed between consecutive VISIBLE members (separator semantics:
+    /// a collapsed member takes its gap away — no gone margins to think about). Animatable.
+    /// </summary>
+    /// <remarks>
+    /// Applies to member pairs with no adjacent-member anchors: declaring an anchor to the adjacent member
+    /// (<c>After="a,8"</c>) overrides the chain gap for that pair with the per-anchor margin/gone semantics.
+    /// </remarks>
+    public double Gap
+    {
+        get => (double) GetValue(GapProperty);
+        set => SetValue(GapProperty, value);
     }
 
     /// <summary>

@@ -199,6 +199,120 @@ public class MagnetChainMarginTests
     }
 
     [Fact]
+    public void UniformChainGapAppliesBetweenMembers()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Top(P);
+        h.View("c", 30, 20).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, Gap = 10 }.With("a", "b", "c"));
+
+        h.Layout(200, 100, 200, 100);
+
+        h.Frame("a").ShouldBe(0, 0, 30, 20);
+        h.Frame("b").ShouldBe(40, 0, 30, 20);
+        h.Frame("c").ShouldBe(80, 0, 30, 20);
+    }
+
+    [Fact]
+    public void ChainGapHasSeparatorSemanticsWhenMembersCollapse()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Top(P);
+        h.View("c", 30, 20).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, Gap = 10 }.With("a", "b", "c"));
+
+        // Middle hidden: ONE gap between the two visible members — no gone margins to think about.
+        h.Fake("b").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("a").ShouldBe(0, 0, 30, 20);
+        h.Frame("c").ShouldBe(40, 0, 30, 20);
+
+        // Head run hidden: the first visible member gets NO leading gap.
+        h.Fake("a").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("c").ShouldBe(0, 0, 30, 20);
+
+        // Tail hidden: no trailing gap either.
+        h.Fake("a").Visibility = Visibility.Visible;
+        h.Fake("b").Visibility = Visibility.Visible;
+        h.Fake("c").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("a").ShouldBe(0, 0, 30, 20);
+        h.Frame("b").ShouldBe(40, 0, 30, 20);
+    }
+
+    [Fact]
+    public void PerPairAnchorOverridesTheChainGap()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Top(P);
+        h.View("c", 30, 20).Left("b", MagnetPole.Right, 30).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, Gap = 10 }.With("a", "b", "c"));
+
+        h.Layout(200, 100, 200, 100);
+        h.Frame("b").ShouldBe(40, 0, 30, 20);
+        h.Frame("c").ShouldBe(100, 0, 30, 20);
+
+        // The anchored pair keeps the per-anchor gone semantics; the Gap pair keeps the separator semantics.
+        h.Fake("b").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("a").ShouldBe(0, 0, 30, 20);
+        h.Frame("c").ShouldBe(60, 0, 30, 20);
+    }
+
+    [Fact]
+    public void WeightedChainAccountsTheChainGap()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Size(MagnetSizing.Constraint, 20);
+        h.View("b", 30, 20).Right(P).Top(P).Size(MagnetSizing.Constraint, 20);
+        h.Add(new MagnetChain { MagnetId = "row", Gap = 20 }.With("a", "b"));
+
+        h.Layout(200, 100, 200, 100);
+
+        h.Frame("a").ShouldBe(0, 0, 90, 20);
+        h.Frame("b").ShouldBe(110, 0, 90, 20);
+    }
+
+    [Fact]
+    public void SpreadChainReservesTheGapAndSpreadsTheRest()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P);
+        h.View("b", 30, 20).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Spread, Gap = 20 }.With("a", "b"));
+
+        h.Layout(200, 100, 200, 100);
+
+        // sizes 60 + gap 20 → slack 120 over 3 spread slots of 40.
+        h.Frame("a").ShouldBe(40, 0, 30, 20);
+        h.Frame("b").ShouldBe(130, 0, 30, 20);
+    }
+
+    [Fact]
+    public void GapIsAnAnimatableValuePatch()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Top(P);
+        var chain = h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, Gap = 10 }.With("a", "b"));
+
+        h.Layout(200, 100, 200, 100);
+        h.Frame("b").ShouldBe(40, 0, 30, 20);
+        var tape = h.Engine.Tape;
+
+        chain.Gap = 30;
+        h.Engine.PatchValues();
+        h.Layout(200, 100, 200, 100);
+
+        h.Engine.Tape.Should().BeSameAs(tape, "Gap is a patched value, not structure");
+        h.Frame("b").ShouldBe(60, 0, 30, 20);
+    }
+
+    [Fact]
     public void ChainMembersCenterVerticallyOnAGuidelineAndOnEachOther()
     {
         var h = new EngineHarness();

@@ -50,7 +50,7 @@ public class MagnetChainPlaygroundPage : ContentPage
         AddDemo(stack, "Packed · gaps 8 (gone 2) / 16 (gone 4)", "pk", MagnetChainStyle.Packed, gaps, weights: null, bias: 0);
         AddDemo(stack, "Spread · same gaps", "sp", MagnetChainStyle.Spread, gaps, weights: null, bias: null);
         AddDemo(stack, "SpreadInside · same gaps", "si", MagnetChainStyle.SpreadInside, gaps, weights: null, bias: null);
-        AddDemo(stack, "Weighted 1:2:1 · gaps 4", "wt", MagnetChainStyle.Spread, [null, (4, 4), (4, 4)], weights: [1, 2, 1], bias: null);
+        AddDemo(stack, "Weighted 1:2:1 · chain Gap 4", "wt", MagnetChainStyle.Spread, [null, null, null], weights: [1, 2, 1], bias: null, gap: 4);
         AddDemo(stack, "Packed ×4 · gaps 5/6/7 (gone 1/2/3)", "p4", MagnetChainStyle.Packed, gaps4, weights: null, bias: 0);
         AddDemo(stack, "10 A 20 B 30 C · gone = margin (default)", "ex", MagnetChainStyle.Packed, [(10, null), (20, null), (30, null)], weights: null, bias: 0);
 
@@ -64,7 +64,8 @@ public class MagnetChainPlaygroundPage : ContentPage
         MagnetChainStyle style,
         (double Margin, double? Gone)?[] gaps,
         double[]? weights,
-        double? bias
+        double? bias,
+        double gap = 0
     )
     {
         stack.Children.Add(new Label { Text = caption, FontSize = 12, TextColor = Color.FromArgb("#7A8194") });
@@ -78,7 +79,7 @@ public class MagnetChainPlaygroundPage : ContentPage
             Padding = new Thickness(0, 6)
         };
 
-        var chain = new MagnetChain { MagnetId = $"{prefix}Chain", Style = style };
+        var chain = new MagnetChain { MagnetId = $"{prefix}Chain", Style = style, Gap = gap };
 
         for (var i = 0; i < gaps.Length; i++)
         {
@@ -105,9 +106,9 @@ public class MagnetChainPlaygroundPage : ContentPage
                     node.Bias(b, 0.5);
                 }
             }
-            else if (gaps[i] is { } gap)
+            else if (gaps[i] is { } pairGap)
             {
-                node.Left($"{prefix}{(char) (letter - 1)}", MagnetPole.Right, gap.Margin, goneMargin: gap.Gone);
+                node.Left($"{prefix}{(char) (letter - 1)}", MagnetPole.Right, pairGap.Margin, goneMargin: pairGap.Gone);
             }
 
             chain.Nodes.Add(id);
