@@ -86,7 +86,7 @@ internal enum PatchKind : byte
     BarrierMargin,
     GuidelinePercent,
     GuidelinePosition,
-    ChainWeightFraction // Aux = member position
+    ChainWeight // Aux = member position; the raw weight (fractions are computed at runtime so collapsed members are excluded)
 }
 
 /// <summary>

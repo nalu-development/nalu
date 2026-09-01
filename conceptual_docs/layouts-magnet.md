@@ -160,9 +160,13 @@ Chains are **explicit** nodes (unlike Android, which infers them from mutual anc
 
 The chain start is the first member's `LeftTo` (default `parent.Left`), the end is the last member's `RightTo`
 (default `parent.Right`). Inner members must not carry anchors on the chain axis, except anchors to the adjacent
-member (which only contribute their margin, e.g. `b.LeftTo="a.Right,8"`). `Packed` uses the first member's bias
-(`HorizontalBias="0.3"` on the head puts the packed group at 30% of the free space). Members sized `*` share the
-remaining space according to `Weights` (positional, aligned with `Nodes`, default 1). `Measured` members are measured with the room left by
+member (which only contribute their margin, e.g. `b.LeftTo="a.Right,8"`) — so **gaps can differ per pair**, and each
+carries its own gone margin (`b.LeftTo="a.Right,8,gone:2"`). Collapsed members follow the GONE rules: they drop
+their own margins (including the chain's start/end margin when the head/tail collapses), the anchor pointing *at* a
+collapsed member uses its gone margin, and spread gaps only count visible members. `Packed` uses the first member's
+bias (`HorizontalBias="0.3"` on the head puts the packed group at 30% of the free space). Members sized `*` share the
+remaining space according to `Weights` (positional, aligned with `Nodes`, default 1; collapsed members are excluded,
+their share goes back to the visible ones). `Measured` members are measured with the room left by
 the other members (in chain order): a packed `[name, star]` chain lets the name grow until it must ellipsize while the
 star stays glued to its right — the pattern that needs a `FlexLayout` elsewhere.
 

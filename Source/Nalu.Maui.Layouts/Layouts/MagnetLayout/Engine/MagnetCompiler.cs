@@ -54,7 +54,7 @@ internal sealed class MagnetCompiler
         public int Axis; // 0 = X, 1 = Y
         public int[] Members = [];
         public int MarginSlot, PercentSlot, PositionSlot;
-        public int[] FractionSlots = [];
+        public int[] WeightSlots = [];
         public int StartSlot = -1, EndSlot = -1, SpanSlot = -1; // chain
         public int RatioFeedbackSlot = -1; // Ratio width fed by a Y-dependent height
     }
@@ -346,11 +346,11 @@ internal sealed class MagnetCompiler
 
                 case MagnetChain chain:
                     n.Axis = chain.Orientation == MagnetOrientation.Horizontal ? 0 : 1;
-                    n.FractionSlots = new int[chain.Nodes.Count];
+                    n.WeightSlots = new int[chain.Nodes.Count];
 
                     for (var m = 0; m < chain.Nodes.Count; m++)
                     {
-                        n.FractionSlots[m] = Input(i, PatchKind.ChainWeightFraction, m);
+                        n.WeightSlots[m] = Input(i, PatchKind.ChainWeight, m);
                     }
 
                     break;
@@ -1486,6 +1486,28 @@ internal sealed class MagnetCompiler
             var dist = Lin(n.SpanSlot, 1, totalNw, -1, gapsTotal, -1);
             dist = Clamp(dist, MagnetTape.Zero, MagnetTape.PosInf);
 
+            // Effective weights: a collapsed member contributes 0, so the visible members absorb its share
+            // (fractions must be computed at runtime — visibility is not a patched input).
+            var weightedCount = k - nwCount;
+            var weightBlock = _slots;
+            _slots += weightedCount;
+            var gathered = weightBlock;
+
+            for (var i = 0; i < k; i++)
+            {
+                var member = n.Members[i];
+
+                if (_nodes[member].Axes[axis].Weighted)
+                {
+                    Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
+                }
+            }
+
+            var totalWeight = Alloc();
+            Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
+
+            var gatheredSlot = weightBlock;
+
             for (var i = 0; i < k; i++)
             {
                 var ax = _nodes[n.Members[i]].Axes[axis];
@@ -1495,7 +1517,8 @@ internal sealed class MagnetCompiler
                     continue;
                 }
 
-                var raw = MulAdd(dist, n.FractionSlots[i]);
+                var fraction = Div(gatheredSlot++, totalWeight);
+                var raw = MulAdd(dist, fraction);
                 var bounded = ax.Size.HasBounds ? Clamp(raw, ax.MinSlot, ax.MaxSlot) : raw;
                 MulAddInto(ax.WeightedSizeSlot, bounded, _nodes[n.Members[i]].VisSlot);
                 ax.SizeSlot = ax.WeightedSizeSlot;

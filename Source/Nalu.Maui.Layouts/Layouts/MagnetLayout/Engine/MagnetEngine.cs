@@ -154,8 +154,8 @@ internal sealed class MagnetEngine
             case PatchKind.GuidelinePosition:
                 return ((MagnetGuideline) node).Position;
 
-            case PatchKind.ChainWeightFraction:
-                return ChainFraction((MagnetChain) node, aux);
+            case PatchKind.ChainWeight:
+                return ChainWeight((MagnetChain) node, aux);
 
             default:
                 throw new NotSupportedException(kind.ToString());
@@ -164,7 +164,11 @@ internal sealed class MagnetEngine
 
     private static MagnetSizing GetSize(MagnetView view, int axis) => axis == 0 ? view.WidthSizing : view.HeightSizing;
 
-    private double ChainFraction(MagnetChain chain, int member)
+    /// <summary>
+    /// The raw weight of a chain member (validated). Fractions are computed at runtime by the tape so that
+    /// collapsed members are excluded and the others absorb their share.
+    /// </summary>
+    private double ChainWeight(MagnetChain chain, int member)
     {
         var horizontal = chain.Orientation == MagnetOrientation.Horizontal;
         var sum = 0d;
@@ -208,11 +212,9 @@ internal sealed class MagnetEngine
             {
                 throw new InvalidOperationException($"MagnetChain '{chain.MagnetId}': total weight is 0.");
             }
-
-            return 0;
         }
 
-        return sum == 0 ? 0 : own / sum;
+        return own;
     }
 
     /// <summary>

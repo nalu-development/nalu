@@ -230,6 +230,7 @@ public sealed class MagnetChain : MagnetNode
 
     /// <summary>
     /// Gets or sets the weights of the members (positional, aligned with <see cref="Nodes" />, applies to <see cref="MagnetSizingUnit.Constraint" />-sized members only; missing entries default to 1).
+    /// Collapsed members are excluded: their share is redistributed to the visible weighted members.
     /// XAML: a comma-separated attribute, <c>Weights="2,1"</c>.
     /// </summary>
     /// <remarks>The setter replaces the contents: the backing list never changes identity.</remarks>
