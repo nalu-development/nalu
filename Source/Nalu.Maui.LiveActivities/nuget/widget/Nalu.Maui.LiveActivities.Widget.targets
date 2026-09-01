@@ -1,15 +1,17 @@
 <!--
   Nalu.Maui.LiveActivities — automatic iOS widget extension.
 
-  For iOS APP builds on macOS this wires up everything a Live Activity needs to render,
-  with zero files in the consumer's project:
+  For iOS APP builds on macOS this wires up the widget a Live Activity needs to render:
 
-    1. injects NSSupportsLiveActivities into the compiled Info.plist (PartialAppManifest);
-    2. copies the bundled generic widget (SwiftUI rendering the shared content model)
+    1. copies the bundled generic widget (SwiftUI rendering the shared content model)
        into obj/ and builds it with xcodebuild for the right SDK slice, stamping
        PRODUCT_BUNDLE_IDENTIFIER=$(ApplicationId).$(NaluLiveActivitiesWidgetBundleSuffix);
-    3. embeds the resulting .appex via AdditionalAppExtensions (the .NET iOS SDK copies
+    2. embeds the resulting .appex via AdditionalAppExtensions (the .NET iOS SDK copies
        it into PlugIns/ and codesigns it with the app's identity).
+
+  The app itself must declare NSSupportsLiveActivities=true in Platforms/iOS/Info.plist —
+  automatic injection via PartialAppManifest proved unreliable in real apps, so the key is
+  a documented manual step (see conceptual_docs/liveactivities.md).
 
   Customization properties:
     - NaluLiveActivitiesWidget           false to disable everything (default: true for Exe projects)
@@ -35,32 +37,27 @@
     <_NaluWidgetEnabled Condition="'$(NaluLiveActivitiesWidget)' == 'true' and $([MSBuild]::IsOSPlatform('osx'))">true</_NaluWidgetEnabled>
   </PropertyGroup>
 
-  <!-- 1. NSSupportsLiveActivities: merged into the compiled app manifest, so the consumer
-       does not have to touch Platforms/iOS/Info.plist at all. -->
-  <Target Name="_NaluLiveActivitiesPartialManifest"
-          Condition="'$(_NaluWidgetEnabled)' == 'true'"
-          BeforeTargets="_CompileAppManifest;CompileAppManifest">
+  <!-- Fail fast when the app manifest lacks NSSupportsLiveActivities: without the key
+       ActivityKit rejects every activity at runtime with a cryptic error far from the fix.
+       This is a READ-ONLY check on the COMPILED manifest — unlike manifest injection it has
+       no ordering or incrementality hazards (at worst it fires one build later). The key
+       name appears as literal bytes in both XML and binary plists. Runs regardless of the
+       widget opt-out (a custom widget still needs the key); suppress with
+       <NaluLiveActivitiesManifestCheck>false</NaluLiveActivitiesManifestCheck>. -->
+  <Target Name="_NaluLiveActivitiesValidateManifest"
+          Condition="'$(NaluLiveActivitiesManifestCheck)' != 'false' and '$(OutputType)' == 'Exe' and Exists('$(_TemporaryAppManifest)')"
+          AfterTargets="_CompileAppManifest">
     <PropertyGroup>
-      <_NaluPartialManifestPath>$(IntermediateOutputPath)NaluLiveActivitiesInfo.plist</_NaluPartialManifestPath>
-      <_NaluPartialManifestContent><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
-</dict>
-</plist>]]></_NaluPartialManifestContent>
+      <_NaluManifestHasLiveActivitiesKey>$([System.IO.File]::ReadAllText('$(_TemporaryAppManifest)').Contains('NSSupportsLiveActivities'))</_NaluManifestHasLiveActivitiesKey>
     </PropertyGroup>
 
-    <WriteLinesToFile File="$(_NaluPartialManifestPath)" Lines="$(_NaluPartialManifestContent)" Overwrite="true" WriteOnlyWhenDifferent="true" />
-
-    <ItemGroup>
-      <PartialAppManifest Include="$(_NaluPartialManifestPath)" />
-      <FileWrites Include="$(_NaluPartialManifestPath)" />
-    </ItemGroup>
+    <Error
+        Code="NALU001"
+        Condition="'$(_NaluManifestHasLiveActivitiesKey)' != 'True'"
+        Text="Nalu.Maui.LiveActivities: NSSupportsLiveActivities is missing from the app's Info.plist, so ActivityKit will reject every Live Activity at runtime. Add &lt;key&gt;NSSupportsLiveActivities&lt;/key&gt;&lt;true/&gt; to Platforms/iOS/Info.plist. (Suppress this check with &lt;NaluLiveActivitiesManifestCheck&gt;false&lt;/NaluLiveActivitiesManifestCheck&gt;.)" />
   </Target>
 
-  <!-- 2 + 3. Build the widget appex and hand it to the SDK for embedding + codesigning.
+  <!-- 1 + 2. Build the widget appex and hand it to the SDK for embedding + codesigning.
        Everything is computed at target-execution time: RuntimeIdentifier is still empty
        during evaluation, and a device appex embedded into a simulator app silently fails
        pluginkit registration. -->

@@ -45,6 +45,16 @@ public final class NaluLiveUpdates {
     }
 
     /**
+     * Whether this device can PROMOTE an ongoing notification to a Live Update
+     * (status-bar chip + floating card). The promotion API only exists from
+     * Android 16 QPR1 (SDK_INT_FULL BAKLAVA_1 = API 36.1); base Android 16
+     * renders the same content as a plain ongoing notification.
+     */
+    public static boolean supportsPromotion() {
+        return Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1;
+    }
+
+    /**
      * Ensures the channel exists, renders the content and posts the notification.
      * Colors are ARGB ints with 0 meaning "not set" (real colors always carry alpha).
      * Returns false when notifications cannot be posted (no manager / pre-O device).

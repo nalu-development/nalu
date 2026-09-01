@@ -6,6 +6,7 @@ public class LiveActivityContentTests
     {
         Title = "Pizza on the way",
         Subtitle = "Preparing",
+        SubtitleOverflow = "Running late",
         ChipText = "10%",
         AccentColor = "#4C7DF0",
         Progress = new LiveActivityProgress

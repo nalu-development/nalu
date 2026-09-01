@@ -38,7 +38,10 @@ internal sealed class AndroidLiveActivityManager : ILiveActivityManager
                 return LiveActivitySupport.Unavailable;
             }
 
-            if (OperatingSystem.IsAndroidVersionAtLeast(36))
+            // The Live Update promotion API (status-bar chip + floating card) only exists
+            // from Android 16 QPR1 (API 36.1): base Android 16 renders the same content
+            // as a plain ongoing notification, which is exactly the Degraded contract.
+            if (OperatingSystem.IsAndroidVersionAtLeast(36) && Platform.NaluLiveUpdates.SupportsPromotion())
             {
                 return LiveActivitySupport.Full;
             }

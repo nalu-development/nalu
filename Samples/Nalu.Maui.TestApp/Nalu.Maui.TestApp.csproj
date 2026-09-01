@@ -97,8 +97,9 @@
     </ItemGroup>
   <!-- Live Activity widget: consume the library's buildTransitive targets directly —
        a ProjectReference does not flow them the way the nupkg does, so this Import
-       exercises the exact file the package ships (widget build + embedding +
-       NSSupportsLiveActivities injection, all automatic). -->
+       exercises the exact file the package ships (widget build + embedding).
+       NSSupportsLiveActivities is declared in Platforms/iOS/Info.plist, the same
+       manual step the docs require of consumers. -->
   <Import Project="..\..\Source\Nalu.Maui.LiveActivities\nuget\widget\Nalu.Maui.LiveActivities.Widget.targets"
           Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'" />
 </Project>

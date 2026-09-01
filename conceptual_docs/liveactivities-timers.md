@@ -42,18 +42,29 @@ What each platform *displays* past the end:
 | | Android | iOS |
 |---|---|---|
 | Native behavior | chronometer counts **into negatives** (−08:30) | rendered text **stops at 0:00** |
-| With `StaleAt = endsAt` | (unchanged) | system re-renders at that instant → widget flips to **negative overflow** (−0:01 and counting) |
+| With `StaleAt = endsAt` | (unchanged) | system re-renders at that instant → the overflow starts ticking by itself |
 
 That second row is the one system-side trigger iOS offers. ActivityKit's `staleDate` (our
 `StaleAt`) makes the **system re-render the widget** when the instant passes — no app code
 runs, but the re-render is enough for the bundled widget to notice the end is in the past
-and switch to the negative display. One line makes iOS match Android end to end, even with
+and switch to the overflow display. One line makes iOS match Android end to end, even with
 your app dead:
 
 ```csharp
 Timer = LiveActivityTimer.CountDown(eta),
-StaleAt = eta,   // boundary re-render: countdown flips to −overflow by itself
+StaleAt = eta,   // boundary re-render: countdown flips to overflow by itself
 ```
+
+**What the overflow looks like** is controlled by `SubtitleOverflow`:
+
+- `SubtitleOverflow = null` (default): the overflow ticks as a **negative duration**
+  (−0:35 and counting) — Android's chronometer natively, iOS as a `−`-prefixed count-up.
+  Compact and language-neutral, but the number is the only overflow signal.
+- `SubtitleOverflow = "Running over"`: past the end the wording **takes the subtitle's
+  place** and the overflow ticks as a **plain count-up** (no minus) — the text carries the
+  semantics, app-localized. On iOS the swap happens system-side (with `StaleAt` set even
+  while your app is dead); on Android it applies from the first post at or after the end —
+  until then the chronometer ticks natively into negatives.
 
 > [!NOTE]
 > `StaleAt` does double duty: it also transitions the handle to
@@ -67,16 +78,19 @@ the activity *says* — "Time remaining" becoming "Running over", green becoming
 alert firing — that is an app-owned update at the boundary:
 
 ```csharp
-// While the appointment runs: green countdown.
+// While the appointment runs: green countdown, with the overflow wording ready.
+Subtitle = "Time remaining";
+SubtitleOverflow = "Running over";   // takes the subtitle's place past the end
 Timer = LiveActivityTimer.CountDown(appointmentEnd);
+StaleAt = appointmentEnd;   // display flips to overflow even if the app never wakes
 
-// At the boundary (your own scheduled task while the app lives):
+// At the boundary (your own scheduled task while the app lives) — rendering is already
+// handled; the update carries only what the system cannot do alone:
 await activity.UpdateAsync(
     c =>
     {
-        c.Subtitle = "Running over";
         c.AccentColor = "#E5484D";
-        c.Timer = LiveActivityTimer.CountUp(appointmentEnd);   // overflow ticks up natively
+        c.StaleAt = null;
     },
     new LiveActivityAlert("Appointment is running over"));
 ```
@@ -99,3 +113,15 @@ The full decision ladder:
 The TestApp's **"Live Activity Timer Tests"** page is the runnable version of this chapter:
 a 2-minute appointment counting down, flipping to red overflow automatically at the end (or
 on demand via *Overflow now*).
+
+## Lock Screen display fidelity (iOS)
+
+Two rendering behaviors are the OS's, not yours — no API changes them:
+
+- **Always-On Display masks seconds.** In the reduced-luminance lock state the system
+  renders a ticking clock as `1:--`, updating only the minutes; full luminance brings the
+  seconds back. Apple's own Timer activity behaves the same.
+- **Only interval-based timer text survives the Lock Screen.** The bundled widget renders
+  every ticking mode through SwiftUI's `Text(timerInterval:)`: the plain `.timer` text
+  style can degrade to a coarse relative string ("1 minute") on the Lock Screen instead of
+  ticking. Keep that in mind when building a custom widget.

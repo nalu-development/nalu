@@ -16,6 +16,9 @@ public interface ILiveActivityContent
     /// <inheritdoc cref="LiveActivityContent.Subtitle"/>
     string? Subtitle { get; }
 
+    /// <inheritdoc cref="LiveActivityContent.SubtitleOverflow"/>
+    string? SubtitleOverflow { get; }
+
     /// <inheritdoc cref="LiveActivityContent.ChipText"/>
     string? ChipText { get; }
 

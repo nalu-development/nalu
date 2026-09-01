@@ -57,10 +57,29 @@ builder.UseNaluLiveActivities(live => live
 
 Resolve `ILiveActivityManager` from DI wherever you need it.
 
-That is the whole setup on iOS: the NuGet package injects `NSSupportsLiveActivities` into
-your compiled `Info.plist` and builds + embeds a generic WidgetKit extension rendering the
-content model — Lock Screen, Dynamic Island, everything. On Android, the package's manifest
-declares the notification permissions; you only trigger the runtime prompt:
+On iOS, declare Live Activity support in `Platforms/iOS/Info.plist`:
+
+```xml
+<key>NSSupportsLiveActivities</key>
+<true/>
+```
+
+That is the whole setup on iOS: with the key declared, the NuGet package builds + embeds a
+generic WidgetKit extension rendering the content model — Lock Screen, Dynamic Island,
+everything. Forget the key and the **build fails with `NALU001`** telling you exactly what
+to add — the package validates the compiled app manifest so the mistake can never reach
+ActivityKit's cryptic runtime error.
+
+On Android there is **nothing to add to your manifest**: the package declares
+
+- `android.permission.POST_NOTIFICATIONS` (the runtime-prompted notification permission), and
+- `android.permission.POST_PROMOTED_NOTIFICATIONS` (the install-time grant that allows
+  Live Update promotion)
+
+via assembly-level `[UsesPermission]` attributes, and Android's standard manifest merge
+carries both into your app — the same first-class mechanism every Android library uses
+(verify with `aapt2 dump` on the built APK if in doubt). Your only job is triggering the
+runtime prompt:
 
 ```csharp
 var allowed = await liveActivities.RequestPermissionAsync();
@@ -76,11 +95,18 @@ var allowed = await liveActivities.RequestPermissionAsync();
 ```csharp
 switch (liveActivities.Support)
 {
-    case LiveActivitySupport.Full:        // iOS 16.2+ · Android 16+ (chip + floating card)
-    case LiveActivitySupport.Degraded:    // Android 8–15: plain ongoing notification, no chip
+    case LiveActivitySupport.Full:        // iOS 16.2+ · Android 16 QPR1+ (chip + floating card)
+    case LiveActivitySupport.Degraded:    // Android 8 – 16 base: plain ongoing notification, no chip
     case LiveActivitySupport.Unavailable: // iOS < 16.2, Mac Catalyst, Windows, or user-disabled
 }
 ```
+
+> [!NOTE]
+> The Live Update chip needs **Android 16 QPR1 (API 36.1)** — the promotion API does not
+> exist on base Android 16, so devices that have not received QPR1 yet (common on OEM
+> schedules) report `Degraded` and show the plain ongoing notification. The chip's exact
+> look also follows the vendor's skin. Users can additionally veto promotion per app
+> (notification settings → "Live updates" / promoted notifications).
 
 Calls are **never** platform-branched in your code: on `Unavailable` surfaces `StartAsync`
 returns an inert handle and every call is a no-op, so the same code path runs everywhere.
@@ -133,6 +159,7 @@ while `LiveActivityDismissal.Immediate` removes it instantly.
 | Property | Android (Live Update) | iOS (widget) |
 |---|---|---|
 | `Title` / `Subtitle` | notification title / text | card headline / secondary line |
+| `SubtitleOverflow` | subtitle once a countdown runs over (from the next post) | subtitle once a countdown runs over (system-side with `StaleAt`) — see [timers](liveactivities-timers.md#when-the-countdown-reaches-zero) |
 | `ChipText` | status-bar chip text (`setShortCriticalText`) | Dynamic Island compact pill; expanded-card corner caption |
 | `ChipIcon` | — (chip shows the small icon) | identity glyph (SF Symbol name) in card + minimal island |
 | `AccentColor` | small-icon tint + progress bar color | progress track + identity glyph tint — **nothing else**, see below |
@@ -231,11 +258,26 @@ Actions =
 ]
 ```
 
-Both platforms render them as buttons; tapping opens the app at the link (register the
-scheme: `CFBundleURLTypes` on iOS, an `IntentFilter` on Android). There are no in-process
-callbacks yet: an action with an `Id` but **no `DeepLink` is valid to declare today but not
-rendered** — it is reserved for the upcoming direct-callback support, which will report taps
-back through that `Id` without opening the app.
+Both platforms render them as buttons; tapping opens the app at the link. There are no
+in-process callbacks yet: an action with an `Id` but **no `DeepLink` is valid to declare
+today but not rendered** — it is reserved for the upcoming direct-callback support, which
+will report taps back through that `Id` without opening the app.
+
+> [!WARNING]
+> **Every deep link — the content-level `DeepLink` and each action's — needs its scheme
+> registered by your app, and an unregistered scheme fails SILENTLY**: the tap is
+> delivered, resolves to nothing, and the app never opens. Register it on iOS via
+> `CFBundleURLTypes` in `Info.plist` and on Android on your `MainActivity`:
+>
+> ```csharp
+> [IntentFilter([Intent.ActionView],
+>     Categories = [Intent.CategoryDefault, Intent.CategoryBrowsable],
+>     DataScheme = "myapp")]
+> public class MainActivity : MauiAppCompatActivity { ... }
+> ```
+>
+> Omitting `DeepLink` on the content is always safe: tapping then simply foregrounds the
+> app (Android falls back to the launch intent; iOS opens the app by default).
 
 ## Where to next
 

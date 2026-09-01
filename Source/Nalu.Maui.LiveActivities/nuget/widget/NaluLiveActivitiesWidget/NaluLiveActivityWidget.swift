@@ -22,6 +22,7 @@ struct NaluLiveActivityAttributes: ActivityAttributes {
 struct LiveContent: Codable {
     var title: String?
     var subtitle: String?
+    var subtitleOverflow: String?
     var chipText: String?
     var chipIcon: String?
     var accentColor: String?
@@ -86,6 +87,27 @@ struct LiveContent: Codable {
 
     var url: URL? {
         deepLink.flatMap(URL.init(string:))
+    }
+
+    /// True when a countdown timer is already past its end at render time.
+    var isOverflowing: Bool {
+        guard timer?.mode == "CountDown", let endsAt = timer?.endsAt else {
+            return false
+        }
+        return Date(timeIntervalSince1970: endsAt / 1000) <= Date.now
+    }
+
+    /// The subtitle to render right now: while a countdown is overflowing, the
+    /// app-provided overflow wording ("Running over") takes the subtitle's place —
+    /// it is the app-localized signal that the count-up shown is overtime.
+    var displaySubtitle: String? {
+        isOverflowing ? (subtitleOverflow ?? subtitle) : subtitle
+    }
+
+    /// Without overflow wording the overflowing countdown carries a "−" prefix as the
+    /// language-neutral direction signal; with wording the sign is redundant.
+    var showsOverflowSign: Bool {
+        subtitleOverflow == nil
     }
 
     /// Identity glyph for the card and the compact island: chipIcon is interpreted as an
@@ -157,7 +179,7 @@ struct NaluLiveActivityWidget: Widget {
             } compactTrailing: {
                 // Text(timerInterval:) is width-greedy: align the digits to the trailing
                 // edge so the reserved width never reads as asymmetric padding.
-                TimerText(timer: content.timer)
+                TimerText(content: content)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -216,7 +238,7 @@ private struct ContentCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.85)
                     }
-                    if let subtitle = content.subtitle {
+                    if let subtitle = content.displaySubtitle {
                         Text(subtitle)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -227,7 +249,7 @@ private struct ContentCard: View {
 
                 Spacer(minLength: 8)
 
-                TimerText(timer: content.timer)
+                TimerText(content: content)
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .lineLimit(1)
@@ -390,8 +412,19 @@ private struct CompactLabel: View {
 }
 
 /// The ticking clock, rendered natively by the OS: no updates while time passes.
+///
+/// Every ticking mode renders through Text(timerInterval:) — NOT Text(_:style:.timer):
+/// on the Lock Screen the system degrades the .timer style to a coarse relative string
+/// ("1 minute"), and on the Always-On Display only timerInterval gets the proper
+/// reduced-fidelity masking ("1:--", minutes still updating). Count-up intervals need an
+/// explicit upper bound; it only defines the reserved layout width and when the ticking
+/// stops, so it is sized to the surface's realistic lifetime.
 private struct TimerText: View {
-    let timer: LiveContent.TimerInfo?
+    let content: LiveContent
+
+    private var timer: LiveContent.TimerInfo? {
+        content.timer
+    }
 
     var body: some View {
         switch timer?.mode {
@@ -401,19 +434,32 @@ private struct TimerText: View {
                 if end > Date.now {
                     Text(timerInterval: Date.now...end, countsDown: true)
                 } else {
-                    // Already ran over at render time: mirror Android's negative
-                    // chronometer (count up from the end, negated). Note the platform
-                    // limit: this view only re-renders on content updates, so a
-                    // countdown crossing zero holds at 0:00 until the next update —
-                    // apps wanting an exact boundary flip should update at the end
-                    // instant (see the appointment pattern).
-                    Text(verbatim: "−") + Text(end, style: .timer)
+                    // Already ran over at render time: count up from the end. With
+                    // subtitleOverflow provided, the swapped subtitle carries the
+                    // "running over" semantics and the count-up renders plain;
+                    // without it, a "−" prefix mirrors Android's negative
+                    // chronometer. Note the platform limit: this view only
+                    // re-renders on content updates, so a countdown crossing zero
+                    // holds at 0:00 until the next update — set StaleAt to the end
+                    // instant for the system-side flip (see the appointment
+                    // pattern). The 1h bound keeps the reserved width to MM:SS; an
+                    // activity running over longer than that should long have
+                    // updated or ended.
+                    let overflow = Text(timerInterval: end...end.addingTimeInterval(3600), countsDown: false)
+                    if content.showsOverflowSign {
+                        Text(verbatim: "−") + overflow
+                    } else {
+                        overflow
+                    }
                 }
             }
 
         case "CountUp":
             if let startsAt = timer?.startsAt {
-                Text(Date(timeIntervalSince1970: startsAt / 1000), style: .timer)
+                let start = Date(timeIntervalSince1970: startsAt / 1000)
+                // 12h upper bound: past the Lock Screen persistence limit of any
+                // Live Activity, so the clock never stops ticking in practice.
+                Text(timerInterval: start...start.addingTimeInterval(12 * 3600), countsDown: false)
             }
 
         case "Paused":

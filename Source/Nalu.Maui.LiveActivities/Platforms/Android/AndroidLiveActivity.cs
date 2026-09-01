@@ -65,6 +65,8 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
             _ => Platform.NaluLiveUpdates.ProgressValue
         };
 
+        var subtitle = content.Subtitle;
+
         var (timerMode, timerAnchorMs, pausedElapsedMs) = content.Timer switch
         {
             { Mode: LiveActivityTimerMode.CountDown, EndsAt: { } endsAt } => (Platform.NaluLiveUpdates.TimerCountDown, endsAt.ToUnixTimeMilliseconds(), 0L),
@@ -72,6 +74,18 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
             { Mode: LiveActivityTimerMode.Paused, PausedElapsed: { } elapsed } => (Platform.NaluLiveUpdates.TimerPaused, 0L, (long)elapsed.TotalMilliseconds),
             _ => (Platform.NaluLiveUpdates.TimerNone, 0L, 0L)
         };
+
+        // A countdown already past its end with overflow wording renders as that wording
+        // plus a plain count-up from the end — mirroring the iOS widget. Without the
+        // wording the countdown chronometer keeps ticking natively into negatives.
+        // Android has no boundary re-render, so this applies from the first post after
+        // the end instant.
+        if (content is { SubtitleOverflow: { } subtitleOverflow, Timer: { Mode: LiveActivityTimerMode.CountDown, EndsAt: { } end } } && end <= DateTimeOffset.UtcNow)
+        {
+            subtitle = subtitleOverflow;
+            timerMode = Platform.NaluLiveUpdates.TimerCountUp;
+            timerAnchorMs = end.ToUnixTimeMilliseconds();
+        }
 
         var segments = progress?.Segments;
         var points = progress?.Points;
@@ -90,7 +104,7 @@ internal sealed class AndroidLiveActivity : LiveActivityBase
             _manager.Options.GetKindDisplayName(Kind),
             _manager.Options.AndroidSmallIcon,
             content.Title,
-            content.Subtitle,
+            subtitle,
             content.ChipText,
             ParseColor(content.AccentColor),
             content.ImageName,

@@ -104,11 +104,20 @@ public class LiveActivityTimerTests : ContentPage
         {
             Title = "Standup meeting",
             Subtitle = "Time remaining",
+
+            // Past the end the renderers swap this in for the subtitle and drop the "−"
+            // from the count-up (set it to null to get "−0:35" instead).
+            SubtitleOverflow = "Running over",
             AccentColor = "#30A46C",
-            Timer = LiveActivityTimer.CountDown(_appointmentEnd, startedAt: now)
+            Timer = LiveActivityTimer.CountDown(_appointmentEnd, startedAt: now),
+
+            // The system-side zero-crossing trigger: with the app suspended (locked phone)
+            // iOS re-renders the widget at this instant, flipping the countdown display
+            // into the overflow instead of holding at 0:00.
+            StaleAt = _appointmentEnd
         });
 
-        SetStatus($"Appointment until {_appointmentEnd:HH:mm:ss} ({_activity.State})");
+        SetStatus($"Appointment until {_appointmentEnd.ToLocalTime():HH:mm:ss} ({_activity.State})");
         WatchForOverflow();
     }
 
@@ -178,19 +187,19 @@ public class LiveActivityTimerTests : ContentPage
             return;
         }
 
-        // Overflow = counting UP from the appointment end; the OS keeps ticking natively,
-        // no further updates needed no matter how long the meeting runs over.
+        // Overflow keeps the CountDown timer: past its end SubtitleOverflow takes the
+        // subtitle's place next to a plain count-up on both platforms — the update only
+        // recolors and alerts.
         await _activity.UpdateAsync(
             c =>
             {
-                c.Subtitle = "Running over";
                 c.AccentColor = "#E5484D";
-                c.Timer = LiveActivityTimer.CountUp(_appointmentEnd);
+                c.StaleAt = null;
             },
             new LiveActivityAlert("Appointment is running over")
         );
 
-        SetStatus($"Overflowing since {_appointmentEnd:HH:mm:ss} ({_activity.State})");
+        SetStatus($"Overflowing since {_appointmentEnd.ToLocalTime():HH:mm:ss} ({_activity.State})");
     }
 
     private void CancelOverflowWatch()

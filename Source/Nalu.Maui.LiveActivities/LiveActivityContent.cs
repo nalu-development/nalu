@@ -19,6 +19,17 @@ public sealed record LiveActivityContent : ILiveActivityContent
     public string? Subtitle { get; set; }
 
     /// <summary>
+    /// Replaces <see cref="Subtitle"/> while a <see cref="LiveActivityTimerMode.CountDown"/>
+    /// timer is past its end ("Running over"), and the overflow then renders as a plain
+    /// count-up. When <c>null</c>, the overflow keeps ticking as a NEGATIVE duration
+    /// (−0:35) instead. On iOS the swap happens system-side (pair it with
+    /// <see cref="StaleAt"/> = the end instant so the boundary re-render fires); on
+    /// Android it applies from the first post after the end (until then the countdown
+    /// chronometer ticks natively into negatives).
+    /// </summary>
+    public string? SubtitleOverflow { get; set; }
+
+    /// <summary>
     /// The one short value for the tiny always-visible surface: the Android status-bar chip
     /// and the iOS Dynamic Island compact view. Keep it under ~7 characters ("12 min", "3-2").
     /// </summary>
