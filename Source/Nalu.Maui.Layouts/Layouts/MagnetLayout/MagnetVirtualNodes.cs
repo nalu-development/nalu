@@ -196,6 +196,15 @@ public sealed class MagnetChain : MagnetNode
         propertyChanged: OnValuePropertyChanged
     );
 
+    /// <summary>Bindable property for <see cref="GapMode" />.</summary>
+    public static readonly BindableProperty GapModeProperty = BindableProperty.Create(
+        nameof(GapMode),
+        typeof(MagnetChainGapMode),
+        typeof(MagnetChain),
+        MagnetChainGapMode.Anchors,
+        propertyChanged: OnStructurePropertyChanged
+    );
+
     private readonly IList<string> _nodes;
     private readonly IList<double> _weights;
 
@@ -249,6 +258,19 @@ public sealed class MagnetChain : MagnetNode
     {
         get => (double) GetValue(GapProperty);
         set => SetValue(GapProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how the margins between members are interpreted. Defaults to
+    /// <see cref="MagnetChainGapMode.Anchors" /> (ConstraintLayout semantics); with
+    /// <see cref="MagnetChainGapMode.Separators" /> the head/tail margins belong to the chain and survive their
+    /// member collapsing, and inner margins apply only between visible members (a StackLayout-like padding+spacing
+    /// model — the first visible member sits at the chain's leading margin, whichever member it is).
+    /// </summary>
+    public MagnetChainGapMode GapMode
+    {
+        get => (MagnetChainGapMode) GetValue(GapModeProperty);
+        set => SetValue(GapModeProperty, value);
     }
 
     /// <summary>

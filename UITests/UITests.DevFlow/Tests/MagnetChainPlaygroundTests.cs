@@ -11,6 +11,26 @@ namespace Nalu.Maui.UITests.Tests;
 public class MagnetChainPlaygroundTests(NaluApp app) : BaseUiTest(app)
 {
     [Fact]
+    public async Task SeparatorsRowKeepsTheChainLeadWhenTheHeadCollapses()
+    {
+        await App.OpenTestPageAsync("Magnet Chain Playground");
+        var sxRoot = await App.WaitForStableBoundsAsync("sxRoot");
+        var exRoot = await App.GetBoundsAsync("exRoot");
+
+        // All visible: the Anchors and Separators rows are identical (10 A 20 B 30 C, members 40 wide).
+        (await App.GetBoundsAsync("sxC")).X.Should().BeApproximately(sxRoot.X + 140, 1);
+        (await App.GetBoundsAsync("exC")).X.Should().BeApproximately(exRoot.X + 140, 1);
+
+        // Hide A and B everywhere (animated).
+        await App.TapAsync("ToggleA");
+        await App.TapAsync("ToggleB");
+
+        // Anchors row: C lands at its gone margin (30). Separators row: C sits at the CHAIN lead (10).
+        await App.WaitForBoundsAsync("exC", b => Math.Abs(b.X - (exRoot.X + 30)) < 1, TimeSpan.FromSeconds(5));
+        await App.WaitForBoundsAsync("sxC", b => Math.Abs(b.X - (sxRoot.X + 10)) < 1, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task TogglingAMemberAppliesGoneMarginsAndRedistributesWeights()
     {
         await App.OpenTestPageAsync("Magnet Chain Playground");

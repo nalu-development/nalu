@@ -52,7 +52,8 @@ public class MagnetChainPlaygroundPage : ContentPage
         AddDemo(stack, "SpreadInside · same gaps", "si", MagnetChainStyle.SpreadInside, gaps, weights: null, bias: null);
         AddDemo(stack, "Weighted 1:2:1 · chain Gap 4", "wt", MagnetChainStyle.Spread, [null, null, null], weights: [1, 2, 1], bias: null, gap: 4);
         AddDemo(stack, "Packed ×4 · gaps 5/6/7 (gone 1/2/3)", "p4", MagnetChainStyle.Packed, gaps4, weights: null, bias: 0);
-        AddDemo(stack, "10 A 20 B 30 C · gone = margin (default)", "ex", MagnetChainStyle.Packed, [(10, null), (20, null), (30, null)], weights: null, bias: 0);
+        AddDemo(stack, "10 A 20 B 30 C · GapMode=Anchors (default)", "ex", MagnetChainStyle.Packed, [(10, null), (20, null), (30, null)], weights: null, bias: 0);
+        AddDemo(stack, "10 A 20 B 30 C · GapMode=Separators", "sx", MagnetChainStyle.Packed, [(10, null), (20, null), (30, null)], weights: null, bias: 0, gapMode: MagnetChainGapMode.Separators);
 
         Content = new ScrollView { Content = stack };
     }
@@ -65,7 +66,8 @@ public class MagnetChainPlaygroundPage : ContentPage
         (double Margin, double? Gone)?[] gaps,
         double[]? weights,
         double? bias,
-        double gap = 0
+        double gap = 0,
+        MagnetChainGapMode gapMode = MagnetChainGapMode.Anchors
     )
     {
         stack.Children.Add(new Label { Text = caption, FontSize = 12, TextColor = Color.FromArgb("#7A8194") });
@@ -79,7 +81,7 @@ public class MagnetChainPlaygroundPage : ContentPage
             Padding = new Thickness(0, 6)
         };
 
-        var chain = new MagnetChain { MagnetId = $"{prefix}Chain", Style = style, Gap = gap };
+        var chain = new MagnetChain { MagnetId = $"{prefix}Chain", Style = style, Gap = gap, GapMode = gapMode };
 
         for (var i = 0; i < gaps.Length; i++)
         {

@@ -1390,11 +1390,19 @@ internal sealed class MagnetCompiler
     private void EmitChainSpan(int axis, int node)
     {
         var n = _nodes[node];
+        var separators = ((MagnetChain) n.Node).GapMode == MagnetChainGapMode.Separators;
         var first = _nodes[n.Members[0]].Axes[axis];
         var last = _nodes[n.Members[^1]].Axes[axis];
 
-        n.StartSlot = first.Start is { } s ? Lin(PoleSlot(axis, s), 1, s.EffSlot, 1) : StageStartSlot(axis);
-        n.EndSlot = last.End is { } e ? Lin(PoleSlot(axis, e), 1, e.EffSlot, -1) : StageEndSlot(axis);
+        // Separators mode: the head/tail margins belong to the CHAIN — read them raw, skipping only the
+        // self-collapsed zeroing (the target-gone logic still applies when the anchor targets a view).
+        int ChainOwnedMargin(ResolvedAnchor anchor)
+            => anchor.Target < 0
+                ? anchor.MarginSlot
+                : MulAdd(Lin(anchor.MarginSlot, 1, anchor.GoneSlot, -1), _nodes[anchor.Target].VisSlot, anchor.GoneSlot);
+
+        n.StartSlot = first.Start is { } s ? Lin(PoleSlot(axis, s), 1, separators ? ChainOwnedMargin(s) : s.EffSlot, 1) : StageStartSlot(axis);
+        n.EndSlot = last.End is { } e ? Lin(PoleSlot(axis, e), 1, separators ? ChainOwnedMargin(e) : e.EffSlot, -1) : StageEndSlot(axis);
         n.SpanSlot = Lin(n.EndSlot, 1, n.StartSlot, -1);
 
         // Weighted members get their size slot up-front so downstream vertices can reference it.
@@ -1435,7 +1443,8 @@ internal sealed class MagnetCompiler
 
             if (ax.End is { Adjacent: true } endAnchor)
             {
-                g1 = endAnchor.EffSlot;
+                // Separators: the raw declared margin IS the separator (gone margins are not involved).
+                g1 = separators ? endAnchor.MarginSlot : endAnchor.EffSlot;
                 anchored = true;
             }
 
@@ -1443,20 +1452,23 @@ internal sealed class MagnetCompiler
 
             if (next.Start is { Adjacent: true } startAnchor)
             {
-                g2 = startAnchor.EffSlot;
+                g2 = separators ? startAnchor.MarginSlot : startAnchor.EffSlot;
                 anchored = true;
             }
 
             int gap;
 
-            if (anchored)
+            if (anchored && !separators)
             {
                 gap = Lin(g1, 1, g2, 1);
             }
             else
             {
+                // Separator gating (anchored pairs in Separators mode and chain-Gap pairs in any mode):
+                // value × vis(next) × min(visibleBefore, 1) — the gap exists only between visible members.
+                var value = anchored ? Lin(g1, 1, g2, 1) : n.GapSlot;
                 var hasVisibleBefore = Clamp(prefixVis, MagnetTape.Zero, MagnetTape.One);
-                var scaled = MulAdd(n.GapSlot, _nodes[n.Members[i + 1]].VisSlot);
+                var scaled = MulAdd(value, _nodes[n.Members[i + 1]].VisSlot);
                 gap = MulAdd(scaled, hasVisibleBefore);
             }
 

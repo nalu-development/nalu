@@ -164,7 +164,15 @@ member (which only contribute their margin, e.g. `b.LeftTo="a.Right,8"`) — so 
 carries its own gone margin (`b.LeftTo="a.Right,8,gone:2"`). For the common uniform case, declare the gap ONCE on the
 chain instead: `Gap="8"` places it between consecutive **visible** members (separator semantics: a collapsed member
 takes its gap away, no gone margins involved — like Android's `Flow` `flow_horizontalGap`); it is animatable, and a
-per-pair adjacent anchor overrides it for that pair. Collapsed members follow the GONE rules: they drop
+per-pair adjacent anchor overrides it for that pair.
+
+`GapMode="Separators"` extends the separator semantics to the per-pair anchors and the chain ends — the
+StackLayout padding+spacing mental model, per pair: the first member's start margin and the last member's end
+margin belong to the **chain** (they survive the head/tail collapsing, so the first visible member sits at the
+chain's leading margin whichever member it is), and a member's margin towards the previous one applies only when
+a visible member precedes it (gone margins are not involved). With the default `GapMode="Anchors"` the margins
+follow the ConstraintLayout rules above. `"10 A 20 B 30 C"` with A and B collapsed yields `30 C` in Anchors mode
+and `10 C` in Separators mode. Collapsed members follow the GONE rules: they drop
 their own margins (including the chain's start/end margin when the head/tail collapses), the anchor pointing *at* a
 collapsed member uses its gone margin, and spread gaps only count visible members. `Packed` uses the first member's
 bias (`HorizontalBias="0.3"` on the head puts the packed group at 30% of the free space). Members sized `*` share the

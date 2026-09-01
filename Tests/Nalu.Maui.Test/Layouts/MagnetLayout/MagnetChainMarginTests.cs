@@ -312,6 +312,140 @@ public class MagnetChainMarginTests
         h.Frame("b").ShouldBe(60, 0, 30, 20);
     }
 
+    /// <summary>"10 A 20 B 30 C" in Separators mode: lead owned by the chain, inner margins gated by visibility.</summary>
+    private static EngineHarness CreateSeparatorsRow()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P, margin: 10).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Left("a", MagnetPole.Right, 20).Top(P);
+        h.View("c", 30, 20).Left("b", MagnetPole.Right, 30).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, GapMode = MagnetChainGapMode.Separators }.With("a", "b", "c"));
+
+        return h;
+    }
+
+    [Fact]
+    public void SeparatorsModeMatchesAnchorsModeWhenEveryoneIsVisible()
+    {
+        var h = CreateSeparatorsRow();
+
+        h.Layout(300, 100, 300, 100);
+
+        h.Frame("a").ShouldBe(10, 0, 30, 20);
+        h.Frame("b").ShouldBe(60, 0, 30, 20);
+        h.Frame("c").ShouldBe(120, 0, 30, 20);
+    }
+
+    [Fact]
+    public void SeparatorsModeKeepsTheSurvivorsSeparatorWhenTheMiddleCollapses()
+    {
+        var h = CreateSeparatorsRow();
+        h.Fake("b").Visibility = Visibility.Collapsed;
+
+        h.Layout(300, 100, 300, 100);
+
+        // "10 A 30 C": C's own separator applies because a visible member precedes it.
+        h.Frame("a").ShouldBe(10, 0, 30, 20);
+        h.Frame("c").ShouldBe(70, 0, 30, 20);
+    }
+
+    [Fact]
+    public void SeparatorsModePutsTheFirstVisibleMemberAtTheChainLead()
+    {
+        var h = CreateSeparatorsRow();
+        h.Fake("a").Visibility = Visibility.Collapsed;
+        h.Fake("b").Visibility = Visibility.Collapsed;
+
+        h.Layout(300, 100, 300, 100);
+
+        // "10 C": the lead belongs to the chain (survives the head collapsing); C has no separator.
+        h.Frame("c").ShouldBe(10, 0, 30, 20);
+
+        // Showing everything back restores the full row.
+        h.Fake("a").Visibility = Visibility.Visible;
+        h.Fake("b").Visibility = Visibility.Visible;
+        h.Layout(300, 100, 300, 100);
+        h.Frame("c").ShouldBe(120, 0, 30, 20);
+    }
+
+    [Fact]
+    public void SeparatorsModeDropsTheSeparatorOfAHiddenTail()
+    {
+        var h = CreateSeparatorsRow();
+        h.Fake("c").Visibility = Visibility.Collapsed;
+
+        h.Layout(300, 100, 300, 100);
+
+        h.Frame("a").ShouldBe(10, 0, 30, 20);
+        h.Frame("b").ShouldBe(60, 0, 30, 20);
+    }
+
+    [Fact]
+    public void SeparatorsModeKeepsTheTrailingMarginWhenTheTailCollapses()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Bias(1, 0.5); // packed to the end
+        h.View("b", 30, 20).Left("a", MagnetPole.Right, 20).Top(P);
+        h.View("c", 30, 20).Left("b", MagnetPole.Right, 30).Right(P, margin: 12).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, GapMode = MagnetChainGapMode.Separators }.With("a", "b", "c"));
+
+        h.Fake("c").Visibility = Visibility.Collapsed;
+        h.Layout(300, 100, 300, 100);
+
+        // The trailing 12 belongs to the chain: the last visible member ends at 300 - 12.
+        h.Frame("b").Right.Should().Be(288);
+    }
+
+    [Fact]
+    public void SeparatorsModeIgnoresGoneMarginsOnInnerPairs()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P, margin: 10).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Left("a", MagnetPole.Right, 20, goneMargin: 2).Top(P);
+        h.View("c", 30, 20).Left("b", MagnetPole.Right, 30, goneMargin: 4).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, GapMode = MagnetChainGapMode.Separators }.With("a", "b", "c"));
+
+        h.Fake("b").Visibility = Visibility.Collapsed;
+        h.Layout(300, 100, 300, 100);
+
+        // The separator is C's raw margin (30), not its gone margin (4).
+        h.Frame("c").ShouldBe(70, 0, 30, 20);
+    }
+
+    [Fact]
+    public void SeparatorsModeComposesWithTheUniformChainGap()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P, margin: 10).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Top(P);
+        h.View("c", 30, 20).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, Gap = 8, GapMode = MagnetChainGapMode.Separators }.With("a", "b", "c"));
+
+        h.Layout(300, 100, 300, 100);
+        h.Frame("a").ShouldBe(10, 0, 30, 20);
+        h.Frame("b").ShouldBe(48, 0, 30, 20);
+
+        // Head hidden: the first visible member sits at the chain lead, not at lead + gap.
+        h.Fake("a").Visibility = Visibility.Collapsed;
+        h.Layout(300, 100, 300, 100);
+        h.Frame("b").ShouldBe(10, 0, 30, 20);
+        h.Frame("c").ShouldBe(48, 0, 30, 20);
+    }
+
+    [Fact]
+    public void GapModeIsPartOfTheStructuralFingerprint()
+    {
+        MagnetNode[] Create(MagnetChainGapMode mode) =>
+        [
+            new MagnetView().Id("a").Left(P, margin: 10).Top(P),
+            new MagnetView().Id("b").Left("a", MagnetPole.Right, 20).Top(P),
+            new MagnetChain { MagnetId = "row", GapMode = mode }.With("a", "b")
+        ];
+
+        Nalu.MagnetLayout.Engine.MagnetCompiler.GetOrCompile(Create(MagnetChainGapMode.Anchors))
+            .Should().NotBeSameAs(Nalu.MagnetLayout.Engine.MagnetCompiler.GetOrCompile(Create(MagnetChainGapMode.Separators)));
+    }
+
     [Fact]
     public void ChainMembersCenterVerticallyOnAGuidelineAndOnEachOther()
     {

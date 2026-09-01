@@ -110,3 +110,19 @@ public enum MagnetVisibilityAction : byte
     /// <summary>Sets <c>IsVisible = false</c> on the bound view when applied (animated as a fade-out inside a transition).</summary>
     Hide
 }
+
+/// <summary>
+/// How a <see cref="MagnetChain" /> interprets the margins between its members.
+/// </summary>
+public enum MagnetChainGapMode : byte
+{
+    /// <summary>Margins belong to the anchors (ConstraintLayout semantics): a collapsed member drops its own margins, anchors pointing at it use their gone margin.</summary>
+    Anchors,
+
+    /// <summary>
+    /// Margins are separators: the first member's start margin and the last member's end margin belong to the CHAIN
+    /// (they survive the head/tail collapsing), and a member's margin towards the previous one applies only when the
+    /// member is visible and a visible member precedes it (gone margins are not involved).
+    /// </summary>
+    Separators
+}

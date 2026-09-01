@@ -142,7 +142,7 @@ internal static class MagnetTapeCache
                     break;
 
                 case MagnetChain chain:
-                    sb.Append('C').Append((int) chain.Orientation).Append((int) chain.Style);
+                    sb.Append('C').Append((int) chain.Orientation).Append((int) chain.Style).Append((int) chain.GapMode);
                     AppendList(sb, chain.Nodes);
 
                     break;
