@@ -351,7 +351,15 @@ public final class NaluLiveUpdates {
         if (deepLink != null) {
             intent = new Intent(Intent.ACTION_VIEW, Uri.parse(deepLink));
             intent.setPackage(context.getPackageName());
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            // NEW_TASK alone lets Android resolve an existing task to START_DELIVERED_TO_TOP:
+            // the intent reaches onNewIntent but the task is NOT reordered to front, so the
+            // tap appears to do nothing (or half-works, leaving the Live Update chip's
+            // expanded card on screen). CLEAR_TOP forces a real task-to-front launch, and
+            // SINGLE_TOP alongside it means the target is reused via onNewIntent rather than
+            // destroyed and recreated when its launchMode is the default "standard".
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         } else {
             intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         }

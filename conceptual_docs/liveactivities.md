@@ -314,6 +314,15 @@ will report taps back through that `Id` without opening the app.
 > Omitting `DeepLink` on the content is always safe: tapping then simply foregrounds the
 > app (Android falls back to the launch intent; iOS opens the app by default).
 
+> [!NOTE]
+> **Android 16: an action tap leaves the expanded chip card on screen.** Tapping the
+> status-bar chip of a Live Update opens a floating card; tapping the card's *body* (the
+> content `DeepLink`) opens your app and closes the card, but tapping an *action button*
+> opens your app **behind** a card that stays up until it is dismissed or times out. That is
+> SystemUI's own behaviour — a notification cannot close that surface, and
+> `ACTION_CLOSE_SYSTEM_DIALOGS` has been blocked for apps since Android 12. If a single tap
+> target matters more than buttons for your feature, put it on the content `DeepLink`.
+
 ## Where to next
 
 - [Timers](liveactivities-timers.md) — the OS ticks, you don't: count-downs, count-ups,
