@@ -324,20 +324,20 @@ Magnet; 1000 × measure+arrange per row, inflation = 100 instances including com
 
 | Method | Grid | Magnet 2 |
 |---|---:|---:|
-| Child invalidated every pass (e.g. text change) | 0.69 ms / 1.45 MB | 1.06 ms / **0.33 MB** |
-| Nothing changed (MAUI re-measures often) | 0.64 ms / 1.43 MB | 1.03 ms / **0.31 MB** |
-| Changing bounds (rotation) | 0.91 ms / 1.70 MB | 1.31 ms / **0.58 MB** |
-| Value patch (animated margin) + relayout | – | 1.56 ms / 0.58 MB |
-| Inflation | 4.0 ms / 7.8 MB | 4.4 ms / 8.3 MB |
+| Child invalidated every pass (e.g. text change) | 0.72 ms / 1.45 MB | 0.94 ms / **0.33 MB** |
+| Nothing changed (MAUI re-measures often) | 0.68 ms / 1.43 MB | 0.87 ms / **0.31 MB** |
+| Changing bounds (rotation) | 0.96 ms / 1.70 MB | 1.19 ms / **0.58 MB** |
+| Value patch (animated margin) + relayout | – | 1.42 ms / 0.58 MB |
+| Inflation | 4.5 ms / 7.8 MB | 4.9 ms / 8.7 MB |
 
 **Card** (the sample-app credit card: image | name + star / detail | money): the Grid version needs three nested layouts
 (`Grid` + `VerticalStackLayout` + `FlexLayout`), the Magnet version is flat (a packed name+star chain).
 
 | Method | Grid (3 layouts) | Magnet 2 (flat) |
 |---|---:|---:|
-| Child invalidated every pass | 0.50 ms / 1.07 MB | 0.59 ms / **0.33 MB** |
-| Nothing changed | 0.45 ms / 1.05 MB | 0.53 ms / **0.31 MB** |
-| Inflation | 2.8 ms / 4.8 MB | **2.3 ms** / 4.4 MB |
+| Child invalidated every pass | 0.53 ms / 1.07 MB | 0.62 ms / **0.33 MB** |
+| Nothing changed | 0.48 ms / 1.05 MB | 0.57 ms / **0.31 MB** |
+| Inflation | 3.2 ms / 4.8 MB | **2.6 ms** / 4.7 MB |
 
 > **These benchmarks measure only the managed layout algorithm** (no handlers, no platform views). They ignore what
 > nested layouts cost in a real app: every extra layout is an extra native view (`UIView` / `ViewGroup` / `Panel`) to
@@ -363,11 +363,12 @@ On device the flat Magnet wins on every scenario, by the cost of the two native 
 needs. `Magnet VirtualScroll Perf` (2000 cards in a `VirtualScroll`, definition declared inline in the template) shows
 the recycled-cell case: a handful of inflations, one compilation shared by every cell.
 
-Takeaways (managed only): a full relayout costs 1.2–1.6× a `Grid` with 3–4.7× fewer allocations (the generic tape
+Takeaways (managed only): a full relayout costs 1.2–1.3× a `Grid` with 3–4.7× fewer allocations (the generic tape
 interpreter does more work than three trivial specialized layouts, see the on-device numbers for the other side of the
-coin); an arrange that follows a measure with matching bounds re-uses the child measures, an arrange without a measure
-in between (recycled cells) re-measures; the remaining allocations come from MAUI's own `Measure`/`Arrange` plumbing
-(the engine allocates only when compiling).
+coin); an arrange that follows a measure with matching bounds re-uses the child measures — and when only the stage
+size differs from the measured one, the solver replays the measure's affine solution at the arrange size instead of
+re-executing the tape (delta arrange); an arrange without a measure in between (recycled cells) re-measures; the
+remaining allocations come from MAUI's own `Measure`/`Arrange` plumbing (the engine allocates only when compiling).
 Compiled tapes are pure and shared through a process-wide LRU cache keyed by the structure of the definition, so
 template-instantiated cells compile once; the flat Magnet card even inflates faster than its three nested layouts,
 and sharing one `MagnetDefinition` across cells (see above) trims per-cell inflation further.
