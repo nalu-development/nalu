@@ -129,16 +129,61 @@ public class MagnetLayoutTests
     }
 
     [Fact]
-    public void DefinitionCannotBeShared()
+    public void DefinitionIsSharedAcrossLayouts()
     {
-        var definition = new MagnetDefinition();
-        var m1 = new Magnet { Definition = definition };
-        var m2 = new Magnet();
+        var definition = new MagnetDefinition().Add(
+            new MagnetView().Id("a").Left(_p, margin: 10).Top(_p)
+        );
 
-        var act = () => m2.Definition = definition;
+        var (m1, manager1) = CreateMagnet();
+        var (m2, manager2) = CreateMagnet();
+        m1.Definition = definition;
+        m2.Definition = definition;
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*cannot be shared*");
-        m1.Definition.Should().BeSameAs(definition);
+        var v1 = new TestView(40, 20);
+        Magnet.SetMagnetId(v1, "a");
+        var v2 = new TestView(30, 30);
+        Magnet.SetMagnetId(v2, "a");
+        m1.Add(v1);
+        m2.Add(v2);
+
+        Layout(manager1, 400, 400);
+        Layout(manager2, 400, 400);
+
+        // Same declaration, independent per-layout bindings and solutions.
+        v1.Frame.Should().Be(new Rect(10, 0, 40, 20));
+        v2.Frame.Should().Be(new Rect(10, 0, 30, 30));
+
+        // A change to the shared declaration reaches BOTH layouts.
+        ((MagnetView) definition.MagnetNodes[0]).LeftTo = "parent.Left,30";
+        Layout(manager1, 400, 400);
+        Layout(manager2, 400, 400);
+        v1.Frame.X.Should().Be(30);
+        v2.Frame.X.Should().Be(30);
+    }
+
+    [Fact]
+    public void SharedDefinitionAppliesVisibilityPerLayout()
+    {
+        var node = new MagnetView().Id("badge").Left(_p).Top(_p);
+        var definition = new MagnetDefinition().Add(node);
+
+        var (m1, _) = CreateMagnet();
+        var (m2, _) = CreateMagnet();
+        m1.Definition = definition;
+        m2.Definition = definition;
+
+        var v1 = new TestView(20, 20);
+        Magnet.SetMagnetId(v1, "badge");
+        var v2 = new TestView(20, 20);
+        Magnet.SetMagnetId(v2, "badge");
+        m1.Add(v1);
+        m2.Add(v2);
+
+        node.ApplyVisibility = MagnetVisibilityAction.Hide;
+
+        v1.IsVisible.Should().BeFalse("the scene action fans out to every attached layout");
+        v2.IsVisible.Should().BeFalse();
     }
 
     [Fact]

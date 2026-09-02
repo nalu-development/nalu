@@ -133,6 +133,8 @@ public partial class Magnet : Layout, IMagnetOwner
     #endregion
 
     private readonly MagnetEngine _engine = new();
+    private readonly Dictionary<string, MagnetView> _inlineById = new(StringComparer.Ordinal);
+    private readonly List<MagnetView> _inlineNodes = [];
     private MagnetDefinition? _definition;
     private MagnetChange _dirty = MagnetChange.Structure;
     private bool _suppressNotifications;
@@ -558,10 +560,10 @@ public partial class Magnet : Layout, IMagnetOwner
         {
             foreach (var child in this)
             {
-                Unbind(child, oldValue);
+                Unbind(child);
             }
 
-            oldValue.Detach();
+            oldValue.Detach(this);
         }
 
         _definition = newValue;
@@ -610,7 +612,7 @@ public partial class Magnet : Layout, IMagnetOwner
                 );
             }
 
-            definition.Register(inline, MagnetNodeOrigin.View);
+            RegisterInline(inline);
             node = inline;
         }
         else if (id is not null)
@@ -627,24 +629,20 @@ public partial class Magnet : Layout, IMagnetOwner
             else
             {
                 node = GetConstraints(bo);
-
-                if (node.Definition is null)
-                {
-                    definition.Register(node, MagnetNodeOrigin.View);
-                }
+                RegisterInline(node);
             }
         }
 
         if (previous is not null && !ReferenceEquals(previous, node))
         {
-            if (ReferenceEquals(previous.View, child))
+            if (ReferenceEquals(_engine.GetBoundView(previous), child))
             {
-                previous.View = null;
+                _engine.BindView(previous, null);
             }
 
             if (previous.Origin == MagnetNodeOrigin.View)
             {
-                definition.Unregister(previous);
+                UnregisterInline(previous);
             }
         }
 
@@ -655,16 +653,64 @@ public partial class Magnet : Layout, IMagnetOwner
             return;
         }
 
-        if (!ReferenceEquals(node.View, child))
+        if (!ReferenceEquals(_engine.GetBoundView(node), child))
         {
-            node.View = child;
+            _engine.BindView(node, child);
             ((IMagnetOwner) this).OnNodeChanged(node, MagnetChange.Values);
+            node.RequestVisibilityApply();
         }
 
         PropagateAutomationId(bo, node.MagnetId);
     }
 
-    private void Unbind(IView child, MagnetDefinition? definition)
+    /// <summary>
+    /// Registers a per-layout inline node (created by the attached properties): the definition only holds the
+    /// declared nodes, inline nodes live in the layout that owns their view.
+    /// </summary>
+    private void RegisterInline(MagnetView node)
+    {
+        var id = node.MagnetId!;
+
+        if (string.Equals(id, MagnetAnchor.Parent, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"MagnetId '{id}' is reserved for the stage.");
+        }
+
+        if (EffectiveDefinition.TryGet(id, out _))
+        {
+            throw new InvalidOperationException($"MagnetId '{id}' is defined both in the MagnetDefinition and inline on a child view.");
+        }
+
+        if (_inlineById.TryGetValue(id, out var existing))
+        {
+            if (ReferenceEquals(existing, node))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException($"MagnetId '{id}' is defined inline on more than one child view.");
+        }
+
+        node.Origin = MagnetNodeOrigin.View;
+        node.Attach(this);
+        _inlineById[id] = node;
+        _inlineNodes.Add(node);
+        ((IMagnetOwner) this).OnNodeChanged(node, MagnetChange.Structure);
+    }
+
+    private void UnregisterInline(MagnetView node)
+    {
+        if (node.MagnetId is { } id && _inlineById.TryGetValue(id, out var existing) && ReferenceEquals(existing, node))
+        {
+            _inlineById.Remove(id);
+        }
+
+        _inlineNodes.Remove(node);
+        node.Detach();
+        ((IMagnetOwner) this).OnNodeChanged(node, MagnetChange.Structure);
+    }
+
+    private void Unbind(IView child)
     {
         if (child is not BindableObject bo)
         {
@@ -673,14 +719,14 @@ public partial class Magnet : Layout, IMagnetOwner
 
         if (bo.GetValue(BoundNodeProperty) is MagnetView node)
         {
-            if (ReferenceEquals(node.View, child))
+            if (ReferenceEquals(_engine.GetBoundView(node), child))
             {
-                node.View = null;
+                _engine.BindView(node, null);
             }
 
             if (node.Origin == MagnetNodeOrigin.View)
             {
-                (definition ?? node.Definition)?.Unregister(node);
+                UnregisterInline(node);
             }
 
             bo.SetValue(BoundNodeProperty, null);
@@ -718,14 +764,14 @@ public partial class Magnet : Layout, IMagnetOwner
     /// <inheritdoc />
     protected override void OnRemove(int index, IView view)
     {
-        Unbind(view, _definition);
+        Unbind(view);
         base.OnRemove(index, view);
     }
 
     /// <inheritdoc />
     protected override void OnUpdate(int index, IView view, IView oldView)
     {
-        Unbind(oldView, _definition);
+        Unbind(oldView);
         base.OnUpdate(index, view, oldView);
         Bind(view);
     }
@@ -735,7 +781,7 @@ public partial class Magnet : Layout, IMagnetOwner
     {
         foreach (var child in this)
         {
-            Unbind(child, _definition);
+            Unbind(child);
         }
 
         base.OnClear();
@@ -783,7 +829,10 @@ public partial class Magnet : Layout, IMagnetOwner
 
         if ((_dirty & MagnetChange.Structure) != 0 || !_engine.IsCompiled)
         {
-            _engine.Compile(definition.AllNodesArray());
+            var nodes = new List<MagnetNode>(definition.Count + _inlineNodes.Count);
+            definition.CopyNodesTo(nodes);
+            nodes.AddRange(_inlineNodes);
+            _engine.Compile(nodes);
         }
         else if ((_dirty & MagnetChange.Values) != 0)
         {
@@ -796,7 +845,7 @@ public partial class Magnet : Layout, IMagnetOwner
     /// <summary>
     /// Gets whether the layout has any magnet node.
     /// </summary>
-    internal bool HasNodes => _definition is { Count: > 0 };
+    internal bool HasNodes => _definition is { Count: > 0 } || _inlineNodes.Count > 0;
 
     /// <summary>
     /// Gets or sets the maximum number of compiled layout structures kept in the process-wide cache. Defaults to 64.

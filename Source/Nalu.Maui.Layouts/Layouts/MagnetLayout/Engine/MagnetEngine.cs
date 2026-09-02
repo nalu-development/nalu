@@ -16,6 +16,9 @@ internal sealed class MagnetEngine
     private double[] _feedbackPrev = [];
     private byte[] _vis = [];
     private IView?[] _views = [];
+    private IView?[] _bound = [];
+    private readonly Dictionary<MagnetView, IView?> _bindings = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<MagnetNode, int> _indexOf = new(ReferenceEqualityComparer.Instance);
     private double _eval;
     private HashSet<int>? _forcedCollapsed;
 
@@ -63,10 +66,12 @@ internal sealed class MagnetEngine
         _tape = tape;
         _nodes = nodes as MagnetNode[] ?? nodes.ToArray();
         _ids = new Dictionary<string, int>(_nodes.Length, StringComparer.Ordinal);
+        _indexOf.Clear();
 
         for (var i = 0; i < _nodes.Length; i++)
         {
             _ids[_nodes[i].MagnetId!] = i;
+            _indexOf[_nodes[i]] = i;
         }
 
         if (_values.Length != tape.ValueCount)
@@ -84,6 +89,31 @@ internal sealed class MagnetEngine
         {
             _vis = new byte[_nodes.Length];
             _views = new IView?[_nodes.Length];
+            _bound = new IView?[_nodes.Length];
+        }
+
+        // Project the per-layout view bindings onto the compiled order (and drop bindings of swapped-out nodes).
+        Array.Clear(_bound);
+        List<MagnetView>? stale = null;
+
+        foreach (var (node, view) in _bindings)
+        {
+            if (_indexOf.TryGetValue(node, out var index))
+            {
+                _bound[index] = view;
+            }
+            else
+            {
+                (stale ??= []).Add(node);
+            }
+        }
+
+        if (stale is not null)
+        {
+            foreach (var node in stale)
+            {
+                _bindings.Remove(node);
+            }
         }
 
         if (_feedbackPrev.Length != tape.FeedbackSlots.Length)
@@ -236,7 +266,7 @@ internal sealed class MagnetEngine
 
             if (meta.IsView)
             {
-                var view = ((MagnetView) _nodes[i]).View;
+                var view = _bound[i];
                 _views[i] = view;
                 visible = view is not null && view.Visibility != Visibility.Collapsed ? (byte) 1 : (byte) 0;
 
@@ -441,6 +471,37 @@ internal sealed class MagnetEngine
 
         return false;
     }
+
+    /// <summary>
+    /// Binds (or unbinds, with <c>null</c>) the view resolved for a node in THIS layout. Bindings survive
+    /// recompilation; the compiled projection is refreshed at <see cref="Compile" />.
+    /// </summary>
+    public void BindView(MagnetView node, IView? view)
+    {
+        if (view is null)
+        {
+            _bindings.Remove(node);
+        }
+        else
+        {
+            _bindings[node] = view;
+        }
+
+        if (_indexOf.TryGetValue(node, out var index))
+        {
+            _bound[index] = view;
+        }
+    }
+
+    /// <summary>
+    /// Gets the view bound to a node in this layout (independent of compilation).
+    /// </summary>
+    public IView? GetBoundView(MagnetView node) => _bindings.GetValueOrDefault(node);
+
+    /// <summary>
+    /// Gets the compiled index of a node, or -1.
+    /// </summary>
+    public int IndexOf(MagnetNode node) => _indexOf.GetValueOrDefault(node, -1);
 
     /// <summary>
     /// Sets (or clears, with <c>null</c>) the transition-scoped set of node indexes solved as collapsed

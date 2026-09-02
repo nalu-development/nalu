@@ -110,7 +110,6 @@ internal sealed class MagnetCompiler
                     _ => throw new NotSupportedException($"Unsupported node type {node.GetType().Name}.")
                 }
             };
-            node.Index = i;
         }
     }
 
@@ -126,11 +125,6 @@ internal sealed class MagnetCompiler
 
         if (MagnetTapeCache.TryGet(key, out var cached))
         {
-            for (var i = 0; i < nodes.Count; i++)
-            {
-                nodes[i].Index = i;
-            }
-
             return cached;
         }
 

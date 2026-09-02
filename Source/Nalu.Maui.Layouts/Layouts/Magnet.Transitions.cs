@@ -63,7 +63,7 @@ public partial class Magnet
     /// Entry point of <see cref="MagnetView.ApplyVisibility" />: inside a <see cref="TransitionToAsync(Action,uint,Easing?)" />
     /// mutate the write is collected (deferred and animated), otherwise it is stamped immediately.
     /// </summary>
-    internal void OnApplyVisibilityRequested(MagnetView node)
+    public void OnApplyVisibilityRequested(MagnetView node)
     {
         if (_suppressNotifications)
         {
@@ -75,7 +75,18 @@ public partial class Magnet
             return;
         }
 
-        node.ApplyVisibilityNow();
+        ApplyVisibilityNow(node);
+    }
+
+    /// <summary>
+    /// Stamps the node's <see cref="MagnetView.ApplyVisibility" /> onto the view bound in THIS layout.
+    /// </summary>
+    private void ApplyVisibilityNow(MagnetView node)
+    {
+        if (node.ApplyVisibility is not MagnetVisibilityAction.None && _engine.GetBoundView(node) is VisualElement ve)
+        {
+            ve.IsVisible = node.ApplyVisibility == MagnetVisibilityAction.Show;
+        }
     }
 
     /// <summary>
@@ -93,13 +104,13 @@ public partial class Magnet
 
         foreach (var node in _pendingVisibilityApplies)
         {
-            if (node.ApplyVisibility == MagnetVisibilityAction.Hide && node.View is VisualElement { IsVisible: true })
+            if (node.ApplyVisibility == MagnetVisibilityAction.Hide && _engine.GetBoundView(node) is VisualElement { IsVisible: true })
             {
                 (hides ??= []).Add(node);
             }
             else
             {
-                node.ApplyVisibilityNow();
+                ApplyVisibilityNow(node);
             }
         }
 
@@ -123,7 +134,7 @@ public partial class Magnet
         {
             foreach (var node in hides)
             {
-                if (node.View is VisualElement ve)
+                if (_engine.GetBoundView(node) is VisualElement ve)
                 {
                     ve.IsVisible = false;
                 }
@@ -285,9 +296,11 @@ public partial class Magnet
 
             foreach (var hide in hides)
             {
-                if (hide.Index >= 0)
+                var index = _engine.IndexOf(hide);
+
+                if (index >= 0)
                 {
-                    forced.Add(hide.Index);
+                    forced.Add(index);
                 }
             }
 
@@ -316,7 +329,7 @@ public partial class Magnet
 
         for (var i = 0; i < count; i++)
         {
-            if (nodes[i] is not MagnetView view || view.View is not { } iview)
+            if (nodes[i] is not MagnetView view || _engine.GetBoundView(view) is not { } iview)
             {
                 state.Modes[i] = FrameMode.Skip;
 
@@ -400,14 +413,9 @@ public partial class Magnet
 
     private bool VisibilityChanged(Dictionary<string, (Rect Frame, bool Visible)> startFrames)
     {
-        foreach (var node in EffectiveDefinition.AllNodes)
+        foreach (var view in EnumerateViewNodes())
         {
-            if (node is not MagnetView view)
-            {
-                continue;
-            }
-
-            var visible = view.View is { } v && v.Visibility != Visibility.Collapsed;
+            var visible = _engine.GetBoundView(view) is { } v && v.Visibility != Visibility.Collapsed;
 
             if (!startFrames.TryGetValue(view.MagnetId!, out var start) || start.Visible != visible)
             {
@@ -416,6 +424,22 @@ public partial class Magnet
         }
 
         return false;
+    }
+
+    private IEnumerable<MagnetView> EnumerateViewNodes()
+    {
+        foreach (var node in EffectiveDefinition.AllNodes)
+        {
+            if (node is MagnetView view)
+            {
+                yield return view;
+            }
+        }
+
+        foreach (var node in _inlineNodes)
+        {
+            yield return node;
+        }
     }
 
     private void Tick(TransitionState state, double t)
