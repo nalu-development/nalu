@@ -12,7 +12,7 @@ namespace Nalu;
 /// (declaring one inline inside a <c>DataTemplate</c> is fine, each inflation creates a fresh instance).
 /// </remarks>
 [ContentProperty(nameof(MagnetNodes))]
-public sealed class MagnetDefinition : BindableObject
+public sealed class MagnetDefinition
 {
     private readonly ObservableCollection<MagnetNode> _nodes = [];
     private readonly Dictionary<string, MagnetNode> _byId = new(StringComparer.Ordinal);

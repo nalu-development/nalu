@@ -13,23 +13,8 @@ namespace Nalu;
 [ContentProperty(nameof(Nodes))]
 public sealed class MagnetBarrier : MagnetNode
 {
-    /// <summary>Bindable property for <see cref="Direction" />.</summary>
-    public static readonly BindableProperty DirectionProperty = BindableProperty.Create(
-        nameof(Direction),
-        typeof(MagnetPole),
-        typeof(MagnetBarrier),
-        MagnetPole.Right,
-        propertyChanged: OnStructurePropertyChanged
-    );
-
-    /// <summary>Bindable property for <see cref="Margin" />.</summary>
-    public static readonly BindableProperty MarginProperty = BindableProperty.Create(
-        nameof(Margin),
-        typeof(double),
-        typeof(MagnetBarrier),
-        0d,
-        propertyChanged: OnValuePropertyChanged
-    );
+    private MagnetPole _direction = MagnetPole.Right;
+    private double _margin;
 
     private readonly IList<string> _nodes;
 
@@ -46,8 +31,8 @@ public sealed class MagnetBarrier : MagnetNode
     /// </summary>
     public MagnetPole Direction
     {
-        get => (MagnetPole) GetValue(DirectionProperty);
-        set => SetValue(DirectionProperty, value);
+        get => _direction;
+        set => SetStructure(ref _direction, value);
     }
 
     /// <summary>
@@ -66,8 +51,8 @@ public sealed class MagnetBarrier : MagnetNode
     /// </summary>
     public double Margin
     {
-        get => (double) GetValue(MarginProperty);
-        set => SetValue(MarginProperty, value);
+        get => _margin;
+        set => SetValues(ref _margin, value);
     }
 
     /// <summary>Adds members (fluent).</summary>
@@ -82,7 +67,7 @@ public sealed class MagnetBarrier : MagnetNode
     }
 
     /// <summary>Adds members given as views (carrying <c>Magnet.MagnetId</c>) or nodes (fluent).</summary>
-    public MagnetBarrier With(params BindableObject[] elements)
+    public MagnetBarrier With(params object[] elements)
     {
         foreach (var element in elements)
         {
@@ -102,40 +87,17 @@ public sealed class MagnetBarrier : MagnetNode
 /// </remarks>
 public sealed class MagnetGuideline : MagnetNode
 {
-    /// <summary>Bindable property for <see cref="Orientation" />.</summary>
-    public static readonly BindableProperty OrientationProperty = BindableProperty.Create(
-        nameof(Orientation),
-        typeof(MagnetOrientation),
-        typeof(MagnetGuideline),
-        MagnetOrientation.Vertical,
-        propertyChanged: OnStructurePropertyChanged
-    );
-
-    /// <summary>Bindable property for <see cref="Percent" />.</summary>
-    public static readonly BindableProperty PercentProperty = BindableProperty.Create(
-        nameof(Percent),
-        typeof(double),
-        typeof(MagnetGuideline),
-        0d,
-        propertyChanged: OnValuePropertyChanged
-    );
-
-    /// <summary>Bindable property for <see cref="Position" />.</summary>
-    public static readonly BindableProperty PositionProperty = BindableProperty.Create(
-        nameof(Position),
-        typeof(double),
-        typeof(MagnetGuideline),
-        0d,
-        propertyChanged: OnValuePropertyChanged
-    );
+    private MagnetOrientation _orientation = MagnetOrientation.Vertical;
+    private double _percent;
+    private double _position;
 
     /// <summary>
     /// Gets or sets the orientation of the line.
     /// </summary>
     public MagnetOrientation Orientation
     {
-        get => (MagnetOrientation) GetValue(OrientationProperty);
-        set => SetValue(OrientationProperty, value);
+        get => _orientation;
+        set => SetStructure(ref _orientation, value);
     }
 
     /// <summary>
@@ -143,8 +105,8 @@ public sealed class MagnetGuideline : MagnetNode
     /// </summary>
     public double Percent
     {
-        get => (double) GetValue(PercentProperty);
-        set => SetValue(PercentProperty, value);
+        get => _percent;
+        set => SetValues(ref _percent, value);
     }
 
     /// <summary>
@@ -152,8 +114,8 @@ public sealed class MagnetGuideline : MagnetNode
     /// </summary>
     public double Position
     {
-        get => (double) GetValue(PositionProperty);
-        set => SetValue(PositionProperty, value);
+        get => _position;
+        set => SetValues(ref _position, value);
     }
 }
 
@@ -169,41 +131,10 @@ public sealed class MagnetGuideline : MagnetNode
 [ContentProperty(nameof(Nodes))]
 public sealed class MagnetChain : MagnetNode
 {
-    /// <summary>Bindable property for <see cref="Orientation" />.</summary>
-    public static readonly BindableProperty OrientationProperty = BindableProperty.Create(
-        nameof(Orientation),
-        typeof(MagnetOrientation),
-        typeof(MagnetChain),
-        MagnetOrientation.Horizontal,
-        propertyChanged: OnStructurePropertyChanged
-    );
-
-    /// <summary>Bindable property for <see cref="Style" />.</summary>
-    public static readonly BindableProperty StyleProperty = BindableProperty.Create(
-        nameof(Style),
-        typeof(MagnetChainStyle),
-        typeof(MagnetChain),
-        MagnetChainStyle.Spread,
-        propertyChanged: OnStructurePropertyChanged
-    );
-
-    /// <summary>Bindable property for <see cref="Gap" />.</summary>
-    public static readonly BindableProperty GapProperty = BindableProperty.Create(
-        nameof(Gap),
-        typeof(double),
-        typeof(MagnetChain),
-        0d,
-        propertyChanged: OnValuePropertyChanged
-    );
-
-    /// <summary>Bindable property for <see cref="GapMode" />.</summary>
-    public static readonly BindableProperty GapModeProperty = BindableProperty.Create(
-        nameof(GapMode),
-        typeof(MagnetChainGapMode),
-        typeof(MagnetChain),
-        MagnetChainGapMode.Anchors,
-        propertyChanged: OnStructurePropertyChanged
-    );
+    private MagnetOrientation _orientation = MagnetOrientation.Horizontal;
+    private MagnetChainStyle _style = MagnetChainStyle.Spread;
+    private double _gap;
+    private MagnetChainGapMode _gapMode = MagnetChainGapMode.Anchors;
 
     private readonly IList<string> _nodes;
     private readonly IList<double> _weights;
@@ -222,8 +153,8 @@ public sealed class MagnetChain : MagnetNode
     /// </summary>
     public MagnetOrientation Orientation
     {
-        get => (MagnetOrientation) GetValue(OrientationProperty);
-        set => SetValue(OrientationProperty, value);
+        get => _orientation;
+        set => SetStructure(ref _orientation, value);
     }
 
     /// <summary>
@@ -242,8 +173,8 @@ public sealed class MagnetChain : MagnetNode
     /// </summary>
     public MagnetChainStyle Style
     {
-        get => (MagnetChainStyle) GetValue(StyleProperty);
-        set => SetValue(StyleProperty, value);
+        get => _style;
+        set => SetStructure(ref _style, value);
     }
 
     /// <summary>
@@ -256,8 +187,8 @@ public sealed class MagnetChain : MagnetNode
     /// </remarks>
     public double Gap
     {
-        get => (double) GetValue(GapProperty);
-        set => SetValue(GapProperty, value);
+        get => _gap;
+        set => SetValues(ref _gap, value);
     }
 
     /// <summary>
@@ -269,8 +200,8 @@ public sealed class MagnetChain : MagnetNode
     /// </summary>
     public MagnetChainGapMode GapMode
     {
-        get => (MagnetChainGapMode) GetValue(GapModeProperty);
-        set => SetValue(GapModeProperty, value);
+        get => _gapMode;
+        set => SetStructure(ref _gapMode, value);
     }
 
     /// <summary>
@@ -298,7 +229,7 @@ public sealed class MagnetChain : MagnetNode
     }
 
     /// <summary>Adds members given as views (carrying <c>Magnet.MagnetId</c>) or nodes (fluent).</summary>
-    public MagnetChain With(params BindableObject[] elements)
+    public MagnetChain With(params object[] elements)
     {
         foreach (var element in elements)
         {

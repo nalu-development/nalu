@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace Nalu;
 
@@ -26,17 +28,17 @@ internal enum MagnetNodeOrigin : byte
 /// <summary>
 /// Base class of every element of a <see cref="MagnetDefinition" />.
 /// </summary>
-public abstract class MagnetNode : BindableObject
+/// <remarks>
+/// Nodes are plain <see cref="INotifyPropertyChanged" /> objects, not <c>BindableObject</c>s: they live outside the
+/// visual tree, so no <c>BindingContext</c> reaches them — they can act as a binding SOURCE but not as a binding
+/// target. Mutate them directly (optionally inside <c>Magnet.TransitionToAsync</c> to animate the change).
+/// </remarks>
+public abstract class MagnetNode : INotifyPropertyChanged
 {
-    /// <summary>
-    /// Bindable property for <see cref="MagnetId" />.
-    /// </summary>
-    public static readonly BindableProperty MagnetIdProperty = BindableProperty.Create(
-        nameof(MagnetId),
-        typeof(string),
-        typeof(MagnetNode),
-        propertyChanged: (b, o, n) => ((MagnetNode) b).OnMagnetIdChanged((string?) o, (string?) n)
-    );
+    private string? _magnetId;
+
+    /// <inheritdoc />
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>
     /// Gets or sets the identifier of this node. Required and unique within a <see cref="MagnetDefinition" />.
@@ -46,8 +48,20 @@ public abstract class MagnetNode : BindableObject
     /// </remarks>
     public string? MagnetId
     {
-        get => (string?) GetValue(MagnetIdProperty);
-        set => SetValue(MagnetIdProperty, value);
+        get => _magnetId;
+        set
+        {
+            if (string.Equals(_magnetId, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var old = _magnetId;
+            _magnetId = value;
+            OnPropertyChanged();
+            Definition?.OnNodeIdChanged(this, old, value);
+            Notify(MagnetChange.Structure);
+        }
     }
 
     internal MagnetNodeOrigin Origin { get; set; }
@@ -87,18 +101,36 @@ public abstract class MagnetNode : BindableObject
     }
 
     /// <summary>
-    /// Bindable property changed handler for properties whose change requires a recompilation.
+    /// Raises <see cref="PropertyChanged" />.
     /// </summary>
-#pragma warning disable IDE0060
-    protected static void OnStructurePropertyChanged(BindableObject bindable, object oldValue, object newValue)
-        => ((MagnetNode) bindable).Notify(MagnetChange.Structure);
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     /// <summary>
-    /// Bindable property changed handler for properties whose change only patches values.
+    /// Sets a field whose change requires a recompilation.
     /// </summary>
-    protected static void OnValuePropertyChanged(BindableObject bindable, object oldValue, object newValue)
-        => ((MagnetNode) bindable).Notify(MagnetChange.Values);
-#pragma warning restore IDE0060
+    private protected bool SetStructure<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+        => Set(ref field, value, MagnetChange.Structure, propertyName);
+
+    /// <summary>
+    /// Sets a field whose change only patches values.
+    /// </summary>
+    private protected bool SetValues<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+        => Set(ref field, value, MagnetChange.Values, propertyName);
+
+    private bool Set<T>(ref T field, T value, MagnetChange change, string? propertyName)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value))
+        {
+            return false;
+        }
+
+        field = value;
+        OnPropertyChanged(propertyName);
+        Notify(change);
+
+        return true;
+    }
 
     /// <summary>
     /// Creates an observable list which raises <see cref="MagnetChange.Structure" /> on every change.
@@ -149,12 +181,6 @@ public abstract class MagnetNode : BindableObject
     private void OnStructureListChanged(object? sender, NotifyCollectionChangedEventArgs e) => Notify(MagnetChange.Structure);
 
     private void OnValuesListChanged(object? sender, NotifyCollectionChangedEventArgs e) => Notify(MagnetChange.Values);
-
-    private void OnMagnetIdChanged(string? oldValue, string? newValue)
-    {
-        Definition?.OnNodeIdChanged(this, oldValue, newValue);
-        Notify(MagnetChange.Structure);
-    }
 
     /// <inheritdoc />
     public override string ToString() => $"{GetType().Name}('{MagnetId}')";
