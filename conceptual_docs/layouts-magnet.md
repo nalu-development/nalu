@@ -353,11 +353,15 @@ The TestApp ships a manual benchmark page (`Magnet Perf`) that inflates N cards 
 of the native layout pass. Debug builds (JIT, no AOT), 200 cards, warm second run — absolute numbers are inflated by the
 Debug configuration, the ratio is what matters:
 
-| 200 cards | iPhone 17 Pro simulator | Android emulator (arm64) |
+| 200 cards, warm run | iPhone simulator | Android emulator (arm64) |
 |---|---|---|
-| Inflate: `Add` (handlers + native views) → settled | Grid 1592 ms · **Magnet 1228 ms** (−23%) | Grid 8272 ms · **Magnet 7978 ms** (layout phase after `Add`: 1351 vs 954 ms, −29%) |
-| Text change on every card → settled | Grid 270 ms · **Magnet 209 ms** (−23%) | Grid 757 ms · **Magnet 560 ms** (−26%) |
+| Inflate: create + `Add` (handlers + native views) → settled | Grid 1600 ms · **Magnet 1352 ms** (−16%) | Grid 1999 ms · **Magnet 1219 ms** (−39%; layout phase after `Add`: 321 vs 166 ms) |
+| Text change on every card → settled | Grid 253 ms · **Magnet 185 ms** (−27%) | Grid 390 ms · **Magnet 102 ms** (−74%) |
 | `SizeChanged` events per inflate | Grid 1800 · Magnet 1267 | Grid 1800 · Magnet 1267 |
+
+The numbers are collected by the opt-in `MagnetPerfStatsTests` DevFlow test (set `MAGNET_PERF_OUT` to a file
+path), which drives the page: a discarded cold inflate to warm the JIT, then the recorded warm inflate and
+text change per flavour.
 
 On device the flat Magnet wins on every scenario, by the cost of the two native views per card that the nested Grid
 needs. `Magnet VirtualScroll Perf` (2000 cards in a `VirtualScroll`, definition declared inline in the template) shows
