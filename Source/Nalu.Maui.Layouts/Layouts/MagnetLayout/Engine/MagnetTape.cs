@@ -35,7 +35,24 @@ internal enum OpKind : byte
     MeasureChild,
 
     /// <summary>Resolves the stage end slot (Dst) of axis C from the requirement slots ReqSlots[A..A+B-1].</summary>
-    StageEnd
+    StageEnd,
+
+    /// <summary>dst = Σ v[AuxSlots[A..A+B-1]] (indexed variant of <see cref="SumRange" />: no copy block needed).</summary>
+    SumIndexed,
+
+    /// <summary>
+    /// All per-pair gaps of one chain axis in one dispatch. B entries of 6 ints at AuxSlots[A]:
+    /// (gated, g1, g2, visPrev, visNext, out) → out = (v[g1]+v[g2]) × (gated ? vis(next)·min(Σ visPrev so far, 1) : 1);
+    /// dst = Σ out. Inputs are visibility/margin/input slots only, so the op always lives in phase 0.
+    /// </summary>
+    ChainGaps,
+
+    /// <summary>
+    /// Effective weight fractions of one chain axis in one dispatch. B entries of 3 ints at AuxSlots[A]:
+    /// (weight, vis, out) → dst = Σ weight·vis, then out = dst == 0 ? 0 : weight·vis / dst.
+    /// Inputs are weight inputs and visibility only, so the op always lives in phase 0.
+    /// </summary>
+    ChainFractions
 }
 
 /// <summary>
@@ -67,6 +84,9 @@ internal readonly struct Op(OpKind kind, int dst, int a, int b, int c, byte k1 =
             OpKind.Gather => $"v[{Dst}] = vis[{A}] ? v[{B}] : {coefficients[K1]}",
             OpKind.MeasureChild => $"measure node {A} with (v[{B}], v[{C}])",
             OpKind.StageEnd => $"v[{Dst}] = stageEnd(axis {C}, reqs {A}..{A + B - 1})",
+            OpKind.SumIndexed => $"v[{Dst}] = sum(v[aux[{A}..{A + B - 1}]])",
+            OpKind.ChainGaps => $"v[{Dst}] = chainGaps({B} pairs at aux[{A}])",
+            OpKind.ChainFractions => $"v[{Dst}] = chainFractions({B} weights at aux[{A}])",
             _ => Kind.ToString()
         };
 }
@@ -147,6 +167,9 @@ internal sealed class MagnetTape
     public required int ValueCount { get; init; }
     /// <summary>Requirement entries: slot ≥ 0 means "v[slot] ≥ 0", ~slot means "v[slot] ≤ stageEnd".</summary>
     public required int[] ReqSlots { get; init; }
+
+    /// <summary>Side table of slot indexes for the table-driven ops (SumIndexed / ChainGaps / ChainFractions).</summary>
+    public required int[] AuxSlots { get; init; }
     public required AxisPhases X { get; init; }
     public required AxisPhases Y { get; init; }
     public required NodeMeta[] Nodes { get; init; }

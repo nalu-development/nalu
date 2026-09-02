@@ -59,6 +59,8 @@ internal sealed class MagnetCompiler
         public int GapSlot = -1;
         public int[] GapAfterSlots = [];
         public int GapsTotalSlot = MagnetTape.Zero;
+        public int VisCountSlot = -1;
+        public int[] FractionSlots = [];
         public int StartSlot = -1, EndSlot = -1, SpanSlot = -1; // chain
         public int RatioFeedbackSlot = -1; // Ratio width fed by a Y-dependent height
     }
@@ -69,6 +71,7 @@ internal sealed class MagnetCompiler
     private readonly List<PatchEntry> _patches;
     private readonly List<MarginEntry> _margins;
     private readonly List<int> _reqSlots;
+    private readonly List<int> _auxSlots = [];
     private readonly List<int> _feedbackSlots = [];
     private readonly List<int> _deferredMeasureOps = [];
     private bool _hasStageDependentMeasures;
@@ -198,8 +201,28 @@ internal sealed class MagnetCompiler
         {
             var dstOk = op.Kind == OpKind.MeasureChild ? op.Dst is -1 or -2 : (uint) op.Dst < (uint) _slots;
             var rangeOp = op.Kind is OpKind.MinRange or OpKind.MaxRange or OpKind.SumRange;
-            var aOk = op.Kind is OpKind.MeasureChild or OpKind.Gather ? (uint) op.A < (uint) _nodes.Length : op.Kind == OpKind.StageEnd || (uint) op.A < (uint) _slots;
-            var bOk = rangeOp ? op.B >= 0 && op.A + op.B <= _slots : op.Kind == OpKind.StageEnd || (uint) op.B < (uint) _slots;
+            bool aOk, bOk;
+
+            if (op.Kind is OpKind.SumIndexed or OpKind.ChainGaps or OpKind.ChainFractions)
+            {
+                // Table ops: A = aux offset, B = entry count; every referenced aux slot must be valid.
+                var stride = op.Kind switch { OpKind.ChainGaps => 6, OpKind.ChainFractions => 3, _ => 1 };
+                aOk = op.A >= 0 && op.B > 0 && op.A + (op.B * stride) <= _auxSlots.Count;
+                bOk = aOk;
+
+                for (var e = op.A; aOk && e < op.A + (op.B * stride); e++)
+                {
+                    // ChainGaps entry position 0 is the gated flag, not a slot.
+                    var isFlag = op.Kind == OpKind.ChainGaps && (e - op.A) % 6 == 0;
+                    aOk = isFlag ? _auxSlots[e] is 0 or 1 : (uint) _auxSlots[e] < (uint) _slots;
+                }
+            }
+            else
+            {
+                aOk = op.Kind is OpKind.MeasureChild or OpKind.Gather ? (uint) op.A < (uint) _nodes.Length : op.Kind == OpKind.StageEnd || (uint) op.A < (uint) _slots;
+                bOk = rangeOp ? op.B >= 0 && op.A + op.B <= _slots : op.Kind == OpKind.StageEnd || (uint) op.B < (uint) _slots;
+            }
+
             var cOk = op.Kind == OpKind.StageEnd || (uint) op.C < (uint) _slots;
 
             if (!dstOk || !aOk || !bOk || !cOk)
@@ -233,6 +256,7 @@ internal sealed class MagnetCompiler
             Coefficients = _coefficients.ToArray(),
             ValueCount = _slots,
             ReqSlots = _reqSlots.ToArray(),
+            AuxSlots = _auxSlots.ToArray(),
             X = x,
             Y = y,
             Nodes = meta,
@@ -917,6 +941,17 @@ internal sealed class MagnetCompiler
 
         var phases = new AxisPhases { Start = _ops.Count };
 
+        // Chain runtime preamble: gap gating, visible-member count and weight fractions read only
+        // visibility, margins and patched inputs — never the stage — so they are fused into single
+        // table-driven ops at the head of phase 0 (inside a vertex they would ride every affine re-run).
+        for (var i = 0; i < _nodes.Length; i++)
+        {
+            if (_nodes[i].Kind == NodeKind.Chain && _nodes[i].Axis == axis)
+            {
+                EmitChainPreamble(axis, i);
+            }
+        }
+
         // Phase 0
         foreach (var v in order)
         {
@@ -1420,34 +1455,33 @@ internal sealed class MagnetCompiler
             }
         }
 
-        // Per-pair gaps, emitted here so both the chain positioning and the Measured-member avail can read
-        // them: adjacent-anchor margins when declared (per-anchor margin/gone semantics), otherwise the chain
-        // Gap applied between consecutive VISIBLE members (separator semantics: a collapsed member takes its
-        // gap away — Gap × vis(next) × min(visibleBefore, 1)).
+    }
+
+    /// <summary>
+    /// Emits the fused phase-0 runtime ops of a chain axis (see the preamble note in <see cref="EmitAxis" />):
+    /// per-pair gaps (adjacent-anchor margins when declared — per-anchor margin/gone semantics — otherwise the
+    /// chain Gap between consecutive VISIBLE members: a collapsed member takes its gap away, value × vis(next)
+    /// × min(visibleBefore, 1)), the visible-member count (Spread styles only) and the effective weight fractions.
+    /// </summary>
+    private void EmitChainPreamble(int axis, int node)
+    {
+        var n = _nodes[node];
+        var chain = (MagnetChain) n.Node;
+        var separators = chain.GapMode == MagnetChainGapMode.Separators;
         var k = n.Members.Length;
         n.GapAfterSlots = new int[k];
-        var gapsTotal = MagnetTape.Zero;
-        var prefixVis = MagnetTape.Zero;
-        // A zero Gap in Anchors mode emits no gating ops at all (structural: fingerprinted, and the Gap
-        // setter classifies 0 <-> non-zero as a Structure change so the shortcut can never go stale).
-        var staticZeroGaps = !separators && ((MagnetChain) n.Node).Gap == 0;
+        n.GapAfterSlots[k - 1] = MagnetTape.Zero;
 
-        for (var i = 0; i < k; i++)
+        // A zero Gap in Anchors mode contributes no pair entries at all (structural: fingerprinted, and the
+        // Gap setter classifies 0 <-> non-zero as a Structure change so the shortcut can never go stale).
+        var staticZeroGaps = !separators && chain.Gap == 0;
+        var offset = _auxSlots.Count;
+        var pairs = 0;
+
+        for (var i = 0; i < k - 1; i++)
         {
             var ax = _nodes[n.Members[i]].Axes[axis];
-
-            if (!staticZeroGaps)
-            {
-                prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
-            }
-
-            if (i == k - 1)
-            {
-                n.GapAfterSlots[i] = MagnetTape.Zero;
-
-                break;
-            }
-
+            var next = _nodes[n.Members[i + 1]].Axes[axis];
             var g1 = MagnetTape.Zero;
             var g2 = MagnetTape.Zero;
             var anchored = false;
@@ -1459,43 +1493,96 @@ internal sealed class MagnetCompiler
                 anchored = true;
             }
 
-            var next = _nodes[n.Members[i + 1]].Axes[axis];
-
             if (next.Start is { Adjacent: true } startAnchor)
             {
                 g2 = separators ? startAnchor.MarginSlot : startAnchor.EffSlot;
                 anchored = true;
             }
 
-            int gap;
+            if (staticZeroGaps && !anchored)
+            {
+                n.GapAfterSlots[i] = MagnetTape.Zero;
 
-            if (anchored && !separators)
-            {
-                gap = Lin(g1, 1, g2, 1);
-            }
-            else if (staticZeroGaps && !anchored)
-            {
-                gap = MagnetTape.Zero;
-            }
-            else
-            {
-                // Separator gating (anchored pairs in Separators mode and chain-Gap pairs in any mode):
-                // value × vis(next) × min(visibleBefore, 1) — the gap exists only between visible members.
-                var value = anchored ? Lin(g1, 1, g2, 1) : n.GapSlot;
-                var hasVisibleBefore = Clamp(prefixVis, MagnetTape.Zero, MagnetTape.One);
-                var scaled = MulAdd(value, _nodes[n.Members[i + 1]].VisSlot);
-                gap = MulAdd(scaled, hasVisibleBefore);
+                continue;
             }
 
+            // Gating applies to anchored pairs in Separators mode and chain-Gap pairs in any mode;
+            // anchored pairs in Anchors mode keep their margins unconditionally (gone semantics via EffSlot).
+            var gated = separators || !anchored;
+
+            if (!anchored)
+            {
+                g1 = n.GapSlot;
+            }
+
+            var gap = Alloc();
             n.GapAfterSlots[i] = gap;
+            _auxSlots.Add(gated ? 1 : 0);
+            _auxSlots.Add(g1);
+            _auxSlots.Add(g2);
+            _auxSlots.Add(_nodes[n.Members[i]].VisSlot);
+            _auxSlots.Add(_nodes[n.Members[i + 1]].VisSlot);
+            _auxSlots.Add(gap);
+            pairs++;
+        }
 
-            if (gap != MagnetTape.Zero)
+        if (pairs > 0)
+        {
+            n.GapsTotalSlot = Alloc();
+            Emit(new Op(OpKind.ChainGaps, n.GapsTotalSlot, offset, pairs, MagnetTape.Zero));
+        }
+        else
+        {
+            n.GapsTotalSlot = MagnetTape.Zero;
+        }
+
+        // Visible-member count: only the Spread styles divide by it.
+        if (chain.Style != MagnetChainStyle.Packed)
+        {
+            var visOffset = _auxSlots.Count;
+
+            foreach (var m in n.Members)
             {
-                gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+                _auxSlots.Add(_nodes[m].VisSlot);
+            }
+
+            n.VisCountSlot = Alloc();
+            Emit(new Op(OpKind.SumIndexed, n.VisCountSlot, visOffset, k, MagnetTape.Zero));
+        }
+
+        // Effective weight fractions: a collapsed member contributes 0, so the visible members absorb its
+        // share. A single weighted member always takes fraction 1 (no op needed).
+        var weightedCount = 0;
+
+        foreach (var m in n.Members)
+        {
+            if (_nodes[m].Axes[axis].Weighted)
+            {
+                weightedCount++;
             }
         }
 
-        n.GapsTotalSlot = gapsTotal;
+        if (weightedCount > 1)
+        {
+            n.FractionSlots = new int[k];
+            var weightOffset = _auxSlots.Count;
+
+            for (var i = 0; i < k; i++)
+            {
+                if (!_nodes[n.Members[i]].Axes[axis].Weighted)
+                {
+                    continue;
+                }
+
+                var fraction = Alloc();
+                n.FractionSlots[i] = fraction;
+                _auxSlots.Add(n.WeightSlots[i]);
+                _auxSlots.Add(_nodes[n.Members[i]].VisSlot);
+                _auxSlots.Add(fraction);
+            }
+
+            Emit(new Op(OpKind.ChainFractions, Alloc(), weightOffset, weightedCount, MagnetTape.Zero));
+        }
     }
 
     private void EmitChain(int axis, int node)
@@ -1521,9 +1608,7 @@ internal sealed class MagnetCompiler
 
         if (nwCount > 0)
         {
-            var block = _slots;
-            _slots += nwCount;
-            var b = block;
+            var offset = _auxSlots.Count;
 
             foreach (var m in n.Members)
             {
@@ -1531,12 +1616,12 @@ internal sealed class MagnetCompiler
 
                 if (!ax.Weighted)
                 {
-                    LinInto(b++, ax.SizeSlot, 1);
+                    _auxSlots.Add(ax.SizeSlot);
                 }
             }
 
             totalNw = Alloc();
-            Emit(new Op(OpKind.SumRange, totalNw, block, nwCount, MagnetTape.Zero));
+            Emit(new Op(OpKind.SumIndexed, totalNw, offset, nwCount, MagnetTape.Zero));
         }
 
         // Per-pair gaps: precomputed at the span vertex (anchored pairs + chain Gap separator pairs).
@@ -1550,37 +1635,7 @@ internal sealed class MagnetCompiler
         {
             var dist = Lin(n.SpanSlot, 1, totalNw, -1, gapsTotal, -1);
             dist = Clamp(dist, MagnetTape.Zero, MagnetTape.PosInf);
-
-            // Effective weights: a collapsed member contributes 0, so the visible members absorb its share
-            // (fractions must be computed at runtime — visibility is not a patched input).
             var weightedCount = k - nwCount;
-            var weightBlock = _slots;
-
-            if (weightedCount > 1)
-            {
-                _slots += weightedCount;
-                var gathered = weightBlock;
-
-                for (var i = 0; i < k; i++)
-                {
-                    var member = n.Members[i];
-
-                    if (_nodes[member].Axes[axis].Weighted)
-                    {
-                        Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
-                    }
-                }
-            }
-
-            var totalWeight = -1;
-
-            if (weightedCount > 1)
-            {
-                totalWeight = Alloc();
-                Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
-            }
-
-            var gatheredSlot = weightBlock;
 
             for (var i = 0; i < k; i++)
             {
@@ -1591,9 +1646,10 @@ internal sealed class MagnetCompiler
                     continue;
                 }
 
-                // A single weighted member always takes the whole distributable space — no gather/sum/div
-                // needed (when hidden its size is zeroed by the VisSlot product anyway).
-                var fraction = weightedCount == 1 ? MagnetTape.One : Div(gatheredSlot++, totalWeight);
+                // A single weighted member always takes the whole distributable space (when hidden its size
+                // is zeroed by the VisSlot product anyway); otherwise the preamble's ChainFractions op
+                // computed the visibility-effective fraction.
+                var fraction = weightedCount == 1 ? MagnetTape.One : n.FractionSlots[i];
                 var raw = MulAdd(dist, fraction);
                 var bounded = ax.Size.HasBounds ? Clamp(raw, ax.MinSlot, ax.MaxSlot) : raw;
                 MulAddInto(ax.WeightedSizeSlot, bounded, _nodes[n.Members[i]].VisSlot);
@@ -1606,17 +1662,8 @@ internal sealed class MagnetCompiler
         var slack = Lin(n.SpanSlot, 1, total, -1);
         _pendingReqs.Add(slack);
 
-        // Visible member count
-        var visBlock = _slots;
-        _slots += k;
-
-        for (var i = 0; i < k; i++)
-        {
-            LinInto(visBlock + i, _nodes[n.Members[i]].VisSlot, 1);
-        }
-
-        var visCount = Alloc();
-        Emit(new Op(OpKind.SumRange, visCount, visBlock, k, MagnetTape.Zero));
+        // Visible member count: precomputed by the preamble (Spread styles only).
+        var visCount = n.VisCountSlot;
 
         var style = chain.Style;
         var gap = MagnetTape.Zero;
