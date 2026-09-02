@@ -149,6 +149,94 @@ public class MagnetSolverBoundaryTests
     }
 
     [Fact]
+    public void DeltaArrangeEngagesOnTheReusePathAndMatchesTheFullSolve()
+    {
+        var h = new EngineHarness();
+        h.View("a", 40, 20).Left(P).Top(P);
+        h.View("b", 0, 20).Top(P).Size(MagnetSizing.Constraint, MagnetSizing.Fixed(20));
+        h.View("c", 40, 20).Right(P).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row", Gap = 12 }.With("a", "b", "c"));
+
+        var before = h.Engine.DeltaArrangesTaken;
+
+        // The canonical fill flow: arrange at the measure ARG width, hug height — the delta fast path
+        // must engage (the differential verifier cross-checks the frames against the full solve).
+        h.Measure(400, 50);
+        h.Engine.Arrange(400, 20, MeasurePass.Deferred);
+
+        (h.Engine.DeltaArrangesTaken - before).Should().BeGreaterThan(0);
+        h.Frame("b").ShouldBe(52, 0, 296, 20);
+        h.Frame("c").X.Should().Be(360);
+
+        // A fresh measure re-arms the path at the new width.
+        h.Measure(500, 50);
+        h.Engine.Arrange(500, 20, MeasurePass.Deferred);
+        h.Frame("c").X.Should().Be(460);
+    }
+
+    [Fact]
+    public void DeltaArrangeBailsWhenAClampBranchFlips()
+    {
+        var h = new EngineHarness();
+        h.View("a", 0, 20).Left(P).Top(P).Size(MagnetSizing.Constraint.WithBounds(max: 60), MagnetSizing.Fixed(20));
+        h.View("b", 40, 20).Right(P).Top(P);
+        h.Add(new MagnetChain { MagnetId = "row" }.With("a", "b"));
+
+        // Hug leaves the weighted member under its Max; the arrange width would push it past: whatever
+        // path runs must produce the clamped solution (the verifier compares against the full solve).
+        h.Measure(300, 50);
+        h.Engine.Arrange(300, 20, MeasurePass.Deferred);
+
+        h.Frame("a").Width.Should().Be(60);
+        h.Frame("b").Width.Should().Be(40);
+    }
+
+    [Fact]
+    public void DeltaArrangeBailsOnVisibilityChange()
+    {
+        var h = new EngineHarness();
+        h.View("a", 40, 20).Left(P).Top(P);
+        h.View("b", 30, 20).Top(P).After("a", 10);
+
+        h.Measure(200, 50);
+        h.Fake("a").Visibility = Visibility.Collapsed;
+        var before = h.Engine.DeltaArrangesTaken;
+        h.Engine.Arrange(200, 20, MeasurePass.Deferred);
+
+        // The delta path must refuse to replay a solution captured with different visibility; the full
+        // solve it falls back to keeps the STALE measured width under Deferred (pre-existing semantics:
+        // MAUI always re-measures on a visibility change, so this flow never reaches production) — the
+        // differential verifier asserts the fallback matches the reference full solve either way.
+        (h.Engine.DeltaArrangesTaken - before).Should().Be(0);
+        h.Frame("b").X.Should().Be(50);
+
+        // The realistic follow-up (re-measure, then arrange) lands on the collapsed solution.
+        h.Layout(200, 50, 200, 50);
+        h.Frame("b").X.Should().Be(10);
+    }
+
+    [Fact]
+    public void DeltaArrangeBailsOnCrossAxisRatio()
+    {
+        var h = new EngineHarness();
+        // The chain hugs to 40 but fills the arrange width; "r" mirrors the weighted member's width and
+        // derives its height from it (Ratio) — a Y result driven by an X-stage-dependent slot.
+        h.View("a", 40, 20).Left(P).Top(P);
+        h.View("b", 0, 20).Top(P).Size(MagnetSizing.Constraint, MagnetSizing.Fixed(20));
+        h.Add(new MagnetChain { MagnetId = "row" }.With("a", "b"));
+        h.View("r", 0, 0).Below("a").AlignLeft("b").AlignRight("b").Size(MagnetSizing.Constraint, MagnetSizing.Ratio(0.5));
+
+        var before = h.Engine.DeltaArrangesTaken;
+        h.Measure(400, 400);
+        h.Engine.Arrange(400, 200, MeasurePass.Deferred);
+
+        // Y reads the X-stage-dependent width: the compile-time flag must route X moves to the full solve.
+        (h.Engine.DeltaArrangesTaken - before).Should().Be(0);
+        h.Frame("r").Width.Should().Be(360);
+        h.Frame("r").Height.Should().Be(180);
+    }
+
+    [Fact]
     public void GapChainArrangedWiderThanMeasured()
     {
         var h = new EngineHarness();

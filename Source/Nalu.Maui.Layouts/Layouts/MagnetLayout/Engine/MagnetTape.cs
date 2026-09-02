@@ -196,6 +196,23 @@ internal sealed class MagnetTape
     /// <summary>Op indexes of the deferred measures (fast path for re-running just them).</summary>
     public required int[] DeferredMeasureOps { get; init; }
 
+    /// <summary>
+    /// Distinct slots written by the phase-1 ops of each axis (MeasureChild excluded). Finalize sweeps these
+    /// (each exactly once, so slopes can be preserved), and the delta-arrange fast path shifts them by
+    /// slope·Δ when the affine solution is still valid at the arrange size.
+    /// </summary>
+    public required int[] PhaseOneSlotsX { get; init; }
+
+    /// <inheritdoc cref="PhaseOneSlotsX" />
+    public required int[] PhaseOneSlotsY { get; init; }
+
+    /// <summary>
+    /// Whether any Y-axis op reads an X-stage-dependent slot (an X phase-1 result or the X stage end).
+    /// When true, shifting the X solution invalidates the stored Y solution, so the delta-arrange fast
+    /// path bails out to a full re-solve whenever the X size changes.
+    /// </summary>
+    public required bool YReadsStageDependentX { get; init; }
+
     public const int StageLeft = 0;
     public const int StageTop = 1;
     public const int StageRight = 2;
