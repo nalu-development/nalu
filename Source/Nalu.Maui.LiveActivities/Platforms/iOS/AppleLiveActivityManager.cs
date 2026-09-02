@@ -58,7 +58,7 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
         NaluLiveActivitiesBridge.StartActivity(
             kind,
             payload,
-            ToEpochMs(snapshot.StaleAt),
+            ToStaleEpochMs(snapshot.StaleAt),
             (id, error) => completion.TrySetResult(((string?)id, (string?)error))
         );
 
@@ -74,7 +74,23 @@ internal sealed class AppleLiveActivityManager : ILiveActivityManager
         return activity;
     }
 
-    internal static double ToEpochMs(DateTimeOffset? instant) => instant?.ToUnixTimeMilliseconds() ?? 0;
+    /// <summary>
+    /// Stale date for ActivityKit, with a date ALREADY IN THE PAST dropped (0 = "no stale date").
+    /// </summary>
+    /// <remarks>
+    /// Handing ActivityKit a stale date that has already passed makes the activity arrive in
+    /// <c>ActivityState.stale</c>, and a stale activity is NEVER PRESENTED — verified on device:
+    /// SpringBoard emits no "Inserting supplementary item" for it, so nothing reaches the Lock
+    /// Screen at all. There is no upside to passing one (it cannot even produce a stale
+    /// treatment, because there is nothing on screen to treat), and the trap is easy to fall
+    /// into: the documented appointment pattern sets StaleAt to the countdown end, which becomes
+    /// a past instant the moment that end goes by. So an activity for a session that finished
+    /// half an hour ago would silently never show up.
+    /// </remarks>
+    internal static double ToStaleEpochMs(DateTimeOffset? staleAt)
+        => staleAt is { } instant && instant > DateTimeOffset.UtcNow
+            ? instant.ToUnixTimeMilliseconds()
+            : 0;
 
     /// <summary>
     /// ActivityKit already ignores updates to an activity the user removed, so nothing can

@@ -141,7 +141,7 @@ public class LiveActivityTests : ContentPage
             // with no app involvement — the only zero-crossing trigger iOS offers.
             // Only when it is still ahead: a stale date in the past would make the content
             // immediately stale, confounding the timer-range question under test.
-            StaleAt = eta > DateTimeOffset.UtcNow ? eta : null,
+            StaleAt = eta,
             Actions =
             [
                 // v1: link-backed actions render as buttons and open the app at the link.
@@ -152,7 +152,14 @@ public class LiveActivityTests : ContentPage
             ]
         });
         Track(_activity);
-        SetStatus($"Started {_activity.Id} ({_activity.State}) hours={hours.ToString(System.Globalization.CultureInfo.InvariantCulture)} known={_manager.Activities.Count}");
+
+        // ActivityKit's OWN state, not the handle's: an activity handed a stale date already in
+        // the past arrives as "stale" and is then never presented at all, which the handle
+        // cannot see. Small delay because the state settles a few tens of ms after creation.
+        await Task.Delay(600);
+        var kitState = ReadActivityKitState(_activity.Id);
+
+        SetStatus($"Started {_activity.Id} ({_activity.State}) hours={hours.ToString(System.Globalization.CultureInfo.InvariantCulture)} known={_manager.Activities.Count} kit={kitState}");
     }
 
     private async Task AdvanceAsync()
@@ -228,6 +235,22 @@ public class LiveActivityTests : ContentPage
     /// </summary>
     private void Track(ILiveActivity activity)
         => activity.Dismissed += (_, _) => SetStatus($"Dismissed by user ({activity.State})");
+
+    /// <summary>
+    /// The state ActivityKit itself reports for <paramref name="id" /> — "active", "stale",
+    /// "dismissed", "ended" or "missing". "stale" is the interesting one: such an activity is
+    /// never put on the Lock Screen.
+    /// </summary>
+    private static string ReadActivityKitState(string id)
+    {
+#if IOS && !MACCATALYST
+        var infos = LiveActivityRehydration.Parse(NaluLiveActivitiesBridge.ActivitiesJson());
+
+        return infos.FirstOrDefault(i => i.Id == id)?.State ?? "missing";
+#else
+        return "n/a";
+#endif
+    }
 
     private void SetStatus(string message) => _statusLabel.Text = message;
 }

@@ -67,6 +67,12 @@ StaleAt = eta,   // boundary re-render: countdown flips to overflow by itself
   until then the chronometer ticks natively into negatives.
 
 > [!NOTE]
+> [!IMPORTANT]
+> `StaleAt` must be **in the future** to be useful. A stale date that has already passed makes
+> ActivityKit create the activity in `ActivityState.stale`, and a stale activity is never shown
+> at all. Nalu drops a past stale date for you, so an activity whose end has gone by still
+> appears — but do not rely on a past `StaleAt` to mean anything.
+
 > `StaleAt` does double duty: it also transitions the handle to
 > `LiveActivityState.Stale`, its original meaning of "this content is now outdated". Only
 > point it at the countdown end when the overflow flip is what you want.

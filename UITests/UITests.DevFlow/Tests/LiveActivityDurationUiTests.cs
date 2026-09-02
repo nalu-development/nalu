@@ -7,34 +7,44 @@ using Xunit;
 namespace Nalu.Maui.UITests.Tests;
 
 /// <summary>
-/// Timer ranges an iOS Live Activity is expected to survive: still ahead, and already elapsed.
+/// Guards the rule that a Live Activity is never handed a stale date already in the past.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Written while chasing a field report of "the Live Activity does not show up when the timer is
-/// longer than 24 hours". Two findings came out of it, both worth not re-deriving.
+/// Field report: "the Live Activity does not show up when the timer is longer than 24 hours."
+/// The duration turned out to be a red herring — ActivityKit accepts ANY range (verified on an
+/// iPhone 13 from 48 h ahead to 22 h elapsed, every one returning an active activity) and the
+/// widget renders an elapsed range correctly.
 /// </para>
 /// <para>
-/// FIRST — ActivityKit accepts ANY range. Verified on an iPhone 13 at 0.2/4/8/12/23/25/48 h into
-/// the future and at 0.5/2/22 h already elapsed: every one returns an active activity. A long or
-/// expired timer is never the reason a request fails.
+/// The actual cause is the STALE DATE. Setting <c>StaleAt</c> to the countdown end — which the
+/// appointment pattern in the docs recommends — makes it a PAST instant once that end goes by,
+/// and ActivityKit then creates the activity directly in <c>ActivityState.stale</c>. A stale
+/// activity is never presented at all. Measured on device from SpringBoard's telemetry:
+/// </para>
+/// <code>
+/// case          staleDate    CoverSheet insert   state
+/// 0.2 h ahead   ahead                1           active -> dismissed
+/// -0.5 h        30 min past          0           stale  -> dismissed
+/// -2 h          2 h past             0           stale  -> dismissed
+/// -22 h         22 h past            0           stale  -> dismissed
+/// </code>
+/// <para>
+/// The control logs 115 lines including "CoverSheet: Inserting supplementary item"; the stale
+/// cases log 17 with no insert and no render. Note it already happens at MINUS THIRTY MINUTES:
+/// the threshold is not 24 h, it is simply "in the past".
 /// </para>
 /// <para>
-/// SECOND — and this is why the test BACKGROUNDS the app rather than trusting the status label:
-/// a foreground app never shows its own Live Activity, so "StartAsync returned Started" is not
-/// evidence of presentation. Presentation was verified out of band from SpringBoard's own
-/// telemetry (<c>idevicesyslog</c>), where an activity ending 22 hours ago produced an event
-/// sequence identical to a normal one — 120 lines, 73 distinct shapes, both carrying
-/// <c>SpringBoard(CoverSheet): Inserting supplementary item</c> and
-/// <c>WidgetRenderer_Activities: Rendering view: AnyView(…)</c>. The widget renders an elapsed
-/// range fine, so the overflow branch's 1 h bound is not a problem.
+/// <c>ToStaleEpochMs</c> now drops such a date, so this suite asserts the ActivityKit state is
+/// "active" for every case. It reads that state from the bridge rather than from the handle,
+/// because the managed handle cannot see staleness — and it backgrounds the app for every case,
+/// because a foreground app never shows its own Live Activity and a start call that returned
+/// successfully is NOT evidence of presentation.
 /// </para>
 /// <para>
-/// The actual cause of that report was neither: the activity had been alive for 23 hours, and
-/// iOS ends a Live Activity after about 8 hours. Nothing in the content model can extend that —
-/// an app whose session outlives the limit has to end and re-request. Related, and the other
-/// half of the same report: the Dynamic Island presentation needs an iPhone 14 Pro or later; on
-/// a notch device (iPhone 13 and earlier) only the Lock Screen presentation ever appears.
+/// Two unrelated limits found along the way, worth not re-deriving: iOS ends a Live Activity
+/// after about 8 hours, and the Dynamic Island presentation needs an iPhone 14 Pro or later —
+/// on a notch device only the Lock Screen presentation ever appears.
 /// </para>
 /// </remarks>
 public class LiveActivityDurationUiTests(NaluApp app) : BaseUiTest(app)
@@ -79,7 +89,7 @@ public class LiveActivityDurationUiTests(NaluApp app) : BaseUiTest(app)
     }
 
     [Fact]
-    public async Task FutureAndElapsedTimersAreBothAccepted()
+    public async Task ElapsedTimersAreNotBornStale()
     {
         await OpenAsync();
 
@@ -95,7 +105,17 @@ public class LiveActivityDurationUiTests(NaluApp app) : BaseUiTest(app)
 
             if (!status.StartsWith("Started", StringComparison.Ordinal))
             {
-                failures.Add($"{hours}h -> {status}");
+                failures.Add($"{hours}h was not accepted -> {status}");
+
+                continue;
+            }
+
+            // "kit=stale" is the regression: such an activity is never put on the Lock Screen.
+            var kit = status.Split("kit=", StringSplitOptions.None) is [_, { } tail] ? tail.Trim() : "(missing)";
+
+            if (kit != "active")
+            {
+                failures.Add($"{hours}h reached ActivityKit as '{kit}', expected 'active'");
             }
         }
 
@@ -104,6 +124,8 @@ public class LiveActivityDurationUiTests(NaluApp app) : BaseUiTest(app)
             report.ToString()
         );
 
-        failures.Should().BeEmpty($"ActivityKit accepts a countdown of any length, elapsed or not{Environment.NewLine}{Environment.NewLine}{report}");
+        failures.Should().BeEmpty(
+            $"every timer, elapsed or not, must reach ActivityKit ACTIVE — a stale one is never presented{Environment.NewLine}{Environment.NewLine}{report}"
+        );
     }
 }

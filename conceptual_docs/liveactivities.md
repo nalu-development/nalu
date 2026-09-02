@@ -251,6 +251,18 @@ Note this is about the activity's own AGE, not the timer's length: ActivityKit a
 countdown of any duration, including one whose end is already in the past (verified on device
 from 48 hours ahead to 22 hours elapsed), and the widget renders an elapsed range correctly.
 
+**A stale date in the past is a different matter, and it makes the activity invisible.** If
+`StaleAt` has already passed, ActivityKit creates the activity directly in
+`ActivityState.stale`, and a stale activity is **never presented at all** — SpringBoard does not
+put it on the Lock Screen, so nothing appears and nothing renders. Nalu therefore **drops a
+stale date that is already in the past** rather than forwarding it, because there is no upside:
+it cannot even produce a stale *treatment*, since there is nothing on screen to treat.
+
+This matters because the [appointment pattern](liveactivities-timers.md) sets `StaleAt` to the
+countdown end — perfectly correct while that end is ahead, and a past instant the moment it goes
+by. Without the guard, restarting or updating an activity for a session that finished half an
+hour ago would silently show nothing.
+
 **The Dynamic Island needs an iPhone 14 Pro or later.** On a notch device — iPhone 13 and
 earlier — Live Activities are fully supported but only ever appear on the **Lock Screen** and as
 alert banners; the compact and minimal presentations have nowhere to draw. If you are testing
