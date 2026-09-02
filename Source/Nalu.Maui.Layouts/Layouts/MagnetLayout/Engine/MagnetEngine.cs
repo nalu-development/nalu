@@ -99,6 +99,13 @@ internal sealed class MagnetEngine
             Array.Clear(_slopes);
         }
 
+        if (VerifySolver && _verifyValues.Length != tape.ValueCount)
+        {
+            // Pre-size the differential-verification buffers so verified passes stay allocation-free.
+            _verifyValues = new double[tape.ValueCount];
+            _verifySlopes = new double[tape.ValueCount];
+        }
+
         if (_vis.Length != _nodes.Length)
         {
             _vis = new byte[_nodes.Length];
@@ -350,6 +357,11 @@ internal sealed class MagnetEngine
         LastMeasured = new Size(values[MagnetTape.StageRight], values[MagnetTape.StageBottom]);
         HasMeasured = true;
 
+        if (VerifySolver && !_verifying)
+        {
+            VerifyMeasureSolution();
+        }
+
         return LastMeasured;
     }
 
@@ -426,6 +438,16 @@ internal sealed class MagnetEngine
     /// measures of the last measure pass are still valid, None during transition frames.</param>
     public void Arrange(double stageWidth, double stageHeight, MeasurePass measure)
     {
+        ArrangeCore(stageWidth, stageHeight, measure);
+
+        if (VerifySolver && !_verifying)
+        {
+            VerifyArrangeSolution(stageWidth, stageHeight);
+        }
+    }
+
+    private void ArrangeCore(double stageWidth, double stageHeight, MeasurePass measure)
+    {
         var tape = _tape ?? throw new InvalidOperationException("Not compiled.");
 
         if (measure != MeasurePass.All && HasMeasured && stageWidth == LastMeasured.Width && stageHeight == LastMeasured.Height)
@@ -468,6 +490,135 @@ internal sealed class MagnetEngine
             RunNormal(tape.Y.Start, tape.Y.ReqStart, measure);
         }
     }
+
+    #region Differential solver verification (tests only)
+
+    /// <summary>
+    /// Test-only differential harness: when enabled, every Measure is re-checked by evaluating the phase-1 ops
+    /// concretely at the solved stage end (validating the affine machinery and Finalize against the plain
+    /// interpreter), and every Arrange is re-checked against an unconditional full re-solve (validating the
+    /// early-return/deferred fast paths and any future one). Child measures are never re-run
+    /// (<see cref="MeasurePass.None" />): the check targets the solver math — the measure protocol has its own
+    /// dedicated tests — and stays free of view side effects (measure-count assertions). The engine state is
+    /// restored afterwards, so enabling it is invisible to the caller. The unit-test assembly turns it on for
+    /// the whole suite via a module initializer.
+    /// </summary>
+    internal static bool VerifySolver;
+
+    private bool _verifying;
+    private double[] _verifyValues = [];
+    private double[] _verifySlopes = [];
+
+    private void VerifyMeasureSolution()
+    {
+        var tape = _tape!;
+        SnapshotForVerify();
+        _verifying = true;
+
+        try
+        {
+            RunNormal(tape.X.OneStart, tape.X.ReqStart, MeasurePass.None);
+            RunNormal(tape.Y.OneStart, tape.Y.ReqStart, MeasurePass.None);
+            CompareWithVerifySnapshot("measure");
+        }
+        finally
+        {
+            RestoreVerifySnapshot();
+        }
+    }
+
+    private void VerifyArrangeSolution(double stageWidth, double stageHeight)
+    {
+        var tape = _tape!;
+        SnapshotForVerify();
+        _verifying = true;
+
+        try
+        {
+            PrepareRuntime();
+            var values = _values;
+            values[MagnetTape.StageWidthArg] = stageWidth;
+            values[MagnetTape.StageHeightArg] = stageHeight;
+            values[MagnetTape.StageRight] = stageWidth;
+            values[MagnetTape.StageBottom] = stageHeight;
+            _slopes[MagnetTape.StageRight] = 0;
+            _slopes[MagnetTape.StageBottom] = 0;
+
+            if (tape.HasFeedback)
+            {
+                SnapshotFeedback();
+            }
+
+            RunNormal(tape.X.Start, tape.X.ReqStart, MeasurePass.None);
+            RunNormal(tape.Y.Start, tape.Y.ReqStart, MeasurePass.None);
+
+            if (tape.HasFeedback && FeedbackChanged())
+            {
+                RunNormal(tape.X.Start, tape.X.ReqStart, MeasurePass.None);
+                RunNormal(tape.Y.Start, tape.Y.ReqStart, MeasurePass.None);
+            }
+
+            // The context string is built only on failure: this path must stay allocation-free.
+            CompareWithVerifySnapshot("arrange");
+        }
+        finally
+        {
+            RestoreVerifySnapshot();
+        }
+    }
+
+    private void SnapshotForVerify()
+    {
+        if (_verifyValues.Length != _values.Length)
+        {
+            // Normally pre-sized by Compile; resized here only if the flag was flipped mid-flight.
+            _verifyValues = new double[_values.Length];
+            _verifySlopes = new double[_slopes.Length];
+        }
+
+        Array.Copy(_values, _verifyValues, _values.Length);
+        Array.Copy(_slopes, _verifySlopes, _slopes.Length);
+    }
+
+    private void RestoreVerifySnapshot()
+    {
+        Array.Copy(_verifyValues, _values, _values.Length);
+        Array.Copy(_verifySlopes, _slopes, _slopes.Length);
+        _verifying = false;
+    }
+
+    private void CompareWithVerifySnapshot(string context)
+    {
+        var metas = _tape!.Nodes;
+
+        for (var i = 0; i < metas.Length; i++)
+        {
+            ref readonly var meta = ref metas[i];
+            CompareVerifySlot(i, meta.Left, "Left", context);
+            CompareVerifySlot(i, meta.Right, "Right", context);
+            CompareVerifySlot(i, meta.Top, "Top", context);
+            CompareVerifySlot(i, meta.Bottom, "Bottom", context);
+        }
+    }
+
+    private void CompareVerifySlot(int node, int slot, string pole, string context)
+    {
+        if (slot < 0)
+        {
+            return;
+        }
+
+        var reference = _values[slot];
+        var actual = _verifyValues[slot];
+
+        if (Math.Abs(reference - actual) > 1e-6 && !(double.IsNaN(reference) && double.IsNaN(actual)))
+        {
+            throw new InvalidOperationException(
+                $"Magnet solver verification failed ({context}): node '{_nodes[node].MagnetId}' {pole} is {actual} but the reference solve gives {reference}.");
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Snapshots the feedback slots (values used by the X pass) — call before executing.
