@@ -1428,11 +1428,18 @@ internal sealed class MagnetCompiler
         n.GapAfterSlots = new int[k];
         var gapsTotal = MagnetTape.Zero;
         var prefixVis = MagnetTape.Zero;
+        // A zero Gap in Anchors mode emits no gating ops at all (structural: fingerprinted, and the Gap
+        // setter classifies 0 <-> non-zero as a Structure change so the shortcut can never go stale).
+        var staticZeroGaps = !separators && ((MagnetChain) n.Node).Gap == 0;
 
         for (var i = 0; i < k; i++)
         {
             var ax = _nodes[n.Members[i]].Axes[axis];
-            prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
+
+            if (!staticZeroGaps)
+            {
+                prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
+            }
 
             if (i == k - 1)
             {
@@ -1466,6 +1473,10 @@ internal sealed class MagnetCompiler
             {
                 gap = Lin(g1, 1, g2, 1);
             }
+            else if (staticZeroGaps && !anchored)
+            {
+                gap = MagnetTape.Zero;
+            }
             else
             {
                 // Separator gating (anchored pairs in Separators mode and chain-Gap pairs in any mode):
@@ -1477,7 +1488,11 @@ internal sealed class MagnetCompiler
             }
 
             n.GapAfterSlots[i] = gap;
-            gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+
+            if (gap != MagnetTape.Zero)
+            {
+                gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+            }
         }
 
         n.GapsTotalSlot = gapsTotal;
@@ -1540,21 +1555,30 @@ internal sealed class MagnetCompiler
             // (fractions must be computed at runtime — visibility is not a patched input).
             var weightedCount = k - nwCount;
             var weightBlock = _slots;
-            _slots += weightedCount;
-            var gathered = weightBlock;
 
-            for (var i = 0; i < k; i++)
+            if (weightedCount > 1)
             {
-                var member = n.Members[i];
+                _slots += weightedCount;
+                var gathered = weightBlock;
 
-                if (_nodes[member].Axes[axis].Weighted)
+                for (var i = 0; i < k; i++)
                 {
-                    Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
+                    var member = n.Members[i];
+
+                    if (_nodes[member].Axes[axis].Weighted)
+                    {
+                        Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
+                    }
                 }
             }
 
-            var totalWeight = Alloc();
-            Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
+            var totalWeight = -1;
+
+            if (weightedCount > 1)
+            {
+                totalWeight = Alloc();
+                Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
+            }
 
             var gatheredSlot = weightBlock;
 
@@ -1567,7 +1591,9 @@ internal sealed class MagnetCompiler
                     continue;
                 }
 
-                var fraction = Div(gatheredSlot++, totalWeight);
+                // A single weighted member always takes the whole distributable space — no gather/sum/div
+                // needed (when hidden its size is zeroed by the VisSlot product anyway).
+                var fraction = weightedCount == 1 ? MagnetTape.One : Div(gatheredSlot++, totalWeight);
                 var raw = MulAdd(dist, fraction);
                 var bounded = ax.Size.HasBounds ? Clamp(raw, ax.MinSlot, ax.MaxSlot) : raw;
                 MulAddInto(ax.WeightedSizeSlot, bounded, _nodes[n.Members[i]].VisSlot);
