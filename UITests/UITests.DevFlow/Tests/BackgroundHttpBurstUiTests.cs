@@ -77,11 +77,12 @@ public class BackgroundHttpBurstUiTests(NaluApp app, ChaosServerFixture chaos) :
     }
 
     /// <summary>Runs one cell of the matrix and returns the parsed summary counters.</summary>
-    private async Task<IReadOnlyDictionary<string, long>> RunAsync(int count, string path, int logDelayMs)
+    private async Task<IReadOnlyDictionary<string, long>> RunAsync(int count, string path, int logDelayMs, int ballastMb)
     {
         await App.FillVerifiedAsync("BurstPath", path);
         await App.FillVerifiedAsync("BurstCount", count.ToString(CultureInfo.InvariantCulture));
         await App.FillVerifiedAsync("BurstLogDelayMs", logDelayMs.ToString(CultureInfo.InvariantCulture));
+        await App.FillVerifiedAsync("BurstBallastMb", ballastMb.ToString(CultureInfo.InvariantCulture));
         await App.TapAsync("BurstRunButton");
 
         var summary = await App.WaitForTextMatchAsync(
@@ -117,20 +118,22 @@ public class BackgroundHttpBurstUiTests(NaluApp app, ChaosServerFixture chaos) :
     /// the 10 ms logger stands in for a provider (Sentry, a flushing file sink) that does
     /// synchronous work inside every one of the delegate's ~12 on-queue Log calls.
     /// </summary>
-    private static readonly (int Count, string Path, int LogDelayMs)[] _matrix =
+    private static readonly (int Count, string Path, int LogDelayMs, int BallastMb)[] _matrix =
     [
-        // Small payload isolates pure queue latency from allocation pressure.
-        (8, "/ok", 0),
-        (24, "/ok", 0),
-        (48, "/ok", 0),
-        (24, "/ok", 25),
-        (48, "/ok", 25),
-        (48, "/ok", 50),
-        // Big payload adds the deferred-processing allocation the GC-pressure theory needs.
-        (8, "/huge?mb=5", 0),
-        (24, "/huge?mb=5", 0),
-        (24, "/huge?mb=5", 25),
-        (48, "/huge?mb=5", 50)
+        // Baselines, no pressure — these were all green in the first sweep.
+        (24, "/ok", 0, 0),
+        (48, "/ok", 50, 0),
+        (24, "/huge?mb=5", 0, 0),
+        (48, "/huge?mb=5", 50, 0),
+        // MEMORY PRESSURE: INERT, kept only as evidence. A .NET app on iOS sits PERMANENTLY
+        // above the high-memory-load threshold (~3.4-3.6 GB against a 3.3 GB threshold here), so
+        // the ballast breaks out before allocating anything — and, more importantly, the same
+        // fact means "memory load above threshold" in a crash report is the steady state, not a
+        // signal. It is also the wrong resource: iOS purges Library/Caches under DISK pressure.
+        (14, "/huge?mb=5", 0, 2000),
+        (24, "/ok", 0, 2000),
+        (24, "/huge?mb=5", 0, 2000),
+        (48, "/huge?mb=5", 0, 2000)
     ];
 
     /// <summary>
@@ -140,22 +143,74 @@ public class BackgroundHttpBurstUiTests(NaluApp app, ChaosServerFixture chaos) :
     private static string ReportPath
         => Environment.GetEnvironmentVariable("BURST_REPORT") ?? Path.Combine(AppContext.BaseDirectory, "burst-sweep.txt");
 
+    /// <summary>
+    /// The condition BOTH field events share and the sweep never had: the app leaves the
+    /// foreground while the downloads are still in flight.
+    /// </summary>
+    /// <remarks>
+    /// Both reports carry <c>In Foreground: false</c>, and the iPhone 13 Pro Max breadcrumbs show
+    /// user taps at 22.567 and 24.795 with the staging failure at 28.778 — the app backgrounded
+    /// mid-burst. Unlike disk or memory pressure this is ORDINARY user behaviour, which fits a
+    /// failure seen across many users on healthy devices. Repeated, because it is a race.
+    /// </remarks>
+    [Fact]
+    public async Task BackgroundedMidBurst()
+    {
+        await OpenAsync();
+
+        var table = new StringBuilder();
+        table.AppendLine("attempt | done  ok staging procerr err canceled elapsedMs");
+
+        var staged = 0L;
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await App.FillVerifiedAsync("BurstPath", "/huge?mb=5");
+            await App.FillVerifiedAsync("BurstCount", "14");
+            await App.FillVerifiedAsync("BurstLogDelayMs", "0");
+            await App.FillVerifiedAsync("BurstBallastMb", "0");
+            await App.TapAsync("BurstRunButton");
+
+            // Leave the app with transfers in flight, stay away long enough for them to finish
+            // under nsurlsessiond, then come back and read the outcome.
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            await App.BackgroundAppAsync();
+            await Task.Delay(TimeSpan.FromSeconds(12));
+            await App.ForegroundAppAsync();
+
+            var summary = await App.WaitForTextMatchAsync(
+                "BurstSummaryLabel",
+                t => t is not null && t != "idle" && t != "running",
+                _burstTimeout
+            );
+
+            var result = Parse(summary!);
+            staged += result.GetValueOrDefault("staging");
+
+            table.AppendLine(CultureInfo.InvariantCulture, $"{attempt,7} | {result.GetValueOrDefault("done"),4} {result.GetValueOrDefault("ok"),3} {result.GetValueOrDefault("staging"),7} {result.GetValueOrDefault("procerr"),7} {result.GetValueOrDefault("err"),3} {result.GetValueOrDefault("canceled"),8} {result.GetValueOrDefault("elapsedMs"),9}");
+        }
+
+        await File.WriteAllTextAsync(ReportPath + ".background.txt", table.ToString());
+
+        staged.Should().Be(0, $"backgrounding mid-burst must not lose downloaded files{Environment.NewLine}{table}");
+    }
+
     [Fact]
     public async Task Sweep()
     {
         await OpenAsync();
 
         var table = new StringBuilder();
-        table.AppendLine("burst payload            logMs | done  ok staging procerr err canceled elapsedMs maxMs logCalls");
+        table.AppendLine("burst payload            logMs ballMB | done  ok staging procerr err canceled elapsedMs maxMs logCalls memLoadMb memThrMb");
 
         var staged = 0L;
 
-        foreach (var (count, path, logDelayMs) in _matrix)
+        foreach (var (count, path, logDelayMs, ballastMb) in _matrix)
         {
-            var result = await RunAsync(count, path, logDelayMs);
+            var result = await RunAsync(count, path, logDelayMs, ballastMb);
             staged += result.GetValueOrDefault("staging");
 
-            table.AppendLine(CultureInfo.InvariantCulture, $"{count,5} {path,-18} {logDelayMs,5} | {result.GetValueOrDefault("done"),4} {result.GetValueOrDefault("ok"),3} {result.GetValueOrDefault("staging"),7} {result.GetValueOrDefault("procerr"),7} {result.GetValueOrDefault("err"),3} {result.GetValueOrDefault("canceled"),8} {result.GetValueOrDefault("elapsedMs"),9} {result.GetValueOrDefault("maxMs"),5} {result.GetValueOrDefault("logCalls"),8}");
+            table.AppendLine(CultureInfo.InvariantCulture, $"{count,5} {path,-18} {logDelayMs,5} {ballastMb,6} | {result.GetValueOrDefault("done"),4} {result.GetValueOrDefault("ok"),3} {result.GetValueOrDefault("staging"),7} {result.GetValueOrDefault("procerr"),7} {result.GetValueOrDefault("err"),3} {result.GetValueOrDefault("canceled"),8} {result.GetValueOrDefault("elapsedMs"),9} {result.GetValueOrDefault("maxMs"),5} {result.GetValueOrDefault("logCalls"),8} {result.GetValueOrDefault("memLoadMb"),9} {result.GetValueOrDefault("memThresholdMb"),8}");
         }
 
         await File.WriteAllTextAsync(ReportPath, table.ToString());
