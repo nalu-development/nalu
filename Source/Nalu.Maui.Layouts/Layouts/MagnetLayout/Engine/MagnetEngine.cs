@@ -673,6 +673,7 @@ internal sealed class MagnetEngine
     {
         var ops = _tape!.Ops;
         var coefficients = _tape.Coefficients;
+        var aux = _tape.AuxSlots;
         ref var v0 = ref MemoryMarshal.GetArrayDataReference(_values);
         ref var s0 = ref MemoryMarshal.GetArrayDataReference(_slopes);
 
@@ -763,6 +764,70 @@ internal sealed class MagnetEngine
                     Unsafe.Add(ref v0, op.Dst) = _vis[op.A] != 0 ? Unsafe.Add(ref v0, op.B) : coefficients[op.K1];
 
                     break;
+
+                case OpKind.SumIndexed:
+                {
+                    var sum = 0d;
+                    var last = op.A + op.B;
+
+                    for (var e = op.A; e < last; e++)
+                    {
+                        sum += Unsafe.Add(ref v0, aux[e]);
+                    }
+
+                    Unsafe.Add(ref v0, op.Dst) = sum;
+
+                    break;
+                }
+
+                case OpKind.ChainGaps:
+                {
+                    var prefix = 0d;
+                    var total = 0d;
+                    var last = op.A + (op.B * 6);
+
+                    for (var e = op.A; e < last; e += 6)
+                    {
+                        prefix += Unsafe.Add(ref v0, aux[e + 3]);
+                        var gap = Unsafe.Add(ref v0, aux[e + 1]) + Unsafe.Add(ref v0, aux[e + 2]);
+
+                        if (aux[e] != 0)
+                        {
+                            gap *= Unsafe.Add(ref v0, aux[e + 4]) * Math.Min(prefix, 1);
+                        }
+
+                        var dst = aux[e + 5];
+                        Unsafe.Add(ref v0, dst) = gap;
+                        Unsafe.Add(ref s0, dst) = 0;
+                        total += gap;
+                    }
+
+                    Unsafe.Add(ref v0, op.Dst) = total;
+
+                    break;
+                }
+
+                case OpKind.ChainFractions:
+                {
+                    var total = 0d;
+                    var last = op.A + (op.B * 3);
+
+                    for (var e = op.A; e < last; e += 3)
+                    {
+                        total += Unsafe.Add(ref v0, aux[e]) * Unsafe.Add(ref v0, aux[e + 1]);
+                    }
+
+                    Unsafe.Add(ref v0, op.Dst) = total;
+
+                    for (var e = op.A; e < last; e += 3)
+                    {
+                        var dst = aux[e + 2];
+                        Unsafe.Add(ref v0, dst) = total == 0 ? 0 : Unsafe.Add(ref v0, aux[e]) * Unsafe.Add(ref v0, aux[e + 1]) / total;
+                        Unsafe.Add(ref s0, dst) = 0;
+                    }
+
+                    break;
+                }
             }
         }
     }
@@ -770,11 +835,13 @@ internal sealed class MagnetEngine
     /// <summary>
     /// Executes ops in affine mode: every slot carries (value at stageEnd = 0, slope w.r.t. stageEnd);
     /// piecewise ops choose their branch at the current evaluation point.
+    /// ChainGaps/ChainFractions never appear here: they are emitted only in the phase-0 chain preamble.
     /// </summary>
     private void RunAffine(int start, int end, MeasurePass measure)
     {
         var ops = _tape!.Ops;
         var coefficients = _tape.Coefficients;
+        var aux = _tape.AuxSlots;
         ref var v0 = ref MemoryMarshal.GetArrayDataReference(_values);
         ref var s0 = ref MemoryMarshal.GetArrayDataReference(_slopes);
 
@@ -854,6 +921,25 @@ internal sealed class MagnetEngine
                     {
                         sum += Unsafe.Add(ref v0, s);
                         slope += Unsafe.Add(ref s0, s);
+                    }
+
+                    Unsafe.Add(ref v0, op.Dst) = sum;
+                    Unsafe.Add(ref s0, op.Dst) = slope;
+
+                    break;
+                }
+
+                case OpKind.SumIndexed:
+                {
+                    var sum = 0d;
+                    var slope = 0d;
+                    var last = op.A + op.B;
+
+                    for (var e = op.A; e < last; e++)
+                    {
+                        var slot = aux[e];
+                        sum += Unsafe.Add(ref v0, slot);
+                        slope += Unsafe.Add(ref s0, slot);
                     }
 
                     Unsafe.Add(ref v0, op.Dst) = sum;

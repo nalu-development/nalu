@@ -77,7 +77,8 @@ public class MagnetBenchmarks
     private static Magnet CreateMagnet()
     {
         const string p = MagnetAnchor.Parent;
-        var chain = new MagnetChain { MagnetId = "row" };
+        // MAGNET_BENCH_GAP sizes the cost of the chain-Gap runtime ops (0 = elided entirely).
+        var chain = new MagnetChain { MagnetId = "row", Gap = double.TryParse(Environment.GetEnvironmentVariable("MAGNET_BENCH_GAP"), out var g) ? g : 0 };
         var definition = new MagnetDefinition().Add(chain);
 
         for (var i = 0; i < _children.Length; i++)
