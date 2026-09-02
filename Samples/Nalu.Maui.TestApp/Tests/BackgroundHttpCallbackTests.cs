@@ -225,6 +225,8 @@ public class BackgroundHttpCallbackTests : ContentPage
             ("duplicate-identifier", DuplicateIdentifierAsync),
             ("lost-download", LostDownloadAsync),
             ("lost-error", LostErrorAsync),
+            ("lost-staging", LostStagingAsync),
+            ("cancel-then-finish", CancelThenFinishAsync),
             ("response-file-unlinked", ResponseFileUnlinkedAsync),
             ("staged-file-race", StagedFileRaceAsync),
             ("burst-completions", BurstCompletionsAsync),
@@ -917,6 +919,173 @@ public class BackgroundHttpCallbackTests : ContentPage
         {
             BackgroundHttpLostMessageHandler.Interceptor = null;
         }
+    }
+
+    /// <summary>
+    /// Captures staging/processing faults that resurface as
+    /// <see cref="TaskScheduler.UnobservedTaskException" /> — i.e. faults set on a
+    /// <see cref="TaskCompletionSource" /> that nothing will ever await.
+    /// </summary>
+    private sealed class UnobservedWatcher : IDisposable
+    {
+        private readonly Lock _gate = new();
+        private readonly List<string> _escaped = [];
+
+        public UnobservedWatcher() => TaskScheduler.UnobservedTaskException += OnUnobserved;
+
+        public string[] Escaped
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return [.. _escaped];
+                }
+            }
+        }
+
+        /// <summary>A faulted Task only reports itself unobserved once FINALIZED.</summary>
+        public static async Task SettleAsync()
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(250);
+            }
+        }
+
+        private void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            var text = e.Exception?.ToString() ?? string.Empty;
+
+            // Other scenarios share this process; only the staging/processing faults count.
+            if (text.Contains("Failed to secure downloaded file", StringComparison.Ordinal)
+                || text.Contains("Failed to process downloaded file", StringComparison.Ordinal))
+            {
+                lock (_gate)
+                {
+                    _escaped.Add(e.Exception?.InnerException?.Message ?? text);
+                }
+            }
+
+            // Claim it either way: leaving it unobserved would leak into whatever the host app
+            // has attached to this event (in production, Sentry).
+            e.SetObserved();
+        }
+
+        public void Dispose() => TaskScheduler.UnobservedTaskException -= OnUnobserved;
+    }
+
+    /// <summary>
+    /// THE PRODUCTION FAILURE, deterministically: a staging loss on a handle nobody owns.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Field evidence (Sentry, iPhone 8 / iOS 16.7): nsurlsessiond finishes a background
+    /// download, then the app cannot run the callback for a long time — the process died, or it
+    /// sat suspended for hours. Meanwhile iOS purges <c>Library/Caches</c> under memory
+    /// pressure, and that is where the downloaded temp file lives. When the callback finally
+    /// arrives the file is gone (<c>ENOENT</c>, "source file exists: False") AND the request has
+    /// no owner, because whoever awaited it is long gone.
+    /// </para>
+    /// <para>
+    /// <see cref="MissingDownloadFileAsync" /> already covers the OWNED half of this: there a
+    /// caller awaits the handle, observes the fault and everything is clean. The unowned half is
+    /// what reaches production — the delegate faults a <see cref="TaskCompletionSource" /> that
+    /// nothing will ever await, so the exception resurfaces at FINALIZATION as
+    /// <see cref="TaskScheduler.UnobservedTaskException" /> and gets reported as an unhandled
+    /// error. Every one of the delegate's nine TrySetException/TrySetCanceled sites is exposed;
+    /// only the SUCCESS path checks <c>IsLostRequest</c>.
+    /// </para>
+    /// <para>
+    /// Note this asserts only the leak, not how it should be fixed: whether an unowned failure
+    /// belongs on the lost-message handler or should simply be absorbed is a design decision for
+    /// the fix — <see cref="LostErrorAsync" /> currently says error completions must NOT reach
+    /// that handler. <c>lostHandlerSaw</c> is reported for diagnosis, not asserted.
+    /// </para>
+    /// </remarks>
+    private async Task LostStagingAsync()
+    {
+        var id = $"cb-loststage-{Guid.NewGuid():N}";
+        var missingPath = Path.Combine(Path.GetTempPath(), $"chaos-loststage-{Guid.NewGuid():N}.download");
+
+        var lostHandlerSaw = false;
+        BackgroundHttpLostMessageHandler.Interceptor = _ =>
+        {
+            lostHandlerSaw = true;
+
+            return Task.CompletedTask;
+        };
+
+        using var unobserved = new UnobservedWatcher();
+
+        try
+        {
+            // No CreatePendingAsync on purpose: nothing owns this identifier.
+            InvokeFinished(new FakeTask { Desc = id, TaskResponse = MakeHttpResponse() }, missingPath);
+
+            await Task.Delay(1_000);
+
+            Check(!SessionHandler.GetPendingResponses().ContainsKey(id), "the lost staging failure leaked a pending handle");
+
+            await UnobservedWatcher.SettleAsync();
+
+            var escaped = unobserved.Escaped;
+            Check(escaped.Length == 0,
+                $"the staging failure escaped as UnobservedTaskException x{escaped.Length} (lostHandlerSaw={lostHandlerSaw}): {string.Join(" | ", escaped)}"
+            );
+        }
+        finally
+        {
+            BackgroundHttpLostMessageHandler.Interceptor = null;
+        }
+    }
+
+    /// <summary>
+    /// HOW a request the app itself started becomes unowned: the cancel/completion race.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the production trigger, and it needs no memory pressure, no burst and no
+    /// suspension. When the caller cancels, the token registration calls <c>task.Cancel()</c> —
+    /// which makes nsurlsessiond DELETE the downloaded temp file — and <c>SendAsync</c> then
+    /// runs <c>CompleteAndRemoveHandle</c>, dropping the identifier from the pending map on the
+    /// assumption (stated in its own comment) that "the native completion callback may never
+    /// arrive for a canceled background task".
+    /// </para>
+    /// <para>
+    /// But it CAN arrive: if the download had already finished when the cancel landed, the
+    /// queued <c>DidFinishDownloading</c> still runs. It finds no pending handle, synthesizes a
+    /// LOST one, fails to stage because the cancel deleted the file — "source file exists:
+    /// False" — and faults a completion source nobody awaits.
+    /// </para>
+    /// </remarks>
+    private async Task CancelThenFinishAsync()
+    {
+        using var pending = await CreatePendingAsync("cancelrace");
+        var id = pending.Id;
+        var missingPath = Path.Combine(Path.GetTempPath(), $"chaos-cancelrace-{Guid.NewGuid():N}.download");
+
+        using var unobserved = new UnobservedWatcher();
+
+        // The caller cancels and observes its own cancellation — nothing wrong so far.
+        await pending.Cts.CancelAsync();
+        var exception = await AwaitFaultAsync(pending.ResponseTask, "cancellation", 5_000);
+        Check(exception is OperationCanceledException, $"expected OperationCanceledException, got {exception.GetType().Name}");
+        await WaitRemovedFromPendingAsync(id);
+
+        // The completion that was already in flight when the cancel landed, arriving to find the
+        // file deleted by that very cancel.
+        InvokeFinished(new FakeTask { Desc = id, TaskResponse = MakeHttpResponse() }, missingPath);
+
+        await Task.Delay(1_000);
+        await UnobservedWatcher.SettleAsync();
+
+        var escaped = unobserved.Escaped;
+        Check(escaped.Length == 0,
+            $"the post-cancel completion escaped as UnobservedTaskException x{escaped.Length}: {string.Join(" | ", escaped)}"
+        );
     }
 
     private async Task CancellationAsync()
