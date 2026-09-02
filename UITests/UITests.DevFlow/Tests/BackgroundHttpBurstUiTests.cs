@@ -77,13 +77,24 @@ public class BackgroundHttpBurstUiTests(NaluApp app, ChaosServerFixture chaos) :
     }
 
     /// <summary>Runs one cell of the matrix and returns the parsed summary counters.</summary>
-    private async Task<IReadOnlyDictionary<string, long>> RunAsync(int count, string path, int logDelayMs, int ballastMb)
+    private async Task<IReadOnlyDictionary<string, long>> RunAsync(int count, string path, int logDelayMs, int ballastMb, bool background)
     {
         await App.FillVerifiedAsync("BurstPath", path);
         await App.FillVerifiedAsync("BurstCount", count.ToString(CultureInfo.InvariantCulture));
         await App.FillVerifiedAsync("BurstLogDelayMs", logDelayMs.ToString(CultureInfo.InvariantCulture));
         await App.FillVerifiedAsync("BurstBallastMb", ballastMb.ToString(CultureInfo.InvariantCulture));
         await App.TapAsync("BurstRunButton");
+
+        if (background)
+        {
+            // Leave with transfers in flight. 500 ms rather than seconds so even the fast /ok
+            // rows are still working when the app goes away; 12 s away is long enough for
+            // nsurlsessiond to finish and hold completions for a suspended app.
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            await App.BackgroundAppAsync();
+            await Task.Delay(TimeSpan.FromSeconds(12));
+            await App.ForegroundAppAsync();
+        }
 
         var summary = await App.WaitForTextMatchAsync(
             "BurstSummaryLabel",
@@ -144,55 +155,36 @@ public class BackgroundHttpBurstUiTests(NaluApp app, ChaosServerFixture chaos) :
         => Environment.GetEnvironmentVariable("BURST_REPORT") ?? Path.Combine(AppContext.BaseDirectory, "burst-sweep.txt");
 
     /// <summary>
-    /// The condition BOTH field events share and the sweep never had: the app leaves the
-    /// foreground while the downloads are still in flight.
+    /// The same matrix as <see cref="Sweep" />, with the app leaving the foreground while the
+    /// transfers are in flight — one variable changed, so the two tables are comparable.
     /// </summary>
     /// <remarks>
-    /// Both reports carry <c>In Foreground: false</c>, and the iPhone 13 Pro Max breadcrumbs show
-    /// user taps at 22.567 and 24.795 with the staging failure at 28.778 — the app backgrounded
-    /// mid-burst. Unlike disk or memory pressure this is ORDINARY user behaviour, which fits a
-    /// failure seen across many users on healthy devices. Repeated, because it is a race.
+    /// Both field events carry <c>In Foreground: false</c>, and the iPhone 13 Pro Max
+    /// breadcrumbs show user taps at 22.567 and 24.795 with the staging failure at 28.778: the
+    /// app backgrounded mid-burst. Unlike disk or memory pressure that is ORDINARY user
+    /// behaviour, which fits a failure seen across many users on healthy devices.
     /// </remarks>
     [Fact]
-    public async Task BackgroundedMidBurst()
+    public async Task SweepBackgrounded()
     {
         await OpenAsync();
 
         var table = new StringBuilder();
-        table.AppendLine("attempt | done  ok staging procerr err canceled elapsedMs");
+        table.AppendLine("burst payload            logMs ballMB | done  ok staging procerr err canceled elapsedMs maxMs logCalls memLoadMb memThrMb");
 
         var staged = 0L;
 
-        for (var attempt = 1; attempt <= 3; attempt++)
+        foreach (var (count, path, logDelayMs, ballastMb) in _matrix)
         {
-            await App.FillVerifiedAsync("BurstPath", "/huge?mb=5");
-            await App.FillVerifiedAsync("BurstCount", "14");
-            await App.FillVerifiedAsync("BurstLogDelayMs", "0");
-            await App.FillVerifiedAsync("BurstBallastMb", "0");
-            await App.TapAsync("BurstRunButton");
-
-            // Leave the app with transfers in flight, stay away long enough for them to finish
-            // under nsurlsessiond, then come back and read the outcome.
-            await Task.Delay(TimeSpan.FromSeconds(2));
-            await App.BackgroundAppAsync();
-            await Task.Delay(TimeSpan.FromSeconds(12));
-            await App.ForegroundAppAsync();
-
-            var summary = await App.WaitForTextMatchAsync(
-                "BurstSummaryLabel",
-                t => t is not null && t != "idle" && t != "running",
-                _burstTimeout
-            );
-
-            var result = Parse(summary!);
+            var result = await RunAsync(count, path, logDelayMs, ballastMb, background: true);
             staged += result.GetValueOrDefault("staging");
 
-            table.AppendLine(CultureInfo.InvariantCulture, $"{attempt,7} | {result.GetValueOrDefault("done"),4} {result.GetValueOrDefault("ok"),3} {result.GetValueOrDefault("staging"),7} {result.GetValueOrDefault("procerr"),7} {result.GetValueOrDefault("err"),3} {result.GetValueOrDefault("canceled"),8} {result.GetValueOrDefault("elapsedMs"),9}");
+            table.AppendLine(CultureInfo.InvariantCulture, $"{count,5} {path,-18} {logDelayMs,5} {ballastMb,6} | {result.GetValueOrDefault("done"),4} {result.GetValueOrDefault("ok"),3} {result.GetValueOrDefault("staging"),7} {result.GetValueOrDefault("procerr"),7} {result.GetValueOrDefault("err"),3} {result.GetValueOrDefault("canceled"),8} {result.GetValueOrDefault("elapsedMs"),9} {result.GetValueOrDefault("maxMs"),5} {result.GetValueOrDefault("logCalls"),8} {result.GetValueOrDefault("memLoadMb"),9} {result.GetValueOrDefault("memThresholdMb"),8}");
         }
 
-        await File.WriteAllTextAsync(ReportPath + ".background.txt", table.ToString());
+        await File.WriteAllTextAsync(ReportPath + ".backgrounded.txt", table.ToString());
 
-        staged.Should().Be(0, $"backgrounding mid-burst must not lose downloaded files{Environment.NewLine}{table}");
+        staged.Should().Be(0, $"no backgrounded burst should lose a downloaded file{Environment.NewLine}{Environment.NewLine}{table}");
     }
 
     [Fact]
@@ -207,7 +199,7 @@ public class BackgroundHttpBurstUiTests(NaluApp app, ChaosServerFixture chaos) :
 
         foreach (var (count, path, logDelayMs, ballastMb) in _matrix)
         {
-            var result = await RunAsync(count, path, logDelayMs, ballastMb);
+            var result = await RunAsync(count, path, logDelayMs, ballastMb, background: false);
             staged += result.GetValueOrDefault("staging");
 
             table.AppendLine(CultureInfo.InvariantCulture, $"{count,5} {path,-18} {logDelayMs,5} {ballastMb,6} | {result.GetValueOrDefault("done"),4} {result.GetValueOrDefault("ok"),3} {result.GetValueOrDefault("staging"),7} {result.GetValueOrDefault("procerr"),7} {result.GetValueOrDefault("err"),3} {result.GetValueOrDefault("canceled"),8} {result.GetValueOrDefault("elapsedMs"),9} {result.GetValueOrDefault("maxMs"),5} {result.GetValueOrDefault("logCalls"),8} {result.GetValueOrDefault("memLoadMb"),9} {result.GetValueOrDefault("memThresholdMb"),8}");
