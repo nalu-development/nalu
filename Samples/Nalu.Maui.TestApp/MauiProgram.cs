@@ -88,6 +88,11 @@ public static class MauiProgram
         builder.Logging.AddDebug();
         builder.Logging.AddSimpleConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Debug);
+
+        // Prices ILogger on the background-session delegate's SERIAL callback queue for the
+        // "Background Http Burst" harness. Inert (0 ms, and only that one category) until a
+        // burst run sets a delay.
+        builder.Logging.AddProvider(new Tests.BackgroundHttpBurstLoggerProvider());
 #endif
 
 #if DEBUG && (ANDROID || IOS || MACCATALYST || WINDOWS)
