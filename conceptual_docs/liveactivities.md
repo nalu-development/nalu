@@ -236,6 +236,32 @@ neither reaches your code. Note the asymmetry it papers over: Android would genu
 resurrect the notification on the next `notify()`, while ActivityKit merely ignores updates —
 without this, the same app code would behave differently per platform.
 
+## …but not forever, and not everywhere
+
+Two iOS limits are worth knowing before you design around a Live Activity, because neither is
+something the content model can influence.
+
+**A Live Activity lives about 8 hours.** After that iOS ends it on its own, removing it from the
+Dynamic Island immediately and from the Lock Screen a few hours later. A timer longer than that
+will always outlive its activity, and an activity left running overnight is simply gone by
+morning — not broken, ended. If your session can outlast the limit, end it and start a fresh one
+rather than expecting a single activity to span a day.
+
+Note this is about the activity's own AGE, not the timer's length: ActivityKit accepts a
+countdown of any duration, including one whose end is already in the past (verified on device
+from 48 hours ahead to 22 hours elapsed), and the widget renders an elapsed range correctly.
+
+**The Dynamic Island needs an iPhone 14 Pro or later.** On a notch device — iPhone 13 and
+earlier — Live Activities are fully supported but only ever appear on the **Lock Screen** and as
+alert banners; the compact and minimal presentations have nowhere to draw. If you are testing
+and "nothing shows up near the notch", check the device before the code. An iPhone 15/16 Pro
+simulator renders all three presentations.
+
+> [!TIP]
+> A foreground app never shows its own Live Activity. Background the app (or lock the device) to
+> see it at all — a start call that returned successfully is not evidence that anything was
+> presented.
+
 ## Activities outlive your app
 
 This is a feature, not a leak: a delivery keeps its Live Activity when the app dies, on both
