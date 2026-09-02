@@ -15,6 +15,13 @@ public class LiveActivityTests : ContentPage
 {
     private readonly ILiveActivityManager _manager;
     private readonly Label _statusLabel;
+
+    /// <summary>
+    /// Countdown length in HOURS. Exists to probe whether a long-running timer prevents the
+    /// activity from appearing: ActivityKit ends any Live Activity after its system limit, so a
+    /// multi-hour countdown is worth distinguishing from one that is simply never accepted.
+    /// </summary>
+    private readonly Entry _hoursEntry;
     private ILiveActivity? _activity;
     private double _progress;
 
@@ -32,6 +39,15 @@ public class LiveActivityTests : ContentPage
             Track(_activity);
         }
 
+        _hoursEntry = new Entry
+        {
+            AutomationId = "LiveActivityHours",
+            Text = "0.2",
+            Keyboard = Keyboard.Numeric,
+            MinimumWidthRequest = 90,
+            Placeholder = "hours"
+        };
+
         _statusLabel = new Label
         {
             AutomationId = "LiveActivityStatus",
@@ -47,6 +63,7 @@ public class LiveActivityTests : ContentPage
             Children =
             {
                 _statusLabel,
+                _hoursEntry,
                 CreateButton("LiveActivityRequestPermission", "Request permission", RequestPermissionAsync),
                 CreateButton("LiveActivityStart", "Start", StartAsync),
                 CreateButton("LiveActivityAdvance", "Advance progress", AdvanceAsync),
@@ -86,7 +103,15 @@ public class LiveActivityTests : ContentPage
     private async Task StartAsync()
     {
         _progress = 0.4;
-        var eta = DateTimeOffset.UtcNow.AddMinutes(12);
+
+        // NEGATIVE is the interesting case: an end already in the past drives the widget's
+        // OVERFLOW branch, whose Text(timerInterval:) range is bounded to end+1h — so once the
+        // activity is more than an hour over, SwiftUI is handed a range entirely in the past.
+        var hours = double.TryParse(_hoursEntry.Text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed) && parsed != 0
+            ? parsed
+            : 0.2;
+
+        var eta = DateTimeOffset.UtcNow.AddHours(hours);
         _activity = await _manager.StartAsync("demo", new LiveActivityContent
         {
             Title = "Pizza Margherita ×2",
@@ -114,7 +139,9 @@ public class LiveActivityTests : ContentPage
             // StaleAt at the countdown end makes the SYSTEM re-render the widget at the
             // boundary (ActivityKit staleDate): the countdown flips to negative overflow
             // with no app involvement — the only zero-crossing trigger iOS offers.
-            StaleAt = eta,
+            // Only when it is still ahead: a stale date in the past would make the content
+            // immediately stale, confounding the timer-range question under test.
+            StaleAt = eta > DateTimeOffset.UtcNow ? eta : null,
             Actions =
             [
                 // v1: link-backed actions render as buttons and open the app at the link.
@@ -125,7 +152,7 @@ public class LiveActivityTests : ContentPage
             ]
         });
         Track(_activity);
-        SetStatus($"Started {_activity.Id} ({_activity.State})");
+        SetStatus($"Started {_activity.Id} ({_activity.State}) hours={hours.ToString(System.Globalization.CultureInfo.InvariantCulture)} known={_manager.Activities.Count}");
     }
 
     private async Task AdvanceAsync()
