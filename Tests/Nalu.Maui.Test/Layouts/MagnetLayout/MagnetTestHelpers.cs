@@ -80,20 +80,14 @@ internal sealed class EngineHarness
     public MagnetEngine Engine { get; } = new();
 
     public MagnetView View(string id, double width, double height, bool shrink = false, bool wraps = false)
-    {
-        var view = new FakeView(width, height, shrink, wraps);
-        var node = new MagnetView { MagnetId = id, View = view.View };
-        _views[id] = view;
-        _nodes.Add(node);
-
-        return node;
-    }
+        => View(id, new FakeView(width, height, shrink, wraps));
 
     public MagnetView View(string id, FakeView view)
     {
-        var node = new MagnetView { MagnetId = id, View = view.View };
+        var node = new MagnetView { MagnetId = id };
         _views[id] = view;
         _nodes.Add(node);
+        Engine.BindView(node, view.View);
 
         return node;
     }
@@ -130,7 +124,7 @@ internal sealed class EngineHarness
         var h = arrangeH ?? measured.Height;
         var reuse = Math.Abs(w - measured.Width) < 0.5 || Math.Abs(w - wc) < 0.5;
         reuse &= Math.Abs(h - measured.Height) < 0.5 || Math.Abs(h - hc) < 0.5;
-        Engine.Arrange(w, h, !reuse);
+        Engine.Arrange(w, h, reuse ? MeasurePass.Deferred : MeasurePass.All);
 
         return measured;
     }

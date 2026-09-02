@@ -293,6 +293,79 @@ public class MagnetChainMarginTests
     }
 
     [Fact]
+    public void ZeroGapIsStructuralAndNonZeroTransitionsRecompile()
+    {
+        // The compiler omits the gap ops entirely for Gap == 0: the zero-ness is part of the fingerprint
+        // and crossing 0 <-> non-zero is a Structure change (never a stale dead-input patch).
+        MagnetNode[] Create(double gap) =>
+        [
+            new MagnetView().Id("a").Left(P).Top(P),
+            new MagnetView().Id("b").Top(P),
+            new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed, Gap = gap }.With("a", "b")
+        ];
+
+        Nalu.MagnetLayout.Engine.MagnetCompiler.GetOrCompile(Create(0))
+            .Should().NotBeSameAs(Nalu.MagnetLayout.Engine.MagnetCompiler.GetOrCompile(Create(10)));
+        Nalu.MagnetLayout.Engine.MagnetCompiler.GetOrCompile(Create(4))
+            .Should().BeSameAs(Nalu.MagnetLayout.Engine.MagnetCompiler.GetOrCompile(Create(8)), "non-zero gaps share the tape (patched value)");
+
+        var chain = new MagnetChain { MagnetId = "row", Gap = 0 };
+        var changes = new List<MagnetChange>();
+        var probe = new OwnerProbe(changes);
+        chain.Attach(probe);
+
+        chain.Gap = 12;
+        chain.Gap = 20;
+        chain.Gap = 0;
+
+        changes.Should().Equal(MagnetChange.Structure, MagnetChange.Values, MagnetChange.Structure);
+    }
+
+    private sealed class OwnerProbe(List<MagnetChange> changes) : IMagnetOwner
+    {
+        public void OnNodeChanged(MagnetNode? node, MagnetChange change) => changes.Add(change);
+
+        public void OnApplyVisibilityRequested(MagnetView node) { }
+    }
+
+    [Fact]
+    public void RuntimeGapFromZeroTakesEffectThroughRecompilation()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Bias(0, 0.5);
+        h.View("b", 30, 20).Top(P);
+        var chain = h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed }.With("a", "b"));
+
+        h.Layout(200, 100, 200, 100);
+        h.Frame("b").ShouldBe(30, 0, 30, 20);
+
+        // 0 -> 12 is structural: recompile (fresh tape) and the gap appears.
+        chain.Gap = 12;
+        h.Compile();
+        h.Layout(200, 100, 200, 100);
+        h.Frame("b").ShouldBe(42, 0, 30, 20);
+    }
+
+    [Fact]
+    public void SingleWeightedMemberTakesTheWholeDistributableSpace()
+    {
+        var h = new EngineHarness();
+        h.View("a", 30, 20).Left(P).Top(P).Size(MagnetSizing.Constraint, 20);
+        h.View("b", 40, 20).Right(P).Top(P).Size(40, 20);
+        h.Add(new MagnetChain { MagnetId = "row", Style = MagnetChainStyle.Packed }.With("a", "b"));
+
+        h.Layout(200, 100, 200, 100);
+        h.Frame("a").ShouldBe(0, 0, 160, 20);
+
+        // Hidden single weighted member: size zeroed by visibility regardless of the fraction shortcut
+        // (the packed group — now just b — centers with the default bias, so the zero-size a sits at 80).
+        h.Fake("a").Visibility = Visibility.Collapsed;
+        h.Layout(200, 100, 200, 100);
+        h.Frame("a").ShouldBe(80, 0, 0, 0);
+        h.Frame("b").ShouldBe(80, 0, 40, 20);
+    }
+
+    [Fact]
     public void GapIsAnAnimatableValuePatch()
     {
         var h = new EngineHarness();

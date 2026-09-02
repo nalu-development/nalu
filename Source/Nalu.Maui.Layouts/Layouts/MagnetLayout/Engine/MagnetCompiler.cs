@@ -70,6 +70,7 @@ internal sealed class MagnetCompiler
     private readonly List<MarginEntry> _margins;
     private readonly List<int> _reqSlots;
     private readonly List<int> _feedbackSlots = [];
+    private readonly List<int> _deferredMeasureOps = [];
     private bool _hasStageDependentMeasures;
     private int _slots;
     private int _inputStart, _inputEnd;
@@ -110,7 +111,6 @@ internal sealed class MagnetCompiler
                     _ => throw new NotSupportedException($"Unsupported node type {node.GetType().Name}.")
                 }
             };
-            node.Index = i;
         }
     }
 
@@ -126,11 +126,6 @@ internal sealed class MagnetCompiler
 
         if (MagnetTapeCache.TryGet(key, out var cached))
         {
-            for (var i = 0; i < nodes.Count; i++)
-            {
-                nodes[i].Index = i;
-            }
-
             return cached;
         }
 
@@ -201,7 +196,7 @@ internal sealed class MagnetCompiler
         // Safety net: the executor accesses slots without bounds checks, so every index must be valid here.
         foreach (var op in _ops)
         {
-            var dstOk = op.Kind == OpKind.MeasureChild ? op.Dst == -1 : (uint) op.Dst < (uint) _slots;
+            var dstOk = op.Kind == OpKind.MeasureChild ? op.Dst is -1 or -2 : (uint) op.Dst < (uint) _slots;
             var rangeOp = op.Kind is OpKind.MinRange or OpKind.MaxRange or OpKind.SumRange;
             var aOk = op.Kind is OpKind.MeasureChild or OpKind.Gather ? (uint) op.A < (uint) _nodes.Length : op.Kind == OpKind.StageEnd || (uint) op.A < (uint) _slots;
             var bOk = rangeOp ? op.B >= 0 && op.A + op.B <= _slots : op.Kind == OpKind.StageEnd || (uint) op.B < (uint) _slots;
@@ -246,7 +241,8 @@ internal sealed class MagnetCompiler
             InputStart = _inputStart,
             InputEnd = _inputEnd,
             FeedbackSlots = _feedbackSlots.ToArray(),
-            HasStageDependentMeasures = _hasStageDependentMeasures
+            HasDeferredMeasures = _hasStageDependentMeasures,
+            DeferredMeasureOps = _deferredMeasureOps.ToArray()
         };
     }
 
@@ -1340,10 +1336,18 @@ internal sealed class MagnetCompiler
             // MAUI contract: every child is measured each pass. Views with no Measured axis are measured
             // with their EXACT resolved sizes (like a Grid star cell) once both axes are known — skipping
             // this leaves platform containers with a zero DesiredSize and their content never laid out.
-            // The op itself may sit in Y phase 0 while reading a stage-dependent X size (finalized at the
-            // hug): flag it from the CONSTRAINT dependencies, not from the op's own phase.
-            Emit(new Op(OpKind.MeasureChild, -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
-            _hasStageDependentMeasures |= n.Axes[0].StageDependent || stageDependent;
+            // A stage-dependent constraint means the measure-pass value (finalized at the hug) is the wrong
+            // solution for a differently-sized arrange: mark the op DEFERRED (Dst = -2) — skipped during the
+            // measure pass and executed at arrange with the real solution.
+            var deferred = n.Axes[0].StageDependent || stageDependent;
+
+            if (deferred)
+            {
+                _deferredMeasureOps.Add(_ops.Count);
+            }
+
+            Emit(new Op(OpKind.MeasureChild, deferred ? -2 : -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
+            _hasStageDependentMeasures |= deferred;
         }
     }
 
@@ -1424,11 +1428,18 @@ internal sealed class MagnetCompiler
         n.GapAfterSlots = new int[k];
         var gapsTotal = MagnetTape.Zero;
         var prefixVis = MagnetTape.Zero;
+        // A zero Gap in Anchors mode emits no gating ops at all (structural: fingerprinted, and the Gap
+        // setter classifies 0 <-> non-zero as a Structure change so the shortcut can never go stale).
+        var staticZeroGaps = !separators && ((MagnetChain) n.Node).Gap == 0;
 
         for (var i = 0; i < k; i++)
         {
             var ax = _nodes[n.Members[i]].Axes[axis];
-            prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
+
+            if (!staticZeroGaps)
+            {
+                prefixVis = Lin(prefixVis, 1, _nodes[n.Members[i]].VisSlot, 1);
+            }
 
             if (i == k - 1)
             {
@@ -1462,6 +1473,10 @@ internal sealed class MagnetCompiler
             {
                 gap = Lin(g1, 1, g2, 1);
             }
+            else if (staticZeroGaps && !anchored)
+            {
+                gap = MagnetTape.Zero;
+            }
             else
             {
                 // Separator gating (anchored pairs in Separators mode and chain-Gap pairs in any mode):
@@ -1473,7 +1488,11 @@ internal sealed class MagnetCompiler
             }
 
             n.GapAfterSlots[i] = gap;
-            gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+
+            if (gap != MagnetTape.Zero)
+            {
+                gapsTotal = gapsTotal == MagnetTape.Zero ? Lin(gap, 1) : Lin(gapsTotal, 1, gap, 1);
+            }
         }
 
         n.GapsTotalSlot = gapsTotal;
@@ -1536,21 +1555,30 @@ internal sealed class MagnetCompiler
             // (fractions must be computed at runtime — visibility is not a patched input).
             var weightedCount = k - nwCount;
             var weightBlock = _slots;
-            _slots += weightedCount;
-            var gathered = weightBlock;
 
-            for (var i = 0; i < k; i++)
+            if (weightedCount > 1)
             {
-                var member = n.Members[i];
+                _slots += weightedCount;
+                var gathered = weightBlock;
 
-                if (_nodes[member].Axes[axis].Weighted)
+                for (var i = 0; i < k; i++)
                 {
-                    Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
+                    var member = n.Members[i];
+
+                    if (_nodes[member].Axes[axis].Weighted)
+                    {
+                        Emit(new Op(OpKind.Gather, gathered++, member, n.WeightSlots[i], MagnetTape.Zero, Coef(0)));
+                    }
                 }
             }
 
-            var totalWeight = Alloc();
-            Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
+            var totalWeight = -1;
+
+            if (weightedCount > 1)
+            {
+                totalWeight = Alloc();
+                Emit(new Op(OpKind.SumRange, totalWeight, weightBlock, weightedCount, MagnetTape.Zero));
+            }
 
             var gatheredSlot = weightBlock;
 
@@ -1563,7 +1591,9 @@ internal sealed class MagnetCompiler
                     continue;
                 }
 
-                var fraction = Div(gatheredSlot++, totalWeight);
+                // A single weighted member always takes the whole distributable space — no gather/sum/div
+                // needed (when hidden its size is zeroed by the VisSlot product anyway).
+                var fraction = weightedCount == 1 ? MagnetTape.One : Div(gatheredSlot++, totalWeight);
                 var raw = MulAdd(dist, fraction);
                 var bounded = ax.Size.HasBounds ? Clamp(raw, ax.MinSlot, ax.MaxSlot) : raw;
                 MulAddInto(ax.WeightedSizeSlot, bounded, _nodes[n.Members[i]].VisSlot);

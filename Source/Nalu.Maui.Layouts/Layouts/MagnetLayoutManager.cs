@@ -83,15 +83,9 @@ internal class MagnetLayoutManager(Magnet magnet) : LayoutManager(magnet)
                         && MatchesAxis(width, engine.LastMeasureArgs.Width, engine.LastMeasured.Width)
                         && MatchesAxis(height, engine.LastMeasureArgs.Height, engine.LastMeasured.Height);
 
-            if (reuse && engine.Tape!.HasStageDependentMeasures)
-            {
-                // Stage-dependent measures are valid only for the solved (hug) size: at any other arrange
-                // size the children were measured against the wrong solution and must be re-measured.
-                reuse = Math.Abs(width - engine.LastMeasured.Width) < 0.5
-                        && Math.Abs(height - engine.LastMeasured.Height) < 0.5;
-            }
-
-            engine.Arrange(width, height, !reuse);
+            // Reuse keeps the measure-pass results and only runs the DEFERRED child measures (the ones whose
+            // constraints depend on the stage end, now solved for the real arrange size).
+            engine.Arrange(width, height, reuse ? MagnetLayout.Engine.MeasurePass.Deferred : MagnetLayout.Engine.MeasurePass.All);
             ArrangeNodes(engine, left, top);
         }
 

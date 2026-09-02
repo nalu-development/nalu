@@ -4,6 +4,19 @@ using System.Runtime.InteropServices;
 namespace Nalu.MagnetLayout.Engine;
 
 /// <summary>
+/// Which MeasureChild ops an execution runs. IMMEDIATE ops (Dst = -1) measure during the measure pass with
+/// constraints valid at the requested size; DEFERRED ops (Dst = -2) have stage-dependent constraints and only
+/// measure at arrange time, when the real solution is known.
+/// </summary>
+internal enum MeasurePass : byte
+{
+    None,
+    Deferred,
+    Immediate,
+    All
+}
+
+/// <summary>
 /// Owns the compiled tape and the value array of one <see cref="Magnet" /> instance and executes it.
 /// </summary>
 internal sealed class MagnetEngine
@@ -16,7 +29,11 @@ internal sealed class MagnetEngine
     private double[] _feedbackPrev = [];
     private byte[] _vis = [];
     private IView?[] _views = [];
+    private IView?[] _bound = [];
+    private readonly Dictionary<MagnetView, IView?> _bindings = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<MagnetNode, int> _indexOf = new(ReferenceEqualityComparer.Instance);
     private double _eval;
+    private bool _deferredMeasured;
     private HashSet<int>? _forcedCollapsed;
 
     /// <summary>
@@ -63,10 +80,12 @@ internal sealed class MagnetEngine
         _tape = tape;
         _nodes = nodes as MagnetNode[] ?? nodes.ToArray();
         _ids = new Dictionary<string, int>(_nodes.Length, StringComparer.Ordinal);
+        _indexOf.Clear();
 
         for (var i = 0; i < _nodes.Length; i++)
         {
             _ids[_nodes[i].MagnetId!] = i;
+            _indexOf[_nodes[i]] = i;
         }
 
         if (_values.Length != tape.ValueCount)
@@ -84,6 +103,31 @@ internal sealed class MagnetEngine
         {
             _vis = new byte[_nodes.Length];
             _views = new IView?[_nodes.Length];
+            _bound = new IView?[_nodes.Length];
+        }
+
+        // Project the per-layout view bindings onto the compiled order (and drop bindings of swapped-out nodes).
+        Array.Clear(_bound);
+        List<MagnetView>? stale = null;
+
+        foreach (var (node, view) in _bindings)
+        {
+            if (_indexOf.TryGetValue(node, out var index))
+            {
+                _bound[index] = view;
+            }
+            else
+            {
+                (stale ??= []).Add(node);
+            }
+        }
+
+        if (stale is not null)
+        {
+            foreach (var node in stale)
+            {
+                _bindings.Remove(node);
+            }
         }
 
         if (_feedbackPrev.Length != tape.FeedbackSlots.Length)
@@ -114,6 +158,7 @@ internal sealed class MagnetEngine
         }
 
         HasMeasured = false;
+        _deferredMeasured = false;
     }
 
     private double ReadInput(MagnetNode node, PatchKind kind, int aux)
@@ -236,7 +281,7 @@ internal sealed class MagnetEngine
 
             if (meta.IsView)
             {
-                var view = ((MagnetView) _nodes[i]).View;
+                var view = _bound[i];
                 _views[i] = view;
                 visible = view is not null && view.Visibility != Visibility.Collapsed ? (byte) 1 : (byte) 0;
 
@@ -280,6 +325,7 @@ internal sealed class MagnetEngine
     {
         var tape = _tape ?? throw new InvalidOperationException("Not compiled.");
         PrepareRuntime();
+        _deferredMeasured = false;
         var values = _values;
         Array.Clear(_slopes);
         values[MagnetTape.StageWidthArg] = stageWidth;
@@ -313,13 +359,13 @@ internal sealed class MagnetEngine
         var slopes = _slopes;
 
         // Phase 0: independent of the stage end.
-        RunNormal(phases.Start, phases.OneStart, true);
+        RunNormal(phases.Start, phases.OneStart, MeasurePass.Immediate);
 
         // Phase 1 (affine in the stage end), then hug resolution.
         values[endSlot] = 0;
         slopes[endSlot] = 1;
         _eval = arg;
-        RunAffine(phases.OneStart, phases.ReqStart, true);
+        RunAffine(phases.OneStart, phases.ReqStart, MeasurePass.Immediate);
         StageEnd(phases.StageEndOp);
         var linear = true;
 
@@ -330,7 +376,7 @@ internal sealed class MagnetEngine
             _eval = first;
             values[endSlot] = 0;
             slopes[endSlot] = 1;
-            RunAffine(phases.OneStart, phases.ReqStart, false);
+            RunAffine(phases.OneStart, phases.ReqStart, MeasurePass.None);
             StageEnd(phases.StageEndOp);
             linear = Math.Abs(values[endSlot] - first) < 1e-6;
         }
@@ -342,7 +388,7 @@ internal sealed class MagnetEngine
         }
         else
         {
-            RunNormal(phases.OneStart, phases.ReqStart, false);
+            RunNormal(phases.OneStart, phases.ReqStart, MeasurePass.None);
         }
     }
 
@@ -376,14 +422,26 @@ internal sealed class MagnetEngine
     /// </summary>
     /// <param name="stageWidth">The stage width.</param>
     /// <param name="stageHeight">The stage height.</param>
-    /// <param name="measureChildren">Whether children must be re-measured (false when the last measure execution is known to be valid).</param>
-    public void Arrange(double stageWidth, double stageHeight, bool measureChildren)
+    /// <param name="measure">Which child measures to run: All for a fresh solve, Deferred when the immediate
+    /// measures of the last measure pass are still valid, None during transition frames.</param>
+    public void Arrange(double stageWidth, double stageHeight, MeasurePass measure)
     {
         var tape = _tape ?? throw new InvalidOperationException("Not compiled.");
 
-        if (!measureChildren && HasMeasured && stageWidth == LastMeasured.Width && stageHeight == LastMeasured.Height)
+        if (measure != MeasurePass.All && HasMeasured && stageWidth == LastMeasured.Width && stageHeight == LastMeasured.Height)
         {
-            // Arranging at the measured size: the slots already hold this exact solution.
+            // Arranging at the measured size: the slots already hold this exact solution — but deferred measures
+            // were skipped by the measure pass and must run once against it.
+            if (measure != MeasurePass.None && !_deferredMeasured)
+            {
+                var deferredOps = tape.DeferredMeasureOps;
+
+                for (var i = 0; i < deferredOps.Length; i++)
+                {
+                    MeasureChild(in tape.Ops[deferredOps[i]], false);
+                }
+            }
+
             return;
         }
 
@@ -401,13 +459,13 @@ internal sealed class MagnetEngine
             SnapshotFeedback();
         }
 
-        RunNormal(tape.X.Start, tape.X.ReqStart, measureChildren);
-        RunNormal(tape.Y.Start, tape.Y.ReqStart, measureChildren);
+        RunNormal(tape.X.Start, tape.X.ReqStart, measure);
+        RunNormal(tape.Y.Start, tape.Y.ReqStart, measure);
 
         if (tape.HasFeedback && FeedbackChanged())
         {
-            RunNormal(tape.X.Start, tape.X.ReqStart, measureChildren);
-            RunNormal(tape.Y.Start, tape.Y.ReqStart, measureChildren);
+            RunNormal(tape.X.Start, tape.X.ReqStart, measure);
+            RunNormal(tape.Y.Start, tape.Y.ReqStart, measure);
         }
     }
 
@@ -441,6 +499,37 @@ internal sealed class MagnetEngine
 
         return false;
     }
+
+    /// <summary>
+    /// Binds (or unbinds, with <c>null</c>) the view resolved for a node in THIS layout. Bindings survive
+    /// recompilation; the compiled projection is refreshed at <see cref="Compile" />.
+    /// </summary>
+    public void BindView(MagnetView node, IView? view)
+    {
+        if (view is null)
+        {
+            _bindings.Remove(node);
+        }
+        else
+        {
+            _bindings[node] = view;
+        }
+
+        if (_indexOf.TryGetValue(node, out var index))
+        {
+            _bound[index] = view;
+        }
+    }
+
+    /// <summary>
+    /// Gets the view bound to a node in this layout (independent of compilation).
+    /// </summary>
+    public IView? GetBoundView(MagnetView node) => _bindings.GetValueOrDefault(node);
+
+    /// <summary>
+    /// Gets the compiled index of a node, or -1.
+    /// </summary>
+    public int IndexOf(MagnetNode node) => _indexOf.GetValueOrDefault(node, -1);
 
     /// <summary>
     /// Sets (or clears, with <c>null</c>) the transition-scoped set of node indexes solved as collapsed
@@ -568,10 +657,19 @@ internal sealed class MagnetEngine
         slopes[op.Dst] = 0;
     }
 
+    private static bool ShouldMeasure(MeasurePass pass, int dst)
+        => pass switch
+        {
+            MeasurePass.All => true,
+            MeasurePass.Immediate => dst == -1,
+            MeasurePass.Deferred => dst == -2,
+            _ => false
+        };
+
     /// <summary>
     /// Executes ops with concrete values (slopes of written slots are reset).
     /// </summary>
-    private void RunNormal(int start, int end, bool measure)
+    private void RunNormal(int start, int end, MeasurePass measure)
     {
         var ops = _tape!.Ops;
         var coefficients = _tape.Coefficients;
@@ -584,7 +682,7 @@ internal sealed class MagnetEngine
 
             if (op.Kind == OpKind.MeasureChild)
             {
-                if (measure)
+                if (ShouldMeasure(measure, op.Dst))
                 {
                     MeasureChild(in op, false);
                 }
@@ -673,7 +771,7 @@ internal sealed class MagnetEngine
     /// Executes ops in affine mode: every slot carries (value at stageEnd = 0, slope w.r.t. stageEnd);
     /// piecewise ops choose their branch at the current evaluation point.
     /// </summary>
-    private void RunAffine(int start, int end, bool measure)
+    private void RunAffine(int start, int end, MeasurePass measure)
     {
         var ops = _tape!.Ops;
         var coefficients = _tape.Coefficients;
@@ -804,7 +902,7 @@ internal sealed class MagnetEngine
                     break;
 
                 case OpKind.MeasureChild:
-                    if (measure)
+                    if (ShouldMeasure(measure, op.Dst))
                     {
                         MeasureChild(in op, true);
                     }
@@ -816,6 +914,11 @@ internal sealed class MagnetEngine
 
     private void MeasureChild(in Op op, bool affine)
     {
+        if (op.Dst == -2)
+        {
+            _deferredMeasured = true;
+        }
+
         ref readonly var meta = ref _tape!.Nodes[op.A];
         var values = _values;
         var view = _views[op.A];

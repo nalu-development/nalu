@@ -129,16 +129,61 @@ public class MagnetLayoutTests
     }
 
     [Fact]
-    public void DefinitionCannotBeShared()
+    public void DefinitionIsSharedAcrossLayouts()
     {
-        var definition = new MagnetDefinition();
-        var m1 = new Magnet { Definition = definition };
-        var m2 = new Magnet();
+        var definition = new MagnetDefinition().Add(
+            new MagnetView().Id("a").Left(_p, margin: 10).Top(_p)
+        );
 
-        var act = () => m2.Definition = definition;
+        var (m1, manager1) = CreateMagnet();
+        var (m2, manager2) = CreateMagnet();
+        m1.Definition = definition;
+        m2.Definition = definition;
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*cannot be shared*");
-        m1.Definition.Should().BeSameAs(definition);
+        var v1 = new TestView(40, 20);
+        Magnet.SetMagnetId(v1, "a");
+        var v2 = new TestView(30, 30);
+        Magnet.SetMagnetId(v2, "a");
+        m1.Add(v1);
+        m2.Add(v2);
+
+        Layout(manager1, 400, 400);
+        Layout(manager2, 400, 400);
+
+        // Same declaration, independent per-layout bindings and solutions.
+        v1.Frame.Should().Be(new Rect(10, 0, 40, 20));
+        v2.Frame.Should().Be(new Rect(10, 0, 30, 30));
+
+        // A change to the shared declaration reaches BOTH layouts.
+        ((MagnetView) definition.MagnetNodes[0]).LeftTo = "parent.Left,30";
+        Layout(manager1, 400, 400);
+        Layout(manager2, 400, 400);
+        v1.Frame.X.Should().Be(30);
+        v2.Frame.X.Should().Be(30);
+    }
+
+    [Fact]
+    public void SharedDefinitionAppliesVisibilityPerLayout()
+    {
+        var node = new MagnetView().Id("badge").Left(_p).Top(_p);
+        var definition = new MagnetDefinition().Add(node);
+
+        var (m1, _) = CreateMagnet();
+        var (m2, _) = CreateMagnet();
+        m1.Definition = definition;
+        m2.Definition = definition;
+
+        var v1 = new TestView(20, 20);
+        Magnet.SetMagnetId(v1, "badge");
+        var v2 = new TestView(20, 20);
+        Magnet.SetMagnetId(v2, "badge");
+        m1.Add(v1);
+        m2.Add(v2);
+
+        node.ApplyVisibility = MagnetVisibilityAction.Hide;
+
+        v1.IsVisible.Should().BeFalse("the scene action fans out to every attached layout");
+        v2.IsVisible.Should().BeFalse();
     }
 
     [Fact]
@@ -217,10 +262,10 @@ public class MagnetLayoutTests
         manager.Measure(400, 400); // hug width ≈ 0: the star child contributes only its margins
         manager.ArrangeChildren(new Rect(0, 0, 400, 400));
 
-        // The measure pass measured the child against the hug solution; arranging at 400 must re-measure
-        // with the real span, or containers keep a stale (zero) DesiredSize for their own content.
+        // A star-sized child has a DEFERRED measure: skipped in the measure pass (the hug solution would hand
+        // it the wrong constraints) and executed exactly ONCE at arrange, against the real span.
         a.Frame.Width.Should().Be(400);
-        a.MeasureCount.Should().Be(2);
+        a.MeasureCount.Should().Be(1);
     }
 
     [Fact]

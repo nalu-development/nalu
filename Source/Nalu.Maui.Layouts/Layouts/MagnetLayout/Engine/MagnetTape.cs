@@ -164,11 +164,14 @@ internal sealed class MagnetTape
     public bool HasFeedback => FeedbackSlots.Length > 0;
 
     /// <summary>
-    /// Whether any child is measured with stage-end-dependent constraints (star spans, chain-distributed sizes…).
-    /// When true, the measures of a measure pass are valid only for the SOLVED (hug) size: arranging at any other
-    /// size must re-measure (the args-match reuse shortcut would hand children constraints from the wrong solution).
+    /// Whether the tape contains DEFERRED measures (exact child measures with stage-end-dependent constraints,
+    /// marked with Dst = -2): those are skipped during the measure pass (the hug solution would hand the child the
+    /// wrong constraints) and executed at arrange time with the real solution.
     /// </summary>
-    public required bool HasStageDependentMeasures { get; init; }
+    public required bool HasDeferredMeasures { get; init; }
+
+    /// <summary>Op indexes of the deferred measures (fast path for re-running just them).</summary>
+    public required int[] DeferredMeasureOps { get; init; }
 
     public const int StageLeft = 0;
     public const int StageTop = 1;

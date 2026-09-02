@@ -211,7 +211,22 @@ public sealed class MagnetChain : MagnetNode
     public double Gap
     {
         get => _gap;
-        set => SetValues(ref _gap, value, GapBit);
+        set
+        {
+            MarkSet(GapBit);
+
+            if (_gap == value)
+            {
+                return;
+            }
+
+            // Zero is structural: the compiler omits the gap ops entirely for a zero gap, so crossing
+            // 0 <-> non-zero recompiles (and is part of the tape fingerprint); other changes just patch.
+            var change = _gap == 0 != (value == 0) ? MagnetChange.Structure : MagnetChange.Values;
+            _gap = value;
+            OnPropertyChanged();
+            Notify(change);
+        }
     }
 
     /// <summary>

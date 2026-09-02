@@ -165,58 +165,16 @@ public sealed class MagnetView : MagnetNode
         }
     }
 
-    private IView? _view;
-
     /// <summary>
-    /// The view bound to this node (by identifier match or inline transfer).
+    /// Routes a pending <see cref="ApplyVisibility" /> to the owner(s): view bindings live per-layout, so the
+    /// owning Magnet (directly for inline nodes, or through the definition's fan-out for declared ones) resolves
+    /// the bound view and applies or defers the write.
     /// </summary>
-    internal IView? View
+    internal void RequestVisibilityApply()
     {
-        get => _view;
-        set
+        if (ApplyVisibility != MagnetVisibilityAction.None)
         {
-            if (ReferenceEquals(_view, value))
-            {
-                return;
-            }
-
-            _view = value;
-
-            if (value is not null)
-            {
-                RequestVisibilityApply();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Routes a pending <see cref="ApplyVisibility" /> to the owner (which defers it during a transition) or applies it directly.
-    /// </summary>
-    private void RequestVisibilityApply()
-    {
-        if (ApplyVisibility == MagnetVisibilityAction.None || _view is null)
-        {
-            return;
-        }
-
-        if (Owner is Magnet magnet)
-        {
-            magnet.OnApplyVisibilityRequested(this);
-        }
-        else
-        {
-            ApplyVisibilityNow();
-        }
-    }
-
-    /// <summary>
-    /// Stamps <see cref="ApplyVisibility" /> onto the bound view's <c>IsVisible</c> (no-op for <see cref="MagnetVisibilityAction.None" />).
-    /// </summary>
-    internal void ApplyVisibilityNow()
-    {
-        if (_view is VisualElement ve && ApplyVisibility is not MagnetVisibilityAction.None)
-        {
-            ve.IsVisible = ApplyVisibility == MagnetVisibilityAction.Show;
+            Owner?.OnApplyVisibilityRequested(this);
         }
     }
 

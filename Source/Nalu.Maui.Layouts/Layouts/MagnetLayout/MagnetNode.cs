@@ -11,6 +11,8 @@ namespace Nalu;
 internal interface IMagnetOwner
 {
     void OnNodeChanged(MagnetNode? node, MagnetChange change);
+
+    void OnApplyVisibilityRequested(MagnetView node);
 }
 
 /// <summary>
@@ -80,11 +82,6 @@ public abstract class MagnetNode : INotifyPropertyChanged
     internal IMagnetOwner? Owner { get; private set; }
 
     internal MagnetDefinition? Definition { get; set; }
-
-    /// <summary>
-    /// Index assigned by the compiler (valid only after compilation).
-    /// </summary>
-    internal int Index { get; set; } = -1;
 
     internal void Attach(IMagnetOwner owner)
     {

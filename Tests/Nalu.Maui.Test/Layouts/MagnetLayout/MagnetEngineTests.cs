@@ -466,7 +466,7 @@ public class MagnetEngineTests
         h.Fake("b").MeasureCount.Should().Be(1);
 
         // Fill arrange with the same constraints: still no re-measure.
-        h.Engine.Arrange(300, 300, false);
+        h.Engine.Arrange(300, 300, MeasurePass.Deferred);
         h.Fake("a").MeasureCount.Should().Be(1);
         h.Frame("b").ShouldBe(40, 135, 30, 30);
     }
@@ -517,7 +517,13 @@ public class MagnetEngineAllocationTests
     public void MeasureAndArrangeDoNotAllocate()
     {
         var h = new EngineHarness();
-        MagnetView Stub(string id, double w, double hh) => h.Add(new MagnetView { MagnetId = id, View = new StubView(w, hh) });
+        MagnetView Stub(string id, double w, double hh)
+        {
+            var node = h.Add(new MagnetView { MagnetId = id });
+            h.Engine.BindView(node, new StubView(w, hh));
+
+            return node;
+        }
         Stub("a", 60, 48).Left(P, margin: 4).VerticallyWithin(P);
         Stub("b", 40, 20).Left("a", MagnetPole.Right, 8).Right("c", MagnetPole.Left).Top(P).Bias(0, 0.5);
         Stub("c", 98, 20).Right(P).VerticallyWithin(P).Size(MagnetSizing.Measured, MagnetSizing.Constraint);
@@ -535,7 +541,7 @@ public class MagnetEngineAllocationTests
         for (var i = 0; i < 100; i++)
         {
             h.Engine.Measure(500, double.PositiveInfinity);
-            h.Engine.Arrange(500, 500, true);
+            h.Engine.Arrange(500, 500, MeasurePass.All);
         }
 
         var after = GC.GetAllocatedBytesForCurrentThread();
