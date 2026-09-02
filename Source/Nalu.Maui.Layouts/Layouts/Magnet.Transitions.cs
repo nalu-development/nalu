@@ -204,7 +204,7 @@ public partial class Magnet
                 _engine.Measure(stageSize.Width, stageSize.Height);
             }
 
-            _engine.Arrange(stageSize.Width, stageSize.Height, false);
+            _engine.Arrange(stageSize.Width, stageSize.Height, MeasurePass.Deferred);
             startFrames = CaptureEngineFrames();
             startMeasured = _engine.LastMeasured;
             startInputs = new double[_engine.InputCount];
@@ -316,7 +316,7 @@ public partial class Magnet
         // Hugging axes follow the new content size, filling axes keep the assigned size.
         var endStageW = Math.Abs(stage.Width - state.StartMeasured.Width) < 0.5 ? endMeasured.Width : stage.Width;
         var endStageH = Math.Abs(stage.Height - state.StartMeasured.Height) < 0.5 ? endMeasured.Height : stage.Height;
-        _engine.Arrange(endStageW, endStageH, true);
+        _engine.Arrange(endStageW, endStageH, MeasurePass.All);
 
         var nodes = _engine.Nodes;
         var count = nodes.Length;
@@ -479,7 +479,7 @@ public partial class Magnet
         }
         else if (state.Mode == TransitionMode.Values)
         {
-            _engine.Arrange(state.StageSize.Width, state.StageSize.Height, false);
+            _engine.Arrange(state.StageSize.Width, state.StageSize.Height, MeasurePass.None);
             MagnetLayoutManager.ArrangeNodes(_engine, left, top);
         }
         else
@@ -539,7 +539,7 @@ public partial class Magnet
 
         if (state.Mode == TransitionMode.Values)
         {
-            _engine.Arrange(bounds.Width - padding.HorizontalThickness, bounds.Height - padding.VerticalThickness, false);
+            _engine.Arrange(bounds.Width - padding.HorizontalThickness, bounds.Height - padding.VerticalThickness, MeasurePass.None);
             MagnetLayoutManager.ArrangeNodes(_engine, left, top);
         }
         else

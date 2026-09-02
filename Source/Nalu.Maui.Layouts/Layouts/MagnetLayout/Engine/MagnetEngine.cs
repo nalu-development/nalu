@@ -4,6 +4,19 @@ using System.Runtime.InteropServices;
 namespace Nalu.MagnetLayout.Engine;
 
 /// <summary>
+/// Which MeasureChild ops an execution runs. IMMEDIATE ops (Dst = -1) measure during the measure pass with
+/// constraints valid at the requested size; DEFERRED ops (Dst = -2) have stage-dependent constraints and only
+/// measure at arrange time, when the real solution is known.
+/// </summary>
+internal enum MeasurePass : byte
+{
+    None,
+    Deferred,
+    Immediate,
+    All
+}
+
+/// <summary>
 /// Owns the compiled tape and the value array of one <see cref="Magnet" /> instance and executes it.
 /// </summary>
 internal sealed class MagnetEngine
@@ -20,6 +33,7 @@ internal sealed class MagnetEngine
     private readonly Dictionary<MagnetView, IView?> _bindings = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<MagnetNode, int> _indexOf = new(ReferenceEqualityComparer.Instance);
     private double _eval;
+    private bool _deferredMeasured;
     private HashSet<int>? _forcedCollapsed;
 
     /// <summary>
@@ -144,6 +158,7 @@ internal sealed class MagnetEngine
         }
 
         HasMeasured = false;
+        _deferredMeasured = false;
     }
 
     private double ReadInput(MagnetNode node, PatchKind kind, int aux)
@@ -310,6 +325,7 @@ internal sealed class MagnetEngine
     {
         var tape = _tape ?? throw new InvalidOperationException("Not compiled.");
         PrepareRuntime();
+        _deferredMeasured = false;
         var values = _values;
         Array.Clear(_slopes);
         values[MagnetTape.StageWidthArg] = stageWidth;
@@ -343,13 +359,13 @@ internal sealed class MagnetEngine
         var slopes = _slopes;
 
         // Phase 0: independent of the stage end.
-        RunNormal(phases.Start, phases.OneStart, true);
+        RunNormal(phases.Start, phases.OneStart, MeasurePass.Immediate);
 
         // Phase 1 (affine in the stage end), then hug resolution.
         values[endSlot] = 0;
         slopes[endSlot] = 1;
         _eval = arg;
-        RunAffine(phases.OneStart, phases.ReqStart, true);
+        RunAffine(phases.OneStart, phases.ReqStart, MeasurePass.Immediate);
         StageEnd(phases.StageEndOp);
         var linear = true;
 
@@ -360,7 +376,7 @@ internal sealed class MagnetEngine
             _eval = first;
             values[endSlot] = 0;
             slopes[endSlot] = 1;
-            RunAffine(phases.OneStart, phases.ReqStart, false);
+            RunAffine(phases.OneStart, phases.ReqStart, MeasurePass.None);
             StageEnd(phases.StageEndOp);
             linear = Math.Abs(values[endSlot] - first) < 1e-6;
         }
@@ -372,7 +388,7 @@ internal sealed class MagnetEngine
         }
         else
         {
-            RunNormal(phases.OneStart, phases.ReqStart, false);
+            RunNormal(phases.OneStart, phases.ReqStart, MeasurePass.None);
         }
     }
 
@@ -406,14 +422,26 @@ internal sealed class MagnetEngine
     /// </summary>
     /// <param name="stageWidth">The stage width.</param>
     /// <param name="stageHeight">The stage height.</param>
-    /// <param name="measureChildren">Whether children must be re-measured (false when the last measure execution is known to be valid).</param>
-    public void Arrange(double stageWidth, double stageHeight, bool measureChildren)
+    /// <param name="measure">Which child measures to run: All for a fresh solve, Deferred when the immediate
+    /// measures of the last measure pass are still valid, None during transition frames.</param>
+    public void Arrange(double stageWidth, double stageHeight, MeasurePass measure)
     {
         var tape = _tape ?? throw new InvalidOperationException("Not compiled.");
 
-        if (!measureChildren && HasMeasured && stageWidth == LastMeasured.Width && stageHeight == LastMeasured.Height)
+        if (measure != MeasurePass.All && HasMeasured && stageWidth == LastMeasured.Width && stageHeight == LastMeasured.Height)
         {
-            // Arranging at the measured size: the slots already hold this exact solution.
+            // Arranging at the measured size: the slots already hold this exact solution — but deferred measures
+            // were skipped by the measure pass and must run once against it.
+            if (measure != MeasurePass.None && !_deferredMeasured)
+            {
+                var deferredOps = tape.DeferredMeasureOps;
+
+                for (var i = 0; i < deferredOps.Length; i++)
+                {
+                    MeasureChild(in tape.Ops[deferredOps[i]], false);
+                }
+            }
+
             return;
         }
 
@@ -431,13 +459,13 @@ internal sealed class MagnetEngine
             SnapshotFeedback();
         }
 
-        RunNormal(tape.X.Start, tape.X.ReqStart, measureChildren);
-        RunNormal(tape.Y.Start, tape.Y.ReqStart, measureChildren);
+        RunNormal(tape.X.Start, tape.X.ReqStart, measure);
+        RunNormal(tape.Y.Start, tape.Y.ReqStart, measure);
 
         if (tape.HasFeedback && FeedbackChanged())
         {
-            RunNormal(tape.X.Start, tape.X.ReqStart, measureChildren);
-            RunNormal(tape.Y.Start, tape.Y.ReqStart, measureChildren);
+            RunNormal(tape.X.Start, tape.X.ReqStart, measure);
+            RunNormal(tape.Y.Start, tape.Y.ReqStart, measure);
         }
     }
 
@@ -629,10 +657,19 @@ internal sealed class MagnetEngine
         slopes[op.Dst] = 0;
     }
 
+    private static bool ShouldMeasure(MeasurePass pass, int dst)
+        => pass switch
+        {
+            MeasurePass.All => true,
+            MeasurePass.Immediate => dst == -1,
+            MeasurePass.Deferred => dst == -2,
+            _ => false
+        };
+
     /// <summary>
     /// Executes ops with concrete values (slopes of written slots are reset).
     /// </summary>
-    private void RunNormal(int start, int end, bool measure)
+    private void RunNormal(int start, int end, MeasurePass measure)
     {
         var ops = _tape!.Ops;
         var coefficients = _tape.Coefficients;
@@ -645,7 +682,7 @@ internal sealed class MagnetEngine
 
             if (op.Kind == OpKind.MeasureChild)
             {
-                if (measure)
+                if (ShouldMeasure(measure, op.Dst))
                 {
                     MeasureChild(in op, false);
                 }
@@ -734,7 +771,7 @@ internal sealed class MagnetEngine
     /// Executes ops in affine mode: every slot carries (value at stageEnd = 0, slope w.r.t. stageEnd);
     /// piecewise ops choose their branch at the current evaluation point.
     /// </summary>
-    private void RunAffine(int start, int end, bool measure)
+    private void RunAffine(int start, int end, MeasurePass measure)
     {
         var ops = _tape!.Ops;
         var coefficients = _tape.Coefficients;
@@ -865,7 +902,7 @@ internal sealed class MagnetEngine
                     break;
 
                 case OpKind.MeasureChild:
-                    if (measure)
+                    if (ShouldMeasure(measure, op.Dst))
                     {
                         MeasureChild(in op, true);
                     }
@@ -877,6 +914,11 @@ internal sealed class MagnetEngine
 
     private void MeasureChild(in Op op, bool affine)
     {
+        if (op.Dst == -2)
+        {
+            _deferredMeasured = true;
+        }
+
         ref readonly var meta = ref _tape!.Nodes[op.A];
         var values = _values;
         var view = _views[op.A];

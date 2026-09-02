@@ -70,6 +70,7 @@ internal sealed class MagnetCompiler
     private readonly List<MarginEntry> _margins;
     private readonly List<int> _reqSlots;
     private readonly List<int> _feedbackSlots = [];
+    private readonly List<int> _deferredMeasureOps = [];
     private bool _hasStageDependentMeasures;
     private int _slots;
     private int _inputStart, _inputEnd;
@@ -195,7 +196,7 @@ internal sealed class MagnetCompiler
         // Safety net: the executor accesses slots without bounds checks, so every index must be valid here.
         foreach (var op in _ops)
         {
-            var dstOk = op.Kind == OpKind.MeasureChild ? op.Dst == -1 : (uint) op.Dst < (uint) _slots;
+            var dstOk = op.Kind == OpKind.MeasureChild ? op.Dst is -1 or -2 : (uint) op.Dst < (uint) _slots;
             var rangeOp = op.Kind is OpKind.MinRange or OpKind.MaxRange or OpKind.SumRange;
             var aOk = op.Kind is OpKind.MeasureChild or OpKind.Gather ? (uint) op.A < (uint) _nodes.Length : op.Kind == OpKind.StageEnd || (uint) op.A < (uint) _slots;
             var bOk = rangeOp ? op.B >= 0 && op.A + op.B <= _slots : op.Kind == OpKind.StageEnd || (uint) op.B < (uint) _slots;
@@ -240,7 +241,8 @@ internal sealed class MagnetCompiler
             InputStart = _inputStart,
             InputEnd = _inputEnd,
             FeedbackSlots = _feedbackSlots.ToArray(),
-            HasStageDependentMeasures = _hasStageDependentMeasures
+            HasDeferredMeasures = _hasStageDependentMeasures,
+            DeferredMeasureOps = _deferredMeasureOps.ToArray()
         };
     }
 
@@ -1334,10 +1336,18 @@ internal sealed class MagnetCompiler
             // MAUI contract: every child is measured each pass. Views with no Measured axis are measured
             // with their EXACT resolved sizes (like a Grid star cell) once both axes are known — skipping
             // this leaves platform containers with a zero DesiredSize and their content never laid out.
-            // The op itself may sit in Y phase 0 while reading a stage-dependent X size (finalized at the
-            // hug): flag it from the CONSTRAINT dependencies, not from the op's own phase.
-            Emit(new Op(OpKind.MeasureChild, -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
-            _hasStageDependentMeasures |= n.Axes[0].StageDependent || stageDependent;
+            // A stage-dependent constraint means the measure-pass value (finalized at the hug) is the wrong
+            // solution for a differently-sized arrange: mark the op DEFERRED (Dst = -2) — skipped during the
+            // measure pass and executed at arrange with the real solution.
+            var deferred = n.Axes[0].StageDependent || stageDependent;
+
+            if (deferred)
+            {
+                _deferredMeasureOps.Add(_ops.Count);
+            }
+
+            Emit(new Op(OpKind.MeasureChild, deferred ? -2 : -1, node, n.Axes[0].SizeSlot, ax.SizeSlot));
+            _hasStageDependentMeasures |= deferred;
         }
     }
 

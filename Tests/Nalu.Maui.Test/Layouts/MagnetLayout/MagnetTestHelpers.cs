@@ -124,7 +124,7 @@ internal sealed class EngineHarness
         var h = arrangeH ?? measured.Height;
         var reuse = Math.Abs(w - measured.Width) < 0.5 || Math.Abs(w - wc) < 0.5;
         reuse &= Math.Abs(h - measured.Height) < 0.5 || Math.Abs(h - hc) < 0.5;
-        Engine.Arrange(w, h, !reuse);
+        Engine.Arrange(w, h, reuse ? MeasurePass.Deferred : MeasurePass.All);
 
         return measured;
     }

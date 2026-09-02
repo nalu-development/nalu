@@ -262,10 +262,10 @@ public class MagnetLayoutTests
         manager.Measure(400, 400); // hug width ≈ 0: the star child contributes only its margins
         manager.ArrangeChildren(new Rect(0, 0, 400, 400));
 
-        // The measure pass measured the child against the hug solution; arranging at 400 must re-measure
-        // with the real span, or containers keep a stale (zero) DesiredSize for their own content.
+        // A star-sized child has a DEFERRED measure: skipped in the measure pass (the hug solution would hand
+        // it the wrong constraints) and executed exactly ONCE at arrange, against the real span.
         a.Frame.Width.Should().Be(400);
-        a.MeasureCount.Should().Be(2);
+        a.MeasureCount.Should().Be(1);
     }
 
     [Fact]

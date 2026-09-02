@@ -466,7 +466,7 @@ public class MagnetEngineTests
         h.Fake("b").MeasureCount.Should().Be(1);
 
         // Fill arrange with the same constraints: still no re-measure.
-        h.Engine.Arrange(300, 300, false);
+        h.Engine.Arrange(300, 300, MeasurePass.Deferred);
         h.Fake("a").MeasureCount.Should().Be(1);
         h.Frame("b").ShouldBe(40, 135, 30, 30);
     }
@@ -541,7 +541,7 @@ public class MagnetEngineAllocationTests
         for (var i = 0; i < 100; i++)
         {
             h.Engine.Measure(500, double.PositiveInfinity);
-            h.Engine.Arrange(500, 500, true);
+            h.Engine.Arrange(500, 500, MeasurePass.All);
         }
 
         var after = GC.GetAllocatedBytesForCurrentThread();
