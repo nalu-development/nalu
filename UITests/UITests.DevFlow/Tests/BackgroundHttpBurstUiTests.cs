@@ -43,6 +43,12 @@ namespace Nalu.Maui.UITests.Tests;
 /// bigger burst.
 /// </para>
 /// <para>
+/// SUPERSEDED as a reproduction by the <c>lost-staging</c> scenario in the callback-injection
+/// suite, which reaches the real production failure deterministically and in seconds. This
+/// suite is kept for the negative result above — the evidence that queue latency is NOT the
+/// mechanism, which is worth not re-deriving.
+/// </para>
+/// <para>
 /// Physical device only in practice: staging is a rename inside the app container, so the loss
 /// happens off-device-CPU in nsurlsessiond and a simulator will not schedule it the same way.
 /// Run with <c>DEVFLOW_HOST=localhost DEVFLOW_PORT=9224</c> behind
