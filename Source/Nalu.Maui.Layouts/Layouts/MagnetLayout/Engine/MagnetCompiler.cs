@@ -196,6 +196,10 @@ internal sealed class MagnetCompiler
         var x = EmitAxis(0);
         var y = EmitAxis(1);
 
+        var phaseOneSlotsX = CollectPhaseOneSlots(x);
+        var phaseOneSlotsY = CollectPhaseOneSlots(y);
+        var yReadsStageDependentX = ComputeYReadsStageDependentX(y, phaseOneSlotsX);
+
         // Safety net: the executor accesses slots without bounds checks, so every index must be valid here.
         foreach (var op in _ops)
         {
@@ -266,8 +270,114 @@ internal sealed class MagnetCompiler
             InputEnd = _inputEnd,
             FeedbackSlots = _feedbackSlots.ToArray(),
             HasDeferredMeasures = _hasStageDependentMeasures,
-            DeferredMeasureOps = _deferredMeasureOps.ToArray()
+            DeferredMeasureOps = _deferredMeasureOps.ToArray(),
+            PhaseOneSlotsX = phaseOneSlotsX,
+            PhaseOneSlotsY = phaseOneSlotsY,
+            YReadsStageDependentX = yReadsStageDependentX
         };
+    }
+
+    /// <summary>
+    /// Distinct dst slots of the axis' phase-1 ops (MeasureChild excluded): the slots Finalize sweeps and
+    /// the delta-arrange fast path shifts.
+    /// </summary>
+    private int[] CollectPhaseOneSlots(in AxisPhases phases)
+    {
+        var seen = new HashSet<int>();
+        var slots = new List<int>(phases.ReqStart - phases.OneStart);
+
+        for (var i = phases.OneStart; i < phases.ReqStart; i++)
+        {
+            var op = _ops[i];
+
+            if (op.Kind != OpKind.MeasureChild && seen.Add(op.Dst))
+            {
+                slots.Add(op.Dst);
+            }
+        }
+
+        return slots.ToArray();
+    }
+
+    /// <summary>
+    /// Whether any Y op reads an X-stage-dependent slot (an X phase-1 result or the X stage end itself):
+    /// if so, a shifted X solution invalidates the stored Y solution.
+    /// </summary>
+    private bool ComputeYReadsStageDependentX(in AxisPhases y, int[] phaseOneSlotsX)
+    {
+        var stageDependentX = new bool[_slots];
+        stageDependentX[StageEndSlot(0)] = true;
+
+        foreach (var slot in phaseOneSlotsX)
+        {
+            stageDependentX[slot] = true;
+        }
+
+        for (var i = y.Start; i < y.ReqStart; i++)
+        {
+            var op = _ops[i];
+
+            switch (op.Kind)
+            {
+                case OpKind.MeasureChild:
+                    // Deferred measures re-run at arrange against the final solution; immediate ones are
+                    // not re-run under the fast path's MeasurePass.Deferred scope (nor under today's).
+                    continue;
+
+                case OpKind.MinRange:
+                case OpKind.MaxRange:
+                case OpKind.SumRange:
+                {
+                    for (var s = op.A; s < op.A + op.B; s++)
+                    {
+                        if (stageDependentX[s])
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                case OpKind.SumIndexed:
+                case OpKind.ChainGaps:
+                case OpKind.ChainFractions:
+                {
+                    var stride = op.Kind switch { OpKind.ChainGaps => 6, OpKind.ChainFractions => 3, _ => 1 };
+
+                    for (var e = op.A; e < op.A + (op.B * stride); e++)
+                    {
+                        // ChainGaps entry position 0 is the gated flag, not a slot.
+                        var isFlag = op.Kind == OpKind.ChainGaps && (e - op.A) % 6 == 0;
+
+                        if (!isFlag && stageDependentX[_auxSlots[e]])
+                        {
+                            return true;
+                        }
+                    }
+
+                    continue;
+                }
+
+                case OpKind.Gather:
+                    if (stageDependentX[op.B])
+                    {
+                        return true;
+                    }
+
+                    continue;
+
+                default:
+                    if (stageDependentX[op.A] || stageDependentX[op.B] || stageDependentX[op.C])
+                    {
+                        return true;
+                    }
+
+                    continue;
+            }
+        }
+
+        return false;
     }
 
     #region Slots & inputs

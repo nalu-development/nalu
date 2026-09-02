@@ -36,6 +36,14 @@ internal sealed class MagnetEngine
     private bool _deferredMeasured;
     private HashSet<int>? _forcedCollapsed;
 
+    // Delta-arrange state: the ARG-linearization of each axis captured during Measure (base = value at
+    // stage end 0, slope), the stage end the current values represent, and whether the capture matches the
+    // state the last execution ran with (false after any full arrange or recompile).
+    private double[] _deltaBase = [];
+    private double[] _deltaSlopes = [];
+    private readonly double[] _finalizedEnd = new double[2];
+    private readonly bool[] _deltaCapable = new bool[2];
+
     /// <summary>
     /// Gets whether a tape is compiled.
     /// </summary>
@@ -105,6 +113,15 @@ internal sealed class MagnetEngine
             _verifyValues = new double[tape.ValueCount];
             _verifySlopes = new double[tape.ValueCount];
         }
+
+        if (_deltaSlopes.Length != tape.ValueCount)
+        {
+            _deltaBase = new double[tape.ValueCount];
+            _deltaSlopes = new double[tape.ValueCount];
+        }
+
+        _deltaCapable[0] = false;
+        _deltaCapable[1] = false;
 
         if (_vis.Length != _nodes.Length)
         {
@@ -379,6 +396,23 @@ internal sealed class MagnetEngine
         _eval = arg;
         RunAffine(phases.OneStart, phases.ReqStart, MeasurePass.Immediate);
         StageEnd(phases.StageEndOp);
+        var axis = endSlot == MagnetTape.StageRight ? 0 : 1;
+
+        // Capture the ARG-linearization: its branches were chosen by evaluating at exactly the measure
+        // argument, so (base, slope) evaluated AT the argument reproduces the concrete solution there —
+        // that is precisely the size the typical fill arrange comes back with (delta-arrange replay).
+        // Valid regardless of how the hug refinement below plays out.
+        var phaseOneSlots = axis == 0 ? _tape!.PhaseOneSlotsX : _tape!.PhaseOneSlotsY;
+
+        for (var i = 0; i < phaseOneSlots.Length; i++)
+        {
+            var slot = phaseOneSlots[i];
+            _deltaBase[slot] = values[slot];
+            _deltaSlopes[slot] = slopes[slot];
+        }
+
+        _deltaCapable[axis] = true;
+
         var linear = true;
 
         if (phases.HasPiecewise)
@@ -396,35 +430,31 @@ internal sealed class MagnetEngine
         if (linear)
         {
             // Every phase-1 slot is a + b·W with branches already chosen at W: finalize in one sweep.
-            Finalize(phases.OneStart, phases.ReqStart, values[endSlot]);
+            Finalize(phaseOneSlots, values[endSlot]);
         }
         else
         {
             RunNormal(phases.OneStart, phases.ReqStart, MeasurePass.None);
         }
+
+        _finalizedEnd[axis] = values[endSlot];
     }
 
     /// <summary>
-    /// Replaces the affine (value at W = 0, slope) representation of the phase-1 slots with their value at <paramref name="w" />.
-    /// Idempotent per slot (slope is reset to 0), so slots written by more than one op are finalized once.
+    /// Replaces the affine (value at W = 0, slope) representation of the phase-1 slots with their value at
+    /// <paramref name="w" />. The slot list holds each slot exactly once (compiler-deduped); slopes are reset
+    /// so downstream passes (the other axis, the verifier) read finalized slots as constants.
     /// </summary>
-    private void Finalize(int start, int end, double w)
+    private void Finalize(int[] slots, double w)
     {
-        var ops = _tape!.Ops;
         ref var v0 = ref MemoryMarshal.GetArrayDataReference(_values);
         ref var s0 = ref MemoryMarshal.GetArrayDataReference(_slopes);
 
-        for (var i = start; i < end; i++)
+        for (var i = 0; i < slots.Length; i++)
         {
-            ref readonly var op = ref ops[i];
-
-            if (op.Kind == OpKind.MeasureChild)
-            {
-                continue;
-            }
-
-            ref var slope = ref Unsafe.Add(ref s0, op.Dst);
-            Unsafe.Add(ref v0, op.Dst) += slope * w;
+            var slot = slots[i];
+            ref var slope = ref Unsafe.Add(ref s0, slot);
+            Unsafe.Add(ref v0, slot) += slope * w;
             slope = 0;
         }
     }
@@ -467,6 +497,11 @@ internal sealed class MagnetEngine
             return;
         }
 
+        if (TryDeltaArrange(tape, stageWidth, stageHeight, measure))
+        {
+            return;
+        }
+
         PrepareRuntime();
         var values = _values;
         values[MagnetTape.StageWidthArg] = stageWidth;
@@ -489,6 +524,152 @@ internal sealed class MagnetEngine
             RunNormal(tape.X.Start, tape.X.ReqStart, measure);
             RunNormal(tape.Y.Start, tape.Y.ReqStart, measure);
         }
+
+        // The concrete solve replaced the finalized affine snapshot: later arranges cannot delta from it.
+        _deltaCapable[0] = false;
+        _deltaCapable[1] = false;
+
+    }
+
+    /// <summary>
+    /// The delta-arrange fast path: when only the stage size changed since the measure, each axis' phase-1
+    /// slots are re-evaluated from the captured ARG-linearization — value = base + slope·target — instead of
+    /// re-executing the tape. The capture's piecewise branches were CHOSEN by evaluating at the measure
+    /// argument, so replaying it at exactly that argument reproduces the concrete solution there, including
+    /// layouts whose hug lives on different branches (weighted fills). Scope (v1, everything else falls back
+    /// to the full solve):
+    /// - <see cref="MeasurePass.Deferred" /> only (the reuse path): neither this nor today's full solve
+    ///   re-runs immediate child measures there, so measured slots are identical by construction.
+    /// - Per axis, the target must be the current solution's end (no-op) or EXACTLY the measure argument —
+    ///   both the branch-choice point and the point arg-dependent phase-0 ops were evaluated at.
+    /// - Visibility (incl. forced collapses) and view bindings must be unchanged since the last execution;
+    ///   value patches already clear <see cref="HasMeasured" />.
+    /// - A moved X invalidates Y when any Y op reads an X-stage-dependent slot (compile-time flag).
+    /// </summary>
+    private bool TryDeltaArrange(MagnetTape tape, double stageWidth, double stageHeight, MeasurePass measure)
+    {
+        if (measure != MeasurePass.Deferred || !HasMeasured || tape.HasFeedback)
+        {
+            return false;
+        }
+
+        var moveX = Math.Abs(stageWidth - _finalizedEnd[0]) > 0.001;
+        var moveY = Math.Abs(stageHeight - _finalizedEnd[1]) > 0.001;
+
+        if (moveX && (!_deltaCapable[0] || stageWidth != LastMeasureArgs.Width))
+        {
+            return false;
+        }
+
+        if (moveY && (!_deltaCapable[1] || stageHeight != LastMeasureArgs.Height))
+        {
+            return false;
+        }
+
+        if (moveX && tape.YReadsStageDependentX)
+        {
+            return false;
+        }
+
+        if (VisibilityChangedSinceMeasure(tape))
+        {
+            return false;
+        }
+
+
+        if (moveX || moveY)
+        {
+            if (moveX)
+            {
+                ReplayCapture(tape.PhaseOneSlotsX, stageWidth);
+                _values[MagnetTape.StageRight] = stageWidth;
+                _finalizedEnd[0] = stageWidth;
+            }
+
+            if (moveY)
+            {
+                ReplayCapture(tape.PhaseOneSlotsY, stageHeight);
+                _values[MagnetTape.StageBottom] = stageHeight;
+                _finalizedEnd[1] = stageHeight;
+            }
+
+            DeltaArrangesTaken++;
+        }
+
+        RunPendingDeferredMeasures(tape, measure);
+
+        return true;
+    }
+
+    private void ReplayCapture(int[] slots, double target)
+    {
+        ref var v0 = ref MemoryMarshal.GetArrayDataReference(_values);
+        ref var b0 = ref MemoryMarshal.GetArrayDataReference(_deltaBase);
+        ref var d0 = ref MemoryMarshal.GetArrayDataReference(_deltaSlopes);
+
+        for (var i = 0; i < slots.Length; i++)
+        {
+            var slot = slots[i];
+            Unsafe.Add(ref v0, slot) = Unsafe.Add(ref b0, slot) + (Unsafe.Add(ref d0, slot) * target);
+        }
+    }
+
+    /// <summary>Diagnostics: number of arranges this engine resolved by a delta replay (tests assert the path engages).</summary>
+    internal int DeltaArrangesTaken { get; private set; }
+
+    private void RunPendingDeferredMeasures(MagnetTape tape, MeasurePass measure)
+    {
+        if (measure == MeasurePass.None || _deferredMeasured)
+        {
+            return;
+        }
+
+        var deferredOps = tape.DeferredMeasureOps;
+
+        for (var i = 0; i < deferredOps.Length; i++)
+        {
+            MeasureChild(in tape.Ops[deferredOps[i]], false);
+        }
+    }
+
+    /// <summary>
+    /// Whether any node's effective visibility (bound view + forced collapses) differs from the one the
+    /// last execution used. Read-only: no state is touched, so bailing to the full path stays clean.
+    /// </summary>
+    private bool VisibilityChangedSinceMeasure(MagnetTape tape)
+    {
+        var metas = tape.Nodes;
+
+        for (var i = 0; i < _nodes.Length; i++)
+        {
+            byte visible = 1;
+
+            if (metas[i].IsView)
+            {
+                var view = _bound[i];
+
+                if (!ReferenceEquals(_views[i], view))
+                {
+                    // Rebound since the last execution: the solution (and the deferred-measure targets)
+                    // belong to the old view.
+                    return true;
+                }
+
+                visible = view is not null && view.Visibility != Visibility.Collapsed ? (byte) 1 : (byte) 0;
+
+                if (visible == 1 && _forcedCollapsed?.Contains(i) == true)
+                {
+                    visible = 0;
+                }
+            }
+
+            if (_vis[i] != visible)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     #region Differential solver verification (tests only)
@@ -497,7 +678,7 @@ internal sealed class MagnetEngine
     /// Test-only differential harness: when enabled, every Measure is re-checked by evaluating the phase-1 ops
     /// concretely at the solved stage end (validating the affine machinery and Finalize against the plain
     /// interpreter), and every Arrange is re-checked against an unconditional full re-solve (validating the
-    /// early-return/deferred fast paths and any future one). Child measures are never re-run
+    /// early-return/deferred/delta fast paths and any future one). Child measures are never re-run
     /// (<see cref="MeasurePass.None" />): the check targets the solver math — the measure protocol has its own
     /// dedicated tests — and stays free of view side effects (measure-count assertions). The engine state is
     /// restored afterwards, so enabling it is invisible to the caller. The unit-test assembly turns it on for
