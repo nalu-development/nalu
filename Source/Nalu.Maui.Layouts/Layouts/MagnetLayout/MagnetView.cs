@@ -11,6 +11,16 @@ namespace Nalu;
 /// </remarks>
 public sealed class MagnetView : MagnetNode
 {
+    internal const uint LeftToBit = 1u << 0;
+    internal const uint RightToBit = 1u << 1;
+    internal const uint TopToBit = 1u << 2;
+    internal const uint BottomToBit = 1u << 3;
+    internal const uint WidthSizingBit = 1u << 4;
+    internal const uint HeightSizingBit = 1u << 5;
+    internal const uint HorizontalBiasBit = 1u << 6;
+    internal const uint VerticalBiasBit = 1u << 7;
+    internal const uint ApplyVisibilityBit = 1u << 8;
+
     private MagnetAnchor? _leftTo;
     private MagnetAnchor? _rightTo;
     private MagnetAnchor? _topTo;
@@ -21,8 +31,10 @@ public sealed class MagnetView : MagnetNode
     private double _verticalBias = 0.5;
     private MagnetVisibilityAction _applyVisibility;
 
-    private void SetAnchorField(ref MagnetAnchor? field, MagnetAnchor? value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    private void SetAnchorField(ref MagnetAnchor? field, MagnetAnchor? value, uint setBit, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
     {
+        MarkSet(setBit);
+
         if (field == value)
         {
             return;
@@ -34,8 +46,10 @@ public sealed class MagnetView : MagnetNode
         Notify(change);
     }
 
-    private void SetSizeField(ref MagnetSizing field, MagnetSizing value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    private void SetSizeField(ref MagnetSizing field, MagnetSizing value, uint setBit, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
     {
+        MarkSet(setBit);
+
         if (field == value)
         {
             return;
@@ -53,7 +67,7 @@ public sealed class MagnetView : MagnetNode
     public MagnetAnchor? LeftTo
     {
         get => _leftTo;
-        set => SetAnchorField(ref _leftTo, value);
+        set => SetAnchorField(ref _leftTo, value, LeftToBit);
     }
 
     /// <summary>
@@ -62,7 +76,7 @@ public sealed class MagnetView : MagnetNode
     public MagnetAnchor? RightTo
     {
         get => _rightTo;
-        set => SetAnchorField(ref _rightTo, value);
+        set => SetAnchorField(ref _rightTo, value, RightToBit);
     }
 
     /// <summary>
@@ -71,7 +85,7 @@ public sealed class MagnetView : MagnetNode
     public MagnetAnchor? TopTo
     {
         get => _topTo;
-        set => SetAnchorField(ref _topTo, value);
+        set => SetAnchorField(ref _topTo, value, TopToBit);
     }
 
     /// <summary>
@@ -80,7 +94,7 @@ public sealed class MagnetView : MagnetNode
     public MagnetAnchor? BottomTo
     {
         get => _bottomTo;
-        set => SetAnchorField(ref _bottomTo, value);
+        set => SetAnchorField(ref _bottomTo, value, BottomToBit);
     }
 
     /// <summary>
@@ -89,7 +103,7 @@ public sealed class MagnetView : MagnetNode
     public MagnetSizing WidthSizing
     {
         get => _widthSizing;
-        set => SetSizeField(ref _widthSizing, value);
+        set => SetSizeField(ref _widthSizing, value, WidthSizingBit);
     }
 
     /// <summary>
@@ -98,7 +112,7 @@ public sealed class MagnetView : MagnetNode
     public MagnetSizing HeightSizing
     {
         get => _heightSizing;
-        set => SetSizeField(ref _heightSizing, value);
+        set => SetSizeField(ref _heightSizing, value, HeightSizingBit);
     }
 
     /// <summary>
@@ -108,7 +122,7 @@ public sealed class MagnetView : MagnetNode
     public double HorizontalBias
     {
         get => _horizontalBias;
-        set => SetValues(ref _horizontalBias, value);
+        set => SetValues(ref _horizontalBias, value, HorizontalBiasBit);
     }
 
     /// <summary>
@@ -118,7 +132,7 @@ public sealed class MagnetView : MagnetNode
     public double VerticalBias
     {
         get => _verticalBias;
-        set => SetValues(ref _verticalBias, value);
+        set => SetValues(ref _verticalBias, value, VerticalBiasBit);
     }
 
     /// <summary>
@@ -138,6 +152,8 @@ public sealed class MagnetView : MagnetNode
         get => _applyVisibility;
         set
         {
+            MarkSet(ApplyVisibilityBit);
+
             if (_applyVisibility == value)
             {
                 return;
@@ -397,73 +413,128 @@ public sealed class MagnetView : MagnetNode
     // --- Typed targets: a view carrying Magnet.MagnetId, or a node ---
 
     /// <summary>Resolves the <see cref="MagnetNode.MagnetId" /> of a view or node used as a target.</summary>
-    public static string IdOf(object target)
+    public static string IdOf(MagnetNode target)
+        => string.IsNullOrEmpty(target.MagnetId)
+            ? throw new InvalidOperationException($"The target {target.GetType().Name} has no MagnetId.")
+            : target.MagnetId;
+
+    /// <summary>Resolves the <see cref="MagnetNode.MagnetId" /> of a view used as a target.</summary>
+    public static string IdOf(BindableObject target)
     {
-        var id = target switch
-        {
-            MagnetNode node => node.MagnetId,
-            BindableObject bindable => Magnet.GetMagnetId(bindable),
-            _ => null
-        };
+        var id = Magnet.GetMagnetId(target);
 
         return string.IsNullOrEmpty(id)
             ? throw new InvalidOperationException($"The target {target.GetType().Name} has no MagnetId (set Magnet.MagnetId on it, or use Magnet.GetConstraints(view).Id(...)).")
             : id;
     }
 
-    /// <summary>Builds a <see cref="MagnetTarget" /> from a view or node.</summary>
-    public static MagnetTarget TargetOf(object target, double margin = 0, double? goneMargin = null) => new(IdOf(target), margin, goneMargin);
+    /// <summary>Builds a <see cref="MagnetTarget" /> from a node.</summary>
+    public static MagnetTarget TargetOf(MagnetNode target, double margin = 0, double? goneMargin = null) => new(IdOf(target), margin, goneMargin);
+
+    /// <summary>Builds a <see cref="MagnetTarget" /> from a view.</summary>
+    public static MagnetTarget TargetOf(BindableObject target, double margin = 0, double? goneMargin = null) => new(IdOf(target), margin, goneMargin);
 
     /// <inheritdoc cref="Left(string, MagnetPole, double, double?)" />
-    public MagnetView Left(object target, MagnetPole pole = MagnetPole.Left, double margin = 0, double? goneMargin = null) => Left(IdOf(target), pole, margin, goneMargin);
+    public MagnetView Left(MagnetNode target, MagnetPole pole = MagnetPole.Left, double margin = 0, double? goneMargin = null) => Left(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Left(string, MagnetPole, double, double?)" />
+    public MagnetView Left(BindableObject target, MagnetPole pole = MagnetPole.Left, double margin = 0, double? goneMargin = null) => Left(IdOf(target), pole, margin, goneMargin);
 
     /// <inheritdoc cref="Right(string, MagnetPole, double, double?)" />
-    public MagnetView Right(object target, MagnetPole pole = MagnetPole.Right, double margin = 0, double? goneMargin = null) => Right(IdOf(target), pole, margin, goneMargin);
+    public MagnetView Right(MagnetNode target, MagnetPole pole = MagnetPole.Right, double margin = 0, double? goneMargin = null) => Right(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Right(string, MagnetPole, double, double?)" />
+    public MagnetView Right(BindableObject target, MagnetPole pole = MagnetPole.Right, double margin = 0, double? goneMargin = null) => Right(IdOf(target), pole, margin, goneMargin);
 
     /// <inheritdoc cref="Top(string, MagnetPole, double, double?)" />
-    public MagnetView Top(object target, MagnetPole pole = MagnetPole.Top, double margin = 0, double? goneMargin = null) => Top(IdOf(target), pole, margin, goneMargin);
+    public MagnetView Top(MagnetNode target, MagnetPole pole = MagnetPole.Top, double margin = 0, double? goneMargin = null) => Top(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Top(string, MagnetPole, double, double?)" />
+    public MagnetView Top(BindableObject target, MagnetPole pole = MagnetPole.Top, double margin = 0, double? goneMargin = null) => Top(IdOf(target), pole, margin, goneMargin);
 
     /// <inheritdoc cref="Bottom(string, MagnetPole, double, double?)" />
-    public MagnetView Bottom(object target, MagnetPole pole = MagnetPole.Bottom, double margin = 0, double? goneMargin = null) => Bottom(IdOf(target), pole, margin, goneMargin);
+    public MagnetView Bottom(MagnetNode target, MagnetPole pole = MagnetPole.Bottom, double margin = 0, double? goneMargin = null) => Bottom(IdOf(target), pole, margin, goneMargin);
+
+    /// <inheritdoc cref="Bottom(string, MagnetPole, double, double?)" />
+    public MagnetView Bottom(BindableObject target, MagnetPole pole = MagnetPole.Bottom, double margin = 0, double? goneMargin = null) => Bottom(IdOf(target), pole, margin, goneMargin);
 
     /// <inheritdoc cref="After(MagnetTarget)" />
-    public MagnetView After(object target, double margin = 0, double? goneMargin = null) => After(TargetOf(target, margin, goneMargin));
+    public MagnetView After(MagnetNode target, double margin = 0, double? goneMargin = null) => After(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="After(MagnetTarget)" />
+    public MagnetView After(BindableObject target, double margin = 0, double? goneMargin = null) => After(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="Before(MagnetTarget)" />
-    public MagnetView Before(object target, double margin = 0, double? goneMargin = null) => Before(TargetOf(target, margin, goneMargin));
+    public MagnetView Before(MagnetNode target, double margin = 0, double? goneMargin = null) => Before(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Before(MagnetTarget)" />
+    public MagnetView Before(BindableObject target, double margin = 0, double? goneMargin = null) => Before(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="Below(MagnetTarget)" />
-    public MagnetView Below(object target, double margin = 0, double? goneMargin = null) => Below(TargetOf(target, margin, goneMargin));
+    public MagnetView Below(MagnetNode target, double margin = 0, double? goneMargin = null) => Below(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Below(MagnetTarget)" />
+    public MagnetView Below(BindableObject target, double margin = 0, double? goneMargin = null) => Below(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="Above(MagnetTarget)" />
-    public MagnetView Above(object target, double margin = 0, double? goneMargin = null) => Above(TargetOf(target, margin, goneMargin));
+    public MagnetView Above(MagnetNode target, double margin = 0, double? goneMargin = null) => Above(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="Above(MagnetTarget)" />
+    public MagnetView Above(BindableObject target, double margin = 0, double? goneMargin = null) => Above(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="AlignLeft(MagnetTarget)" />
-    public MagnetView AlignLeft(object target, double margin = 0, double? goneMargin = null) => AlignLeft(TargetOf(target, margin, goneMargin));
+    public MagnetView AlignLeft(MagnetNode target, double margin = 0, double? goneMargin = null) => AlignLeft(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignLeft(MagnetTarget)" />
+    public MagnetView AlignLeft(BindableObject target, double margin = 0, double? goneMargin = null) => AlignLeft(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="AlignRight(MagnetTarget)" />
-    public MagnetView AlignRight(object target, double margin = 0, double? goneMargin = null) => AlignRight(TargetOf(target, margin, goneMargin));
+    public MagnetView AlignRight(MagnetNode target, double margin = 0, double? goneMargin = null) => AlignRight(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignRight(MagnetTarget)" />
+    public MagnetView AlignRight(BindableObject target, double margin = 0, double? goneMargin = null) => AlignRight(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="AlignTop(MagnetTarget)" />
-    public MagnetView AlignTop(object target, double margin = 0, double? goneMargin = null) => AlignTop(TargetOf(target, margin, goneMargin));
+    public MagnetView AlignTop(MagnetNode target, double margin = 0, double? goneMargin = null) => AlignTop(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignTop(MagnetTarget)" />
+    public MagnetView AlignTop(BindableObject target, double margin = 0, double? goneMargin = null) => AlignTop(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="AlignBottom(MagnetTarget)" />
-    public MagnetView AlignBottom(object target, double margin = 0, double? goneMargin = null) => AlignBottom(TargetOf(target, margin, goneMargin));
+    public MagnetView AlignBottom(MagnetNode target, double margin = 0, double? goneMargin = null) => AlignBottom(TargetOf(target, margin, goneMargin));
+
+    /// <inheritdoc cref="AlignBottom(MagnetTarget)" />
+    public MagnetView AlignBottom(BindableObject target, double margin = 0, double? goneMargin = null) => AlignBottom(TargetOf(target, margin, goneMargin));
 
     /// <inheritdoc cref="HorizontallyWithin(MagnetTarget)" />
-    public MagnetView HorizontallyWithin(object target, double margin = 0) => HorizontallyWithin(TargetOf(target, margin));
+    public MagnetView HorizontallyWithin(MagnetNode target, double margin = 0) => HorizontallyWithin(TargetOf(target, margin));
+
+    /// <inheritdoc cref="HorizontallyWithin(MagnetTarget)" />
+    public MagnetView HorizontallyWithin(BindableObject target, double margin = 0) => HorizontallyWithin(TargetOf(target, margin));
 
     /// <inheritdoc cref="VerticallyWithin(MagnetTarget)" />
-    public MagnetView VerticallyWithin(object target, double margin = 0) => VerticallyWithin(TargetOf(target, margin));
+    public MagnetView VerticallyWithin(MagnetNode target, double margin = 0) => VerticallyWithin(TargetOf(target, margin));
+
+    /// <inheritdoc cref="VerticallyWithin(MagnetTarget)" />
+    public MagnetView VerticallyWithin(BindableObject target, double margin = 0) => VerticallyWithin(TargetOf(target, margin));
 
     /// <inheritdoc cref="Within(MagnetTarget)" />
-    public MagnetView Within(object target, double margin = 0) => Within(TargetOf(target, margin));
+    public MagnetView Within(MagnetNode target, double margin = 0) => Within(TargetOf(target, margin));
+
+    /// <inheritdoc cref="Within(MagnetTarget)" />
+    public MagnetView Within(BindableObject target, double margin = 0) => Within(TargetOf(target, margin));
 
     /// <inheritdoc cref="FillWidth(MagnetTarget)" />
-    public MagnetView FillWidth(object target, double margin = 0) => FillWidth(TargetOf(target, margin));
+    public MagnetView FillWidth(MagnetNode target, double margin = 0) => FillWidth(TargetOf(target, margin));
+
+    /// <inheritdoc cref="FillWidth(MagnetTarget)" />
+    public MagnetView FillWidth(BindableObject target, double margin = 0) => FillWidth(TargetOf(target, margin));
 
     /// <inheritdoc cref="FillHeight(MagnetTarget)" />
-    public MagnetView FillHeight(object target, double margin = 0) => FillHeight(TargetOf(target, margin));
+    public MagnetView FillHeight(MagnetNode target, double margin = 0) => FillHeight(TargetOf(target, margin));
+
+    /// <inheritdoc cref="FillHeight(MagnetTarget)" />
+    public MagnetView FillHeight(BindableObject target, double margin = 0) => FillHeight(TargetOf(target, margin));
 
     /// <summary>Sets width and height.</summary>
     public MagnetView Size(MagnetSizing width, MagnetSizing height)

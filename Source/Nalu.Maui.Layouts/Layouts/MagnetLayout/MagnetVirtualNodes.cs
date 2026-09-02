@@ -13,6 +13,9 @@ namespace Nalu;
 [ContentProperty(nameof(Nodes))]
 public sealed class MagnetBarrier : MagnetNode
 {
+    internal const uint DirectionBit = 1u << 0;
+    internal const uint MarginBit = 1u << 1;
+
     private MagnetPole _direction = MagnetPole.Right;
     private double _margin;
 
@@ -32,7 +35,7 @@ public sealed class MagnetBarrier : MagnetNode
     public MagnetPole Direction
     {
         get => _direction;
-        set => SetStructure(ref _direction, value);
+        set => SetStructure(ref _direction, value, DirectionBit);
     }
 
     /// <summary>
@@ -52,7 +55,7 @@ public sealed class MagnetBarrier : MagnetNode
     public double Margin
     {
         get => _margin;
-        set => SetValues(ref _margin, value);
+        set => SetValues(ref _margin, value, MarginBit);
     }
 
     /// <summary>Adds members (fluent).</summary>
@@ -66,8 +69,19 @@ public sealed class MagnetBarrier : MagnetNode
         return this;
     }
 
-    /// <summary>Adds members given as views (carrying <c>Magnet.MagnetId</c>) or nodes (fluent).</summary>
-    public MagnetBarrier With(params object[] elements)
+    /// <summary>Adds members given as nodes (fluent).</summary>
+    public MagnetBarrier With(params MagnetNode[] elements)
+    {
+        foreach (var element in elements)
+        {
+            Nodes.Add(MagnetView.IdOf(element));
+        }
+
+        return this;
+    }
+
+    /// <summary>Adds members given as views carrying <c>Magnet.MagnetId</c> (fluent).</summary>
+    public MagnetBarrier With(params BindableObject[] elements)
     {
         foreach (var element in elements)
         {
@@ -87,6 +101,10 @@ public sealed class MagnetBarrier : MagnetNode
 /// </remarks>
 public sealed class MagnetGuideline : MagnetNode
 {
+    internal const uint OrientationBit = 1u << 0;
+    internal const uint PercentBit = 1u << 1;
+    internal const uint PositionBit = 1u << 2;
+
     private MagnetOrientation _orientation = MagnetOrientation.Vertical;
     private double _percent;
     private double _position;
@@ -97,7 +115,7 @@ public sealed class MagnetGuideline : MagnetNode
     public MagnetOrientation Orientation
     {
         get => _orientation;
-        set => SetStructure(ref _orientation, value);
+        set => SetStructure(ref _orientation, value, OrientationBit);
     }
 
     /// <summary>
@@ -106,7 +124,7 @@ public sealed class MagnetGuideline : MagnetNode
     public double Percent
     {
         get => _percent;
-        set => SetValues(ref _percent, value);
+        set => SetValues(ref _percent, value, PercentBit);
     }
 
     /// <summary>
@@ -115,7 +133,7 @@ public sealed class MagnetGuideline : MagnetNode
     public double Position
     {
         get => _position;
-        set => SetValues(ref _position, value);
+        set => SetValues(ref _position, value, PositionBit);
     }
 }
 
@@ -131,6 +149,11 @@ public sealed class MagnetGuideline : MagnetNode
 [ContentProperty(nameof(Nodes))]
 public sealed class MagnetChain : MagnetNode
 {
+    internal const uint OrientationBit = 1u << 0;
+    internal const uint StyleBit = 1u << 1;
+    internal const uint GapBit = 1u << 2;
+    internal const uint GapModeBit = 1u << 3;
+
     private MagnetOrientation _orientation = MagnetOrientation.Horizontal;
     private MagnetChainStyle _style = MagnetChainStyle.Spread;
     private double _gap;
@@ -154,7 +177,7 @@ public sealed class MagnetChain : MagnetNode
     public MagnetOrientation Orientation
     {
         get => _orientation;
-        set => SetStructure(ref _orientation, value);
+        set => SetStructure(ref _orientation, value, OrientationBit);
     }
 
     /// <summary>
@@ -174,7 +197,7 @@ public sealed class MagnetChain : MagnetNode
     public MagnetChainStyle Style
     {
         get => _style;
-        set => SetStructure(ref _style, value);
+        set => SetStructure(ref _style, value, StyleBit);
     }
 
     /// <summary>
@@ -188,7 +211,7 @@ public sealed class MagnetChain : MagnetNode
     public double Gap
     {
         get => _gap;
-        set => SetValues(ref _gap, value);
+        set => SetValues(ref _gap, value, GapBit);
     }
 
     /// <summary>
@@ -201,7 +224,7 @@ public sealed class MagnetChain : MagnetNode
     public MagnetChainGapMode GapMode
     {
         get => _gapMode;
-        set => SetStructure(ref _gapMode, value);
+        set => SetStructure(ref _gapMode, value, GapModeBit);
     }
 
     /// <summary>
@@ -228,8 +251,19 @@ public sealed class MagnetChain : MagnetNode
         return this;
     }
 
-    /// <summary>Adds members given as views (carrying <c>Magnet.MagnetId</c>) or nodes (fluent).</summary>
-    public MagnetChain With(params object[] elements)
+    /// <summary>Adds members given as nodes (fluent).</summary>
+    public MagnetChain With(params MagnetNode[] elements)
+    {
+        foreach (var element in elements)
+        {
+            Nodes.Add(MagnetView.IdOf(element));
+        }
+
+        return this;
+    }
+
+    /// <summary>Adds members given as views carrying <c>Magnet.MagnetId</c> (fluent).</summary>
+    public MagnetChain With(params BindableObject[] elements)
     {
         foreach (var element in elements)
         {

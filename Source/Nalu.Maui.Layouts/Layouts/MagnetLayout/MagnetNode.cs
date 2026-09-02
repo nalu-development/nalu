@@ -36,9 +36,20 @@ internal enum MagnetNodeOrigin : byte
 public abstract class MagnetNode : INotifyPropertyChanged
 {
     private string? _magnetId;
+    private uint _setMask;
 
     /// <inheritdoc />
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>
+    /// Marks a property as explicitly assigned (assembly-internal replacement of <c>BindableObject.IsSet</c>,
+    /// used by definition derivation to know which properties a node overrides). Marked on every assignment,
+    /// including assignments of the current value.
+    /// </summary>
+    private protected void MarkSet(uint bit) => _setMask |= bit;
+
+    /// <summary>Gets whether a property was explicitly assigned (bit constants are defined per node class).</summary>
+    internal bool IsSet(uint bit) => (_setMask & bit) != 0;
 
     /// <summary>
     /// Gets or sets the identifier of this node. Required and unique within a <see cref="MagnetDefinition" />.
@@ -109,17 +120,19 @@ public abstract class MagnetNode : INotifyPropertyChanged
     /// <summary>
     /// Sets a field whose change requires a recompilation.
     /// </summary>
-    private protected bool SetStructure<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-        => Set(ref field, value, MagnetChange.Structure, propertyName);
+    private protected bool SetStructure<T>(ref T field, T value, uint setBit = 0, [CallerMemberName] string? propertyName = null)
+        => Set(ref field, value, MagnetChange.Structure, setBit, propertyName);
 
     /// <summary>
     /// Sets a field whose change only patches values.
     /// </summary>
-    private protected bool SetValues<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-        => Set(ref field, value, MagnetChange.Values, propertyName);
+    private protected bool SetValues<T>(ref T field, T value, uint setBit = 0, [CallerMemberName] string? propertyName = null)
+        => Set(ref field, value, MagnetChange.Values, setBit, propertyName);
 
-    private bool Set<T>(ref T field, T value, MagnetChange change, string? propertyName)
+    private bool Set<T>(ref T field, T value, MagnetChange change, uint setBit, string? propertyName)
     {
+        MarkSet(setBit);
+
         if (EqualityComparer<T>.Default.Equals(field, value))
         {
             return false;

@@ -538,7 +538,8 @@ public class MagnetShortcutTests
         Magnet.SetMagnetId(b, "b");
         var chain = new MagnetChain { MagnetId = "row" }.With(a, b);
         chain.Nodes.Should().Equal("a", "b");
-        var barrier = new MagnetBarrier { MagnetId = "end" }.With(a, Magnet.GetConstraints(b));
+        // Views and nodes have separate typed overloads: mixing them takes two chained calls.
+        var barrier = new MagnetBarrier { MagnetId = "end" }.With(a).With(Magnet.GetConstraints(b));
         barrier.Nodes.Should().Equal("a", "b");
 
         var act = () => new MagnetChain { MagnetId = "x" }.With(new TestView(1, 1));
@@ -626,5 +627,34 @@ public class MagnetSetOnlyAttachedTests
         node.HorizontalBias = 0.7;
         label.ClearValue(Magnet.HorizontalBiasProperty);
         node.HorizontalBias.Should().Be(0.7);
+    }
+}
+
+public class MagnetNodeSetTrackingTests
+{
+    [Fact]
+    public void ExplicitAssignmentsAreTrackedEvenWithDefaultValues()
+    {
+        var view = new MagnetView();
+        view.IsSet(MagnetView.LeftToBit).Should().BeFalse();
+        view.IsSet(MagnetView.WidthSizingBit).Should().BeFalse();
+
+        // BindableObject.IsSet parity: assigning marks, even when the value equals the current one.
+        view.LeftTo = null;
+        view.WidthSizing = MagnetSizing.Measured;
+        view.HorizontalBias = 0.5;
+        view.ApplyVisibility = MagnetVisibilityAction.None;
+
+        view.IsSet(MagnetView.LeftToBit).Should().BeTrue();
+        view.IsSet(MagnetView.WidthSizingBit).Should().BeTrue();
+        view.IsSet(MagnetView.HorizontalBiasBit).Should().BeTrue();
+        view.IsSet(MagnetView.ApplyVisibilityBit).Should().BeTrue();
+        view.IsSet(MagnetView.RightToBit).Should().BeFalse("untouched properties stay unset");
+
+        var chain = new MagnetChain();
+        chain.IsSet(MagnetChain.GapBit).Should().BeFalse();
+        chain.Gap = 0;
+        chain.IsSet(MagnetChain.GapBit).Should().BeTrue();
+        chain.IsSet(MagnetChain.StyleBit).Should().BeFalse();
     }
 }
