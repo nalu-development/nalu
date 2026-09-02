@@ -30,7 +30,7 @@ internal sealed class AppleLiveActivity : LiveActivityBase
         NaluLiveActivitiesBridge.UpdateActivity(
             Id,
             payload,
-            AppleLiveActivityManager.ToEpochMs(content.StaleAt),
+            AppleLiveActivityManager.ToStaleEpochMs(content.StaleAt),
             alert?.Title,
             alert?.Body,
             () => completion.TrySetResult()
