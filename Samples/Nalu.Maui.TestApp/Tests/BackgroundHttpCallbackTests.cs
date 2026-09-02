@@ -225,6 +225,7 @@ public class BackgroundHttpCallbackTests : ContentPage
             ("duplicate-identifier", DuplicateIdentifierAsync),
             ("lost-download", LostDownloadAsync),
             ("lost-error", LostErrorAsync),
+            ("lost-staging", LostStagingAsync),
             ("response-file-unlinked", ResponseFileUnlinkedAsync),
             ("staged-file-race", StagedFileRaceAsync),
             ("burst-completions", BurstCompletionsAsync),
@@ -915,6 +916,104 @@ public class BackgroundHttpCallbackTests : ContentPage
         }
         finally
         {
+            BackgroundHttpLostMessageHandler.Interceptor = null;
+        }
+    }
+
+    /// <summary>
+    /// THE PRODUCTION FAILURE, deterministically: a staging loss on a handle nobody owns.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Field evidence (Sentry, iPhone 8 / iOS 16.7): nsurlsessiond finishes a background
+    /// download, then the app cannot run the callback for a long time — the process died, or it
+    /// sat suspended for hours. Meanwhile iOS purges <c>Library/Caches</c> under memory
+    /// pressure, and that is where the downloaded temp file lives. When the callback finally
+    /// arrives the file is gone (<c>ENOENT</c>, "source file exists: False") AND the request has
+    /// no owner, because whoever awaited it is long gone.
+    /// </para>
+    /// <para>
+    /// <see cref="MissingDownloadFileAsync" /> already covers the OWNED half of this: there a
+    /// caller awaits the handle, observes the fault and everything is clean. The unowned half is
+    /// what reaches production — the delegate faults a <see cref="TaskCompletionSource" /> that
+    /// nothing will ever await, so the exception resurfaces at FINALIZATION as
+    /// <see cref="TaskScheduler.UnobservedTaskException" /> and gets reported as an unhandled
+    /// error. Every one of the delegate's nine TrySetException/TrySetCanceled sites is exposed;
+    /// only the SUCCESS path checks <c>IsLostRequest</c>.
+    /// </para>
+    /// <para>
+    /// Note this asserts only the leak, not how it should be fixed: whether an unowned failure
+    /// belongs on the lost-message handler or should simply be absorbed is a design decision for
+    /// the fix — <see cref="LostErrorAsync" /> currently says error completions must NOT reach
+    /// that handler. <c>lostHandlerSaw</c> is reported for diagnosis, not asserted.
+    /// </para>
+    /// </remarks>
+    private async Task LostStagingAsync()
+    {
+        var id = $"cb-loststage-{Guid.NewGuid():N}";
+        var missingPath = Path.Combine(Path.GetTempPath(), $"chaos-loststage-{Guid.NewGuid():N}.download");
+
+        var lostHandlerSaw = false;
+        BackgroundHttpLostMessageHandler.Interceptor = _ =>
+        {
+            lostHandlerSaw = true;
+
+            return Task.CompletedTask;
+        };
+
+        var gate = new Lock();
+        var escaped = new List<string>();
+
+        void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs e)
+        {
+            var text = e.Exception?.ToString() ?? string.Empty;
+
+            // Other scenarios share this process; only OUR staging failure counts.
+            if (text.Contains("Failed to secure downloaded file", StringComparison.Ordinal)
+                || text.Contains("Failed to process downloaded file", StringComparison.Ordinal))
+            {
+                lock (gate)
+                {
+                    escaped.Add(e.Exception?.InnerException?.Message ?? text);
+                }
+            }
+
+            // Claim it either way: leaving it unobserved would leak into whatever the host app
+            // has attached to this event (in production, Sentry).
+            e.SetObserved();
+        }
+
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+
+        try
+        {
+            // No CreatePendingAsync on purpose: nothing owns this identifier, which is exactly
+            // the state a relaunched — or long-suspended — process is in.
+            InvokeFinished(new FakeTask { Desc = id, TaskResponse = MakeHttpResponse() }, missingPath);
+
+            await Task.Delay(1_000);
+
+            Check(!SessionHandler.GetPendingResponses().ContainsKey(id), "the lost staging failure leaked a pending handle");
+
+            // A faulted Task only reports itself unobserved when it is FINALIZED, so the leak is
+            // invisible until the handle is collected.
+            for (var i = 0; i < 3; i++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                await Task.Delay(250);
+            }
+
+            lock (gate)
+            {
+                Check(escaped.Count == 0,
+                    $"the staging failure escaped as UnobservedTaskException x{escaped.Count} (lostHandlerSaw={lostHandlerSaw}): {string.Join(" | ", escaped)}"
+                );
+            }
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= OnUnobserved;
             BackgroundHttpLostMessageHandler.Interceptor = null;
         }
     }
