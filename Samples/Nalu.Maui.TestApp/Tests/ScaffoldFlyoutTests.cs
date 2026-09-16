@@ -47,7 +47,10 @@ public partial class FlyoutTabPageModel : ObservableObject;
 public class FlyoutHomePage : ContentPage
 {
     private readonly Label _stateLabel;
+    private readonly Label _handlerLabel;
     private Scaffold? _observedScaffold;
+    private bool _reopenOnClose;
+    private int _handlerGeneration;
 
     public FlyoutHomePage(FlyoutHomePageModel model)
     {
@@ -85,13 +88,44 @@ public class FlyoutHomePage : ContentPage
         );
 
         _stateLabel = new Label { AutomationId = "FlyoutStateLabel", Text = "idle" };
+        _handlerLabel = new Label { AutomationId = "ScaffoldHandlerLabel", Text = "handler-gen:0" };
 
         var stack = new VerticalStackLayout { Spacing = 12, Padding = 16 };
         stack.Add(new Label { Text = "FlyoutHomePage", AutomationId = "FlyoutHomePage", FontSize = 20, FontAttributes = FontAttributes.Bold });
         stack.Add(_stateLabel);
+        stack.Add(_handlerLabel);
         stack.Add(NavPageFactory.MakeButton("Open start", "OpenStartFlyoutButton", model.OpenStart));
         stack.Add(NavPageFactory.MakeButton("Open end", "OpenEndFlyoutButton", model.OpenEnd));
         stack.Add(NavPageFactory.MakeButton("Push detail", "PushFlyoutDetail", model.PushDetail));
+
+        // Arms a ONE-SHOT reopen from inside the closed event: the owner callbacks run before
+        // the presenter has torn the previous presentation down, so a synchronous reopen there
+        // must still find the drawer content free (UIViewControllerHierarchyInconsistency on
+        // iOS, "child already has a parent" on Android, otherwise).
+        var reopenButton = new Button { Text = "Reopen on close", AutomationId = "ArmReopenOnCloseButton", FontSize = 11 };
+        reopenButton.Clicked += (_, _) => _reopenOnClose = true;
+        stack.Add(reopenButton);
+
+        // Disconnects and reconnects the scaffold's handler the way the harness swaps pages
+        // (window page swap + explicit DisconnectHandlers): the presenter is disposed and a
+        // fresh one mounts the same scaffold, pages and drawer content again. Whatever was
+        // presented at that moment must be closed for real — owner state included.
+        var reconnectButton = new Button { Text = "Reconnect scaffold", AutomationId = "ReconnectScaffoldButton", FontSize = 11 };
+
+        reconnectButton.Clicked += (_, _) =>
+        {
+            if (_observedScaffold is not { } scaffold)
+            {
+                return;
+            }
+
+            var window = Application.Current!.Windows[0];
+            window.Page = new ContentPage { Content = new Label { Text = "placeholder" } };
+            scaffold.DisconnectHandlers();
+            Dispatcher.Dispatch(() => window.Page = scaffold);
+        };
+
+        stack.Add(reconnectButton);
 
         var exitButton = new Button { Text = "Exit", AutomationId = "ExitFlyoutHome", FontSize = 11, BackgroundColor = Colors.IndianRed };
         exitButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
@@ -116,8 +150,28 @@ public class FlyoutHomePage : ContentPage
         if (element is Scaffold scaffold && !ReferenceEquals(_observedScaffold, scaffold))
         {
             _observedScaffold = scaffold;
+            _handlerGeneration = scaffold.Handler is null ? 0 : 1;
+            _handlerLabel.Text = $"handler-gen:{_handlerGeneration}";
+
+            scaffold.HandlerChanged += (_, _) =>
+            {
+                if (scaffold.Handler is not null)
+                {
+                    _handlerLabel.Text = $"handler-gen:{++_handlerGeneration}";
+                }
+            };
+
             scaffold.FlyoutStartOpened += (_, _) => _stateLabel.Text = $"start-open:{scaffold.IsFlyoutStartOpen}";
-            scaffold.FlyoutStartClosed += (_, _) => _stateLabel.Text = $"start-closed:{scaffold.IsFlyoutStartOpen}";
+            scaffold.FlyoutStartClosed += (_, _) =>
+            {
+                _stateLabel.Text = $"start-closed:{scaffold.IsFlyoutStartOpen}";
+
+                if (_reopenOnClose)
+                {
+                    _reopenOnClose = false;
+                    _ = scaffold.OpenFlyoutAsync(ScaffoldFlyoutSide.Start);
+                }
+            };
             scaffold.FlyoutEndOpened += (_, _) => _stateLabel.Text = $"end-open:{scaffold.IsFlyoutEndOpen}";
             scaffold.FlyoutEndClosed += (_, _) => _stateLabel.Text = $"end-closed:{scaffold.IsFlyoutEndOpen}";
         }

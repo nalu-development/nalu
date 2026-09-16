@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.ExceptionServices;
 using Android.Views;
 using AndroidX.AppCompat.App;
 using AndroidX.Core.View;
@@ -46,6 +47,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         public required AView ContentPlatform { get; set; }
         public double FlyoutOffscreenTranslation { get; init; }
         public bool Closing { get; set; }
+
+        /// <summary>Torn down by disposal: an in-flight close must not run its teardown again.</summary>
+        public bool Discarded { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
@@ -1623,6 +1627,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
     public void Dispose()
     {
+        DiscardOverlays();
+
         if (_scaffoldObserved)
         {
             _scaffoldObserved = false;
@@ -2247,32 +2253,110 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
 
-        // Owner cleanup (state flags, logical-child detach, handle completion) runs AFTER the
-        // exit animation: detaching the content's logical child earlier freezes its exit
-        // transforms — the sheet/popup would sit still and vanish at the end.
-        request.Cleanup?.Invoke();
+        if (entry.Discarded)
+        {
+            // The presenter was disposed while the exit was in flight: disposal already tore
+            // the entry down and told the owner.
+            return;
+        }
 
+        // Platform teardown FIRST, owner cleanup second: the owner callbacks (open-state
+        // properties, the closed events, handle completion) reach app code that may present the
+        // very same content again synchronously — its platform view must be out of the container
+        // by then (a view can have one parent), and a throwing callback must not skip the teardown.
         (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
         (entry.ScrimPlatform.Parent as AViewGroup)?.RemoveView(entry.ScrimPlatform);
         _overlays.Remove(entry);
 
-        // The keyboard goes back to the entry below, or to the page.
-        if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet
-            && scaffold.Handler is IPlatformViewHandler { PlatformView: ScaffoldLayout ownerLayout } && ownerLayout.Context is { } ownerContext)
-        {
-            OnKeyboardOwnerChanged(ownerLayout, ownerContext);
-        }
-
+        // The exit transforms are undone before the owner hears "closed": a synchronous
+        // re-presentation from there sets up its own entrance, which a later reset would clobber.
         ScaffoldOverlayAnimations.ResetContent(request.Content);
-        entry.ScrimView.DisconnectHandlers();
-        scaffold.RemoveLogicalChild(entry.ScrimView);
 
-        if (request.DisconnectContentOnClose)
+        try
         {
-            request.Content.DisconnectHandlers();
+            // Owner cleanup runs AFTER the exit animation: detaching the content's logical child
+            // earlier freezes its exit transforms — the sheet/popup would sit still and vanish
+            // at the end.
+            request.Cleanup?.Invoke();
+        }
+        finally
+        {
+            // The keyboard goes back to the entry below, or to the page.
+            if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet
+                && scaffold.Handler is IPlatformViewHandler { PlatformView: ScaffoldLayout ownerLayout } && ownerLayout.Context is { } ownerContext)
+            {
+                OnKeyboardOwnerChanged(ownerLayout, ownerContext);
+            }
+
+            entry.ScrimView.DisconnectHandlers();
+            scaffold.RemoveLogicalChild(entry.ScrimView);
+
+            if (request.DisconnectContentOnClose)
+            {
+                request.Content.DisconnectHandlers();
+            }
+
+            entry.ClosedTcs.TrySetResult();
+            scaffold.UpdateBackCallbackEnabled();
+        }
+    }
+
+    /// <summary>
+    /// Drops every presented overlay when the presenter goes away (handler disconnection), with
+    /// no exit animation: the platform views leave the container and each owner hears "closed",
+    /// so the scaffold's open-state flags, handles and awaiting callers do not outlive the
+    /// presentation (a drawer left "open" could never be opened again). Same order as
+    /// <see cref="CloseEntryAsync"/>: teardown first, owner callback second; one throwing owner
+    /// does not skip the rest — its exception surfaces once everything is down.
+    /// </summary>
+    private void DiscardOverlays()
+    {
+        if (_overlays.Count == 0)
+        {
+            return;
         }
 
-        entry.ClosedTcs.TrySetResult();
-        scaffold.UpdateBackCallbackEnabled();
+        var entries = _overlays.ToArray();
+        _overlays.Clear();
+        ExceptionDispatchInfo? failure = null;
+
+        foreach (var entry in entries)
+        {
+            var request = entry.Request;
+            entry.Closing = true;
+            entry.Discarded = true;
+
+            if (request.Kind == ScaffoldOverlayKind.Flyout)
+            {
+                scaffold.SystemBars.OverlaySurface = null;
+            }
+
+            (entry.ContentPlatform.Parent as AViewGroup)?.RemoveView(entry.ContentPlatform);
+            (entry.ScrimPlatform.Parent as AViewGroup)?.RemoveView(entry.ScrimPlatform);
+            ScaffoldOverlayAnimations.ResetContent(request.Content);
+
+            try
+            {
+                request.Cleanup?.Invoke();
+            }
+            catch (Exception exception)
+            {
+                failure ??= ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                entry.ScrimView.DisconnectHandlers();
+                scaffold.RemoveLogicalChild(entry.ScrimView);
+
+                if (request.DisconnectContentOnClose)
+                {
+                    request.Content.DisconnectHandlers();
+                }
+
+                entry.ClosedTcs.TrySetResult();
+            }
+        }
+
+        failure?.Throw();
     }
 }

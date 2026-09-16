@@ -126,6 +126,74 @@ public class ScaffoldFlyoutChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     }
 
     [Fact]
+    public async Task StartFlyoutReopensAfterClose()
+    {
+        await WaitDisplayedAsync("FlyoutHomePage");
+
+        // The LEFT drawer's content is hosted by a view controller (window-controls inset);
+        // UIKit allows a view ONE controller, and the same content view is mounted on every
+        // open — a stale association from the previous presentation throws
+        // UIViewControllerHierarchyInconsistency on the reopen.
+        for (var round = 0; round < 3; round++)
+        {
+            await App.TapAsync("OpenStartFlyoutButton");
+            await App.WaitForTextAsync("FlyoutStateLabel", "start-open:True");
+
+            await App.TapAsync("CloseStartFlyoutButton");
+            await App.WaitForTextAsync("FlyoutStateLabel", "start-closed:False");
+        }
+    }
+
+    [Fact]
+    public async Task StartFlyoutReopensFromItsClosedEvent()
+    {
+        await WaitDisplayedAsync("FlyoutHomePage");
+
+        // A reopen issued synchronously from the closed event runs before the presenter has
+        // finished tearing the previous presentation down: the drawer content must already be
+        // released by then (the same native view is presented again).
+        await App.TapAsync("ArmReopenOnCloseButton");
+        await App.TapAsync("OpenStartFlyoutButton");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-open:True");
+
+        await App.TapAsync("CloseStartFlyoutButton");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-closed:False");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-open:True");
+
+        await App.TapAsync("CloseStartFlyoutButton");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-closed:False");
+    }
+
+    [Fact]
+    public async Task OpenFlyoutIsClosedByScaffoldReconnect()
+    {
+        await WaitDisplayedAsync("FlyoutHomePage");
+
+        // The page counts the scaffold's handler connections (the label is relative: how many
+        // it saw depends on when the page joined the tree).
+        var generation = (await App.FindElementAsync("ScaffoldHandlerLabel"))?.Text ?? throw new InvalidOperationException("Missing handler label");
+        var next = int.Parse(generation["handler-gen:".Length..]) + 1;
+
+        await App.TapAsync("OpenStartFlyoutButton");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-open:True");
+
+        // Disposing the presenter with the drawer open must close it for real: the owner hears
+        // "closed" (open flag + event), and the fresh presenter can present the same drawer
+        // content again — a stale "open" flag would make every later open a no-op.
+        await App.TapAsync("ReconnectScaffoldButton");
+        await App.WaitForTextAsync("ScaffoldHandlerLabel", $"handler-gen:{next}");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-closed:False");
+        await WaitDisplayedAsync("FlyoutHomePage");
+
+        await App.TapAsync("OpenStartFlyoutButton");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-open:True");
+        await WaitDisplayedAsync("StartFlyoutHeader");
+
+        await App.TapAsync("CloseStartFlyoutButton");
+        await App.WaitForTextAsync("FlyoutStateLabel", "start-closed:False");
+    }
+
+    [Fact]
     public async Task PageLevelEndModeAndOpenStateEvents()
     {
         await WaitDisplayedAsync("FlyoutHomePage");

@@ -21,10 +21,14 @@ namespace Nalu;
 /// </remarks>
 internal sealed class ScaffoldFlyoutPanelController(UIView panel) : UIViewController
 {
-    private readonly UIView _panel = panel;
+    private UIView? _panel = panel;
 
-    /// <inheritdoc />
-    public override void LoadView() => View = _panel;
+    /// <summary>
+    /// Hands the panel out ONCE. After <see cref="ReleaseView"/> a lazy <c>view</c> access
+    /// (UIKit loads on demand) gets a throwaway view instead: re-claiming the panel would
+    /// silently tie it back to a retired controller, and the next presentation would throw.
+    /// </summary>
+    public override void LoadView() => View = _panel ?? new UIView();
 
     /// <summary>
     /// Gives the panel back: UIKit allows a view exactly ONE controller, and a flyout's content
@@ -34,15 +38,39 @@ internal sealed class ScaffoldFlyoutPanelController(UIView panel) : UIViewContro
     /// </summary>
     public void ReleaseView()
     {
+        _panel = null;
         AdditionalSafeAreaInsets = UIEdgeInsets.Zero;
         View = null;
+    }
+
+    /// <summary>
+    /// Frees the panel from a retired controller that still holds it — a presentation that never
+    /// reached the close routine (an owner callback that threw, a presenter torn down with the
+    /// drawer open). The controller of a view is its next responder; a released panel (or one
+    /// never hosted) answers its superview instead.
+    /// </summary>
+    public static void ReleaseStaleOwner(UIView panel)
+    {
+        if (panel.NextResponder is not ScaffoldFlyoutPanelController stale)
+        {
+            return;
+        }
+
+        stale.WillMoveToParentViewController(null);
+        stale.RemoveFromParentViewController();
+        stale.ReleaseView();
     }
 
     /// <summary>Re-reads the top inset the window controls impose; called from the layout pass.</summary>
     public void UpdateWindowControlsInset()
     {
-        var inherited = _panel.SafeAreaInsets.Top - AdditionalSafeAreaInsets.Top;
-        var inset = ScaffoldWindowControls.TopInsetFor(_panel, inherited);
+        if (_panel is not { } panel)
+        {
+            return;
+        }
+
+        var inherited = panel.SafeAreaInsets.Top - AdditionalSafeAreaInsets.Top;
+        var inset = ScaffoldWindowControls.TopInsetFor(panel, inherited);
 
         if (Math.Abs(AdditionalSafeAreaInsets.Top - inset) < 0.5)
         {

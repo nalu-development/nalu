@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.ExceptionServices;
 using CoreGraphics;
 using Microsoft.Maui.Platform;
 using Nalu.Internals;
@@ -98,6 +99,9 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         /// <summary>Set for a LEFT-edge flyout: the controller carrying its window-controls inset.</summary>
         public ScaffoldFlyoutPanelController? PanelController { get; init; }
         public bool Closing { get; set; }
+
+        /// <summary>Torn down by disposal: an in-flight close must not run its teardown again.</summary>
+        public bool Discarded { get; set; }
         public TaskCompletionSource ClosedTcs { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
@@ -1137,6 +1141,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
     public void Dispose()
     {
+        DiscardOverlays();
+
         if (_scaffoldObserved)
         {
             _scaffoldObserved = false;
@@ -1240,6 +1246,10 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 // translation, applied after the arrange.
                 panel = request.Content.ToPlatform(mauiContext);
                 flyoutOffscreen = LayoutFlyout(request, container);
+
+                // The same platform view is presented on every open: a retired controller that
+                // never got to release it (see ReleaseStaleOwner) would make hosting it throw.
+                ScaffoldFlyoutPanelController.ReleaseStaleOwner(panel);
 
                 // Only the panel on the physical LEFT can meet the iPadOS 26 window controls, so
                 // only that one is given a controller to carry a top inset for them.
@@ -1711,11 +1721,19 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         await ScaffoldOverlayAnimations.ExitAsync(request, entry.ScrimView, entry.FlyoutOffscreenTranslation);
 
-        // Owner cleanup (state flags, logical-child detach, handle completion) runs AFTER the
-        // exit animation: detaching the content's logical child earlier freezes its exit
-        // transforms — the sheet/popup would sit still and vanish at the end.
-        request.Cleanup?.Invoke();
+        if (entry.Discarded)
+        {
+            // The presenter was disposed while the exit was in flight: disposal already tore
+            // the entry down and told the owner.
+            return;
+        }
 
+        // Platform teardown FIRST, owner cleanup second. The owner callbacks (open-state
+        // properties, the closed events, handle completion) reach app code that may present the
+        // very same content again synchronously — the drawer content must be free of its previous
+        // controller and out of the container by then. Keeping the teardown ahead of the callbacks
+        // also means a throwing callback cannot leave the panel owned (the next open would throw
+        // UIViewControllerHierarchyInconsistency) with the owner already reset to "closed".
         if (entry.PanelController is { } panelController)
         {
             panelController.WillMoveToParentViewController(null);
@@ -1734,22 +1752,108 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         entry.ScrimPlatform.RemoveFromSuperview();
         _overlays.Remove(entry);
 
+        // The exit transforms are undone before the owner hears "closed": a synchronous
+        // re-presentation from there sets up its own entrance, which a later reset would clobber.
         ScaffoldOverlayAnimations.ResetContent(request.Content);
-        entry.ScrimView.DisconnectHandlers();
-        scaffold.RemoveLogicalChild(entry.ScrimView);
 
-        if (request.DisconnectContentOnClose)
+        try
         {
-            request.Content.DisconnectHandlers();
+            // Owner cleanup runs AFTER the exit animation: detaching the content's logical child
+            // earlier freezes its exit transforms — the sheet/popup would sit still and vanish
+            // at the end.
+            request.Cleanup?.Invoke();
+        }
+        finally
+        {
+            entry.ScrimView.DisconnectHandlers();
+            scaffold.RemoveLogicalChild(entry.ScrimView);
+
+            if (request.DisconnectContentOnClose)
+            {
+                request.Content.DisconnectHandlers();
+            }
+
+            // The keyboard goes back to the entry below, or to the page.
+            if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet
+                && scaffold.Handler is IPlatformViewHandler { ViewController: ScaffoldViewController controller })
+            {
+                OnKeyboardOwnerChanged(controller);
+            }
+
+            entry.ClosedTcs.TrySetResult();
+        }
+    }
+
+    /// <summary>
+    /// Drops every presented overlay when the presenter goes away (handler disconnection), with
+    /// no exit animation: the platform views leave the container — a LEFT flyout's controller
+    /// lets its view go, since the next presenter mounts the very same view — and each owner
+    /// hears "closed", so the scaffold's open-state flags, handles and awaiting callers do not
+    /// outlive the presentation (a drawer left "open" could never be opened again). Same order
+    /// as <see cref="CloseEntryAsync"/>: teardown first, owner callback second; one throwing
+    /// owner does not skip the rest — its exception surfaces once everything is down.
+    /// </summary>
+    private void DiscardOverlays()
+    {
+        if (_overlays.Count == 0)
+        {
+            return;
         }
 
-        // The keyboard goes back to the entry below, or to the page.
-        if (request.Kind is ScaffoldOverlayKind.Popup or ScaffoldOverlayKind.BottomSheet
-            && scaffold.Handler is IPlatformViewHandler { ViewController: ScaffoldViewController controller })
+        var entries = _overlays.ToArray();
+        _overlays.Clear();
+        ExceptionDispatchInfo? failure = null;
+
+        foreach (var entry in entries)
         {
-            OnKeyboardOwnerChanged(controller);
+            var request = entry.Request;
+            entry.Closing = true;
+            entry.Discarded = true;
+
+            if (entry.ContentPlatform is ScaffoldOverlayPanelHost host)
+            {
+                host.MeasurePanel = null;
+            }
+
+            if (request.Kind == ScaffoldOverlayKind.Flyout)
+            {
+                scaffold.SystemBars.OverlaySurface = null;
+            }
+
+            if (entry.PanelController is { } panelController)
+            {
+                panelController.WillMoveToParentViewController(null);
+                panelController.View?.RemoveFromSuperview();
+                panelController.RemoveFromParentViewController();
+                panelController.ReleaseView();
+            }
+
+            entry.ContentPlatform.RemoveFromSuperview();
+            entry.ScrimPlatform.RemoveFromSuperview();
+            ScaffoldOverlayAnimations.ResetContent(request.Content);
+
+            try
+            {
+                request.Cleanup?.Invoke();
+            }
+            catch (Exception exception)
+            {
+                failure ??= ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                entry.ScrimView.DisconnectHandlers();
+                scaffold.RemoveLogicalChild(entry.ScrimView);
+
+                if (request.DisconnectContentOnClose)
+                {
+                    request.Content.DisconnectHandlers();
+                }
+
+                entry.ClosedTcs.TrySetResult();
+            }
         }
 
-        entry.ClosedTcs.TrySetResult();
+        failure?.Throw();
     }
 }
