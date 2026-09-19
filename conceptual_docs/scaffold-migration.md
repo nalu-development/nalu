@@ -14,6 +14,7 @@ swapping a few Shell-specific chrome features for their Scaffold equivalents.
 | `ShellContent nalu:Navigation.PageType="..."` | `ScaffoldRoot PageType="{x:Type ...}"` |
 | Shell flyout | `Scaffold.FlyoutStart`/`FlyoutEnd` + `ScaffoldFlyoutMenuView` |
 | `Shell.TitleView` | `nalu:Scaffold.TitleView` (page-attached) |
+| `Page.ToolbarItems` | Unchanged — the default bar renders primary items as buttons and secondary ones in an overflow menu ([Nav Bar](scaffold-navbar.md#toolbar-items)) |
 | `Shell.NavBarIsVisible` | `nalu:Scaffold.IsNavBarVisible` |
 | Shell tab bar visibility | `nalu:Scaffold.TabBarVisibility` (`Auto`/`Visible`/`Hidden`) |
 | NaluTabBar (`UseNaluTabBar` + `SetTabBarView`) | Built-in default tab bar (or `ScaffoldTabBar.TabBarView`) |
@@ -92,6 +93,7 @@ NaluShell needed is not required.
 |--------|-------|
 | `Shell.TitleView` | `nalu:Scaffold.TitleView` — its `BindingContext` is the **page model** now |
 | `Shell.NavBarIsVisible="False"` | `nalu:Scaffold.IsNavBarVisible="False"` |
+| `ContentPage.ToolbarItems` | Keep as is — rendered by the default bar (see [Toolbar items](scaffold-navbar.md#toolbar-items)) |
 | Tab bar hidden on pushed pages | opt-in per page: `nalu:Scaffold.TabBarVisibility="Auto"` (the default is `Visible`) |
 
 The `TitleView` binding-context change is the most common migration fix: NaluShell's title

@@ -23,12 +23,15 @@ it last, blanking the other page's bar. Resolution is unchanged — page → cur
 scaffold, most specific wins.
 
 The default bar composes three columns: leading (start-drawer button, back button), center
-(title, or the page's `TitleView` in its place), trailing (end-drawer button, close button).
-All primitives are public, individually styleable types: `ScaffoldBackButton`,
-`ScaffoldCloseButton`, `ScaffoldFlyoutButton`, `ScaffoldNavBarTitle` — plus their shared base
+(title, or the page's `TitleView` in its place), trailing (the page's [toolbar items](#toolbar-items),
+end-drawer button, close button). All primitives are public, individually styleable types:
+`ScaffoldBackButton`, `ScaffoldCloseButton`, `ScaffoldFlyoutButton`, `ScaffoldNavBarTitle`,
+`ScaffoldToolbarItemsView` (with `ScaffoldToolbarItemButton`, `ScaffoldToolbarOverflowButton`
+and `ScaffoldToolbarOverflowView`) — plus the glyph buttons' shared base
 `ScaffoldNavBarButtonBase` (`Icon`, `IconColor`, `PressedBrush`): style it with
-`ApplyToDerivedTypes="True"` to theme all three buttons at once. Default metrics:
-`BarHeight` 48, `BarPadding` 8,0, `Spacing` 8.
+`ApplyToDerivedTypes="True"` to theme every glyph button at once, the overflow one included.
+Default metrics: `BarHeight` 48, `BarPadding` 8,0, `Spacing` 8; when [toolbar items](#toolbar-items)
+compete for the row the title is kept whole (`KeepTitleWhole`) above a `MinimumTitleWidth` of 96.
 
 ## Titles and TitleView
 
@@ -65,6 +68,76 @@ from.
 `Scaffold.NavBarContext` remains available and means "what the bar shows now" — the CURRENT
 page's context. Prefer the per-page resolution above; the scaffold-level one is only correct
 while a single page is on screen.
+
+## Toolbar items
+
+The default bar renders the page's standard MAUI `ToolbarItems` — nothing to migrate, nothing
+to bind:
+
+```xml
+<ContentPage Title="Weather">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Save" Command="{Binding SaveCommand}" />
+        <ToolbarItem Text="Share" Priority="1"
+                     IconImageSource="{FontImageSource FontFamily=Material, Glyph=&#xe80d;}" />
+        <ToolbarItem Text="Settings" Order="Secondary" Clicked="OnSettingsClicked" />
+    </ContentPage.ToolbarItems>
+</ContentPage>
+```
+
+The semantics are the native toolbar's, identical on iOS and Android:
+
+- **Primary** items (`Order` `Primary` or `Default`) are buttons in the trailing slot, before the
+  end-drawer and close buttons, in ascending `Priority` (declaration order breaks ties). An item
+  with an `IconImageSource` shows the icon — 24dp, centered in a 44dp tap target — and its `Text`
+  becomes the accessibility description; without one it shows the text.
+- **As many as fit — the title first.** The bar measures its fixed parts first, reserves the
+  title's own natural width (never less than `MinimumTitleWidth`, 96 by default), and offers
+  the items what is left: items are taken in priority order while they fit, and the first one
+  that doesn't stops the intake — the rest fold into the overflow menu, listed ahead of the
+  secondary items. Items fold; the title never truncates because of them. This is Android's
+  "if room" behavior with the title on top; MAUI's native bars show every item and let a long
+  list eat the title. Prefer that trade-off on a page (an editor whose "Save" must always
+  show)? Set `KeepTitleWhole="False"` on the bar — via a style, or a page-level
+  `NavBarTemplate` — and the reservation drops to the floor (lower `MinimumTitleWidth` too for
+  a bar that favors items outright). Rotation and runtime changes re-fit. A `TitleView` is
+  treated the same way, by its natural width: a label or an icon-plus-text block reserves what
+  it needs, while a fill-style control (a search bar, an `Entry`) has a small intrinsic width,
+  reserves only that or the floor, and stretches into what the items leave — give it a
+  `WidthRequest` or raise `MinimumTitleWidth` when it needs room.
+- **Secondary** items live behind a ⋮ overflow button that only appears while some exist (or
+  something folded). The menu drops down from the button, end-aligned so it opens inward, lists
+  the items by priority (icon when set, then text), and a row dismisses it first, then activates
+  the item. The scrim and the Android back close it; a navigation closes it like any overlay.
+- A tap runs the item's `Command` (with `CommandParameter`) and raises `Clicked`, as the native
+  bars do. `IsEnabled="False"` — or a command whose `CanExecute` is false — dims the item and
+  makes it inert.
+- The collection is **live**: items added, removed, reordered, re-prioritized or moved between
+  surfaces after the page is shown are reflected at once (MAUI's native toolbars warn that such
+  changes are ignored).
+- The items inherit the page's `BindingContext`, as on every MAUI page — `Command="{Binding …}"`
+  reaches the page model.
+- An item's `AutomationId` lands on the button (or menu row) rendered for it.
+
+Icons follow the bar's foreground the way native template glyphs do: a `FontImageSource` declared
+**without** a `Color` is tinted with the effective `NavBarForeground` (see the merge chain below),
+so it recolors with the rest of the bar — over a photo header, through a scroll-driven ramp,
+across themes. A font icon with an explicit `Color`, or any bitmap, renders exactly as given.
+
+Styling is ordinary MAUI, on public types:
+
+| Type | Knobs |
+|------|-------|
+| `ScaffoldToolbarItemButton` | `TextColor` (also the tint of uncolored font icons), `FontFamily`, `FontSize`, `FontAttributes`, `PressedBrush`. |
+| `ScaffoldToolbarOverflowButton` | A glyph button: `Icon` (replaces the ⋮), `IconColor`, `PressedBrush` — and it picks up a `ScaffoldNavBarButtonBase` style with `ApplyToDerivedTypes`. |
+| `ScaffoldToolbarOverflowView` | `PanelBackground` and `TextColor` — **theme-following when unset** (light: white / near-black, dark: dark gray / near-white), a style pins them — `PanelCornerRadius`, `PanelShadow`, `Scrim` (transparent by default), `FontFamily`, `FontSize`. The panel hugs its widest row between `MinimumWidthRequest` (200) and `MaximumWidthRequest` (280) — both plain properties, style them to change the bounds. |
+
+Color precedence on the bar items is the same as for every other primitive: an explicit or styled
+`TextColor` / `IconColor` wins, then the `NavBarForeground` chain, then the built-in default — so
+prefer the appearance channels, which keep the items following page-level appearances. The
+overflow menu is a floating panel, not bar chrome: it deliberately does NOT inherit the bar's
+foreground (a white-on-photo bar would give white text on a white menu) and follows the app
+theme instead unless styled.
 
 ## Appearance — a per-property merge chain
 
@@ -175,7 +248,9 @@ bar becomes opaque, status-bar icons flip to contrast with it.
 Replace the bar per scaffold, area, or page with `Scaffold.NavBarTemplate`. Custom bars bind the
 `ScaffoldNavBarContext` — `Title`, `Foreground`, `TitleForeground`, `CanNavigateBack`, `BackCommand`,
 `ScrollOffset`, `IsScrolledUnder`, `IsModal`/`IsCloseButtonVisible`, flyout-button visibility
-and commands — and can reuse the public primitives. The bar view owns its top safe-area
+and commands, `ToolbarItems` (the page's live collection) — and can reuse the public primitives:
+drop a `ScaffoldToolbarItemsView` anywhere in a custom bar to get the whole toolbar-items
+behavior, or render the collection your own way. The bar view owns its top safe-area
 behavior (the default bar consumes the status-bar inset itself).
 
 ### iPadOS 26: the system window controls

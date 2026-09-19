@@ -14,6 +14,23 @@ internal static class ScaffoldNavBarDefaults
 
     internal static Geometry ParseGeometry(string pathData)
         => (Geometry)new PathGeometryConverter().ConvertFromInvariantString(pathData)!;
+
+    /// <summary>
+    /// A font icon declared WITHOUT a color takes the bar's effective foreground, the way a
+    /// native toolbar tints its template glyphs; anything else (a colored font icon, a bitmap)
+    /// renders exactly as given.
+    /// </summary>
+    internal static ImageSource? TintFontIcon(ImageSource? source, Color color)
+        => source is FontImageSource font && !font.IsSet(FontImageSource.ColorProperty)
+            ? new FontImageSource
+              {
+                  Glyph = font.Glyph,
+                  FontFamily = font.FontFamily,
+                  Size = font.Size,
+                  FontAutoScalingEnabled = font.FontAutoScalingEnabled,
+                  Color = color
+              }
+            : source;
 }
 
 /// <summary>
@@ -31,6 +48,7 @@ public abstract class ScaffoldNavBarButtonBase : Border
     private readonly Image _iconImage;
     private readonly Ellipse _pressHighlight;
     private readonly TapGestureRecognizer _tap = new();
+    private readonly bool _filledGlyph;
     private ScaffoldNavBarContext? _observedContext;
 
     // Callback caveat (applies to EVERY styling property here): implicit styles are applied by
@@ -87,8 +105,14 @@ public abstract class ScaffoldNavBarButtonBase : Border
         set => SetValue(PressedBrushProperty, value);
     }
 
-    private protected ScaffoldNavBarButtonBase(string glyphPathData)
+    /// <param name="glyphPathData">The glyph geometry, designed centered in a 24-box.</param>
+    /// <param name="filledGlyph">
+    /// True for a closed geometry painted as a FILL (dots); false for the stroke glyphs
+    /// (chevron, X, hamburger). Either way the effective color drives it.
+    /// </param>
+    private protected ScaffoldNavBarButtonBase(string glyphPathData, bool filledGlyph = false)
     {
+        _filledGlyph = filledGlyph;
         StrokeThickness = 0;
         Background = null;
         WidthRequest = 44;
@@ -101,7 +125,7 @@ public abstract class ScaffoldNavBarButtonBase : Border
         _glyph = new ShapePath
         {
             Data = ScaffoldNavBarDefaults.ParseGeometry(glyphPathData),
-            StrokeThickness = 2.2,
+            StrokeThickness = filledGlyph ? 0 : 2.2,
             StrokeLineCap = PenLineCap.Round,
             StrokeLineJoin = PenLineJoin.Round,
             WidthRequest = 24,
@@ -149,6 +173,15 @@ public abstract class ScaffoldNavBarButtonBase : Border
     /// <summary>Binds visibility with the given (trim-safe, typed) binding.</summary>
     private protected void BindVisibility(BindingBase binding) => this.SetBinding(IsVisibleProperty, binding);
 
+    /// <summary>Runs the given handler on tap — for buttons whose action is not a context command.</summary>
+    private protected void SetTapHandler(Func<Task> handler) => _tap.Tapped += (_, _) => _ = handler();
+
+    /// <summary>The effective glyph color (see <see cref="ApplyEffectiveColors"/>).</summary>
+    private protected Color EffectiveIconColor
+        => IsSet(IconColorProperty)
+            ? IconColor
+            : _observedContext?.Foreground ?? ScaffoldNavBarDefaults.Foreground;
+
     /// <inheritdoc />
     protected override void OnBindingContextChanged()
     {
@@ -190,11 +223,18 @@ public abstract class ScaffoldNavBarButtonBase : Border
             return;
         }
 
-        var color = IsSet(IconColorProperty)
-            ? IconColor
-            : _observedContext?.Foreground ?? ScaffoldNavBarDefaults.Foreground;
+        var color = EffectiveIconColor;
+        var brush = new SolidColorBrush(color);
 
-        _glyph.Stroke = new SolidColorBrush(color);
+        if (_filledGlyph)
+        {
+            _glyph.Fill = brush;
+        }
+        else
+        {
+            _glyph.Stroke = brush;
+        }
+
         _pressHighlight.Fill = PressedBrush ?? new SolidColorBrush(color.WithAlpha(0.14f));
     }
 

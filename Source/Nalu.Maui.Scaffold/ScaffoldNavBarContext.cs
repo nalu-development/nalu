@@ -53,6 +53,21 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Gets the page's <see cref="Page.ToolbarItems"/>: the LIVE collection (it raises
+    /// <see cref="System.Collections.Specialized.INotifyCollectionChanged"/>), so a bar
+    /// observing it follows items added, removed or reordered at runtime. The default bar
+    /// renders it through <see cref="ScaffoldToolbarItemsView"/> — primary items as buttons,
+    /// secondary ones behind an overflow menu; a custom bar can mount that same primitive or
+    /// bind the collection itself. Null for the detached fallback context, and once the page
+    /// is gone for good.
+    /// </summary>
+    public IList<ToolbarItem>? ToolbarItems
+    {
+        get;
+        internal set => SetField(ref field, value);
+    }
+
+    /// <summary>
     /// Gets the effective <see cref="Scaffold.NavBarForegroundProperty"/>: the color
     /// fallback of every primitive (title text, glyphs) — a color set directly or via style
     /// on a primitive wins over it. Null when no appearance in the chain sets one, in which
@@ -192,6 +207,11 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
             // The observed page is fixed for this context's life: no re-targeting, so a page
             // leaving the screen keeps reporting its own state while it animates away.
             page.PropertyChanged += OnPagePropertyChanged;
+
+            // The collection instance is fixed for the page's life too (MAUI creates it once
+            // per page): exposing it, rather than a snapshot, is what keeps runtime mutations
+            // observable without any relay of our own.
+            ToolbarItems = page.ToolbarItems;
         }
 
         // Non-reentrant commands: CanExecute stays false while the operation is in flight, so
@@ -320,8 +340,9 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
     /// Dropping the references matters as much as unsubscribing. This context is reachable from
     /// objects that outlive the page — a bar host subscribes to the scaffold and the area, a
     /// binding relay is held by the ancestors it walked — and it holds the page
-    /// the page's MODEL (<see cref="PageBindingContext"/>) and the page's
-    /// <see cref="TitleView"/>. Left set, either keeps a dead screen's whole object graph alive.
+    /// the page's MODEL (<see cref="PageBindingContext"/>), the page's
+    /// <see cref="TitleView"/> and its <see cref="ToolbarItems"/> (parented to the page). Left
+    /// set, any of them keeps a dead screen's whole object graph alive.
     /// </remarks>
     internal void Detach()
     {
@@ -332,6 +353,7 @@ public sealed class ScaffoldNavBarContext : INotifyPropertyChanged
 
         PageBindingContext = null;
         TitleView = null;
+        ToolbarItems = null;
     }
 
     /// <summary>Raises <see cref="PropertyChanged"/> for every property (the scaffold-level forwarder swap).</summary>

@@ -46,7 +46,9 @@ activated in DEBUG builds in `MauiProgram.cs`, per-platform ports: Android **922
    calling `AgentClient` from tests).
 5. Run `dotnet test UITests/UITests.DevFlow` (the app must already be running; `NaluApp`
    self-discovers 9223/9224/9225 (+1000 fallbacks) — set `DEVFLOW_PORT` to target one
-   platform when apps on several platforms are running at once).
+   platform when apps on several platforms are running at once). To run ONE class:
+   `dotnet test UITests/UITests.DevFlow -- --filter-class "Nalu.Maui.UITests.Tests.<Class>"`
+   (Microsoft.Testing.Platform — a plain `--filter` is silently ignored and the whole suite runs).
 6. On failure: take a screenshot + visual tree via MCP, diagnose, fix (test, page, or library), repeat.
 
 ### Background-HTTP fault harness (iOS NSUrlSession)
