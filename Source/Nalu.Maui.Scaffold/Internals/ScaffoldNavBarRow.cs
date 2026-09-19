@@ -91,6 +91,9 @@ internal sealed class ScaffoldNavBarRow : Layout
 
     protected override ILayoutManager CreateLayoutManager() => new Manager(this);
 
+    /// <summary>A fresh manager over this row (test seam: the manager is driven headlessly).</summary>
+    internal ILayoutManager CreateManager() => new Manager(this);
+
     private sealed class Manager(ScaffoldNavBarRow row) : ILayoutManager
     {
         public Size Measure(double widthConstraint, double heightConstraint)
