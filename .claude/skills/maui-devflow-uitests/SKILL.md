@@ -89,6 +89,11 @@ are expected between previews and must be absorbed ONLY in `UITests/UITests.DevF
    — back-to-back cross-platform runs need no relaunching. After a relaunch, wait for
    readiness with a no-op MCP call (e.g. `maui_query`) retried until it responds —
    never curl-probe ports.
+   **Filtering**: the project runs on Microsoft.Testing.Platform, so a VSTest `--filter` is
+   SILENTLY IGNORED (warning MTP0001) and the WHOLE suite runs (~30+ min). Select a class with
+   `dotnet test UITests/UITests.DevFlow -- --filter-class "Nalu.Maui.UITests.Tests.<Class>"`
+   (`--filter-method` for a single test); per-test results land in
+   `UITests/UITests.DevFlow/bin/Debug/net10.0/TestResults/*.log`.
 6. **On failure**: screenshot + visual tree via MCP, read the wrapper's TimeoutException (it lists
    the AutomationIds actually present), fix test/page/library, repeat.
 

@@ -232,11 +232,51 @@ public sealed class NaluApp : IAsyncLifetime
     }
 
     /// <summary>Finds a single element by AutomationId, or null when not present.</summary>
+    /// <remarks>
+    /// An id can be carried by several elements, and the tree lists them all: a page's
+    /// <c>ToolbarItem</c> (an <c>Element</c> with no geometry) shares its id with the nav bar
+    /// button the scaffold renders for it, and once that button folds into the overflow menu,
+    /// with the menu row too — the button then hidden and parked off screen. The one ON SCREEN
+    /// wins: displayed first, then merely bounded, then anything.
+    /// </remarks>
     public async Task<ElementInfo?> FindElementAsync(string automationId)
     {
         var matches = await _client.QueryAsync(automationId: automationId).ConfigureAwait(false);
 
-        return matches.FirstOrDefault();
+        return matches.FirstOrDefault(static match => IsDisplayed(match))
+               ?? matches.FirstOrDefault(static match => match.WindowBounds is not null || match.Bounds is not null)
+               ?? matches.FirstOrDefault();
+
+        static bool IsDisplayed(ElementInfo match)
+            => match.IsVisible && (match.WindowBounds ?? match.Bounds) is { Width: > 0, X: >= 0 };
+    }
+
+    /// <summary>
+    /// Waits until NO element with geometry carries the AutomationId — the on-screen view is
+    /// gone, whatever non-visual element (a page's <c>ToolbarItem</c>) still carries the same id.
+    /// Use <see cref="WaitForElementGoneAsync"/> when the id must leave the tree entirely.
+    /// </summary>
+    public async Task WaitForElementNotDisplayedAsync(string automationId, TimeSpan? timeout = null)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var effectiveTimeout = timeout ?? _defaultTimeout;
+
+        while (true)
+        {
+            var element = await FindElementAsync(automationId).ConfigureAwait(false);
+
+            if (element is null || (element.WindowBounds is null && element.Bounds is null))
+            {
+                return;
+            }
+
+            if (stopwatch.Elapsed >= effectiveTimeout)
+            {
+                throw new TimeoutException($"Element '{automationId}' was still displayed after {effectiveTimeout.TotalSeconds:0.#}s.");
+            }
+
+            await Task.Delay(_pollInterval).ConfigureAwait(false);
+        }
     }
 
     /// <summary>Waits until an element with the given AutomationId appears in the visual tree.</summary>

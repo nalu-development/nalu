@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using JetBrains.Annotations;
 
@@ -13,6 +14,35 @@ public partial class NavBarHomePageModel(INavigationService navigationService) :
     public Task PushCustomBar() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarCustomPageModel>());
 
     public Task PushEdgeToEdgeBar() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarEdgeToEdgePageModel>());
+
+    public Task PushToolbar() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarToolbarPageModel>());
+
+    public Task PushFold() => navigationService.GoToAsync(Navigation.Relative().Push<NavBarFoldPageModel>());
+}
+
+[UsedImplicitly]
+public partial class NavBarFoldPageModel(INavigationService navigationService) : ObservableObject
+{
+    /// <summary>The last activated toolbar item, as the UI tests read it.</summary>
+    [ObservableProperty]
+    public partial string LastActivated { get; set; } = "-";
+
+    public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
+}
+
+[UsedImplicitly]
+public partial class NavBarToolbarPageModel(INavigationService navigationService) : ObservableObject
+{
+    private Command? _saveCommand;
+
+    /// <summary>The last activated toolbar item, as the UI tests read it.</summary>
+    [ObservableProperty]
+    public partial string LastActivated { get; set; } = "-";
+
+    /// <summary>Bound from a toolbar item: proves the page model reaches the items (binding-context propagation).</summary>
+    public ICommand SaveCommand => _saveCommand ??= new Command(() => LastActivated = "save");
+
+    public Task Pop() => navigationService.GoToAsync(Navigation.Relative().Pop());
 }
 
 [UsedImplicitly]
@@ -112,7 +142,102 @@ public class NavBarHomePage : ContentPage
             NavPageFactory.MakeButton("Push drawer detail", "PushNavBarDrawerDetail", model.PushDrawerDetail),
             NavPageFactory.MakeButton("Push custom bar", "PushNavBarCustom", model.PushCustomBar),
             NavPageFactory.MakeButton("Push edge-to-edge bar", "PushNavBarEdgeToEdge", model.PushEdgeToEdgeBar),
+            NavPageFactory.MakeButton("Push toolbar page", "PushNavBarToolbar", model.PushToolbar),
+            NavPageFactory.MakeButton("Push fold page", "PushNavBarFold", model.PushFold),
             toggleButton
+        );
+    }
+}
+
+/// <summary>
+/// Pushed page carrying standard MAUI <see cref="Page.ToolbarItems"/>: three primary items
+/// (text, font icon, disabled text) declared OUT of priority order, two secondary ones, plus
+/// runtime mutations (add, move to the overflow, toggle enabled). Activations land in the
+/// model's <see cref="NavBarToolbarPageModel.LastActivated"/>.
+/// </summary>
+[UsedImplicitly]
+public class NavBarToolbarPage : ContentPage
+{
+    public NavBarToolbarPage(NavBarToolbarPageModel model)
+    {
+        BindingContext = model;
+        Title = "Toolbar Title";
+
+        // A page-level foreground: the text item and the UNCOLORED font icon must follow it.
+        Scaffold.SetNavBarForeground(this, Color.FromArgb("#2C479D"));
+
+        // "Items win" here, on purpose: this page is about the ITEMS (rendering, activation,
+        // live changes) and wants them all in the bar, so the title's reservation is dropped —
+        // the title truncates, as native bars do. The fold contract has its own page.
+        Scaffold.SetNavBarTemplate(this, new DataTemplate(static () => new ScaffoldNavBarView { KeepTitleWhole = false, MinimumTitleWidth = 0 }));
+
+        var save = new ToolbarItem { Text = "Save", Priority = 0, AutomationId = "ToolbarSave" };
+        save.SetBinding(MenuItem.CommandProperty, static (NavBarToolbarPageModel m) => m.SaveCommand);
+
+        var share = new ToolbarItem
+        {
+            Text = "Share",
+            Priority = 1,
+            AutomationId = "ToolbarShare",
+            IconImageSource = new FontImageSource { FontFamily = "Material", Glyph = "", Size = 24 }
+        };
+
+        share.Clicked += (_, _) => model.LastActivated = "share";
+
+        var locked = new ToolbarItem { Text = "Locked", Priority = 2, AutomationId = "ToolbarLocked", IsEnabled = false };
+        locked.Clicked += (_, _) => model.LastActivated = "locked";
+
+        var about = new ToolbarItem
+        {
+            Text = "About",
+            Order = ToolbarItemOrder.Secondary,
+            Priority = 0,
+            AutomationId = "ToolbarAbout",
+            IconImageSource = new FontImageSource { FontFamily = "Material", Glyph = "", Color = Colors.DarkOrange, Size = 24 }
+        };
+
+        about.Clicked += (_, _) => model.LastActivated = "about";
+
+        var settings = new ToolbarItem { Text = "Settings", Order = ToolbarItemOrder.Secondary, Priority = 1, AutomationId = "ToolbarSettings" };
+        settings.Clicked += (_, _) => model.LastActivated = "settings";
+
+        // Declared out of priority order on purpose: the bar sorts.
+        ToolbarItems.Add(share);
+        ToolbarItems.Add(settings);
+        ToolbarItems.Add(save);
+        ToolbarItems.Add(about);
+        ToolbarItems.Add(locked);
+
+        var log = new Label { AutomationId = "ToolbarActivationLog", FontSize = 14 };
+        // A string path: the MAUI binding source generator cannot see a source-generated partial property.
+        log.SetBinding(Label.TextProperty, nameof(NavBarToolbarPageModel.LastActivated));
+
+        var addButton = new Button { Text = "Add item", AutomationId = "AddToolbarItem", FontSize = 11 };
+        var extras = 0;
+
+        addButton.Clicked += (_, _) =>
+        {
+            // Numbered: every extra is addressable, and a pile of them exercises the fold.
+            var n = ++extras;
+            var extra = new ToolbarItem { Text = $"Extra {n}", Priority = 3, AutomationId = $"ToolbarExtra{n}" };
+            extra.Clicked += (_, _) => model.LastActivated = $"extra{n}";
+            ToolbarItems.Add(extra);
+        };
+
+        var moveButton = new Button { Text = "Move Share to overflow", AutomationId = "MoveShareToOverflow", FontSize = 11 };
+        moveButton.Clicked += (_, _) => share.Order = ToolbarItemOrder.Secondary;
+
+        var toggleButton = new Button { Text = "Toggle Locked", AutomationId = "ToggleLockedItem", FontSize = 11 };
+        toggleButton.Clicked += (_, _) => locked.IsEnabled = !locked.IsEnabled;
+
+        Content = NavBarPageFactory.BuildContent(
+            "NavBarPageToolbar",
+            probeAnchor: null,
+            log,
+            addButton,
+            moveButton,
+            toggleButton,
+            NavPageFactory.MakeButton("Pop", "PopNavBarToolbar", model.Pop)
         );
     }
 }
@@ -230,6 +355,52 @@ public class NavBarEdgeToEdgePage : ContentPage
             "NavBarPageEdgeToEdge",
             probeAnchor: null,
             NavPageFactory.MakeButton("Pop", "PopNavBarEdgeToEdge", model.Pop)
+        );
+    }
+}
+
+/// <summary>
+/// Pushed page with the DEFAULT bar (title kept whole above its floor) and more primary items than
+/// any phone-width bar can show — eight icon items, plus one secondary — so the "if room" fold is
+/// exercised on default settings: the first items by priority stay in the bar, the rest fold
+/// into the overflow menu ahead of the secondary item, and the title keeps its floor.
+/// </summary>
+[UsedImplicitly]
+public class NavBarFoldPage : ContentPage
+{
+    public NavBarFoldPage(NavBarFoldPageModel model)
+    {
+        BindingContext = model;
+        Title = "Fold Title";
+
+        for (var i = 1; i <= 8; i++)
+        {
+            var n = i;
+
+            var item = new ToolbarItem
+            {
+                Text = $"Fold {n}",
+                Priority = n,
+                AutomationId = $"ToolbarFold{n}",
+                IconImageSource = new FontImageSource { FontFamily = "Material", Glyph = "\ue838", Size = 24 }
+            };
+
+            item.Clicked += (_, _) => model.LastActivated = $"fold{n}";
+            ToolbarItems.Add(item);
+        }
+
+        var secondary = new ToolbarItem { Text = "Fold Secondary", Order = ToolbarItemOrder.Secondary, AutomationId = "ToolbarFoldSecondary" };
+        secondary.Clicked += (_, _) => model.LastActivated = "secondary";
+        ToolbarItems.Add(secondary);
+
+        var log = new Label { AutomationId = "FoldActivationLog", FontSize = 14 };
+        log.SetBinding(Label.TextProperty, nameof(NavBarFoldPageModel.LastActivated));
+
+        Content = NavBarPageFactory.BuildContent(
+            "NavBarPageFold",
+            probeAnchor: null,
+            log,
+            NavPageFactory.MakeButton("Pop", "PopNavBarFold", model.Pop)
         );
     }
 }

@@ -86,6 +86,7 @@ internal static class NavBarContextBindings
             nameof(ScaffoldNavBarContext.Title) => Typed(relay, path, c => c.Title),
             nameof(ScaffoldNavBarContext.TitleView) => Typed(relay, path, c => c.TitleView),
             nameof(ScaffoldNavBarContext.PageBindingContext) => Typed(relay, path, c => c.PageBindingContext),
+            nameof(ScaffoldNavBarContext.ToolbarItems) => Typed(relay, path, c => c.ToolbarItems),
             nameof(ScaffoldNavBarContext.Foreground) => Typed(relay, path, c => c.Foreground),
             nameof(ScaffoldNavBarContext.TitleForeground) => Typed(relay, path, c => c.TitleForeground),
             nameof(ScaffoldNavBarContext.ScrollOffset) => Typed(relay, path, c => c.ScrollOffset),
