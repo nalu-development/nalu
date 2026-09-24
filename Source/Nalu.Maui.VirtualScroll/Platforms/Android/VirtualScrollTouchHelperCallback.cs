@@ -80,7 +80,14 @@ internal class VirtualScrollTouchHelperCallback : ItemTouchHelper.Callback
         }
 
         var orientation = ((VirtualScrollRecyclerView) recyclerView).Orientation;
-        var dragFlags = orientation == ItemsLayoutOrientation.Vertical ? ItemTouchHelper.Up | ItemTouchHelper.Down : ItemTouchHelper.Left | ItemTouchHelper.Right;
+
+        // A grid moves on both axes: constraining a drag to the scrolling axis would make the
+        // neighbouring cells in a line unreachable.
+        var dragFlags = _virtualScroll.ItemsLayout is GridVirtualScrollLayout
+            ? ItemTouchHelper.Up | ItemTouchHelper.Down | ItemTouchHelper.Left | ItemTouchHelper.Right
+            : orientation == ItemsLayoutOrientation.Vertical
+                ? ItemTouchHelper.Up | ItemTouchHelper.Down
+                : ItemTouchHelper.Left | ItemTouchHelper.Right;
 
         return MakeMovementFlags(dragFlags, 0);
     }

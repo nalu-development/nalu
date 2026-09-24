@@ -594,6 +594,9 @@ public partial class VirtualScrollHandler
 
         var layoutSetup = virtualScroll.ItemsLayout switch
         {
+            // Before the linear case: GridVirtualScrollLayout derives from it (the compiler
+            // enforces this order — the reverse makes the grid arm unreachable).
+            GridVirtualScrollLayout gridLayout => VirtualScrollPlatformLayoutFactory.CreateGrid(gridLayout, layoutInfo),
             LinearVirtualScrollLayout linearLayout => VirtualScrollPlatformLayoutFactory.CreateList(linearLayout, layoutInfo),
             CarouselVirtualScrollLayout carouselLayout => VirtualScrollPlatformLayoutFactory.CreateCarousel(carouselLayout, layoutInfo),
             _ => throw new NotSupportedException($"Layout type {virtualScroll.ItemsLayout.GetType().Name} is not supported.")
