@@ -26,6 +26,20 @@ internal static class VirtualScrollPlatformLayoutFactory
     public static readonly NSString NSElementKindSectionFooter = new(ElementKindSectionFooter);
     // ReSharper restore InconsistentNaming
     
+    /// <summary>
+    /// The extra shape a grid layout adds on top of a list: several items per group, and the two
+    /// spacings. The group is what a line is made of, so <see cref="GroupWidth" /> and
+    /// <see cref="GroupHeight" /> describe the line, while the items inside it fill it fractionally.
+    /// </summary>
+    private class GridSizingInfo
+    {
+        public required int Span { get; init; }
+        public required nfloat ItemSpacing { get; init; }
+        public required nfloat LineSpacing { get; init; }
+        public required NSCollectionLayoutDimension GroupWidth { get; init; }
+        public required NSCollectionLayoutDimension GroupHeight { get; init; }
+    }
+
     private class CellSizingInfo
     {
         public required NSCollectionLayoutDimension ItemWidth { get; init; }
@@ -108,6 +122,75 @@ internal static class VirtualScrollPlatformLayoutFactory
                        {
                            collectionView.BouncesHorizontally = false;
                            collectionView.BouncesVertically = true;
+                       }
+
+                       collectionView.DirectionalLockEnabled = true;
+                       collectionView.PagingEnabled = false;
+                   }
+               };
+    }
+
+    /// <summary>
+    /// Creates a grid layout for the specified grid layout.
+    /// </summary>
+    /// <remarks>
+    /// Cells fill their slot in the line fractionally on both axes, while the line itself is
+    /// estimated along the scrolling axis: that is what makes the line self-size to its longest
+    /// cell and stretch every other cell in it to match.
+    /// </remarks>
+    public static VirtualScrollCollectionViewLayoutSetup CreateGrid(GridVirtualScrollLayout gridLayout, IVirtualScrollLayoutInfo layoutInfo)
+    {
+        var horizontal = gridLayout.Orientation == ItemsLayoutOrientation.Horizontal;
+        var scrollDirection = horizontal ? UICollectionViewScrollDirection.Horizontal : UICollectionViewScrollDirection.Vertical;
+
+        // Cells divide the line evenly on the cross axis — the count-based group does the division,
+        // so the item asks for the whole slot rather than a 1/Span fraction of it — and are
+        // estimated along the scrolling axis. The estimate is what makes UIKit ask the cell for its
+        // fitting size (PreferredLayoutAttributesFittingAttributes); a purely fractional item is
+        // never asked, and every line would stay pinned at the estimate with taller content clipped.
+        var cellSizing = new CellSizingInfo
+                         {
+                             ItemWidth = horizontal
+                                 ? NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedItemSize)
+                                 : NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                             ItemHeight = horizontal
+                                 ? NSCollectionLayoutDimension.CreateFractionalHeight(1.0f)
+                                 : NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedItemSize),
+                             HeaderWidth = horizontal ? NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedHeaderSize) : NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                             HeaderHeight = horizontal ? NSCollectionLayoutDimension.CreateFractionalHeight(1.0f) : NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedHeaderSize),
+                             FooterWidth = horizontal ? NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedFooterSize) : NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                             FooterHeight = horizontal ? NSCollectionLayoutDimension.CreateFractionalHeight(1.0f) : NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedFooterSize),
+                             SectionHeaderWidth = horizontal ? NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedSectionHeaderSize) : NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                             SectionHeaderHeight = horizontal ? NSCollectionLayoutDimension.CreateFractionalHeight(1.0f) : NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedSectionHeaderSize),
+                             SectionFooterWidth = horizontal ? NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedSectionFooterSize) : NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                             SectionFooterHeight = horizontal ? NSCollectionLayoutDimension.CreateFractionalHeight(1.0f) : NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedSectionFooterSize)
+                         };
+
+        var gridSizing = new GridSizingInfo
+                         {
+                             Span = gridLayout.Span,
+                             ItemSpacing = (nfloat) gridLayout.ItemSpacing,
+                             LineSpacing = (nfloat) gridLayout.LineSpacing,
+                             // The line spans the cross axis and self-sizes along the scrolling one.
+                             GroupWidth = horizontal
+                                 ? NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedItemSize)
+                                 : NSCollectionLayoutDimension.CreateFractionalWidth(1.0f),
+                             GroupHeight = horizontal
+                                 ? NSCollectionLayoutDimension.CreateFractionalHeight(1.0f)
+                                 : NSCollectionLayoutDimension.CreateEstimated((float) gridLayout.EstimatedItemSize)
+                         };
+
+        var layout = CreateListLayout(scrollDirection, layoutInfo, cellSizing, gridSizing);
+
+        return new VirtualScrollCollectionViewLayoutSetup
+               {
+                   Layout = layout,
+                   ConfigureCollectionView = collectionView =>
+                   {
+                       if (OperatingSystem.IsIOSVersionAtLeast(17, 4))
+                       {
+                           collectionView.BouncesHorizontally = horizontal;
+                           collectionView.BouncesVertically = !horizontal;
                        }
 
                        collectionView.DirectionalLockEnabled = true;
@@ -218,7 +301,8 @@ internal static class VirtualScrollPlatformLayoutFactory
     private static UICollectionViewLayout CreateListLayout(
         UICollectionViewScrollDirection scrollDirection,
         IVirtualScrollLayoutInfo layoutInfo,
-        CellSizingInfo sizingInfo)
+        CellSizingInfo sizingInfo,
+        GridSizingInfo? gridInfo = null)
     {
         var layoutConfiguration = new UICollectionViewCompositionalLayoutConfiguration();
         layoutConfiguration.ScrollDirection = scrollDirection;
@@ -235,27 +319,36 @@ internal static class VirtualScrollPlatformLayoutFactory
             var itemSize = NSCollectionLayoutSize.Create(sizingInfo.ItemWidth, sizingInfo.ItemHeight);
             var item = NSCollectionLayoutItem.Create(layoutSize: itemSize);
 
-            // Create the group (one layout item per group, it's a depth level we don't use)
+            // Create the group. A group is a line: for a list it holds a single item (a depth
+            // level we don't use), for a grid it holds Span of them.
             // Section
             //     ├─ Group
-            //     │   ├─ Item
+            //     │   ├─ Item (│ Item │ Item …, when a grid)
             //     ├─ Group
             //     │   ├─ Item
 
-            // Group dimensions: match item dimensions
-            var sectionGroupWidth = sizingInfo.ItemWidth;
-            var sectionGroupHeight = sizingInfo.ItemHeight;
+            // Group dimensions: match item dimensions for a list, describe the line for a grid.
+            var sectionGroupWidth = gridInfo?.GroupWidth ?? sizingInfo.ItemWidth;
+            var sectionGroupHeight = gridInfo?.GroupHeight ?? sizingInfo.ItemHeight;
             var groupSize = NSCollectionLayoutSize.Create(sectionGroupWidth, sectionGroupHeight);
+            var itemsPerGroup = gridInfo?.Span ?? 1;
 
             // For vertical list: group layouts horizontally (single column, items stack vertically)
             // For horizontal list: group layouts vertically (single row, items stack horizontally)
             var group = scrollDirection == UICollectionViewScrollDirection.Vertical
-                ? NSCollectionLayoutGroup.CreateHorizontal(groupSize, item, 1)
-                : NSCollectionLayoutGroup.CreateVertical(groupSize, item, 1);
+                ? NSCollectionLayoutGroup.CreateHorizontal(groupSize, item, itemsPerGroup)
+                : NSCollectionLayoutGroup.CreateVertical(groupSize, item, itemsPerGroup);
+
+            if (gridInfo is not null && gridInfo.ItemSpacing > 0)
+            {
+                // The count-based group divides what is left after the gaps, so the cells stay
+                // inside the line instead of overflowing it.
+                group.InterItemSpacing = NSCollectionLayoutSpacing.CreateFixed(gridInfo.ItemSpacing);
+            }
 
             // Create the section
             var section = NSCollectionLayoutSection.Create(group: group);
-            section.InterGroupSpacing = 0;
+            section.InterGroupSpacing = gridInfo?.LineSpacing ?? 0;
 
             // Create header and footer for section
             section.BoundarySupplementaryItems = CreateSectionSupplementaryItems(
