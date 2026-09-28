@@ -72,15 +72,24 @@ internal sealed class ScaffoldTabBarItemsLayout : Layout
         }
 
         _moreItem = new ScaffoldTabBarItemView(_owner, root: null);
-        _moreItem.SetSelectedState(_overflowRoots.Any(static root => root.IsSelected));
+        UpdateMoreState();
         Add(_moreItem);
         InvalidateMeasure();
     }
 
     internal void OnRootVisibilityChanged() => InvalidateMeasure();
 
+    /// <summary>The More item mirrors its overflow set: selected when one of it is, dot-badged when one of it is badged.</summary>
     internal void UpdateMoreState()
-        => _moreItem?.SetSelectedState(_overflowRoots.Any(r => r.IsSelected));
+    {
+        if (_moreItem is null)
+        {
+            return;
+        }
+
+        _moreItem.SetSelectedState(_overflowRoots.Any(static root => root.IsSelected));
+        _moreItem.SetOverflowBadgeState(_overflowRoots.Any(static root => !string.IsNullOrEmpty(ScaffoldTabBarView.GetBadgeText(root))));
+    }
 
     protected override ILayoutManager CreateLayoutManager() => new Manager(this);
 

@@ -124,6 +124,15 @@ public class ScaffoldRoot : Element
     /// </summary>
     public ICommand SelectCommand => field ??= new ScaffoldRootSelectCommand(this);
 
+    /// <summary>
+    /// The automation id of the view representing this root in a default chrome template: this
+    /// root's own <see cref="Element.AutomationId"/> plus a per-template <paramref name="suffix"/>
+    /// (a bar item, its overflow row and a drawer entry can all be in the tree at once, so they
+    /// need distinct ids); <paramref name="fallback"/> when the root has none.
+    /// </summary>
+    internal string? GetChromeAutomationId(string suffix, string? fallback)
+        => AutomationId is { Length: > 0 } automationId ? automationId + suffix : fallback;
+
     private void OnIconSourceChanged(ImageSource? oldValue, ImageSource? newValue) => UpdateCurrentIcon();
 
     private void UpdateCurrentIcon()

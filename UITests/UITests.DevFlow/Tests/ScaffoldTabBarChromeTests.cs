@@ -73,6 +73,21 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         );
     }
 
+    private async Task WaitForVisibilityAsync(string automationId, bool visible)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+
+        while ((await App.WaitForElementAsync(automationId)).IsVisible != visible)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException($"'{automationId}' IsVisible never became {visible}.");
+            }
+
+            await Task.Delay(100);
+        }
+    }
+
     [Fact]
     public async Task DefaultTemplateShowsFittingItemsAndMore()
     {
@@ -84,7 +99,7 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (await App.WaitForElementAsync("TabBravo")).IsVisible.Should().BeTrue();
         (await App.WaitForElementAsync("TabCharlie")).IsVisible.Should().BeTrue();
         (await App.WaitForElementAsync("TabDelta")).IsVisible.Should().BeTrue();
-        (await App.WaitForElementAsync("TabMore")).IsVisible.Should().BeTrue();
+        (await App.WaitForElementAsync("TabBarMoreButton")).IsVisible.Should().BeTrue();
 
         // Echo and Foxtrot do not fit: they live in the overflow panel, not the bar — and are
         // HIDDEN rather than parked offscreen, so a screen reader does not announce tabs that
@@ -98,6 +113,35 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
     {
         await App.WaitForElementAsync("TabPageAlpha");
         await App.WaitForTextAsync("TabAlphaBadge", "11");
+    }
+
+    [Fact]
+    public async Task RootAutomationIdLandsOnBarItem()
+    {
+        await App.WaitForElementAsync("TabPageAlpha");
+
+        // Foxtrot declares AutomationId="Foxtrot": its bar item carries it with the TabBarButton
+        // suffix (hidden while overflowed, but present), its badge follows the item's id.
+        await App.WaitForElementAsync("FoxtrotTabBarButton");
+        await App.WaitForTextAsync("FoxtrotTabBarButtonBadge", "2");
+        (await App.FindElementAsync("TabFoxtrot")).Should().BeNull("the Title-based fallback applies only to roots without an AutomationId");
+    }
+
+    [Fact]
+    public async Task MoreItemDotsWhileAnOverflowRootIsBadged()
+    {
+        await SkipUnlessOverflowingAsync();
+
+        await App.WaitForElementAsync("TabPageAlpha");
+
+        // Foxtrot (overflowed) starts with a badge: More shows the dot.
+        await WaitForVisibilityAsync("TabBarMoreButtonBadge", true);
+
+        await App.TapAsync("ToggleOverflowBadgeAlpha");
+        await WaitForVisibilityAsync("TabBarMoreButtonBadge", false);
+
+        await App.TapAsync("ToggleOverflowBadgeAlpha");
+        await WaitForVisibilityAsync("TabBarMoreButtonBadge", true);
     }
 
     [Fact]
@@ -183,10 +227,10 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
         await App.WaitForElementAsync("TabPageAlpha");
 
-        await App.TapAsync("TabMore");
+        await App.TapAsync("TabBarMoreButton");
         await App.WaitForElementAsync("TabBarOverflowPanel");
         (await App.WaitForElementAsync("OverflowRowEcho")).IsVisible.Should().BeTrue();
-        (await App.WaitForElementAsync("OverflowRowFoxtrot")).IsVisible.Should().BeTrue();
+        (await App.WaitForElementAsync("FoxtrotTabBarOverflowButton")).IsVisible.Should().BeTrue("a root's AutomationId lands on its overflow row, suffixed");
 
         // Selecting an overflow root closes the panel and navigates.
         await App.TapAsync("OverflowRowEcho");
@@ -201,11 +245,11 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
         await WaitDisplayedAsync("TabPageAlpha");
 
-        await App.TapAsync("TabMore");
+        await App.TapAsync("TabBarMoreButton");
         await App.WaitForElementAsync("TabBarOverflowPanel");
 
         // A second More tap dismisses the panel without navigating.
-        await App.TapAsync("TabMore");
+        await App.TapAsync("TabBarMoreButton");
         await App.WaitForElementGoneAsync("TabBarOverflowPanel");
         await WaitDisplayedAsync("TabPageAlpha");
     }
@@ -217,7 +261,7 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
         await App.WaitForElementAsync("TabPageAlpha");
 
-        await App.TapAsync("TabMore");
+        await App.TapAsync("TabBarMoreButton");
         await App.WaitForElementAsync("TabBarOverflowPanel");
 
         // The tab bar renders above the scrim: tapping an in-bar item while the panel is open
@@ -234,7 +278,7 @@ public class ScaffoldTabBarChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
 
         await App.WaitForElementAsync("TabPageAlpha");
 
-        await App.TapAsync("TabMore");
+        await App.TapAsync("TabBarMoreButton");
         await App.WaitForElementAsync("TabBarOverflowPanel");
 
         // Back dismisses the overlay before the navigation engine is consulted.

@@ -109,7 +109,7 @@ public sealed class ScaffoldTabBarOverflowView : Border
                 barView,
                 root,
                 tapOverride: () => HandleItemTapAsync(barView, root, closeAsync),
-                automationIdOverride: $"OverflowRow{root.Title}"
+                automationIdOverride: root.GetChromeAutomationId("TabBarOverflowButton", $"OverflowRow{root.Title}")
             )
             {
                 // Same slot width as the bar.

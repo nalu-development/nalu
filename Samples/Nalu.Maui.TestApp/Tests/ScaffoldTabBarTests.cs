@@ -92,21 +92,23 @@ public abstract class TabPageBase : ContentPage
         var badgeButton = new Button { Text = "Set Alpha badge", AutomationId = $"SetBadge{name}", FontSize = 11 };
         badgeButton.Clicked += (_, _) =>
         {
-            // Hosted pages are logical children of the Scaffold itself — resolve the tab bar
-            // through it.
-            Element? element = this;
-
-            while (element is not null and not Scaffold)
-            {
-                element = element.Parent;
-            }
-
-            if (element is Scaffold scaffold && scaffold.Areas.OfType<ScaffoldTabBar>().FirstOrDefault() is { Roots.Count: > 0 } tabBar)
+            if (FindTabBar() is { Roots.Count: > 0 } tabBar)
             {
                 ScaffoldTabBarView.SetBadgeText(tabBar.Roots[0], "9");
             }
         };
         stack.Add(badgeButton);
+
+        // Foxtrot is an OVERFLOW root on a phone: its badge drives the More item's dot.
+        var overflowBadgeButton = new Button { Text = "Toggle Foxtrot badge", AutomationId = $"ToggleOverflowBadge{name}", FontSize = 11 };
+        overflowBadgeButton.Clicked += (_, _) =>
+        {
+            if (FindTabBar()?.Roots.LastOrDefault() is { } foxtrot)
+            {
+                ScaffoldTabBarView.SetBadgeText(foxtrot, string.IsNullOrEmpty(ScaffoldTabBarView.GetBadgeText(foxtrot)) ? "2" : null);
+            }
+        };
+        stack.Add(overflowBadgeButton);
 
         var exitButton = new Button { Text = "Exit", AutomationId = $"Exit{name}", FontSize = 11, BackgroundColor = Colors.IndianRed };
         exitButton.Clicked += (_, _) => ((App)Application.Current!).ResetToMainPage();
@@ -126,6 +128,19 @@ public abstract class TabPageBase : ContentPage
             AutomationId = $"{name}Scroll",
             Content = stack
         };
+    }
+
+    /// <summary>Hosted pages are logical children of the Scaffold itself — resolves the tab bar through it.</summary>
+    private ScaffoldTabBar? FindTabBar()
+    {
+        Element? element = this;
+
+        while (element is not null and not Scaffold)
+        {
+            element = element.Parent;
+        }
+
+        return (element as Scaffold)?.Areas.OfType<ScaffoldTabBar>().FirstOrDefault();
     }
 }
 
@@ -197,7 +212,8 @@ public class TabAutoDetailPage : ContentPage
 /// Scaffold harness exercising the default tab bar template (§5.3): six roots — more than fit a
 /// phone width at the default 76dp ItemWidth, so the trailing "More" item and the overflow panel
 /// engage — icons from the metadata quintet (untinted FontImageSource, including a Selected
-/// variant), badges on an in-bar and an overflow root, and per-page bar visibility toggling.
+/// variant), badges on an in-bar and an overflow root (the latter dot-badging "More"), and
+/// per-page bar visibility toggling.
 /// </summary>
 [UsedImplicitly]
 [TestPage("Scaffold TabBar Tests")]
@@ -254,6 +270,10 @@ public class TabBarScaffold : Scaffold
 
         ScaffoldTabBarView.SetBadgeText(alpha, "11");
         ScaffoldTabBarView.SetBadgeText(foxtrot, "2");
+
+        // The only root with an AutomationId: its chrome ids derive from it (FoxtrotTabBarButton,
+        // FoxtrotTabBarOverflowButton); the others keep the Title-based fallbacks (TabAlpha…).
+        foxtrot.AutomationId = "Foxtrot";
 
         Areas.Add(
             new ScaffoldTabBar

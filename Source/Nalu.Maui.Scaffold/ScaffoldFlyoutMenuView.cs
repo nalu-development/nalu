@@ -425,9 +425,9 @@ internal sealed class ScaffoldFlyoutMenuItemHost : ContentView
     {
         base.OnBindingContextChanged();
 
-        if (BindingContext is ScaffoldRoot { Title: { Length: > 0 } title } && AutomationId is null)
+        if (BindingContext is ScaffoldRoot root && AutomationId is null)
         {
-            AutomationId = $"FlyoutItem{title}";
+            AutomationId = root.GetChromeAutomationId("FlyoutButton", root.Title is { Length: > 0 } title ? $"FlyoutItem{title}" : null);
         }
     }
 }

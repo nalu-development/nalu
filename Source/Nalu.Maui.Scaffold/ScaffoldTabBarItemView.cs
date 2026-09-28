@@ -15,7 +15,8 @@ internal static class ScaffoldTabBarDefaults
 /// One item of the default tab bar template: untinted icon (or the built-in ••• glyph for the
 /// "More" item), optional badge, truncating label, and the rounded selection highlight.
 /// Selection visuals react to the root's <see cref="ScaffoldRoot.IsSelected"/>; the badge to
-/// the <see cref="ScaffoldTabBarView.BadgeTextProperty"/> attached value. The overflow panel
+/// the <see cref="ScaffoldTabBarView.BadgeTextProperty"/> attached value. The "More" item shows
+/// a text-less dot badge while any overflowed root carries a badge. The overflow panel
 /// reuses this same component, so bar items and overflow rows share one look.
 /// </summary>
 /// <remarks>
@@ -51,6 +52,7 @@ public sealed class ScaffoldTabBarItemView : Grid
     private readonly Border? _badge;
     private readonly Label? _badgeLabel;
     private bool _selected;
+    private bool _overflowBadged;
 
     #region Item properties
 
@@ -200,7 +202,7 @@ public sealed class ScaffoldTabBarItemView : Grid
         set => SetValue(BadgeTextColorProperty, value);
     }
 
-    /// <summary>Gets or sets the badge font size.</summary>
+    /// <summary>Gets or sets the badge font size (the "More" item's dot badge scales with it).</summary>
     public double BadgeFontSize
     {
         get => (double)GetValue(BadgeFontSizeProperty);
@@ -220,7 +222,7 @@ public sealed class ScaffoldTabBarItemView : Grid
     /// </param>
     /// <param name="automationIdOverride">
     /// Replaces the default automation id (MAUI allows setting it only once; the overflow panel
-    /// needs distinct ids while the bar's parked item for the same root is still in the tree).
+    /// needs distinct ids while the bar's hidden item for the same root is still in the tree).
     /// </param>
     internal ScaffoldTabBarItemView(ScaffoldTabBarView owner, ScaffoldRoot? root, Func<Task>? tapOverride = null, string? automationIdOverride = null)
     {
@@ -284,16 +286,27 @@ public sealed class ScaffoldTabBarItemView : Grid
             VerticalTextAlignment = TextAlignment.Center
         };
 
-        _badge = new Border
-        {
-            StrokeThickness = 0,
-            Padding = new Thickness(5, 0, 5, 0),
-            StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(9) },
-            HorizontalOptions = LayoutOptions.Center,
-            VerticalOptions = LayoutOptions.Start,
-            IsVisible = false,
-            Content = _badgeLabel
-        };
+        // Root items carry a text pill; the More item only ever signals "something in the
+        // overflow has a badge" — a text-less dot (the label stays out of its tree).
+        _badge = root is not null
+            ? new Border
+            {
+                StrokeThickness = 0,
+                Padding = new Thickness(5, 0, 5, 0),
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(9) },
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Start,
+                IsVisible = false,
+                Content = _badgeLabel
+            }
+            : new Border
+            {
+                StrokeThickness = 0,
+                StrokeShape = new Ellipse(),
+                HorizontalOptions = LayoutOptions.Center,
+                VerticalOptions = LayoutOptions.Start,
+                IsVisible = false
+            };
 
         iconHost.Add(_badge);
 
@@ -328,14 +341,15 @@ public sealed class ScaffoldTabBarItemView : Grid
 
         if (root is not null)
         {
-            AutomationId = automationIdOverride ?? $"Tab{root.Title}";
+            AutomationId = automationIdOverride ?? root.GetChromeAutomationId("TabBarButton", $"Tab{root.Title}");
             _badgeLabel.AutomationId = $"{AutomationId}Badge";
             root.PropertyChanged += OnRootPropertyChanged;
             _selected = root.IsSelected;
         }
         else
         {
-            AutomationId = automationIdOverride ?? "TabMore";
+            AutomationId = automationIdOverride ?? "TabBarMoreButton";
+            _badge.AutomationId = $"{AutomationId}Badge";
         }
 
         // Defaults never raise propertyChanged: seed once from the current values (values set
@@ -373,6 +387,16 @@ public sealed class ScaffoldTabBarItemView : Grid
         }
     }
 
+    /// <summary>More item only: shows the dot badge while any overflowed root carries a badge.</summary>
+    internal void SetOverflowBadgeState(bool badged)
+    {
+        if (_overflowBadged != badged)
+        {
+            _overflowBadged = badged;
+            UpdateBadgeText();
+        }
+    }
+
     /// <summary>Icon slot geometry — and the badge's fixed protrusion, which is derived from it.</summary>
     private void ApplyIconSize()
     {
@@ -398,8 +422,9 @@ public sealed class ScaffoldTabBarItemView : Grid
 
         // Overlap the icon's top-right corner (translation only — no layout impact; the item
         // never clips, and the fixed protrusion stays inside the bar pill's padding headroom).
-        _badge.TranslationX = iconSize * 0.5 + 6;
-        _badge.TranslationY = -5;
+        // The small dot tucks closer to the corner than the text pill does.
+        _badge.TranslationX = iconSize * 0.5 + (Root is null ? 2 : 6);
+        _badge.TranslationY = Root is null ? -3 : -5;
     }
 
     private void ApplyFontFamily()
@@ -458,7 +483,18 @@ public sealed class ScaffoldTabBarItemView : Grid
         }
 
         _badgeLabel.FontSize = BadgeFontSize;
-        _badge.HeightRequest = Math.Ceiling(BadgeFontSize * 1.6);
+
+        if (Root is null)
+        {
+            // The dot: a little over half the text pill's height.
+            var dotSize = Math.Ceiling(BadgeFontSize * 0.9);
+            _badge.WidthRequest = dotSize;
+            _badge.HeightRequest = dotSize;
+        }
+        else
+        {
+            _badge.HeightRequest = Math.Ceiling(BadgeFontSize * 1.6);
+        }
     }
 
     /// <summary>Everything that flips with selection, in one place.</summary>
@@ -476,7 +512,14 @@ public sealed class ScaffoldTabBarItemView : Grid
             return;
         }
 
-        var text = Root is null ? null : ScaffoldTabBarView.GetBadgeText(Root);
+        if (Root is null)
+        {
+            _badge.IsVisible = _overflowBadged;
+
+            return;
+        }
+
+        var text = ScaffoldTabBarView.GetBadgeText(Root);
         _badge.IsVisible = !string.IsNullOrEmpty(text);
         _badgeLabel.Text = text ?? string.Empty;
     }
@@ -498,6 +541,7 @@ public sealed class ScaffoldTabBarItemView : Grid
 
             case "BadgeText":
                 UpdateBadgeText();
+                (Parent as ScaffoldTabBarItemsLayout)?.UpdateMoreState();
 
                 break;
         }

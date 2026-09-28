@@ -42,7 +42,7 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
         // Portrait: the last roots do not fit and are parked offscreen in the overflow panel.
         var overflowedInPortrait = await App.GetBoundsAsync("TabSix");
         overflowedInPortrait.X.Should().BeLessThan(0, "six roots cannot fit a portrait phone bar");
-        (await App.WaitForElementAsync("TabMore")).IsVisible.Should().BeTrue("the overflow item stands in for them");
+        (await App.WaitForElementAsync("TabBarMoreButton")).IsVisible.Should().BeTrue("the overflow item stands in for them");
 
         await App.SetOrientationAsync(landscape: true);
 
@@ -189,7 +189,7 @@ public class ScaffoldOrientationChromeTests(NaluApp app) : BaseUiTest(app), IAsy
     [Fact]
     public async Task RotatingClosesTheOverflowPanel()
     {
-        await App.TapAsync("TabMore");
+        await App.TapAsync("TabBarMoreButton");
         await App.WaitForElementAsync("TabBarOverflowPanel");
 
         await App.SetOrientationAsync(landscape: true);

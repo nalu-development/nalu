@@ -52,7 +52,21 @@ The default bar is styled with plain MAUI implicit styles (`ScaffoldTabBarView`,
 background, spacing and fonts are all standard setters. Notable knobs on `ScaffoldTabBarView`:
 `ItemWidth`, `OverflowIcon`/`OverflowTitle` ("More"), `BarBackground`, `BarCornerRadius`,
 `BarMargin`, `BarPadding`, `BarShadow` — and the `ScaffoldTabBarView.BadgeText` attached
-property for per-root badges (set it on the `ScaffoldRoot`).
+property for per-root badges (set it on the `ScaffoldRoot`). While any overflowed root carries
+a badge, the "More" item shows a text-less dot badge (sized from `BadgeFontSize`, colored by
+`BadgeBackground`), so a badge is never hidden behind the overflow.
+
+A root's `AutomationId` is transferred to the views representing it, suffixed so they stay
+unique while several are in the tree at once:
+
+| View | `AutomationId="Home"` | Without `AutomationId` |
+|------|-----------------------|------------------------|
+| Bar item | `HomeTabBarButton` | `Tab{Title}` |
+| Bar item badge | `HomeTabBarButtonBadge` | `Tab{Title}Badge` |
+| Overflow panel row | `HomeTabBarOverflowButton` | `OverflowRow{Title}` |
+| Drawer menu entry | `HomeFlyoutButton` | `FlyoutItem{Title}` |
+
+The "More" item is `TabBarMoreButton` (its dot badge `TabBarMoreButtonBadge`).
 
 ### Replacing the bar entirely
 

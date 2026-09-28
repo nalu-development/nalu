@@ -43,6 +43,10 @@ tab-bar-only app renders an empty drawer. Customization points: `HeaderView`, `F
 `ScaffoldFlyoutMenuItemView` / `ScaffoldFlyoutMenuGroupHeader` item types. Custom flyout
 content can build the same behavior with `ScaffoldRoot.SelectCommand`.
 
+A root's `AutomationId` lands on its menu entry with a `FlyoutButton` suffix
+(`AutomationId="Home"` → `HomeFlyoutButton`), so UI tests can target it without clashing with
+the same root's tab bar item; roots without one fall back to `FlyoutItem{Title}`.
+
 ## Options
 
 Set `ScaffoldFlyoutOptions` per side (`FlyoutStartOptions` / `FlyoutEndOptions`) — these are

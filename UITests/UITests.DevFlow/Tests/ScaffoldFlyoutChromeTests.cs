@@ -70,7 +70,7 @@ public class ScaffoldFlyoutChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         (await IsDisplayedAsync("StartFlyoutHeader")).Should().BeTrue("the HeaderView renders above the menu");
         (await IsDisplayedAsync("FlyoutGroupZone")).Should().BeTrue("a multi-root area shows its title as group header");
         (await IsDisplayedAsync("FlyoutItemAlpha")).Should().BeTrue();
-        (await IsDisplayedAsync("FlyoutItemBeta")).Should().BeTrue();
+        (await IsDisplayedAsync("BetaFlyoutButton")).Should().BeTrue("a root's AutomationId lands on its entry, suffixed");
 
         // Hidden roots and tab-bar areas are excluded (they are not even in the menu's tree).
         (await App.FindElementAsync("FlyoutItemGhost")).Should().BeNull("non-visible roots are omitted");

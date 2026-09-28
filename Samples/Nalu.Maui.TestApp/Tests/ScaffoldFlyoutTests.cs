@@ -294,7 +294,7 @@ public class FlyoutScaffold : Scaffold
                 Roots =
                 {
                     new ScaffoldRoot { Title = "Alpha", PageType = typeof(FlyoutAlphaPage) },
-                    new ScaffoldRoot { Title = "Beta", PageType = typeof(FlyoutBetaPage) },
+                    new ScaffoldRoot { Title = "Beta", PageType = typeof(FlyoutBetaPage), AutomationId = "Beta" }, // entry id: BetaFlyoutButton
                     new ScaffoldRoot { Title = "Ghost", PageType = typeof(FlyoutTabPage), IsVisible = false }
                 }
             }
