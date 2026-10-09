@@ -152,8 +152,10 @@ internal static class GestureSettling
     public static double Project(double position, double velocity) => position + (velocity * ProjectionSeconds);
 
     /// <summary>The direction of a flick (-1 / +1), or 0 when the release was not fast enough to be one.</summary>
-    public static int FlickDirection(double velocity)
-        => Math.Abs(velocity) < FlickVelocity ? 0 : Math.Sign(velocity);
+    /// <param name="velocity">The release velocity.</param>
+    /// <param name="flickVelocity">The minimum speed of a flick; <see cref="double.PositiveInfinity"/> means nothing is.</param>
+    public static int FlickDirection(double velocity, double flickVelocity = FlickVelocity)
+        => Math.Abs(velocity) < flickVelocity ? 0 : Math.Sign(velocity);
 
     /// <summary>
     /// How long the settle animation should take to cover <paramref name="remaining"/> units while

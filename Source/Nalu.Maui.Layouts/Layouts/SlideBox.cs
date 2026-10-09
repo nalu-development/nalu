@@ -55,6 +55,24 @@ public class SlideBox : Layout
         true
     );
 
+    /// <summary>Bindable property for <see cref="SwipeCommitThreshold" />.</summary>
+    public static readonly BindableProperty SwipeCommitThresholdProperty = BindableProperty.Create(
+        nameof(SwipeCommitThreshold),
+        typeof(double),
+        typeof(SlideBox),
+        1d / 3,
+        validateValue: static (_, value) => value is >= 0d and <= 1d
+    );
+
+    /// <summary>Bindable property for <see cref="SwipeFlickVelocity" />.</summary>
+    public static readonly BindableProperty SwipeFlickVelocityProperty = BindableProperty.Create(
+        nameof(SwipeFlickVelocity),
+        typeof(double),
+        typeof(SlideBox),
+        GestureSettling.FlickVelocity,
+        validateValue: static (_, value) => value is >= 0d
+    );
+
     /// <summary>Bindable property for <see cref="Orientation" />.</summary>
     public static readonly BindableProperty OrientationProperty = BindableProperty.Create(
         nameof(Orientation),
@@ -115,6 +133,32 @@ public class SlideBox : Layout
     {
         get => (bool) GetValue(IsSwipeEnabledProperty);
         set => SetValue(IsSwipeEnabledProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the fraction of a page (0–1, default ⅓) a released swipe must be heading past
+    /// to change slide. Lower values make swiping easier, higher values make it harder.
+    /// </summary>
+    /// <remarks>
+    /// Measured on where the drag would coast to, so a quick swipe needs less travel than a slow
+    /// one. Releases at or above <see cref="SwipeFlickVelocity" /> commit regardless.
+    /// </remarks>
+    public double SwipeCommitThreshold
+    {
+        get => (double) GetValue(SwipeCommitThresholdProperty);
+        set => SetValue(SwipeCommitThresholdProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the release speed (device-independent units per second, default 400) at or
+    /// above which a swipe is a FLICK: it changes slide whatever the distance, and a flick back
+    /// cancels it whatever the distance. <see cref="double.PositiveInfinity" /> disables flicks,
+    /// leaving <see cref="SwipeCommitThreshold" /> as the only rule.
+    /// </summary>
+    public double SwipeFlickVelocity
+    {
+        get => (double) GetValue(SwipeFlickVelocityProperty);
+        set => SetValue(SwipeFlickVelocityProperty, value);
     }
 
     /// <summary>Gets or sets the sliding axis.</summary>
@@ -696,20 +740,10 @@ public class SlideBox : Layout
     }
 
     /// <summary>
-    /// Settles the drag: commits the slide change when the gesture was HEADING past a third of a
-    /// page towards an enabled neighbour, otherwise animates back to rest.
+    /// Settles the drag: commits the slide change when the gesture was HEADING past
+    /// <see cref="SwipeCommitThreshold" /> of a page towards an enabled neighbour (see
+    /// <see cref="ShouldCommitSwipe" />), otherwise animates back to rest.
     /// </summary>
-    /// <remarks>
-    /// Heading, not standing: the decision is taken on where the drag would coast to
-    /// (<see cref="GestureSettling.Project"/>), so a quick swipe lands the next slide without
-    /// having to drag a third of the way there — while a slow drag, whose velocity is nil,
-    /// projects onto itself and behaves exactly as it always did.
-    /// A FLICK commits on its own, whatever the distance: a short sharp swipe is an unambiguous
-    /// instruction, and springing back reads as the gesture having been ignored. Flicking BACK
-    /// returns to rest however far the content had travelled — the finger's last word wins.
-    /// The gesture only ever runs between the current slide and ONE neighbour, the one the drag
-    /// revealed, so a flick backwards means "never mind", not "take the other neighbour".
-    /// </remarks>
     internal void EndDrag(bool canceled)
     {
         if (!_dragging)
@@ -727,16 +761,9 @@ public class SlideBox : Layout
         var logicalDirection = IsRtl ? -direction : direction;
         var target = FindEnabled(SelectedIndex, logicalDirection);
 
-        // Signed like the offset: the sign that means "further towards the revealed neighbour".
-        var towardsNeighbour = offset < 0 ? -1 : 1;
-        var flick = GestureSettling.FlickDirection(velocity);
-        var projected = GestureSettling.Project(offset, velocity);
-
         var commit = !canceled
                      && target >= 0
-                     && flick != -towardsNeighbour
-                     && (flick == towardsNeighbour
-                         || (Math.Sign(projected) == towardsNeighbour && Math.Abs(projected) > PageSize / 3));
+                     && ShouldCommitSwipe(offset, velocity, PageSize, SwipeCommitThreshold, SwipeFlickVelocity);
 
         // The landing keeps the speed the finger left behind rather than restarting from still.
         var remaining = commit ? PageSize - Math.Abs(offset) : Math.Abs(offset);
@@ -756,6 +783,33 @@ public class SlideBox : Layout
         {
             Present(animated: true, duration: duration);
         }
+    }
+
+    /// <summary>
+    /// Whether a drag released at <paramref name="offset" /> with <paramref name="velocity" />
+    /// (both signed along the sliding axis) lands on the neighbour it revealed.
+    /// </summary>
+    /// <remarks>
+    /// Heading, not standing: the decision is taken on where the drag would coast to
+    /// (<see cref="GestureSettling.Project"/>), so a quick swipe lands the next slide without
+    /// having to drag all the way to the threshold — while a slow drag, whose velocity is nil,
+    /// projects onto itself and is judged on distance alone.
+    /// A FLICK commits on its own, whatever the distance: a short sharp swipe is an unambiguous
+    /// instruction, and springing back reads as the gesture having been ignored. Flicking BACK
+    /// returns to rest however far the content had travelled — the finger's last word wins.
+    /// The gesture only ever runs between the current slide and ONE neighbour, the one the drag
+    /// revealed, so a flick backwards means "never mind", not "take the other neighbour".
+    /// </remarks>
+    internal static bool ShouldCommitSwipe(double offset, double velocity, double pageSize, double commitThreshold, double flickVelocity)
+    {
+        // Signed like the offset: the sign that means "further towards the revealed neighbour".
+        var towardsNeighbour = offset < 0 ? -1 : 1;
+        var flick = GestureSettling.FlickDirection(velocity, flickVelocity);
+        var projected = GestureSettling.Project(offset, velocity);
+
+        return flick != -towardsNeighbour
+               && (flick == towardsNeighbour
+                   || (Math.Sign(projected) == towardsNeighbour && Math.Abs(projected) > pageSize * commitThreshold));
     }
 
     /// <inheritdoc />

@@ -76,10 +76,27 @@ enabled neighbor.
 ## Swiping
 
 `IsSwipeEnabled` (default `true`) lets the user drag between adjacent enabled slides:
-one page per gesture, a ⅓-page commit threshold, and rubber-banding when dragging past the
-first or last slide. The gesture is implemented with a cross-platform pan recognizer — no
-platform-specific code — and transitions retarget seamlessly from wherever the finger
-released.
+one page per gesture, and rubber-banding when dragging past the first or last slide.
+Transitions retarget seamlessly from wherever the finger released. On Android the box
+intercepts drags along its axis, so slides hosting a `ScrollView`/`CollectionView` still swipe.
+
+A released swipe changes slide when either:
+
+- it is heading past `SwipeCommitThreshold` of a page (default `⅓`) — measured on where the
+  drag would coast to, so a quick swipe needs less travel than a slow one;
+- or it is a **flick**, released at `SwipeFlickVelocity` or faster (default `400` units per
+  second) — whatever the distance. A flick *back* returns to rest, however far the slide had
+  travelled.
+
+Tune both to make swiping easier or harder:
+
+```xml
+<!-- Easier: a quarter of a page, or a gentle flick -->
+<nalu:SlideBox SwipeCommitThreshold="0.25" SwipeFlickVelocity="250">
+
+<!-- Harder: past half a page, flicks disabled -->
+<nalu:SlideBox SwipeCommitThreshold="0.5" SwipeFlickVelocity="Infinity">
+```
 
 Programmatic transitions are direction-aware translations tuned by `TransitionDuration`
 (default 250ms) and `TransitionEasing` (default `CubicOut`).
@@ -119,6 +136,8 @@ afterwards to override them.
 | `SelectedIndex` | `0` | Two-way bindable selection, coerced onto enabled items. |
 | `SelectedItem` | — | Read-only selected item. |
 | `IsSwipeEnabled` | `true` | Interactive dragging between adjacent slides. |
+| `SwipeCommitThreshold` | `⅓` | Fraction of a page (0–1) a released swipe must be heading past to change slide. |
+| `SwipeFlickVelocity` | `400` | Release speed (units/s) at which a swipe changes slide regardless of distance; `Infinity` disables flicks. |
 | `Orientation` | `Horizontal` | The sliding axis. |
 | `PeekAreaInsets` | `0` | How much of the adjacent slides stays visible at rest (sliding-axis components only). |
 | `TransitionDuration` | `250` | Slide transition duration in milliseconds. |
