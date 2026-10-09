@@ -190,4 +190,77 @@ public class SlideBoxTests
 
         box.Items[0].Content!.BindingContext.Should().BeSameAs(context);
     }
+
+    [Fact(DisplayName = "Swipe thresholds, by default, should be a third of a page and 400 units per second")]
+    public void SwipeThresholdsByDefaultShouldKeepTheHistoricBehavior()
+    {
+        var box = new SlideBox();
+
+        box.SwipeCommitThreshold.Should().BeApproximately(1d / 3, 0.0001);
+        box.SwipeFlickVelocity.Should().Be(400);
+    }
+
+    // MAUI drops a value failing validateValue (logging a warning) instead of throwing.
+    [Theory(DisplayName = "SwipeCommitThreshold, when set outside 0-1, should be ignored")]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    [InlineData(double.NaN)]
+    public void SwipeCommitThresholdWhenOutOfRangeShouldBeIgnored(double threshold)
+    {
+        var box = new SlideBox { SwipeCommitThreshold = 0.5 };
+
+        box.SwipeCommitThreshold = threshold;
+
+        box.SwipeCommitThreshold.Should().Be(0.5);
+    }
+
+    [Fact(DisplayName = "SwipeFlickVelocity, should ignore negatives and accept infinity")]
+    public void SwipeFlickVelocityShouldIgnoreNegativesAndAcceptInfinity()
+    {
+        var box = new SlideBox();
+
+        box.SwipeFlickVelocity = -1;
+        box.SwipeFlickVelocity.Should().Be(400);
+
+        box.SwipeFlickVelocity = double.PositiveInfinity;
+        box.SwipeFlickVelocity.Should().Be(double.PositiveInfinity);
+    }
+
+    [Theory(DisplayName = "ShouldCommitSwipe, should honor the commit threshold and the flick velocity")]
+    // Slow drags are judged on distance alone: 120 of 300 is 40% of the page.
+    [InlineData(-120, 0, 1d / 3, 400, true)]
+    [InlineData(-120, 0, 0.5, 400, false)]
+    [InlineData(-70, 0, 1d / 3, 400, false)]
+    [InlineData(-70, 0, 0.2, 400, true)]
+    [InlineData(120, 0, 1d / 3, 400, true)]
+    // A short flick commits whatever the distance — unless the flick velocity is raised past it
+    // (then its projection, 20 + 60, falls short of a third of the page).
+    [InlineData(-20, -500, 1d / 3, 400, true)]
+    [InlineData(-20, -500, 1d / 3, 1000, false)]
+    [InlineData(-20, -500, 1d / 3, double.PositiveInfinity, false)]
+    // A flick back cancels whatever the distance — unless it is no longer fast enough to be one
+    // (then its projection, 200 - 60, is still past a third of the page).
+    [InlineData(-200, 500, 1d / 3, 400, false)]
+    [InlineData(-200, 500, 1d / 3, 1000, true)]
+    public void ShouldCommitSwipeShouldHonorTheThresholds(double offset, double velocity, double commitThreshold, double flickVelocity, bool expected)
+        => SlideBox.ShouldCommitSwipe(offset, velocity, 300, commitThreshold, flickVelocity).Should().Be(expected);
+
+    [Theory(DisplayName = "EndDrag, should apply SwipeCommitThreshold to the released drag")]
+    [InlineData(1d / 3, 1)]
+    [InlineData(0.6, 0)]
+    public void EndDragShouldApplySwipeCommitThreshold(double commitThreshold, int expectedIndex)
+    {
+        var box = SizedBox(Item(), Item());
+        box.SwipeCommitThreshold = commitThreshold;
+
+        box.BeginDrag();
+        box.UpdateDrag(-150);
+
+        // Past the sampler's 100ms window the release reads as still, so only distance decides.
+        // A late wake-up can only make the pause longer, never shorter: this cannot flake.
+        Thread.Sleep(150);
+        box.EndDrag(canceled: false);
+
+        box.SelectedIndex.Should().Be(expectedIndex);
+    }
 }

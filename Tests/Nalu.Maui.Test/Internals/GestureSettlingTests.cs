@@ -5,8 +5,8 @@ namespace Nalu.Maui.Test.Internals;
 /// <summary>
 /// The rule both swipe gestures settle by: where the drag was HEADING (projection) and whether it
 /// was a flick. The controls apply their own thresholds to those two answers — SlideBox commits
-/// past a third of a page, the sheet snaps to the nearest detent — so what matters here is that a
-/// still release changes nothing and a fast one carries.
+/// past its SwipeCommitThreshold, the sheet snaps to the nearest detent — so what matters here is
+/// that a still release changes nothing and a fast one carries.
 /// </summary>
 public class GestureSettlingTests
 {
@@ -30,6 +30,14 @@ public class GestureSettlingTests
     [InlineData(2500, 1)]
     public void FlickDirectionIsTheSignOfAFastRelease(double velocity, int expected)
         => GestureSettling.FlickDirection(velocity).Should().Be(expected);
+
+    [Theory(DisplayName = "A custom flick velocity moves the line, and infinity disables flicks")]
+    [InlineData(500, 1000, 0)]
+    [InlineData(-1000, 1000, -1)]
+    [InlineData(150, 100, 1)]
+    [InlineData(1e6, double.PositiveInfinity, 0)]
+    public void FlickDirectionHonorsACustomFlickVelocity(double velocity, double flickVelocity, int expected)
+        => GestureSettling.FlickDirection(velocity, flickVelocity).Should().Be(expected);
 
     [Fact(DisplayName = "A still release settles over the control's resting duration")]
     public void SettleDurationFallsBackToTheRestingDuration()
