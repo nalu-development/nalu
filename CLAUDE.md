@@ -94,6 +94,16 @@ Error handling of `NSUrlBackgroundSessionHttpMessageHandler` is covered by a thr
   the serialized body); iOS IGNORES the per-request native timeout on background sessions, so
   `DefaultTimeout` is now enforced MANAGED-side (linked CTS; surfaces as TaskCanceledException
   wrapping TimeoutException, the HttpClient.Timeout convention).
+  Also VERIFIED (device syslog, Oct 2026): CFNetwork acknowledges a download event to nsurlsessiond
+  when the XPC message ARRIVES, before the delegate runs — a kill inside `DidFinishDownloading` is
+  NOT re-delivered (download lost); the daemon may later resend only `didComplete(nil)`. The field
+  error "couldn't be moved … (source file exists: False)" = the download was deleted from
+  `Library/Caches/com.apple.nsurlsessiond/Downloads` before delivery: iOS's CacheDelete (low storage,
+  "Offload App") moves the WHOLE Library/Caches aside and recreates it empty — verified from the system
+  binaries; MAUI 10, Sentry, Pendo iOS, CommunityToolkit, macios never delete outside their own folders.
+  Reproduced by the page's "Wipe Caches next launch" button; "Kill after secure" covers the kill case.
+  Callbacks are matched to requests by identifier AND native `TaskIdentifier` (fake tasks in the
+  callback harness resolve the real task's id via `TryGetPendingTaskIdentifier`).
 
 **Physical-device loop** (background sessions are only meaningful on a real iPhone): build with
 `dotnet build Samples/Nalu.Maui.TestApp -f net10.0-ios -p:RuntimeIdentifier=ios-arm64`, install/launch

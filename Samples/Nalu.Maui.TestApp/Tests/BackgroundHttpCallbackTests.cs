@@ -234,6 +234,14 @@ public class BackgroundHttpCallbackTests : ContentPage
             ("cancellation", CancellationAsync),
             ("tmp-dir-purged", TmpDirPurgedAsync),
             ("background-completion", BackgroundCompletionAsync),
+            ("background-completion-signal", BackgroundCompletionSignalAsync),
+            ("foreign-finish-new-request", ForeignFinishNewRequestAsync),
+            ("foreign-missing-file-new-request", ForeignMissingFileNewRequestAsync),
+            ("foreign-error-new-request", ForeignErrorNewRequestAsync),
+            ("complete-without-download", CompleteWithoutDownloadAsync),
+            ("lost-complete-without-download", LostCompleteWithoutDownloadAsync),
+            ("resend-after-delivery", ResendAfterDeliveryAsync),
+            ("precanceled-token", PrecanceledTokenAsync),
             ("session-invalid-recovery", SessionInvalidRecoveryAsync)
         ];
 
@@ -250,7 +258,21 @@ public class BackgroundHttpCallbackTests : ContentPage
     /// </summary>
     private sealed class FakeTask : NSUrlSessionDownloadTask
     {
+        private static long _nextForeignTaskId = 1_000_000_000;
+        private nuint? _resolvedTaskId;
+
         public string? Desc { get; set; }
+
+        /// <summary>
+        /// The native task identity. Unset, it resolves (once) to the REAL task of the pending
+        /// request <see cref="Desc" /> — a callback OF that request; with no pending request, to a
+        /// fresh foreign identity. Set it to <see cref="ForeignId" /> to impersonate ANOTHER task
+        /// carrying the same request identifier (one a previous process created).
+        /// </summary>
+        public nuint? TaskId { get; set; }
+
+        public static nuint ForeignId() => (nuint) Interlocked.Increment(ref _nextForeignTaskId);
+
         public NSUrlSessionTaskState TaskState { get; set; } = NSUrlSessionTaskState.Completed;
         public NSError? TaskError { get; set; }
         public NSUrlResponse? TaskResponse { get; set; }
@@ -278,6 +300,9 @@ public class BackgroundHttpCallbackTests : ContentPage
         public override NSUrlRequest? CurrentRequest => null;
 
         public override NSUrlRequest? OriginalRequest => null;
+
+        public override nuint TaskIdentifier
+            => TaskId ?? (_resolvedTaskId ??= Desc is not null && SessionHandler.TryGetPendingTaskIdentifier(Desc, out var id) ? id : ForeignId());
     }
 
     private sealed class PendingRequest(string id, Task<HttpResponseMessage> responseTask, CancellationTokenSource cts) : IDisposable
@@ -526,10 +551,13 @@ public class BackgroundHttpCallbackTests : ContentPage
         InvokeFinished(new FakeTask { Desc = pending.Id, TaskResponse = MakeHttpResponse() }, missingPath);
 
         var exception = await AwaitFaultAsync(pending.ResponseTask, "missing download file");
-        Check(exception is HttpRequestException, $"expected HttpRequestException, got {exception.GetType().Name}");
-        Check(exception.Message.Contains("Failed to process downloaded file", StringComparison.Ordinal), $"unexpected message '{exception.Message}'");
-        Check(exception.InnerException?.Message.Contains("Failed to secure downloaded file", StringComparison.Ordinal) == true,
-            $"staging failure reason missing from inner '{exception.InnerException?.Message}'");
+        Check(exception is HttpRequestException { HttpRequestError: HttpRequestError.ResponseEnded },
+            $"expected a retryable HttpRequestException (ResponseEnded), got {exception.GetType().Name}: {exception.Message}");
+        Check(exception.Message.Contains("could not be secured", StringComparison.Ordinal), $"staging failure reason missing from '{exception.Message}'");
+        Check(exception.Message.Contains("source file exists: False", StringComparison.Ordinal), $"source diagnostics missing from '{exception.Message}'");
+        Check(exception.Message.Contains("downloads folder exists: True", StringComparison.Ordinal), $"folder diagnostics missing from '{exception.Message}'");
+        Check(exception.Message.Contains("Library/Caches created: 20", StringComparison.Ordinal), $"Caches creation date missing from '{exception.Message}'");
+        Check(exception.Message.Contains(" GB)", StringComparison.Ordinal) || exception.Message.Contains(" GB,", StringComparison.Ordinal), $"free space missing from '{exception.Message}'");
         await WaitRemovedFromPendingAsync(pending.Id);
     }
 
@@ -546,7 +574,8 @@ public class BackgroundHttpCallbackTests : ContentPage
 
         var exception = await AwaitFaultAsync(pending.ResponseTask, "response getter failure");
         Check(exception is HttpRequestException, $"expected HttpRequestException, got {exception.GetType().Name}");
-        Check(exception.Message.Contains("Failed to process session callback", StringComparison.Ordinal), $"guard message missing from '{exception.Message}'");
+        Check(exception.Message.Contains("Failed to process downloaded file", StringComparison.Ordinal), $"processing failure message missing from '{exception.Message}'");
+        Check(exception.InnerException?.Message.Contains("FakeTask.Response", StringComparison.Ordinal) == true, "the original failure was not preserved as inner exception");
         await WaitRemovedFromPendingAsync(pending.Id);
 
         // Every .nsdownload staged by this scenario must be gone (deletion happens on the
@@ -672,8 +701,8 @@ public class BackgroundHttpCallbackTests : ContentPage
 
         // Simulate a tmp purge landing BETWEEN delivery and consumption: POSIX unlink semantics
         // must keep the already-open response stream fully readable.
-        var responsePath = Path.Combine(Path.GetTempPath(), pending.Id + ".nsresponse");
-        Check(File.Exists(responsePath), $"expected the response content file at {responsePath}");
+        var responsePath = Directory.GetFiles(Path.GetTempPath(), pending.Id + "-*.nsresponse").SingleOrDefault();
+        Check(responsePath is not null, $"expected the response content file {pending.Id}-*.nsresponse");
         File.Delete(responsePath);
 
         var text = await response.Content.ReadAsStringAsync();
@@ -773,7 +802,7 @@ public class BackgroundHttpCallbackTests : ContentPage
                 if (i == missingIndex)
                 {
                     var exception = await AwaitFaultAsync(pendings[i].ResponseTask, $"burst request {i}");
-                    Check(exception.Message.Contains("Failed to process downloaded file", StringComparison.Ordinal), $"unexpected message '{exception.Message}'");
+                    Check(exception is HttpRequestException { HttpRequestError: HttpRequestError.ResponseEnded }, $"unexpected fault '{exception.Message}'");
                 }
                 else
                 {
@@ -961,7 +990,8 @@ public class BackgroundHttpCallbackTests : ContentPage
 
             // Other scenarios share this process; only the staging/processing faults count.
             if (text.Contains("Failed to secure downloaded file", StringComparison.Ordinal)
-                || text.Contains("Failed to process downloaded file", StringComparison.Ordinal))
+                || text.Contains("Failed to process downloaded file", StringComparison.Ordinal)
+                || text.Contains("its response is lost", StringComparison.Ordinal))
             {
                 lock (_gate)
                 {
@@ -1114,6 +1144,192 @@ public class BackgroundHttpCallbackTests : ContentPage
         // with no in-flight events it fires as soon as the quiet-period wait elapses.
         var winner = await Task.WhenAny(invoked.Task, Task.Delay(12_000));
         Check(winner == invoked.Task, "the background completion handler was never invoked");
+    }
+
+    private async Task BackgroundCompletionSignalAsync()
+    {
+        var invoked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var accepted = SessionHandler.HandleEventsForBackgroundUrl(
+            null!,
+            MessageHandlerNSUrlSessionDownloadDelegate.SessionIdentifier,
+            () => invoked.TrySetResult()
+        );
+
+        Check(accepted, "HandleEventsForBackgroundUrl did not accept its own session identifier");
+
+        // Without the signal the handler must NOT fire yet (well under the 3s quiet fallback):
+        // firing early lets iOS suspend the app with acknowledged events still queued.
+        await Task.Delay(1_000);
+        Check(!invoked.Task.IsCompleted, "the completion handler fired before DidFinishEventsForBackgroundSession");
+
+        // Apple's documented signal that every enqueued event was delivered: the handler must
+        // follow promptly (the quiet-period fallback alone would take seconds).
+        SessionHandler.DidFinishEventsForBackgroundSession(null!);
+
+        var winner = await Task.WhenAny(invoked.Task, Task.Delay(1_500));
+        Check(winner == invoked.Task, "the completion handler did not follow DidFinishEventsForBackgroundSession promptly");
+    }
+
+    /// <summary>
+    /// Cross-talk: an OLDER task (e.g. created by a previous process) that carries the identifier
+    /// of a request this process is awaiting must never complete it — it is a lost delivery.
+    /// </summary>
+    private async Task ForeignFinishNewRequestAsync()
+    {
+        using var pending = await CreatePendingAsync("foreignok");
+        var lostTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        BackgroundHttpLostMessageHandler.Interceptor = async handle =>
+        {
+            using var lostResponse = await handle.GetResponseAsync();
+            lostTcs.TrySetResult(await lostResponse.Content.ReadAsStringAsync());
+        };
+
+        try
+        {
+            InvokeFinished(new FakeTask { Desc = pending.Id, TaskId = FakeTask.ForeignId(), TaskResponse = MakeHttpResponse() }, CreateDownloadFile("stale"));
+
+            var lostWinner = await Task.WhenAny(lostTcs.Task, Task.Delay(5_000));
+            Check(lostWinner == lostTcs.Task, "the foreign delivery was not handed to the lost-message handler");
+            Check(await lostTcs.Task == "stale", "the lost-message handler received the wrong content");
+            Check(!pending.ResponseTask.IsCompleted, "a foreign task's download completed the request this process awaits");
+            Check(SessionHandler.GetPendingResponses().ContainsKey(pending.Id), "the awaited request lost its slot to the foreign delivery");
+        }
+        finally
+        {
+            BackgroundHttpLostMessageHandler.Interceptor = null;
+        }
+
+        // Its OWN download still completes it.
+        InvokeFinished(new FakeTask { Desc = pending.Id, TaskResponse = MakeHttpResponse() }, CreateDownloadFile("fresh"));
+        var winner = await Task.WhenAny(pending.ResponseTask, Task.Delay(10_000));
+        Check(winner == pending.ResponseTask, "the request's own download did not complete it");
+
+        using var response = await pending.ResponseTask;
+        Check(await response.Content.ReadAsStringAsync() == "fresh", "the request received a foreign response");
+        response.Dispose();
+        await WaitRemovedFromPendingAsync(pending.Id);
+    }
+
+    private async Task ForeignMissingFileNewRequestAsync()
+    {
+        using var pending = await CreatePendingAsync("foreignnofile");
+        using var unobserved = new UnobservedWatcher();
+        var missingPath = Path.Combine(Path.GetTempPath(), $"chaos-foreign-missing-{Guid.NewGuid():N}.download");
+
+        InvokeFinished(new FakeTask { Desc = pending.Id, TaskId = FakeTask.ForeignId(), TaskResponse = MakeHttpResponse() }, missingPath);
+        await Task.Delay(1_000);
+
+        Check(!pending.ResponseTask.IsCompleted, "a foreign task's lost download failed the request this process awaits");
+        Check(SessionHandler.GetPendingResponses().ContainsKey(pending.Id), "the awaited request lost its slot");
+
+        await UnobservedWatcher.SettleAsync();
+        Check(unobserved.Escaped.Length == 0, $"the foreign staging failure escaped as UnobservedTaskException: {string.Join(" | ", unobserved.Escaped)}");
+    }
+
+    private async Task ForeignErrorNewRequestAsync()
+    {
+        using var pending = await CreatePendingAsync("foreignerr");
+
+        InvokeCompletion(new FakeTask { Desc = pending.Id, TaskId = FakeTask.ForeignId(), TaskError = MakeError(-1005) }, MakeError(-1005));
+        await Task.Delay(750);
+
+        Check(!pending.ResponseTask.IsCompleted, "a foreign task's error completion failed the request this process awaits");
+        Check(SessionHandler.GetPendingResponses().ContainsKey(pending.Id), "the awaited request lost its slot");
+    }
+
+    /// <summary>
+    /// A successful completion whose download never reached this process (it was handed to a
+    /// previous process that died): the request must fail fast and retryably, not hang.
+    /// </summary>
+    private async Task CompleteWithoutDownloadAsync()
+    {
+        using var pending = await CreatePendingAsync("nodownload");
+
+        InvokeCompletion(new FakeTask { Desc = pending.Id }, null);
+
+        var exception = await AwaitFaultAsync(pending.ResponseTask, "completion without download", 5_000);
+        Check(exception is HttpRequestException { HttpRequestError: HttpRequestError.ResponseEnded },
+            $"expected a retryable HttpRequestException (ResponseEnded), got {exception.GetType().Name}: {exception.Message}");
+        await WaitRemovedFromPendingAsync(pending.Id);
+    }
+
+    private async Task LostCompleteWithoutDownloadAsync()
+    {
+        var id = $"cb-lostnodl-{Guid.NewGuid():N}";
+        using var unobserved = new UnobservedWatcher();
+
+        InvokeCompletion(new FakeTask { Desc = id }, null);
+        await Task.Delay(500);
+
+        Check(!SessionHandler.GetPendingResponses().ContainsKey(id), "a lost completion without download leaked a pending handle");
+        await UnobservedWatcher.SettleAsync();
+        Check(unobserved.Escaped.Length == 0, $"escaped as UnobservedTaskException: {string.Join(" | ", unobserved.Escaped)}");
+    }
+
+    /// <summary>
+    /// A re-send after the first transfer DELIVERED (response not yet disposed) starts a fresh
+    /// transfer instead of attaching to the consumed one — and the first response's late disposal
+    /// must not evict the new request from the pending map.
+    /// </summary>
+    private async Task ResendAfterDeliveryAsync()
+    {
+        using var first = await CreatePendingAsync("resend");
+        InvokeFinished(new FakeTask { Desc = first.Id, TaskResponse = MakeHttpResponse() }, CreateDownloadFile("first"));
+
+        var winner = await Task.WhenAny(first.ResponseTask, Task.Delay(10_000));
+        Check(winner == first.ResponseTask, "the first transfer did not deliver");
+        var firstResponse = await first.ResponseTask;
+
+        using var secondCts = new CancellationTokenSource();
+        using var secondRequest = CreateStallRequest(first.Id);
+        var second = SessionHandler.SendAsync(secondRequest, null, Timeout.InfiniteTimeSpan, secondCts.Token);
+
+        await Task.Delay(500);
+        Check(!second.IsCompleted, "the re-send attached to the already delivered response");
+        Check(SessionHandler.GetPendingResponses().TryGetValue(first.Id, out var slot) && !slot.IsCompleted, "the re-send did not take over the identifier");
+
+        // The first consumer finishes LATE: its teardown must leave the new request in place.
+        Check(await firstResponse.Content.ReadAsStringAsync() == "first", "first content mismatch");
+        firstResponse.Dispose();
+        await Task.Delay(250);
+        Check(SessionHandler.GetPendingResponses().ContainsKey(first.Id), "the first response's disposal evicted the re-sent request");
+
+        InvokeFinished(new FakeTask { Desc = first.Id, TaskResponse = MakeHttpResponse() }, CreateDownloadFile("second"));
+        var secondWinner = await Task.WhenAny(second, Task.Delay(10_000));
+        Check(secondWinner == second, "the re-sent request never completed");
+
+        using var secondResponse = await second;
+        Check(await secondResponse.Content.ReadAsStringAsync() == "second", "the re-sent request received the wrong content");
+        secondResponse.Dispose();
+        await WaitRemovedFromPendingAsync(first.Id);
+        await secondCts.CancelAsync();
+    }
+
+    private async Task PrecanceledTokenAsync()
+    {
+        var id = $"cb-precanceled-{Guid.NewGuid():N}";
+        using var canceledCts = new CancellationTokenSource();
+        await canceledCts.CancelAsync();
+
+        using var request = CreateStallRequest(id);
+        var canceled = SessionHandler.SendAsync(request, null, Timeout.InfiniteTimeSpan, canceledCts.Token);
+        var exception = await AwaitFaultAsync(canceled, "pre-canceled send", 5_000);
+        Check(exception is OperationCanceledException, $"expected OperationCanceledException, got {exception.GetType().Name}");
+        await WaitRemovedFromPendingAsync(id);
+
+        // The identifier is free again: a fresh send must start a real transfer, not attach to a corpse.
+        using var cts = new CancellationTokenSource();
+        using var retry = CreateStallRequest(id);
+        var retried = SessionHandler.SendAsync(retry, null, Timeout.InfiniteTimeSpan, cts.Token);
+        await Task.Delay(500);
+        Check(!retried.IsCompleted, "the retry attached to the canceled request");
+        Check(SessionHandler.GetPendingResponses().ContainsKey(id), "the retry is not pending");
+
+        await cts.CancelAsync();
+        _ = await AwaitFaultAsync(retried, "retry cleanup", 5_000);
+        await WaitRemovedFromPendingAsync(id);
     }
 
     private async Task SessionInvalidRecoveryAsync()

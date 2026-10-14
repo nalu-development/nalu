@@ -153,9 +153,11 @@ public class NSUrlBackgroundSessionHttpMessageHandler : HttpMessageHandler
         Action completionHandler
     )
     {
-        if (sessionIdentifier == MessageHandlerNSUrlSessionDownloadDelegate.SessionIdentifier)
+        // The system completion handler must ALWAYS be invoked, or iOS throttles further wakes.
+        if (sessionIdentifier == MessageHandlerNSUrlSessionDownloadDelegate.SessionIdentifier
+            && !MessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler))
         {
-            MessageHandler.HandleEventsForBackgroundUrl(application, sessionIdentifier, completionHandler);
+            completionHandler();
         }
     }
 

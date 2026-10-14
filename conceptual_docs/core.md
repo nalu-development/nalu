@@ -108,6 +108,9 @@ in flight does not start a new transfer — it **attaches** to the pending one a
 response, exactly as if it had awaited the original call (the duplicate's `CancellationToken` only
 stops its own wait, never the shared transfer). Once the request completes — success or failure —
 the identifier is free again, so retrying after a failure starts a fresh transfer.
+Outcomes are matched to the native task that produced them: a transfer started by a previous
+process never completes a new request that reuses its identifier — it is delivered as a lost
+response instead.
 
 We can then register a singleton service implementing the `INSUrlBackgroundSessionLostMessageHandler` interface to handle the lost response.
 
@@ -127,3 +130,23 @@ public class NSUrlBackgroundSessionLostMessageHandler : INSUrlBackgroundSessionL
     }
 }
 ```
+
+Failed requests are never reported to the lost-message handler: nobody awaits them, so they are
+only logged (as warnings).
+
+**Do not clear `Library/Caches` wholesale**
+
+Until iOS hands a finished background download to your app, the system keeps it in
+`Library/Caches/com.apple.nsurlsessiond/Downloads/<bundle id>/`. On iOS,
+`FileSystem.CacheDirectory` *is* `Library/Caches`, and iOS itself purges it when the device runs
+low on storage (or the user offloads the app): the whole directory is discarded and recreated empty,
+which happens while the app is not running — exactly when background downloads wait for delivery.
+A "clear cache" routine that deletes everything in it (at startup, on logout, during a migration…)
+has the same effect. Such a response is lost for good:
+- an awaited request fails with an `HttpRequestException` whose `HttpRequestError` is
+  `ResponseEnded` — the server already processed the request, retry it if that is safe;
+- a lost response (no awaiter) is dropped and logged as a warning.
+
+Exclude the `com.apple.nsurlsessiond` folder from any cache cleanup of yours; the system purge cannot be
+prevented. The logged reason tells the cases apart: whether the downloads folder still exists, when
+`Library/Caches` was (re)created — a recent date dates a system purge — and the free disk space left.
