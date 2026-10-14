@@ -556,6 +556,8 @@ public class BackgroundHttpCallbackTests : ContentPage
         Check(exception.Message.Contains("could not be secured", StringComparison.Ordinal), $"staging failure reason missing from '{exception.Message}'");
         Check(exception.Message.Contains("source file exists: False", StringComparison.Ordinal), $"source diagnostics missing from '{exception.Message}'");
         Check(exception.Message.Contains("downloads folder exists: True", StringComparison.Ordinal), $"folder diagnostics missing from '{exception.Message}'");
+        Check(exception.Message.Contains("Library/Caches created: 20", StringComparison.Ordinal), $"Caches creation date missing from '{exception.Message}'");
+        Check(exception.Message.Contains(" GB)", StringComparison.Ordinal) || exception.Message.Contains(" GB,", StringComparison.Ordinal), $"free space missing from '{exception.Message}'");
         await WaitRemovedFromPendingAsync(pending.Id);
     }
 

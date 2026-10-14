@@ -1052,10 +1052,12 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
             return stagedFilePath;
         }
 
-        // Facts that tell the causes apart: the downloads FOLDER gone means Library/Caches was
-        // cleared wholesale (an app "clear cache"); folder present but file gone points at an iOS
-        // low-storage purge; a file outside the current container means the container moved
-        // (app update) and the system handed out a stale path.
+        // Facts that tell the causes apart. The downloads FOLDER gone means the whole
+        // Library/Caches was cleared: by iOS (CacheDelete, on low storage or "Offload App", moves
+        // the directory aside and RECREATES it empty — so its creation date is the purge time) or
+        // by an app-side "clear cache". Folder present but file gone means the file itself was
+        // deleted. A file outside the current container means the container moved and the system
+        // handed out a stale path. Low free space at failure time points at the iOS purge.
         var sourcePath = location.Path!;
         var downloadsFolder = Path.GetDirectoryName(sourcePath);
         var folderIsDirectory = false;
@@ -1063,10 +1065,55 @@ internal partial class MessageHandlerNSUrlSessionDownloadDelegate : NSUrlSession
         var insideContainer = IsInsideCurrentContainer(sourcePath) is { } inside ? inside ? "yes" : "NO" : "unknown";
 
         // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-        failureReason = $"{FormatNSError(moveError)} (source file exists: {fileManager.FileExists(sourcePath)}, downloads folder exists: {folderExists}, inside current app container: {insideContainer})";
+        failureReason = $"{FormatNSError(moveError)} (source file exists: {fileManager.FileExists(sourcePath)}, downloads folder exists: {folderExists}, inside current app container: {insideContainer}, {DescribeStorageState()})";
         Logger.LogDebug("Failed to stage downloaded file {Source}: {Reason}", sourcePath, failureReason);
 
         return null;
+    }
+
+    /// <summary>
+    /// When Library/Caches was (re)created — iOS's CacheDelete recreates it empty when it purges
+    /// it, so a recent date dates the purge — and the free space left for important usage.
+    /// </summary>
+    private static string DescribeStorageState()
+    {
+        string created;
+        string free;
+
+        try
+        {
+            var caches = NSSearchPath.GetDirectories(NSSearchPathDirectory.CachesDirectory, NSSearchPathDomain.User).FirstOrDefault();
+            var creationDate = caches is null ? null : NSFileManager.DefaultManager.GetAttributes(caches, out _)?.CreationDate;
+
+            if (creationDate is null)
+            {
+                created = "unknown";
+            }
+            else
+            {
+                var createdUtc = ((DateTime) creationDate).ToUniversalTime();
+                created = FormattableString.Invariant($"{createdUtc:O} ({(DateTime.UtcNow - createdUtc).TotalMinutes:0} min ago)");
+            }
+        }
+        catch (Exception)
+        {
+            created = "unknown";
+        }
+
+        try
+        {
+            free = NSFileManager.HomeDirectory is { } home
+                   && NSUrl.FromFilename(home).TryGetResource(NSUrl.VolumeAvailableCapacityForImportantUsageKey, out var value)
+                   && value is NSNumber bytes
+                ? FormattableString.Invariant($"{bytes.Int64Value / 1_000_000_000.0:0.00} GB")
+                : "unknown";
+        }
+        catch (Exception)
+        {
+            free = "unknown";
+        }
+
+        return $"Library/Caches created: {created}, free space: {free}";
     }
 
     /// <summary>

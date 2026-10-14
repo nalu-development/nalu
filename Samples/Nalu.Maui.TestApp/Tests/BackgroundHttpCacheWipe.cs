@@ -1,10 +1,10 @@
 namespace Nalu.Maui.TestApp.Tests;
 
 /// <summary>
-/// Mimics an app that clears <see cref="FileSystem.CacheDirectory" /> (= Library/Caches on iOS) at
-/// startup — e.g. a "clear cache" routine or an upgrade migration. Armed from the lifecycle page, it
-/// runs at the very top of the NEXT launch, before the background session exists, and therefore also
-/// deletes downloads nsurlsessiond finished while the app was dead
+/// Mimics iOS purging <see cref="FileSystem.CacheDirectory" /> (= Library/Caches on iOS) — CacheDelete,
+/// on low storage or "Offload App" — or an app clearing it. Armed from the lifecycle page, it runs at
+/// the very top of the NEXT launch, before the background session exists, and therefore also deletes
+/// downloads nsurlsessiond finished while the app was dead
 /// (Library/Caches/com.apple.nsurlsessiond/Downloads/&lt;bundle id&gt;/CFNetworkDownload_*.tmp).
 /// </summary>
 internal static class BackgroundHttpCacheWipe
@@ -31,33 +31,42 @@ internal static class BackgroundHttpCacheWipe
         }
 
         Preferences.Default.Remove(ArmedKey);
-        var cacheDirectory = FileSystem.CacheDirectory;
-        var downloads = Directory.Exists(cacheDirectory)
-            ? Directory.EnumerateFiles(cacheDirectory, "CFNetworkDownload_*", SearchOption.AllDirectories).Count()
-            : 0;
-        var deleted = 0;
 
-        foreach (var entry in Directory.EnumerateFileSystemEntries(cacheDirectory))
+        // Runs inside FinishedLaunching: it must never throw, or the app aborts at every launch.
+        try
         {
-            try
-            {
-                if (Directory.Exists(entry))
-                {
-                    Directory.Delete(entry, true);
-                }
-                else
-                {
-                    File.Delete(entry);
-                }
+            var cacheDirectory = FileSystem.CacheDirectory;
+            var downloads = Directory.EnumerateFiles(cacheDirectory, "CFNetworkDownload_*", SearchOption.AllDirectories).Count();
+            var entries = Directory.EnumerateFileSystemEntries(cacheDirectory).ToList();
 
-                deleted++;
-            }
-            catch (Exception)
+            // What iOS's CacheDelete does on a low-storage purge or "Offload App" is a one-shot
+            // rename of the whole directory, recreated empty — a privilege the sandboxed app does
+            // not have. Its own fallback ("clearing in place") is what an app can reproduce:
+            // every child goes, the directory stays.
+            foreach (var entry in entries)
             {
-                // Keep going: a real app's wipe would too.
+                try
+                {
+                    if (Directory.Exists(entry))
+                    {
+                        Directory.Delete(entry, true);
+                    }
+                    else
+                    {
+                        File.Delete(entry);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Keep going, like the system's in-place clearing.
+                }
             }
+
+            Preferences.Default.Set(ResultKey, FormattableString.Invariant($"cacheWipe=deleted {entries.Count} entries incl. {downloads} CFNetworkDownload files"));
         }
-
-        Preferences.Default.Set(ResultKey, FormattableString.Invariant($"cacheWipe=deleted {deleted} entries incl. {downloads} CFNetworkDownload files"));
+        catch (Exception ex)
+        {
+            Preferences.Default.Set(ResultKey, $"cacheWipe=failed {ex.GetType().Name}: {ex.Message}");
+        }
     }
 }

@@ -138,11 +138,15 @@ only logged (as warnings).
 
 Until iOS hands a finished background download to your app, the system keeps it in
 `Library/Caches/com.apple.nsurlsessiond/Downloads/<bundle id>/`. On iOS,
-`FileSystem.CacheDirectory` *is* `Library/Caches`: a "clear cache" routine that deletes everything
-in it (at startup, on logout, during a migration…) also deletes those downloads, and so does an
-iOS low-storage cache purge while the app is not running. Such a response is lost for good:
+`FileSystem.CacheDirectory` *is* `Library/Caches`, and iOS itself purges it when the device runs
+low on storage (or the user offloads the app): the whole directory is discarded and recreated empty,
+which happens while the app is not running — exactly when background downloads wait for delivery.
+A "clear cache" routine that deletes everything in it (at startup, on logout, during a migration…)
+has the same effect. Such a response is lost for good:
 - an awaited request fails with an `HttpRequestException` whose `HttpRequestError` is
   `ResponseEnded` — the server already processed the request, retry it if that is safe;
 - a lost response (no awaiter) is dropped and logged as a warning.
 
-Exclude the `com.apple.nsurlsessiond` folder from any cache cleanup.
+Exclude the `com.apple.nsurlsessiond` folder from any cache cleanup of yours; the system purge cannot be
+prevented. The logged reason tells the cases apart: whether the downloads folder still exists, when
+`Library/Caches` was (re)created — a recent date dates a system purge — and the free disk space left.
