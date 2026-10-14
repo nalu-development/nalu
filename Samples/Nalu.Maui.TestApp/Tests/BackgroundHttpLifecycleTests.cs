@@ -42,6 +42,14 @@ public class BackgroundHttpLifecycleTests : ContentPage
     private readonly Label _lostBytesLabel;
     private readonly Label _bgEventsLabel;
     private readonly Label _pendingLabel;
+    private readonly Label _stagingErrorsLabel;
+    private readonly Label _processLabel;
+
+    // Kind of the NEXT "Start N" batch: armed scenarios use their own kind, so their per-kind
+    // assertions cannot be polluted by ghost deliveries of other tests' "batch" requests.
+    private static string? _nextBatchKind;
+
+    private static string KillMarkerPath => Path.Combine(FileSystem.AppDataDirectory, "bghttp-killed-in-callback");
 
     private readonly List<CancellationTokenSource> _inFlight = [];
     private readonly Lock _stateLock = new();
@@ -83,6 +91,8 @@ public class BackgroundHttpLifecycleTests : ContentPage
         _lostBytesLabel = new Label { AutomationId = "LostBytesLabel", FontSize = 11 };
         _bgEventsLabel = new Label { AutomationId = "BgEventsLabel", FontSize = 11 };
         _pendingLabel = new Label { AutomationId = "PendingLabel", FontSize = 11 };
+        _stagingErrorsLabel = new Label { AutomationId = "StagingErrorsLabel", FontSize = 11, LineBreakMode = LineBreakMode.CharacterWrap };
+        _processLabel = new Label { AutomationId = "ProcessLabel", FontSize = 11 };
         var modeLabel = new Label { AutomationId = "LifecycleModeLabel", Text = BackgroundHttpClientFactory.Mode, FontSize = 11 };
 
         var controlsLayout = new HorizontalWrapLayout
@@ -98,7 +108,9 @@ public class BackgroundHttpLifecycleTests : ContentPage
                                  MakeButton("Large", "LifecycleLargeButton", StartLarge),
                                  MakeButton("Cancel", "LifecycleCancelButton", CancelAll),
                                  MakeButton("Refresh", "LifecycleRefreshButton", UpdateLabels),
-                                 MakeButton("Clear", "LifecycleClearButton", Clear)
+                                 MakeButton("Clear", "LifecycleClearButton", Clear),
+                                 MakeButton("Kill after secure", "LifecycleKillAfterSecureButton", ArmKillAfterSecure),
+                                 MakeButton("Wipe Caches next launch", "LifecycleWipeCachesButton", ArmCacheWipe)
                              };
         controlsLayout.HorizontalSpacing = 8;
         controlsLayout.VerticalSpacing = 8;
@@ -108,7 +120,7 @@ public class BackgroundHttpLifecycleTests : ContentPage
                            {
                                Padding = new Thickness(16, 0),
                                Spacing = 2,
-                               Children = { modeLabel, _summaryLabel, _lostSummaryLabel, _lostByKindLabel, _lostBytesLabel, _bgEventsLabel, _pendingLabel }
+                               Children = { modeLabel, _summaryLabel, _lostSummaryLabel, _lostByKindLabel, _lostBytesLabel, _bgEventsLabel, _pendingLabel, _stagingErrorsLabel, _processLabel }
                            };
 
         var logScroll = new VirtualScroll
@@ -195,8 +207,45 @@ public class BackgroundHttpLifecycleTests : ContentPage
                 _lostBytesLabel.Text = FormattableString.Invariant($"lostBytes={BackgroundHttpLostResults.LostBytes}");
                 _bgEventsLabel.Text = FormattableString.Invariant($"bgEvents={BackgroundHttpLostResults.BackgroundEvents}");
                 _pendingLabel.Text = FormattableString.Invariant($"pending={GetPendingCount()}");
+                _stagingErrorsLabel.Text = $"{BackgroundHttpCacheWipe.LastResult} | {BackgroundHttpErrorCapture.Summary}";
+                _processLabel.Text = FormattableString.Invariant($"pid={Environment.ProcessId} killedInCallback={File.Exists(KillMarkerPath)}");
             }
         );
+
+    [System.Runtime.InteropServices.DllImport("libc")]
+    private static extern int kill(int pid, int signal);
+
+    /// <summary>
+    /// SIGKILLs the process inside the NEXT DidFinishDownloading, right after the delegate moved the
+    /// system file away (crash/jetsam-like: the event never gets acknowledged to nsurlsessiond).
+    /// </summary>
+    private void ArmCacheWipe()
+    {
+        Append("armed: wipe Library/Caches at the next launch, before the session exists (next batch kind: wipe)");
+        _nextBatchKind = "wipe";
+        BackgroundHttpCacheWipe.ArmForNextLaunch();
+    }
+
+    private void ArmKillAfterSecure()
+    {
+        Append("armed: SIGKILL right after the next killcb download is secured");
+        _nextBatchKind = "killcb";
+
+        // Scoped to its own request: any other download passing by is left alone. The marker
+        // (a plain file write, synchronous) proves after relaunch that the kill really happened
+        // inside DidFinishDownloading.
+        MessageHandlerNSUrlSessionDownloadDelegate.DownloadSecuredForTesting = (task, stagedFilePath) =>
+        {
+            if (task.TaskDescription?.StartsWith("lc-killcb-", StringComparison.Ordinal) != true)
+            {
+                return;
+            }
+
+            MessageHandlerNSUrlSessionDownloadDelegate.DownloadSecuredForTesting = null;
+            File.WriteAllText(KillMarkerPath, stagedFilePath ?? "null");
+            kill(Environment.ProcessId, 9);
+        };
+    }
 
     /// <summary>
     /// Per-KIND lost stats ("kind=ok/err/bytes", kind parsed from the "lc-{kind}-…" identifier):
@@ -252,6 +301,15 @@ public class BackgroundHttpLifecycleTests : ContentPage
     {
         CancelAll();
         BackgroundHttpLostResults.Reset();
+        BackgroundHttpErrorCapture.Reset();
+        BackgroundHttpCacheWipe.Reset();
+        MessageHandlerNSUrlSessionDownloadDelegate.DownloadSecuredForTesting = null;
+        _nextBatchKind = null;
+
+        if (File.Exists(KillMarkerPath))
+        {
+            File.Delete(KillMarkerPath);
+        }
 
         lock (_stateLock)
         {
@@ -296,10 +354,12 @@ public class BackgroundHttpLifecycleTests : ContentPage
     private void StartDelayedBatch()
     {
         var count = Count;
+        var kind = _nextBatchKind ?? "batch";
+        _nextBatchKind = null;
 
         for (var i = 0; i < count; i++)
         {
-            _ = RunRequestAsync("batch", HttpMethod.Get, FormattableString.Invariant($"/delay?ms={DelayMs}"), null);
+            _ = RunRequestAsync(kind, HttpMethod.Get, FormattableString.Invariant($"/delay?ms={DelayMs}"), null);
         }
     }
 

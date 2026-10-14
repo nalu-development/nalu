@@ -22,6 +22,12 @@ public static class MauiProgram
     {
         AppContext.SetSwitch("System.Reflection.NullabilityInfoContext.IsSupported", true);
 
+#if IOS && !MACCATALYST
+        // "Background Http Lifecycle" harness: an armed startup wipe of Library/Caches runs before
+        // anything can create the background session (no-op unless armed from the page).
+        Tests.BackgroundHttpCacheWipe.RunIfArmed();
+#endif
+
         var builder = MauiApp.CreateBuilder();
 
         builder
@@ -93,6 +99,9 @@ public static class MauiProgram
         // "Background Http Burst" harness. Inert (0 ms, and only that one category) until a
         // burst run sets a delay.
         builder.Logging.AddProvider(new Tests.BackgroundHttpBurstLoggerProvider());
+
+        // Surfaces the background-session delegate's warning/error logs on the lifecycle harness page.
+        builder.Logging.AddProvider(new Tests.BackgroundHttpErrorCapture());
 #endif
 
 #if DEBUG && (ANDROID || IOS || MACCATALYST || WINDOWS)

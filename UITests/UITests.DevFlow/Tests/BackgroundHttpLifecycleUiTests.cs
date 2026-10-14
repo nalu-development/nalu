@@ -217,6 +217,104 @@ public class BackgroundHttpLifecycleUiTests(NaluApp app, ChaosServerFixture chao
         request.BodyLength.Should().BeGreaterThan(8 * 1024 * 1024, "the whole 8MB payload plus multipart boundaries must arrive");
     }
 
+    /// <summary>The page's diagnostic labels refresh on demand only: refresh until <paramref name="predicate" /> holds.</summary>
+    private async Task<string> RefreshUntilAsync(string automationId, Func<string, bool> predicate, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        string? text = null;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            await App.TapAsync("LifecycleRefreshButton");
+            text = await App.WaitForTextMatchAsync(automationId, t => t is not null, TimeSpan.FromSeconds(5));
+
+            if (text is not null && predicate(text))
+            {
+                return text;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        return text ?? string.Empty;
+    }
+
+    private static int Counter(string text, string name)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(text, $@"\b{name}=(\d+)");
+
+        return match.Success ? int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : -1;
+    }
+
+    [Fact]
+    public async Task DownloadsWipedFromCachesBeforeDeliveryAreDroppedWithDiagnostics()
+    {
+        await OpenAsync();
+
+        // The field signature "… couldn't be moved … (source file exists: False)": downloads
+        // nsurlsessiond finished while the app was not running live in Library/Caches until
+        // delivered, so an app clearing FileSystem.CacheDirectory (or an iOS low-storage purge)
+        // deletes them first. Armed here, the wipe runs at the very top of the NEXT launch,
+        // before the background session exists; the batch runs under its own "wipe" kind.
+        await App.FillVerifiedAsync("LifecycleCount", "2");
+        await App.FillVerifiedAsync("LifecycleDelayMs", "8000");
+        await App.TapAsync("LifecycleWipeCachesButton");
+        await App.TapAsync("LifecycleStartButton");
+        await chaos.Server.WaitForRequestAsync(r => r.Path.StartsWith("/delay"), TimeSpan.FromSeconds(10));
+
+        await App.KillAppAsync();
+
+        // The downloads finish while the app is dead (iOS may wake it in the background for them).
+        await Task.Delay(TimeSpan.FromSeconds(12));
+
+        await App.RelaunchAppAsync();
+        await App.OpenTestPageAsync(_pageName);
+
+        // Persisted across processes: the delivery may have happened in a background launch.
+        var diagnostics = await RefreshUntilAsync("StagingErrorsLabel", t => Counter(t, "folderMissing") >= 2, TimeSpan.FromSeconds(40));
+        diagnostics.Should().Contain("cacheWipe=deleted");
+        Counter(diagnostics, "folderMissing").Should().Be(2, "both wiped downloads report their missing downloads folder");
+        Counter(diagnostics, "secureFailed").Should().Be(2);
+        Counter(diagnostics, "delegateErrors").Should().Be(0, "a lost delivery nobody awaits is reported as a warning, never as an error");
+        (await App.WaitForTextMatchAsync("LostByKindLabel", t => t is not null)).Should().NotContain("wipe=", "wiped downloads cannot be delivered");
+        (await App.WaitForTextMatchAsync("PendingLabel", t => t is not null)).Should().Be("pending=0");
+    }
+
+    [Fact]
+    public async Task KillInsideTheDownloadCallbackIsNotRedelivered()
+    {
+        await OpenAsync();
+
+        // VERIFIED platform behavior (iOS 26, iPhone 13): CFNetwork acknowledges a download event
+        // to nsurlsessiond when the message ARRIVES, before the delegate runs. A process dying
+        // inside DidFinishDownloading — the file already moved away — loses that download for
+        // good: nothing is re-delivered on relaunch, so it can never come back as a
+        // missing-file failure. The request runs under its own "killcb" kind.
+        await App.TapAsync("LifecycleRefreshButton");
+        var before = await App.WaitForTextMatchAsync("ProcessLabel", t => t is not null && t.StartsWith("pid=", StringComparison.Ordinal));
+
+        await App.FillVerifiedAsync("LifecycleCount", "1");
+        await App.FillVerifiedAsync("LifecycleDelayMs", "3000");
+        await App.TapAsync("LifecycleKillAfterSecureButton");
+        await App.TapAsync("LifecycleStartButton");
+        await chaos.Server.WaitForRequestAsync(r => r.Path.StartsWith("/delay"), TimeSpan.FromSeconds(10));
+
+        // The app SIGKILLs itself inside the callback ~3s in.
+        await Task.Delay(TimeSpan.FromSeconds(8));
+
+        await App.RelaunchAppAsync();
+        await App.OpenTestPageAsync(_pageName);
+        await Task.Delay(TimeSpan.FromSeconds(5));
+
+        var after = await RefreshUntilAsync("ProcessLabel", t => t.Contains("killedInCallback=True"), TimeSpan.FromSeconds(15));
+        after.Should().Contain("killedInCallback=True", "the hook must have killed the process inside DidFinishDownloading");
+        after.Split(' ')[0].Should().NotBe(before!.Split(' ')[0], "the app must be a NEW process");
+
+        (await App.WaitForTextMatchAsync("LostByKindLabel", t => t is not null)).Should().NotContain("killcb=", "the download killed in its callback is not re-delivered");
+        Counter(await RefreshUntilAsync("StagingErrorsLabel", _ => true, TimeSpan.FromSeconds(5)), "secureFailed").Should().Be(0, "without a re-delivery there is no missing-file failure");
+        (await App.WaitForTextMatchAsync("PendingLabel", t => t is not null)).Should().Be("pending=0");
+    }
+
     [Fact]
     public async Task ErrorCompletionAfterKillIsAbsorbedSilently()
     {
