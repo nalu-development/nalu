@@ -47,18 +47,36 @@ public partial class ScaffoldHandler : ViewHandler<Scaffold, UIView>, IPlatformV
     /// <inheritdoc />
     protected override void DisconnectHandler(UIView platformView)
     {
-        if (VirtualView is { } scaffold)
+        // The presenter completes its own teardown before surfacing an overlay owner's failure;
+        // the handler's teardown must not be skipped by it either.
+        try
         {
-            (scaffold.Presenter as IDisposable)?.Dispose();
-            scaffold.Presenter = null;
+            if (VirtualView is { } scaffold)
+            {
+                try
+                {
+                    (scaffold.Presenter as IDisposable)?.Dispose();
+                }
+                finally
+                {
+                    scaffold.Presenter = null;
+                }
+            }
         }
-
-        if (_viewController is { } viewController)
+        finally
         {
-            viewController.Scaffold = null;
-        }
+            if (_viewController is { } viewController)
+            {
+                viewController.Scaffold = null;
 
-        _viewController = null;
-        base.DisconnectHandler(platformView);
+                // Retire the tab bar strip, which gives the bar back (see ScaffoldHostView): the
+                // bar belongs to its area and the next connection mounts it again — it must not
+                // stay parented to a strip inside this abandoned controller.
+                viewController.UnmountTabBar();
+            }
+
+            _viewController = null;
+            base.DisconnectHandler(platformView);
+        }
     }
 }

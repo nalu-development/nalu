@@ -78,6 +78,14 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     private InteractivePopState? _popHandoff;
     private bool _syncInFlight;
 
+    /// <summary>
+    /// Set by <see cref="Dispose"/>. A synchronization in flight at that moment (suspended on an
+    /// overlay's exit animation, a bar sync) resumes on THIS presenter, whose controller has been
+    /// abandoned: it must stop there — the next presenter owns the pages and the bar, and anything
+    /// mounted from here would be pulled out of its live hierarchy.
+    /// </summary>
+    private bool _disposed;
+
     /// <summary>A live edge-swipe pop: the scrub session plus everything needed to settle it.</summary>
     private sealed record InteractivePopState(
         Page TopPage,
@@ -206,6 +214,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         // Navigation dismisses every open overlay (flyout, panels, popups).
         await CloseAllOverlaysAsync();
 
+        if (_disposed)
+        {
+            return;
+        }
+
         var stack = root.NavigationStack;
         var targetPage = stack.PushedPages.Count > 0 ? stack.PushedPages[^1].Page : stack.RootPage;
 
@@ -238,6 +251,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         if (targetContainer is not null)
         {
             await targetContainer.SyncNavBarAsync(animated: false);
+
+            if (_disposed)
+            {
+                return;
+            }
         }
 
         // The tree shows the INCOMING page's bar from the moment the transition starts: the
@@ -1141,7 +1159,26 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
     /// <summary>Releases the scaffold-lifetime subscriptions (handler disconnection).</summary>
     public void Dispose()
     {
-        DiscardOverlays();
+        _disposed = true;
+
+        // An owner's failure surfaces once the presenter is fully down (the DiscardOverlays
+        // policy): a throwing close callback must not leave the bar parented to a strip of the
+        // abandoned controller, nor this presenter subscribed to the scaffold and its page.
+        ExceptionDispatchInfo? overlayFailure = null;
+
+        try
+        {
+            DiscardOverlays();
+        }
+        catch (Exception exception)
+        {
+            overlayFailure = ExceptionDispatchInfo.Capture(exception);
+        }
+
+        if (_currentPage is not null)
+        {
+            _currentPage.PropertyChanged -= OnCurrentPagePropertyChanged;
+        }
 
         if (_scaffoldObserved)
         {
@@ -1158,6 +1195,13 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         ObserveNavBarArea(null);
 
+        // The tab bar view belongs to its area and outlives this presenter: it leaves the element
+        // tree with the presentation (the handler retires its strip), and the next presenter
+        // attaches it again when it mounts it.
+        _currentTabBarArea?.OnBarViewUnmounted();
+        _currentTabBarArea = null;
+        _currentBarView = null;
+
         // The containers are the presenter's own; the bar hosts inside them belong to the page
         // hosts and are disposed with their pages.
         foreach (var container in _containers.Values)
@@ -1171,6 +1215,8 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
 
         // Anything the scaffold retired and never got to flush goes now.
         scaffold.FlushRetiredPages();
+
+        overlayFailure?.Throw();
     }
 
     /// <summary>
@@ -1738,14 +1784,11 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
         {
             panelController.WillMoveToParentViewController(null);
             panelController.View?.RemoveFromSuperview();
-            panelController.RemoveFromParentViewController();
 
-            // A flyout's content view OUTLIVES its presentation (the same MAUI view is mounted
-            // again on the next open), and leaving the controller as its view controller makes
-            // the next open throw UIViewControllerHierarchyInconsistency — UIKit allows a view
-            // exactly one controller, and dropping the controller from containment does not
-            // clear that association. Releasing the view here does.
-            panelController.ReleaseView();
+            // Leaving containment releases the panel (ScaffoldFlyoutPanelController
+            // .DidMoveToParentViewController): a flyout's content view OUTLIVES its presentation,
+            // and the next open needs it free of this controller.
+            panelController.RemoveFromParentViewController();
         }
 
         entry.ContentPlatform.RemoveFromSuperview();
@@ -1825,7 +1868,6 @@ internal sealed class ScaffoldPresenter(Scaffold scaffold) : IScaffoldPresenter,
                 panelController.WillMoveToParentViewController(null);
                 panelController.View?.RemoveFromSuperview();
                 panelController.RemoveFromParentViewController();
-                panelController.ReleaseView();
             }
 
             entry.ContentPlatform.RemoveFromSuperview();
