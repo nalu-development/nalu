@@ -13,9 +13,10 @@ namespace Nalu;
 /// loading, an expanding section) TERMINATES here, marking the panel dirty and requesting a
 /// layout; the measure + arrange then run in <see cref="LayoutSubviews"/> — the measure pass —
 /// through the presenter (<see cref="MeasurePanel"/>), never inside the invalidation itself.
-/// Same discipline as the chrome strips.
+/// Same discipline as the chrome strips; like them, it releases the panel when it leaves the
+/// container (see <see cref="ScaffoldHostView"/>).
 /// </summary>
-internal sealed class ScaffoldOverlayPanelHost : UIView, IPlatformMeasureInvalidationController
+internal sealed class ScaffoldOverlayPanelHost : ScaffoldHostView, IPlatformMeasureInvalidationController
 {
     private bool _panelDirty;
     private bool _invalidateOnWindow;

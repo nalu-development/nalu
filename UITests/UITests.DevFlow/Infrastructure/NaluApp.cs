@@ -413,6 +413,47 @@ public sealed class NaluApp : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Taps a navigation trigger until its target appears. Both failure modes are silent races,
+    /// retried: Nalu ignores a navigation started while the previous one is still committing (and a
+    /// page shows up in the tree before its commit completes), and an agent element id can stop
+    /// resolving between the query and the tap (ids are recomputed per query, suffixed while an
+    /// AutomationId is momentarily duplicated). A trigger that left the tree means the navigation
+    /// IS underway: then it only waits. That is re-checked before EVERY re-tap — a tap reported
+    /// as failed may still have run, and a slow navigation may commit after a missed wait.
+    /// </summary>
+    public async Task TapUntilAsync(string automationId, string targetAutomationId, TimeSpan? timeout = null)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            if (attempt > 0
+                && (await FindElementAsync(targetAutomationId).ConfigureAwait(false) is not null
+                    || await FindElementAsync(automationId).ConfigureAwait(false) is null))
+            {
+                break;
+            }
+
+            try
+            {
+                // A retry only taps a trigger that is still there: no full wait for one that left.
+                await TapAsync(automationId, attempt == 0 ? null : TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or TimeoutException && attempt < 2)
+            {
+                await Task.Delay(300).ConfigureAwait(false);
+
+                continue;
+            }
+
+            if (await WaitForElementOrDefaultAsync(targetAutomationId, TimeSpan.FromSeconds(5)).ConfigureAwait(false) is not null)
+            {
+                break;
+            }
+        }
+
+        await WaitForElementAsync(targetAutomationId, timeout).ConfigureAwait(false);
+    }
+
     /// <summary>Programmatically focuses an element (raises the soft keyboard for inputs).</summary>
     public async Task FocusAsync(string automationId, TimeSpan? timeout = null)
     {

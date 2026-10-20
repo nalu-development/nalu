@@ -44,10 +44,29 @@ internal sealed class ScaffoldFlyoutPanelController(UIView panel) : UIViewContro
     }
 
     /// <summary>
+    /// Leaving the parent releases the panel (<see cref="ReleaseView"/>), whoever removes the
+    /// controller. A controller holding a panel is therefore always retained by its parent: never
+    /// a retired controller whose managed peer the GC may collect while the panel's
+    /// <c>NextResponder</c> still points at it — marshalling that would throw (see
+    /// <see cref="ScaffoldHostView"/>), from <see cref="ReleaseStaleOwner"/> or from MAUI's own
+    /// responder-chain walks up from the drawer content.
+    /// </summary>
+    public override void DidMoveToParentViewController(UIViewController? parent)
+    {
+        base.DidMoveToParentViewController(parent);
+
+        if (parent is null)
+        {
+            ReleaseView();
+        }
+    }
+
+    /// <summary>
     /// Frees the panel from a retired controller that still holds it — a presentation that never
     /// reached the close routine (an owner callback that threw, a presenter torn down with the
-    /// drawer open). The controller of a view is its next responder; a released panel (or one
-    /// never hosted) answers its superview instead.
+    /// drawer open), so it is still in containment. The controller of a view is its next
+    /// responder — a live one, see <see cref="DidMoveToParentViewController"/>; a released panel
+    /// (or one never hosted) answers its superview instead.
     /// </summary>
     public static void ReleaseStaleOwner(UIView panel)
     {
@@ -58,6 +77,9 @@ internal sealed class ScaffoldFlyoutPanelController(UIView panel) : UIViewContro
 
         stale.WillMoveToParentViewController(null);
         stale.RemoveFromParentViewController();
+
+        // Normally a no-op (leaving the parent already released it); kept for an owner UIKit no
+        // longer lists as a child, where removal raises no didMoveToParentViewController:nil.
         stale.ReleaseView();
     }
 

@@ -57,7 +57,7 @@ internal static class ScaffoldChromeBar
 /// only a strip hosting a DIRECT MAUI bar view also declares itself a cross-platform layout
 /// backing (see <see cref="CrossPlatformLayout"/>). The bar FILLS the strip.
 /// </summary>
-internal abstract class ScaffoldChromeStrip : UIView, IPlatformMeasureInvalidationController, ICrossPlatformLayoutBacking
+internal abstract class ScaffoldChromeStrip : ScaffoldHostView, IPlatformMeasureInvalidationController, ICrossPlatformLayoutBacking
 {
     private bool _invalidateOnWindow;
 
@@ -73,7 +73,10 @@ internal abstract class ScaffoldChromeStrip : UIView, IPlatformMeasureInvalidati
         Bar = bar;
         BackgroundColor = UIColor.Clear;
         CrossPlatformLayout = handlesBarMeasure ? new BarLayout(this) : null;
-        bar.Superview?.WillRemoveSubview(bar);
+
+        // Native calls only: never read bar.Superview here. Whatever held the bar before may be a
+        // native view whose managed peer is already gone (see ScaffoldHostView), and marshalling it
+        // throws. UIKit sends willRemoveSubview: to the previous superview itself.
         bar.RemoveFromSuperview();
         AddSubview(bar);
     }

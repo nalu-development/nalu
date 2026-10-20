@@ -320,7 +320,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
         var one = await MeasureSettledPageAsync();
 
         // Neighbouring roots of the same area: both travel, one leaving as the other arrives.
-        await App.TapAsync("TabTwo");
+        await App.TapAsync("MoTabTwoTabBarButton");
         var rows = await CaptureRowsAsync(_motionSeconds * 1.6);
 
         await App.WaitForElementAsync("MoSecondPage");
@@ -343,7 +343,7 @@ public class ScaffoldMotionChromeTests(NaluApp app) : BaseUiTest(app), IAsyncLif
                 "both roots are on screen together while they travel — rows: " + Describe(rows)
             );
 
-        await App.TapAsync("TabOne");
+        await App.TapAsync("MoTabOneTabBarButton");
         await WaitForPageColorAsync(one, "the switch back lands on the first root");
     }
 
