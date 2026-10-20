@@ -20,6 +20,15 @@ internal class NSUrlRequestHandle(
     public CookieContainer? CookieContainer => cookieContainer;
     public string? ResponseContentFile { get; set; }
 
+    /// <summary>
+    /// The native task this handle belongs to. Request identifiers are caller-chosen and survive
+    /// relaunches, so a callback is only ever applied to the handle created for its very task.
+    /// </summary>
+    public nuint TaskIdentifier { get; init; }
+
+    /// <summary>Whether a second send with the same identifier may attach to this transfer.</summary>
+    public bool IsAttachable => !isLostRequest && !ResponseCompletionSource.Task.IsCompleted;
+
     public CancellationTokenRegistration? CancellationTokenRegistration;
 
     public void Complete()
