@@ -30,6 +30,7 @@ public partial class VirtualScrollHandler
     private SnapHelper? _snapHelper;
     private AnimatorIsRunningListener? _animatorIsRunningListener;
     private RecyclerView.ItemAnimator? _animator;
+    private VirtualScrollGridSpacingItemDecoration? _gridSpacingDecoration;
 
     /// <inheritdoc />
     protected override AView CreatePlatformView()
@@ -151,6 +152,14 @@ public partial class VirtualScrollHandler
         _touchHelperCallback = null;
         _snapHelper?.Dispose();
         _snapHelper = null;
+
+        if (_gridSpacingDecoration is not null)
+        {
+            _recyclerView?.RemoveItemDecoration(_gridSpacingDecoration);
+            _gridSpacingDecoration.Dispose();
+            _gridSpacingDecoration = null;
+        }
+
         _recyclerView?.Dispose();
         _recyclerView = null;
         _swipeRefreshLayout?.Dispose();
@@ -321,8 +330,47 @@ public partial class VirtualScrollHandler
         handler._snapHelper?.Dispose();
         handler._snapHelper = null;
 
+        // Grid spacing belongs to the grid layout only: drop it before the new layout is applied.
+        if (handler._gridSpacingDecoration is { } previousDecoration)
+        {
+            recyclerView.RemoveItemDecoration(previousDecoration);
+            previousDecoration.Dispose();
+            handler._gridSpacingDecoration = null;
+        }
+
         switch (virtualScroll.ItemsLayout)
         {
+            // Before the linear case: GridVirtualScrollLayout derives from it (the compiler
+            // enforces this order — the reverse makes the grid arm unreachable).
+            case GridVirtualScrollLayout gridLayout:
+                var gridOrientation = gridLayout.Orientation == ItemsLayoutOrientation.Vertical ? GridLayoutManager.Vertical : GridLayoutManager.Horizontal;
+                var spanSizeLookup = new VirtualScrollGridSpanSizeLookup(
+                    () => handler._flattenedAdapter,
+                    () => handler.VirtualView
+                )
+                {
+                    CurrentSpanCount = gridLayout.Span
+                };
+
+                var gridLayoutManager = new GridLayoutManager(recyclerView.Context, gridLayout.Span, gridOrientation, false);
+                gridLayoutManager.SetSpanSizeLookup(spanSizeLookup);
+
+                recyclerView.Orientation = gridLayout.Orientation;
+                recyclerView.SetLayoutManager(gridLayoutManager);
+
+                var decoration = new VirtualScrollGridSpacingItemDecoration(recyclerView.Context!, gridLayout);
+
+                if (decoration.IsEmpty)
+                {
+                    decoration.Dispose();
+                }
+                else
+                {
+                    handler._gridSpacingDecoration = decoration;
+                    recyclerView.AddItemDecoration(decoration);
+                }
+
+                break;
             case LinearVirtualScrollLayout linearLayout:
                 var orientation = linearLayout.Orientation == ItemsLayoutOrientation.Vertical ? LinearLayoutManager.Vertical : LinearLayoutManager.Horizontal;
                 var layoutManager = new LinearLayoutManager(recyclerView.Context)

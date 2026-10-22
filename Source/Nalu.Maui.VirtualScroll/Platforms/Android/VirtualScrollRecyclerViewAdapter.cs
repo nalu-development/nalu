@@ -62,6 +62,33 @@ internal class VirtualScrollRecyclerViewAdapter : Platform.VirtualScrollNativeAd
     {
         var item = _adapter.GetItem(position);
 
+        if (holder is VirtualScrollViewHolder viewHolder)
+        {
+            // The cell's axes depend on the layout, and the layout can change while the pool still
+            // holds cells built for the previous one — a vertical cell reused in a horizontal grid
+            // would claim the whole viewport width and push every other cell off-screen. The
+            // existing instance is mutated rather than replaced: RecyclerView casts it to its own
+            // LayoutParams right after this call.
+            var (cellWidth, cellHeight) = GetCellLayoutSize(_virtualScroll);
+
+            if (viewHolder.ViewWrapper.LayoutParameters is { } layoutParameters
+                && (layoutParameters.Width != cellWidth || layoutParameters.Height != cellHeight))
+            {
+                layoutParameters.Width = cellWidth;
+                layoutParameters.Height = cellHeight;
+            }
+
+            // Only a grid stretches a cell beyond its content, and only the item cells: a header or
+            // a footer is alone on its line, so there is never any slack to leave.
+            viewHolder.ViewWrapper.ContentExtent = item.Type == VirtualScrollFlattenedPositionType.Item
+                ? GetCellContentExtent(_virtualScroll)
+                : VirtualScrollCellContentExtent.Fill;
+
+            // The cell is about to show different content, so the size measured for the previous
+            // item must not be reused.
+            viewHolder.ViewWrapper.InvalidateMeasureCache();
+        }
+
         if (holder is VirtualScrollViewHolder { ViewWrapper.VirtualView: BindableObject bindable })
         {
             if (item.Type is VirtualScrollFlattenedPositionType.GlobalFooter or VirtualScrollFlattenedPositionType.GlobalHeader)
@@ -108,11 +135,44 @@ internal class VirtualScrollRecyclerViewAdapter : Platform.VirtualScrollNativeAd
         wrapperPlatformView.AddView(platformView);
         wrapperPlatformView.Id = AView.GenerateViewId();
 
-        wrapperPlatformView.LayoutParameters = virtualScroll.ItemsLayout is CarouselVirtualScrollLayout
-            ? new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent)
-            : virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Vertical
-                ? new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
-                : new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
+        var (cellWidth, cellHeight) = GetCellLayoutSize(virtualScroll);
+        wrapperPlatformView.LayoutParameters = new ViewGroup.LayoutParams(cellWidth, cellHeight);
+
         return wrapperPlatformView;
+    }
+
+    /// <summary>
+    /// The layout params a cell must carry for the current items layout: it fills the cross axis
+    /// and hugs its content along the scrolling one.
+    /// </summary>
+    /// <remarks>
+    /// A grid uses the same values as a list — <see cref="GridLayoutManager" /> turns a cross-axis
+    /// MatchParent into the span slot rather than the whole viewport.
+    /// </remarks>
+    /// <summary>
+    /// Whether an item cell's content fills the cell or keeps its own extent along the scrolling axis.
+    /// </summary>
+    private static VirtualScrollCellContentExtent GetCellContentExtent(IVirtualScroll virtualScroll)
+    {
+        if (virtualScroll.ItemsLayout is not GridVirtualScrollLayout gridLayout)
+        {
+            return VirtualScrollCellContentExtent.Fill;
+        }
+
+        return gridLayout.Orientation == ItemsLayoutOrientation.Vertical
+            ? VirtualScrollCellContentExtent.NaturalHeight
+            : VirtualScrollCellContentExtent.NaturalWidth;
+    }
+
+    private static (int Width, int Height) GetCellLayoutSize(IVirtualScroll virtualScroll)
+    {
+        if (virtualScroll.ItemsLayout is CarouselVirtualScrollLayout)
+        {
+            return (ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent);
+        }
+
+        return virtualScroll.ItemsLayout.Orientation == ItemsLayoutOrientation.Vertical
+            ? (ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent)
+            : (ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.MatchParent);
     }
 }
